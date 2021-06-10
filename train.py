@@ -66,7 +66,7 @@ def train(args: Namespace) -> None:
         args.train_dataset = 'chairs-train'
         print('INFO: --train_dataset is not set. It will be set to "chairs-train"')
 
-    log_model_name = f'{args.model}-{args.train_dataset}'
+    log_model_name = f'{args.model}-{_gen_dataset_id(args.train_dataset)}'
 
     model = get_model(args.model, args.pretrained_ckpt, args)
 
@@ -105,6 +105,28 @@ def train(args: Namespace) -> None:
         warnings.simplefilter('ignore')  # Workaround until pl stop the LightningModule.datamodule` property warning
         trainer.tune(model)
         trainer.fit(model)
+
+
+def _gen_dataset_id(
+    dataset_string: str
+) -> str:
+    sep_datasets = dataset_string.split('+')
+    names_list = []
+    for dataset in sep_datasets:
+        if '*' in dataset:
+            tokens = dataset.split('*')
+            try:
+                _, dataset_params = int(tokens[0]), tokens[1]
+            except ValueError:  # the multiplier is at the end
+                dataset_params = tokens[0]
+        else:
+            dataset_params = dataset
+
+        dataset_name = dataset_params.split('-')[0]
+        names_list.append(dataset_name)
+    
+    dataset_id = '_'.join(names_list)
+    return dataset_id
 
 
 if __name__ == '__main__':
