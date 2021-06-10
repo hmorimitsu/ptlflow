@@ -212,7 +212,6 @@ class BaseFlowDataset(Dataset):
             logging.info('Loading %d samples from %s dataset.', self.__len__(), self.dataset_name)
 
 
-
 class FlyingChairsDataset(BaseFlowDataset):
     """Handle the FlyingChairs dataset."""
 
