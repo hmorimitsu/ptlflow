@@ -1,4 +1,4 @@
-version: 0.1.0
+version: 2
 
 # Build from the docs/ directory with Sphinx
 sphinx:
