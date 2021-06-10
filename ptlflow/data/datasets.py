@@ -203,6 +203,15 @@ class BaseFlowDataset(Dataset):
             flows.append(flow)
         return flows, valids
 
+    def _log_status(self) -> None:
+        if self.__len__() == 0:
+            logging.warning(
+                'No samples were found for %s dataset. Be sure to update the dataset path in datasets.yml, '
+                'or provide the path by the argument --[dataset_name]_root_dir.', self.dataset_name)
+        else:
+            logging.info('Loading %d samples from %s dataset.', self.__len__(), self.dataset_name)
+
+
 
 class FlyingChairsDataset(BaseFlowDataset):
     """Handle the FlyingChairs dataset."""
@@ -278,7 +287,7 @@ class FlyingChairsDataset(BaseFlowDataset):
             {'image_paths': [str(p) for p in paths], 'is_val': paths[0].stem in val_names, 'misc': ''}
             for paths in self.img_paths]
 
-        logging.info('Loading %d samples from %s dataset.', self.__len__(), self.dataset_name)
+        self._log_status()
 
 
 class FlyingChairs2Dataset(BaseFlowDataset):
@@ -377,7 +386,7 @@ class FlyingChairs2Dataset(BaseFlowDataset):
             assert len(self.img_paths) == len(self.occ_b_paths), f'{len(self.img_paths)} vs {len(self.occ_b_paths)}'
             assert len(self.img_paths) == len(self.mb_b_paths), f'{len(self.img_paths)} vs {len(self.mb_b_paths)}'
 
-        logging.info('Loading %d samples from %s dataset.', self.__len__(), self.dataset_name)
+        self._log_status()
 
 
 class FlyingThings3DDataset(BaseFlowDataset):
@@ -546,7 +555,7 @@ class FlyingThings3DDataset(BaseFlowDataset):
             assert len(self.mb_b_paths) == 0 or len(self.img_paths) == len(self.mb_b_paths), (
                 f'{len(self.img_paths)} vs {len(self.mb_b_paths)}')
 
-        logging.info('Loading %d samples from %s dataset.', self.__len__(), self.dataset_name)
+        self._log_status()
 
 
 class FlyingThings3DSubsetDataset(BaseFlowDataset):
@@ -721,7 +730,7 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
             assert len(self.mb_b_paths) == 0 or len(self.img_paths) == len(self.mb_b_paths), (
                 f'{len(self.img_paths)} vs {len(self.mb_b_paths)}')
 
-        logging.info('Loading %d samples from %s dataset.', self.__len__(), self.dataset_name)
+        self._log_status()
 
 
 class Hd1kDataset(BaseFlowDataset):
@@ -818,7 +827,7 @@ class Hd1kDataset(BaseFlowDataset):
         if split != 'test':
             assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
 
-        logging.info('Loading %d samples from %s dataset.', self.__len__(), self.dataset_name)
+        self._log_status()
 
 
 class KittiDataset(BaseFlowDataset):
@@ -921,7 +930,7 @@ class KittiDataset(BaseFlowDataset):
         if split != 'test':
             assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
 
-        logging.info('Loading %d samples from %s dataset.', self.__len__(), self.dataset_name)
+        self._log_status()
 
 
 class SintelDataset(BaseFlowDataset):
@@ -1029,4 +1038,4 @@ class SintelDataset(BaseFlowDataset):
         if len(self.occ_paths) > 0:
             assert len(self.img_paths) == len(self.occ_paths), f'{len(self.img_paths)} vs {len(self.occ_paths)}'
 
-        logging.info('Loading %d samples from %s dataset.', self.__len__(), self.dataset_name)
+        self._log_status()
