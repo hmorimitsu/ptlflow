@@ -2,6 +2,7 @@
 
 ![GitHub CI flake8 status](https://github.com/hmorimitsu/ptlflow/actions/workflows/flake8.yml/badge.svg)
 ![GitHub CI pytest status](https://github.com/hmorimitsu/ptlflow/actions/workflows/pytest.yml/badge.svg)
+![Zenodo DOI badge](https://zenodo.org/badge/375416785.svg)
 
 ## Introduction
 
@@ -65,6 +66,7 @@ Contribution are welcome! Please check [CONTRIBUTING.md](CONTRIBUTING.md) to see
   year = {2021},
   publisher = {GitHub},
   journal = {GitHub repository},
+  doi = {10.5281/zenodo.4923646},
   howpublished = {\url{https://github.com/hmorimitsu/ptlflow}}
 }
 ```
