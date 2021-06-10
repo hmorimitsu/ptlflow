@@ -1,0 +1,8 @@
+flying_chairs: /path/to/FlyingChairs_release
+flying_chairs2: /path/to/FlyingChairs2
+flying_things3d: /path/to/FlyingThings3D
+flying_things3d_subset: /path/to/FlyingThings3D_subset
+mpi_sintel: /path/to/MPI-Sintel
+kitti_2012: /path/to/KITTI/2012
+kitti_2015: /path/to/KITTI/2015
+hd1k: /path/to/HD1K

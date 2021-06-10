@@ -1,0 +1,168 @@
+"""Save the number of trainable parameter and inference speed of all available models."""
+
+# =============================================================================
+# Copyright 2021 Henrique Morimitsu
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# =============================================================================
+
+import argparse
+from pathlib import Path
+from typing import Union
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import torch
+from tqdm import tqdm
+
+import ptlflow
+from ptlflow.models.base_model.base_model import BaseModel
+from ptlflow.utils.timer import Timer
+from ptlflow.utils.utils import count_parameters, make_divisible
+
+TABLE_COLS = ['Model', 'Params', 'Time(ms)']
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--csv_path', type=str, default=None,
+        help=('Path to a csv file with the speed results.'))
+    parser.add_argument(
+        '--num_samples', type=int, default=20,
+        help=('Number of forwards to estimate average time'))
+    parser.add_argument(
+        '--input_size', type=int, nargs=2, default=(500, 1000),
+        help=('Resolution of the input to forward.'))
+    parser.add_argument(
+        '--output_path', type=str, default=str(Path('outputs/speed')),
+        help=('Path to a directory where the outputs will be saved.'))
+
+    args = parser.parse_args()
+
+    return args
+
+
+def benchmark(
+    args: argparse.Namespace
+) -> pd.DataFrame:
+    """Run the benchmark on all models.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Arguments for configuring the benchmark.
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame with the benchmark results.
+    """
+    df = pd.DataFrame(
+        {TABLE_COLS[0]: pd.Series([], dtype='str'),
+         TABLE_COLS[1]: pd.Series([], dtype='int'),
+         TABLE_COLS[2]: pd.Series([], dtype='float')})
+
+    output_path = Path(args.output_path)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    model_names = ptlflow.models_dict.keys()
+    for mname in tqdm(model_names):
+        model = ptlflow.get_model(mname)
+        model = model.eval()
+        if torch.cuda.is_available():
+            model = model.cuda()
+        model_params = count_parameters(model)
+        infer_timer = estimate_inference_time(args, model)
+        values = [mname, model_params, infer_timer*1000]
+        df = df.append({c: v for c, v in zip(df.columns, values)}, ignore_index=True)
+        df = df.round(3)
+        df.to_csv(output_path / 'speed_benchmark.csv', index=False)
+        save_plot(output_path, df)
+    return df
+
+
+def estimate_inference_time(
+    args: argparse.Namespace,
+    model: BaseModel
+) -> float:
+    """Compute the average forward time for one model.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Arguments for configuring the benchmark.
+    model : BaseModel
+        The model to perform the estimation.
+
+    Returns
+    -------
+    float
+        The average time of the runs.
+    """
+    timer = Timer('inference')
+    for i in range(args.num_samples+1):
+        inputs = {
+            'images': torch.rand(
+                1, 2, 3, make_divisible(args.input_size[0], model.output_stride),
+                make_divisible(args.input_size[1], model.output_stride))}
+        if torch.cuda.is_available():
+            inputs['images'] = inputs['images'].cuda()
+        if i > 0:
+            # Skip first time, it is slow due to memory allocation
+            timer.tic()
+        model(inputs)
+        if i > 0:
+            timer.toc()
+    return timer.mean()
+
+
+def save_plot(
+    output_dir: Union[str, Path],
+    df: pd.DataFrame
+) -> None:
+    """Create a plot of the results and save to disk.
+
+    Parameters
+    ----------
+    output_dir : Union[str, Path]
+        Path to the directory where the plot will be saved.
+    df : pd.DataFrame
+        A DataFrame with the benchmark results.
+    """
+    df = df.dropna()
+
+    output_dir = Path(output_dir)
+
+    log10_col = TABLE_COLS[1]+'(Log10)'
+    df_tmp = df.copy()
+    df_tmp[log10_col] = np.log10(df[TABLE_COLS[1]])
+    plt.figure(figsize=(10, 10))
+    sns.scatterplot(data=df_tmp, x=log10_col, y=TABLE_COLS[2], hue=TABLE_COLS[0], style=TABLE_COLS[0], s=300)
+    plt.legend(loc=2, borderaxespad=0)
+    plt.title('Parameters x Forward time')
+    plt.tight_layout()
+    plt.savefig(output_dir / 'speed_plot.png')
+    plt.close()
+
+
+if __name__ == '__main__':
+    args = _parse_args()
+
+    if args.csv_path is None:
+        df = benchmark(args)
+    else:
+        df = pd.read_csv(args.csv_path)
+        save_plot(args.output_path, df)
