@@ -28,6 +28,7 @@ from ptlflow.utils.dummy_datasets import write_flying_chairs, write_kitti, write
 
 TEST_MODEL = 'ext_raft_small'
 TRAIN_DATASET = 'chairs-train'
+TRAIN_LOG_SUFFIX = 'chairs'
 
 
 def test_train(tmp_path: Path) -> None:
@@ -62,9 +63,9 @@ def test_train(tmp_path: Path) -> None:
 
     log_dirs = Path('default/version_0')
 
-    assert (tmp_path / f'{TEST_MODEL}-{TRAIN_DATASET}' / log_dirs / 'hparams.yaml').exists()
+    assert (tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'hparams.yaml').exists()
 
-    ckpt_last = list((tmp_path / f'{TEST_MODEL}-{TRAIN_DATASET}' / log_dirs / 'checkpoints').glob('*_last_*.ckpt'))
+    ckpt_last = list((tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'checkpoints').glob('*_last_*.ckpt'))
     assert len(ckpt_last) > 0
-    ckpt_train = list((tmp_path / f'{TEST_MODEL}-{TRAIN_DATASET}' / log_dirs / 'checkpoints').glob('*_train_*.ckpt'))
+    ckpt_train = list((tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'checkpoints').glob('*_train_*.ckpt'))
     assert len(ckpt_train) > 0
