@@ -2,7 +2,7 @@
 Changelog
 =========
 
-2021/mm/dd - First release
+2021/06/10 - First release
 --------------------------
 
 Made code available.

@@ -50,6 +50,7 @@ use the its original code.
    :caption: Models:
 
    models/models_list
+   models/checkpoint_list
 
 .. toctree::
    :maxdepth: 1
