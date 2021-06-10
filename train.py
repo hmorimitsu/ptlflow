@@ -124,7 +124,7 @@ def _gen_dataset_id(
 
         dataset_name = dataset_params.split('-')[0]
         names_list.append(dataset_name)
-    
+
     dataset_id = '_'.join(names_list)
     return dataset_id
 
