@@ -2,7 +2,35 @@
 Predict optical flow with a pretrained model
 ============================================
 
-In order to use an existing model to predict optical flow, you should perform the following steps:
+infer.py
+========
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/master/infer.py>`__
+
+We provide a script for making it easier to perform inference on different inputs.
+Read :ref:`initial-scripts` to know how to download it.
+Using this script, you can perform the same operation as in the example above by typing:
+
+.. code-block:: bash
+
+    python infer.py ext_raft_small --pretrained_ckpt things --input_path /path/to/img1.jpg /path/to/img2.jpg --show
+
+Note that you can also give a path to a local checkpoint file to ``--pretrained_ckpt`` as well, like:
+
+.. code-block:: bash
+
+    python infer.py ext_raft_small --pretrained_ckpt /path/to/checkpoint --input_path /path/to/img1.jpg /path/to/img2.jpg --show
+
+You can see all the available options of this script with:
+
+.. code-block:: bash
+
+    python infer.py -h
+
+Writing your own script
+=======================
+
+If you prefer to write your own script for the inference, then you should do the following:
 
 1. Get one of the models from PTLFlow.
 
@@ -66,28 +94,3 @@ The code below shows a way to do this:
     cv.imshow('image2', images[1])
     cv.imshow('flow', flow_bgr_npy)
     cv.waitKey()
-
-infer.py
---------
-
-`[source code] <https://github.com/hmorimitsu/ptlflow/tree/master/infer.py>`__
-
-We also provide a script for making it easier to perform inference on different inputs.
-Read :ref:`initial-scripts` to know how to download it.
-Using this script, you can perform the same operation as in the example above by typing:
-
-.. code-block:: bash
-
-    python infer.py ext_raft_small --pretrained_ckpt things --input_path /path/to/img1.jpg /path/to/img2.jpg --show
-
-Note that you can also give a path to a local checkpoint file to ``--pretrained_ckpt`` as well, like:
-
-.. code-block:: bash
-
-    python infer.py ext_raft_small --pretrained_ckpt /path/to/checkpoint --input_path /path/to/img1.jpg /path/to/img2.jpg --show
-
-You can see all the available options of this script with:
-
-.. code-block:: bash
-
-    python infer.py -h
