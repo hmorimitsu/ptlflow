@@ -27,6 +27,7 @@ with warnings.catch_warnings():
 import torch
 
 from ptlflow import get_model, get_model_reference
+from ptlflow.utils.callbacks.logger import LoggerCallback
 from ptlflow.utils.utils import add_datasets_to_parser, get_list_of_available_models_list
 
 
@@ -82,8 +83,9 @@ def train(args: Namespace) -> None:
 
     lr_logger = pl.callbacks.LearningRateMonitor(logging_interval='step')
     callbacks.append(lr_logger)
-    # For the moment, only logging to tensorboard is supported
-    tb_logger = pl.loggers.TensorBoardLogger(str(Path(args.log_dir) / log_model_name))
+
+    log_model_dir = str(Path(args.log_dir) / log_model_name)
+    tb_logger = pl.loggers.TensorBoardLogger(log_model_dir)
 
     model.val_dataloader()  # Called just to populate model.val_dataloader_names
 
@@ -98,6 +100,8 @@ def train(args: Namespace) -> None:
             filename=args.model+'_best_{'+model.val_dataloader_names[0]+':.2f}_{epoch}_{step}', save_weights_only=True,
             save_top_k=1, monitor=model.val_dataloader_names[0])
         callbacks.append(model_ckpt_best)
+
+    callbacks.append(LoggerCallback())
 
     trainer = pl.Trainer.from_argparse_args(
         args, logger=tb_logger, callbacks=callbacks)

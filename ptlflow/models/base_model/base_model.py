@@ -28,22 +28,17 @@ from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-import cv2
-import numpy as np
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')  # Workaround until pl stop raising the metrics deprecation warning
     import pytorch_lightning as pl
 import torch
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
-from torchvision.utils import make_grid
 
 from ptlflow.data import flow_transforms as ft
 from ptlflow.data.datasets import (
     FlyingChairsDataset, FlyingChairs2Dataset, Hd1kDataset, KittiDataset, SintelDataset, FlyingThings3DDataset,
     FlyingThings3DSubsetDataset)
-from ptlflow.utils import flow_utils
 from ptlflow.utils.external.raft import InputPadder
 from ptlflow.utils.utils import config_logging, make_divisible
 from ptlflow.utils.flow_metrics import FlowMetrics
@@ -81,14 +76,15 @@ class BaseModel(pl.LightningModule):
         self.train_metrics = FlowMetrics(prefix='train/')
         self.val_metrics = FlowMetrics(prefix='val/')
 
+        self.train_dataloader_length = 0
         self.train_steps_per_epoch = 0
         self.train_epoch_step = 0
 
         self.val_dataloader_names = []
         self.val_dataloader_lengths = []
-        self.has_val = False
-        self.val_steps_per_epoch = []
-        self.val_epoch_step = []
+
+        self.last_inputs = None
+        self.last_predictions = None
 
         self.can_log_images_flag = None
         if self.args.log_num_images > 0:
@@ -98,10 +94,6 @@ class BaseModel(pl.LightningModule):
                 'images', 'flow_targets', 'flow_preds', 'epes', 'occ_targets', 'occ_preds', 'mb_targets', 'mb_preds',
                 'conf_targets', 'conf_preds']
             self.train_log_images = []
-
-            if self.has_val:
-                self.val_log_img_idx = []
-                self.val_log_images = []
 
         self.save_hyperparameters()
 
@@ -234,6 +226,8 @@ class BaseModel(pl.LightningModule):
               logging purposes.
         """
         preds = self(batch)
+        self.last_inputs = batch
+        self.last_predictions = preds
         loss = self.loss_fn(preds, batch)
         if isinstance(loss, dict):
             loss = loss['loss']
@@ -242,34 +236,9 @@ class BaseModel(pl.LightningModule):
         self.log_dict(metrics, on_step=True, on_epoch=True)
         self.log('epe', metrics['train/epe'], prog_bar=True, on_step=True, on_epoch=True)
 
-        if self._can_log_images() and self.train_epoch_step in self.train_log_img_idx[0]:
-            self._store_log_images('train', 0, preds, batch)
-        self.train_epoch_step += 1
-
         outputs = {'loss': loss,
                    'dataset_name': batch['meta']['dataset_name']}
         return outputs
-
-    def training_epoch_end(
-        self,
-        outputs: Union[List[Dict[str, Any]], List[List[Dict[str, Any]]]]
-    ) -> None:
-        """Perform operations at the end of one training epoch.
-
-        This function is called internally by Pytorch-Lightning during training.
-
-        Parameters
-        ----------
-        outputs : Union[List[Dict[str, Any]], List[List[Dict[str, Any]]]]
-            A list in which each element is the output of training_step().
-
-        See Also
-        --------
-        training_step
-        """
-        self._log_tensorboard_images('train', outputs[0]['dataset_name'][0])
-        self.train_epoch_step = 0
-        self.train_log_images = [{k: [] for k in self.log_image_keys}]
 
     def validation_step(
         self,
@@ -312,12 +281,10 @@ class BaseModel(pl.LightningModule):
         for k in keys:
             if k in preds:
                 preds[k] = padder.unpad(preds[k])
+        self.last_inputs = batch
+        self.last_predictions = preds
         metrics = self.val_metrics(preds, batch)
         train_val_metrics = self._split_train_val_metrics(metrics, batch.get('meta'))
-
-        if self._can_log_images() and self.val_epoch_step[dataloader_idx] in self.val_log_img_idx[dataloader_idx]:
-            self._store_log_images('val', dataloader_idx, preds, batch)
-        self.val_epoch_step[dataloader_idx] += 1
 
         outputs = {'metrics': train_val_metrics,
                    'dataset_name': batch['meta']['dataset_name']}
@@ -340,8 +307,6 @@ class BaseModel(pl.LightningModule):
         --------
         validation_step
         """
-        self.val_epoch_step = [0 for _ in range(len(self.val_steps_per_epoch))]
-
         if not isinstance(outputs[0], list):
             outputs = [outputs]
 
@@ -363,10 +328,6 @@ class BaseModel(pl.LightningModule):
             epe_key = [k for k in metrics_mean if 'full' in k and 'epe' in k][0]
             self.log(self.val_dataloader_names[i], metrics_mean[epe_key], prog_bar=True)
 
-        self._log_tensorboard_images('val', self.val_dataloader_names)
-        self.val_epoch_step = [0 for _ in range(len(self.val_steps_per_epoch))]
-        self.val_log_images = [{k: [] for k in self.log_image_keys} for _ in range(len(self.val_steps_per_epoch))]
-
     def configure_optimizers(self) -> Dict[str, Any]:
         """Initialize the optimizers and LR schedulers.
 
@@ -385,7 +346,9 @@ class BaseModel(pl.LightningModule):
             self.args.max_epochs = 10
             logging.warning('--max_epochs is not set. It will be set to %d.', self.args.max_epochs)
 
-        self._init_train_log_attributes()
+        train_dataloader = self.train_dataloader()
+        if train_dataloader is not None:
+            self.train_steps_per_epoch = len(train_dataloader)
 
         optimizer = optim.AdamW(self.parameters(), lr=self.args.lr, weight_decay=self.args.wdecay)
         assert self.args.max_epochs is not None, 'BasicModel optimizer requires --max_epochs to be set.'
@@ -446,9 +409,11 @@ class BaseModel(pl.LightningModule):
                         train_dataset += dataset
 
             train_pin_memory = False if self.args.train_transform_cuda else True
-            return DataLoader(
+            train_dataloader = DataLoader(
                 train_dataset, self.args.train_batch_size, shuffle=True, num_workers=self.args.train_num_workers,
                 pin_memory=train_pin_memory, drop_last=False)
+            self.train_dataloader_length = len(train_dataloader)
+            return train_dataloader
 
     def val_dataloader(self) -> Optional[List[DataLoader]]:
         """Initialize and return the list of validation dataloaders.
@@ -490,8 +455,6 @@ class BaseModel(pl.LightningModule):
 
             self.val_dataloader_names.append('-'.join(parsed_vals[1:]))
             self.val_dataloader_lengths.append(len(dataset))
-
-        self._init_val_log_attributes()
 
         return dataloaders
 
@@ -545,194 +508,6 @@ class BaseModel(pl.LightningModule):
     ###########################################################################
     # Logging
     ###########################################################################
-
-    def _can_log_images(self) -> bool:
-        """Check if this model is able to log images or not.
-
-        In order to log images, two conditions are necessary: 1. the logger is Tensorboard, and 2. args.log_num_images > 0.
-
-        Returns
-        -------
-        bool
-            Whether the logging conditions are met.
-        """
-        if self.can_log_images_flag is not None:
-            return self.can_log_images_flag
-        else:
-            return self.args.log_num_images > 0 and isinstance(
-                self.logger.experiment, torch.utils.tensorboard.writer.SummaryWriter)
-
-    def _init_train_log_attributes(self) -> None:
-        """Initialize attributes required for logging training data."""
-        train_dataloader = self.train_dataloader()
-        if train_dataloader is not None:
-            self.train_steps_per_epoch = len(train_dataloader)
-        else:
-            self.train_steps_per_epoch = 0
-        self.train_epoch_step = 0
-        if self.args.log_num_images > 0:
-            self.train_log_img_idx = [
-                np.unique(np.linspace(0, self.train_steps_per_epoch-1, self.args.log_num_images, dtype=np.int32))]
-            self.train_log_images = [{k: [] for k in self.log_image_keys}]
-
-    def _init_val_log_attributes(self) -> None:
-        """Initialize attributes required for logging validation data."""
-        self.val_steps_per_epoch = self.val_dataloader_lengths
-        self.val_epoch_step = [0 for _ in range(len(self.val_steps_per_epoch))]
-        self.has_val = True
-
-        if self.args.log_num_images > 0:
-            if self.has_val:
-                self.val_log_img_idx = [
-                    np.unique(np.linspace(0, s-1, self.args.log_num_images, dtype=np.int32)) for s in self.val_steps_per_epoch]
-                self.val_log_images = [{k: [] for k in self.log_image_keys} for _ in range(len(self.val_steps_per_epoch))]
-
-    def _log_tensorboard_images(
-        self,
-        stage: str,
-        dataset_names: Union[str, List[str]]
-    ) -> None:
-        """Log the images to tensorboard, if possible.
-
-        Parameters
-        ----------
-        stage : str
-            A string representing if the given images are coming from the 'train' or 'val' stages.
-        dataset_names : Union[str, List[str]]
-            The names of the datasets from which each image log buffer belong.
-
-        See Also
-        --------
-        _can_log_images
-        """
-        if self._can_log_images():
-            tb_logger = self.logger.experiment
-
-            if stage == 'train':
-                dataset_names = [dataset_names]
-                stage_log_images = self.train_log_images
-            else:
-                stage_log_images = self.val_log_images
-
-            for i in range(len(dataset_names)):
-                img_out = []
-                num_available_keys = 0
-                for k in self.log_image_keys:
-                    if len(stage_log_images[i][k]) > 0:
-                        img_out.extend(stage_log_images[i][k])
-                        num_available_keys += 1
-                if len(img_out) > 0:
-                    img_grid = make_grid(img_out, len(img_out)//num_available_keys)
-                    tb_logger.add_image(f'{stage}/{dataset_names[i]}', img_grid, self.global_step)
-
-    def _normalize_log_image(
-        self,
-        image: torch.Tensor,
-        valid_mask: Optional[torch.Tensor] = None,
-        title: str = '',
-        is_flow: bool = False
-    ) -> torch.Tensor:
-        """Prepare image to be logged.
-
-        This basically consists on converting the image to the correct type and shape.
-
-        Parameters
-        ----------
-        image : torch.Tensor
-            a 4D or 5D BNCHW tensor containing the image. The image must be of type float and have its values in the interval
-            [0, 1]. Only the first image from the first batch will be logged.
-        valid_mask : Optional[torch.Tensor], optional
-            If provided, it must be a tensor with the same structure as image.
-        title : str, optional
-            If provided, the tile will be put over the image before logging.
-        is_flow : bool, default False
-            If true, indicates that the 'image' is actually an optical flow. So it will be converted to RGB before logging.
-
-        Returns
-        -------
-        torch.Tensor
-            The normalized image.
-        """
-        if len(image.shape) == 5:
-            image = image[:, 0]
-        image = image[:1]
-        if is_flow:
-            image = flow_utils.flow_to_rgb(image)
-
-        if valid_mask is not None:
-            if len(valid_mask.shape) == 5:
-                valid_mask = valid_mask[:, 0]
-            valid_mask = valid_mask[:1]
-            invalid_mask = (1 - valid_mask).bool()
-            invalid_mask = invalid_mask.repeat(image.shape[0], image.shape[1], 1, 1)
-            image[invalid_mask] = 0
-        image = F.interpolate(image, size=self.args.log_image_size)
-        image = image[0]
-        if image.shape[0] == 1:
-            image = image.repeat(3, 1, 1)
-
-        if len(title) > 0:
-            image = image.permute(1, 2, 0).numpy().copy()
-            image = (255*image).astype(np.uint8)
-            s = min(image.shape[:2])
-            cv2.rectangle(image, (s//20, s//20), (s//16+s//8*len(title), s//4), (255, 0, 0), -1)
-            cv2.putText(image, title, (s//10, s//5), cv2.FONT_HERSHEY_PLAIN, s//100, (255, 255, 255), s//100)
-            image = image.transpose(2, 0, 1)
-            image = torch.from_numpy(image).float() / 255
-        return image
-
-    def _store_log_images(
-        self,
-        stage: str,
-        log_idx: int,
-        preds: Dict[str, torch.Tensor],
-        targets: Dict[str, torch.Tensor]
-    ) -> None:
-        """Add images to the logging buffer.
-
-        Parameters
-        ----------
-        stage : str
-            A string representing if the given images are coming from the 'train' or 'val' stages.
-        log_idx : int
-            The dataloader index these images belong to.
-        preds : Dict[str, torch.Tensor]
-            The model predictions images.
-        targets : Dict[str, torch.Tensor]
-            The groundtruth images.
-        """
-        if stage == 'train':
-            stage_log_images = self.train_log_images
-        else:
-            stage_log_images = self.val_log_images
-
-        stage_log_images[log_idx]['images'].append(self._normalize_log_image(targets['images'].cpu()).flip([0]))
-        stage_log_images[log_idx]['flow_targets'].append(
-            self._normalize_log_image(targets['flows'].cpu(), targets['valids'].cpu(), is_flow=True))
-        stage_log_images[log_idx]['flow_preds'].append(
-            self._normalize_log_image(preds['flows'].detach().cpu(), targets['valids'].cpu(), is_flow=True))
-        epe = torch.norm(targets['flows'].cpu() - preds['flows'].detach().cpu(), p=2, dim=2)
-        epe = torch.clamp(epe, 0, 5) / 5
-        stage_log_images[log_idx]['epes'].append(self._normalize_log_image(epe, targets['valids'].cpu(), title='EPE<=5'))
-        if 'occs' in preds:
-            if 'occs' in targets:
-                stage_log_images[log_idx]['occ_targets'].append(
-                    self._normalize_log_image(targets['occs'].detach().cpu(), targets['valids'].cpu(), title='occ_target'))
-            stage_log_images[log_idx]['occ_preds'].append(
-                self._normalize_log_image(preds['occs'].detach().cpu(), targets['valids'].cpu(), title='occ_pred'))
-        if 'mbs' in preds:
-            if 'mbs' in targets:
-                stage_log_images[log_idx]['mb_targets'].append(
-                    self._normalize_log_image(targets['mbs'].detach().cpu(), targets['valids'].cpu(), title='mb_target'))
-            stage_log_images[log_idx]['mb_preds'].append(
-                self._normalize_log_image(preds['mbs'].detach().cpu(), targets['valids'].cpu(), title='mb_pred'))
-        if 'confs' in preds:
-            conf_target = torch.exp(-torch.pow(
-                targets['flows'].cpu() - preds['flows'].detach().cpu(), 2).sum(dim=2, keepdim=True))
-            stage_log_images[log_idx]['conf_targets'].append(
-                self._normalize_log_image(conf_target, targets['valids'].cpu(), title='conf_target'))
-            stage_log_images[log_idx]['conf_preds'].append(
-                self._normalize_log_image(preds['confs'].detach().cpu(), targets['valids'].cpu(), title='conf_pred'))
 
     def _split_train_val_metrics(
         self,
