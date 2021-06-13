@@ -17,7 +17,7 @@
 # =============================================================================
 
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple, Union
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
 try:
     from neptune.new.types import File as NeptuneFile
@@ -181,7 +181,8 @@ class LoggerCallback(Callback):
     def on_train_epoch_end(
         self,
         trainer: Trainer,
-        pl_module: BaseModel
+        pl_module: BaseModel,
+        outputs: Any = None  # This arg does not exist anymore, but it is kept here for compatibility
     ) -> None:
         """Log the images accumulated during the training.
 
@@ -191,6 +192,8 @@ class LoggerCallback(Callback):
             An instance of the PyTorch Lightning trainer.
         pl_module : BaseModel
             An instance of the optical flow model.
+        outputs : Any
+            Outputs of the training epoch.
         """
         img_grid = self._make_image_grid(self.train_images)
         self.log_image('train', img_grid, pl_module)
