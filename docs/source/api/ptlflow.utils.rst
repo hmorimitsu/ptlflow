@@ -13,3 +13,9 @@ ptlflow.utils
     ptlflow/utils/io_adapter
     ptlflow/utils/timer
     ptlflow/utils/utils
+
+.. toctree::
+    :maxdepth: 1
+    :caption: Callbacks
+
+    ptlflow/utils/callbacks/logger

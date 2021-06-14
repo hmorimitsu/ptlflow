@@ -34,7 +34,7 @@ from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils import flow_utils
 from ptlflow.utils.external.raft import InputPadder
 from ptlflow.utils.utils import (
-    add_datasets_to_parser, config_logging, get_list_of_available_models_list, tensor_dict_to_numpy, InputScaler)
+    add_datasets_to_parser, config_logging, get_list_of_available_models_list, release_gpu, tensor_dict_to_numpy, InputScaler)
 
 config_logging()
 
@@ -195,14 +195,19 @@ def validate_one_dataloader(
             inputs['images'] = inputs['images_orig'].clone()
             del inputs['images_orig']
 
+            inputs = release_gpu(inputs)
+            preds = release_gpu(preds)
+
             for k in args.prediction_keys:
                 if k in preds:
-                    v = padder.unpad(preds[k].detach().cpu())
+                    v = padder.unpad(preds[k])
                     if scaler is not None:
                         v = scaler.unscale(v)
                     preds[k] = v
 
             metrics = model.val_metrics(preds, inputs)
+            metrics = release_gpu(metrics)
+
             for k in metrics.keys():
                 metrics[k] = metrics[k].detach().cpu()
                 if metrics_sum.get(k) is None:
