@@ -345,7 +345,7 @@ class BaseModel(pl.LightningModule):
             self.args.max_epochs = 10
             logging.warning('--max_epochs is not set. It will be set to %d.', self.args.max_epochs)
 
-        train_dataloader = self.train_dataloader()  # Just to initialize dataloader variables
+        self.train_dataloader()  # Just to initialize dataloader variables
 
         optimizer = optim.AdamW(self.parameters(), lr=self.args.lr, weight_decay=self.args.wdecay)
         assert self.args.max_epochs is not None, 'BasicModel optimizer requires --max_epochs to be set.'
