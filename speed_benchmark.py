@@ -172,3 +172,4 @@ if __name__ == '__main__':
     else:
         df = pd.read_csv(args.csv_path)
         save_plot(args.output_path, args.model, df)
+    print(f'Results saved to {str(args.output_path)}.')
