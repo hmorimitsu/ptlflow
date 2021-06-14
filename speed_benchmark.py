@@ -35,7 +35,7 @@ from ptlflow.utils.utils import count_parameters, get_list_of_available_models_l
 TABLE_COLS = ['Model', 'Params', 'Time(ms)']
 
 
-def _parse_args() -> argparse.Namespace:
+def _init_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--model', type=str, default='all', choices=['all']+get_list_of_available_models_list(),
@@ -53,9 +53,7 @@ def _parse_args() -> argparse.Namespace:
         '--output_path', type=str, default=str(Path('outputs/speed')),
         help=('Path to a directory where the outputs will be saved.'))
 
-    args = parser.parse_args()
-
-    return args
+    return parser
 
 
 def benchmark(
@@ -166,7 +164,8 @@ def save_plot(
 
 
 if __name__ == '__main__':
-    args = _parse_args()
+    parser = _init_parser()
+    args = parser.parse_args()
 
     if args.csv_path is None:
         df = benchmark(args)
