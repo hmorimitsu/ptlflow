@@ -66,7 +66,6 @@ Contribution are welcome! Please check [CONTRIBUTING.md](CONTRIBUTING.md) to see
   year = {2021},
   publisher = {GitHub},
   journal = {GitHub repository},
-  doi = {10.5281/zenodo.4923734},
   howpublished = {\url{https://github.com/hmorimitsu/ptlflow}}
 }
 ```
