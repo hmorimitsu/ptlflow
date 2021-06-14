@@ -31,7 +31,7 @@ import pandas as pd
 import seaborn as sns
 
 
-def _parse_args() -> argparse.Namespace:
+def _init_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--metrics_path', type=str, default=str(Path('results/metrics_all.csv')),
@@ -56,9 +56,7 @@ def _parse_args() -> argparse.Namespace:
         help=('Name of checkpoints to not be included in the final outputs. The names must be substrings of the values in '
               'the file from --metrics_path.'))
 
-    args = parser.parse_args()
-
-    return args
+    return parser
 
 
 def load_summarized_table(
@@ -124,22 +122,9 @@ def save_plots(
         plt.close()
 
 
-def _shorten_columns_names(
-    df: pd.DataFrame
-) -> pd.DataFrame:
-    change_dict = {}
-    for col in df.columns:
-        tokens = col.split('-')
-        if len(tokens) > 1:
-            metric_name = tokens[1].split('/')[1]
-            change_dict[col] = f'{tokens[0]}-{metric_name}'
-
-    df = df.rename(columns=change_dict)
-    return df
-
-
-if __name__ == '__main__':
-    args = _parse_args()
+def summarize(
+    args: argparse.Namespace
+) -> None:
     args.output_dir = Path(args.output_dir)
     df = load_summarized_table(args)
 
@@ -160,3 +145,24 @@ if __name__ == '__main__':
 
     if len(args.chosen_metrics) == 2:
         save_plots(args, df)
+
+
+def _shorten_columns_names(
+    df: pd.DataFrame
+) -> pd.DataFrame:
+    change_dict = {}
+    for col in df.columns:
+        tokens = col.split('-')
+        if len(tokens) > 1:
+            metric_name = tokens[1].split('/')[1]
+            change_dict[col] = f'{tokens[0]}-{metric_name}'
+
+    df = df.rename(columns=change_dict)
+    return df
+
+
+if __name__ == '__main__':
+    parser = _init_parser()
+    args = parser.parse_args()
+    summarize(args)
+    print(f'Results saved to {str(args.output_dir)}.')
