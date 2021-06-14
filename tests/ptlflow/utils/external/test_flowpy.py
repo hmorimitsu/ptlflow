@@ -15,6 +15,7 @@
 # =============================================================================
 
 from pathlib import Path
+import shutil
 
 import cv2
 import numpy as np
@@ -35,6 +36,8 @@ def test_read_write_flo(tmp_path: Path) -> None:
     loaded_flow = flowpy.flow_read(file_path)
     assert np.array_equal(flow, loaded_flow)
 
+    shutil.rmtree(tmp_path)
+
 
 def test_read_write_png(tmp_path: Path) -> None:
     flow = np.stack(np.meshgrid(np.arange(IMG_SIDE)-IMG_MIDDLE, np.arange(IMG_SIDE)-IMG_MIDDLE), axis=2).astype(np.float32)
@@ -44,6 +47,8 @@ def test_read_write_png(tmp_path: Path) -> None:
 
     loaded_flow = flowpy.flow_read(file_path)
     assert np.array_equal(flow, loaded_flow)
+
+    shutil.rmtree(tmp_path)
 
 # Skip these tests, as in some machines the colors are sightly different
 

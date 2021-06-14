@@ -15,6 +15,7 @@
 # =============================================================================
 
 from pathlib import Path
+import shutil
 
 import numpy as np
 
@@ -32,3 +33,5 @@ def test_read_write_pfm(tmp_path: Path) -> None:
 
     loaded_flow = flow_utils.flow_read(file_path)
     assert np.array_equal(flow, loaded_flow)
+
+    shutil.rmtree(tmp_path)

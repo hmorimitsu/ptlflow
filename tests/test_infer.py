@@ -15,6 +15,7 @@
 # =============================================================================
 
 from pathlib import Path
+import shutil
 
 import cv2 as cv
 import numpy as np
@@ -50,6 +51,8 @@ def test_infer(tmp_path: Path) -> None:
     infer.infer(args, model)
     assert (tmp_path / 'flows/img1.png').exists()
     assert (tmp_path / 'flows_viz/img1.png').exists()
+
+    shutil.rmtree(tmp_path)
 
 
 def _create_images(tmp_path: Path) -> None:

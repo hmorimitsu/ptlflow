@@ -15,6 +15,7 @@
 # =============================================================================
 
 from pathlib import Path
+import shutil
 import warnings
 
 import pandas as pd
@@ -40,6 +41,8 @@ def test_train(tmp_path: Path):
     for mname in model_names:
         print(mname)
         _train_one_pass(tmp_path, mname)
+
+    shutil.rmtree(tmp_path)
 
 
 def _train_one_pass(tmp_path: Path, model_name: str) -> None:
@@ -81,6 +84,8 @@ def test_overfit(tmp_path: Path) -> None:
             # Models that require backward will raise this, since there is no backward flows in sintel
             continue
         assert epe < 2
+
+    shutil.rmtree(tmp_path)
 
 
 def _overfit_model(tmp_path: Path, model_name: str) -> float:

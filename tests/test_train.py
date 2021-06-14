@@ -15,6 +15,7 @@
 # =============================================================================
 
 from pathlib import Path
+import shutil
 import warnings
 
 with warnings.catch_warnings():
@@ -69,3 +70,5 @@ def test_train(tmp_path: Path) -> None:
     assert len(ckpt_last) > 0
     ckpt_train = list((tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'checkpoints').glob('*_train_*.ckpt'))
     assert len(ckpt_train) > 0
+
+    shutil.rmtree(tmp_path)
