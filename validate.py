@@ -42,7 +42,7 @@ config_logging()
 def _init_parser() -> ArgumentParser:
     parser = ArgumentParser()
     parser.add_argument(
-        'model', type=str, choices=get_list_of_available_models_list(),
+        'model', type=str, choices=['all']+get_list_of_available_models_list(),
         help='Name of the model to use.')
     parser.add_argument(
         '--datasets', type=str, nargs='+', default=['kitti', 'sintel'],
