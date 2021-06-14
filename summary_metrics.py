@@ -125,6 +125,13 @@ def save_plots(
 def summarize(
     args: argparse.Namespace
 ) -> None:
+    """Summarize the results and save them to the disk.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Arguments required to control the process.
+    """
     args.output_dir = Path(args.output_dir)
     df = load_summarized_table(args)
 

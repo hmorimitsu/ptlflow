@@ -144,6 +144,8 @@ def save_plot(
     ----------
     output_dir : Union[str, Path]
         Path to the directory where the plot will be saved.
+    model_name : str
+        Name of the model. Used just to name the resulting file.
     df : pd.DataFrame
         A DataFrame with the benchmark results.
     """
