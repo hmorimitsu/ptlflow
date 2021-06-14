@@ -85,12 +85,21 @@ to clone and use the source code instead. You can first clone the source code to
     git clone https://github.com/hmorimitsu/ptlflow
 
 Then you can just enter the ``ptlflow`` and work directly from there. Another option is to install
-PTLFlow to your environment after your modifications. You can install PTLFlow from the folder you cloned
-before with the following commands:
+PTLFlow to your environment after your modifications. For that, you will have to build the wheel
+package and then install with ``pip``.
+
+First, install ``build``, if you do not already have it:
+
+.. code-block:: bash
+
+    pip install build
+
+Then, enter the directory you cloned, build the package and install it:
 
 .. code-block:: bash
 
     cd ptlflow
-    python setup.py install
+    python -m build
+    pip install dist/ptlflow-*.whl
 
 Then you should be able to use ``ptlflow`` in the same as if you had installed it from ``pip``.
