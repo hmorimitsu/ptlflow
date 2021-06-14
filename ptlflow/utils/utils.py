@@ -18,7 +18,7 @@
 
 import logging
 from argparse import ArgumentParser
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -253,6 +253,30 @@ def make_divisible(
         The new value of v which is divisible by div.
     """
     return max(div, v - (v % div))
+
+
+def release_gpu(
+    tensors_dict: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Detach and move to cpu the tensors from the input dict.
+
+    The non-tensor elements are kept intact.
+
+    Parameters
+    ----------
+    tensors_dict : Dict[str, Any]
+        A dictionary containing the tensors to move.
+
+    Returns
+    -------
+    Dict[str, Any]
+        The same dictionary, but with the tensors moved to cpu.
+    """
+    for k, v in tensors_dict.items():
+        if isinstance(v, torch.Tensor):
+            tensors_dict[k] = v.detach().cpu()
+            del v
+    return tensors_dict
 
 
 def tensor_dict_to_numpy(

@@ -38,7 +38,7 @@ from ptlflow import get_model, get_model_reference
 from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils.flow_utils import flow_to_rgb, flow_write
 from ptlflow.utils.io_adapter import IOAdapter
-from ptlflow.utils.utils import get_list_of_available_models_list, tensor_dict_to_numpy
+from ptlflow.utils.utils import get_list_of_available_models_list, release_gpu, tensor_dict_to_numpy
 
 
 def _init_parser() -> ArgumentParser:
@@ -117,6 +117,10 @@ def infer(
         if torch.cuda.is_available():
             inputs = {k: v.cuda() for k, v in inputs.items()}
         preds = model(inputs)
+
+        inputs = release_gpu(inputs)
+        preds = release_gpu(preds)
+
         preds = io_adapter.unpad(preds)
         preds_npy = tensor_dict_to_numpy(preds)
         preds_npy['flows_viz'] = flow_to_rgb(preds_npy['flows'])[:, :, ::-1]
