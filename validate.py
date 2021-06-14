@@ -310,10 +310,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if args.val_dataset is None:
-        args.val_dataset = 'sintel-final-trainval+sintel-clean-trainval+kitti-2012-trainval+kitti-2015-trainval'
-        logging.warning('--val_dataset is not set. It will be set to %s', args.val_dataset)
-
     if args.model != 'all':
         model_id = args.model
         if args.pretrained_ckpt is not None:
