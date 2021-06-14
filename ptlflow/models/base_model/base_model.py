@@ -77,7 +77,6 @@ class BaseModel(pl.LightningModule):
         self.val_metrics = FlowMetrics(prefix='val/')
 
         self.train_dataloader_length = 0
-        self.train_steps_per_epoch = 0
         self.train_epoch_step = 0
 
         self.val_dataloader_names = []
@@ -346,14 +345,12 @@ class BaseModel(pl.LightningModule):
             self.args.max_epochs = 10
             logging.warning('--max_epochs is not set. It will be set to %d.', self.args.max_epochs)
 
-        train_dataloader = self.train_dataloader()
-        if train_dataloader is not None:
-            self.train_steps_per_epoch = len(train_dataloader)
+        train_dataloader = self.train_dataloader()  # Just to initialize dataloader variables
 
         optimizer = optim.AdamW(self.parameters(), lr=self.args.lr, weight_decay=self.args.wdecay)
         assert self.args.max_epochs is not None, 'BasicModel optimizer requires --max_epochs to be set.'
         lr_scheduler = optim.lr_scheduler.OneCycleLR(
-            optimizer, self.args.lr, epochs=self.args.max_epochs, steps_per_epoch=self.train_steps_per_epoch, pct_start=0.05,
+            optimizer, self.args.lr, epochs=self.args.max_epochs, steps_per_epoch=self.train_dataloader_length, pct_start=0.05,
             cycle_momentum=False, anneal_strategy='linear')
         return {'optimizer': optimizer,
                 'lr_scheduler': {'scheduler': lr_scheduler, 'interval': 'step'}}
