@@ -17,21 +17,18 @@
 from pathlib import Path
 import shutil
 
-import numpy as np
-
-from ptlflow.utils import flow_utils
-
-IMG_SIDE = 29
-IMG_MIDDLE = IMG_SIDE // 2 + 1
+import summary_metrics
 
 
-def test_read_write_pfm(tmp_path: Path) -> None:
-    flow = np.stack(np.meshgrid(np.arange(IMG_SIDE)-IMG_MIDDLE, np.arange(IMG_SIDE)-IMG_MIDDLE), axis=2).astype(np.float32)
-    file_path = tmp_path / 'flow.pfm'
-    flow_utils.flow_write(file_path, flow)
-    assert file_path.exists()
+def test_summary(tmp_path: Path) -> None:
+    parser = summary_metrics._init_parser()
+    args = parser.parse_args([])
+    args.metrics_path = Path('results/metrics_all.csv')
+    args.output_dir = tmp_path
+    summary_metrics.summarize(args)
 
-    loaded_flow = flow_utils.flow_read(file_path)
-    assert np.array_equal(flow, loaded_flow)
+    assert len(list(tmp_path.glob('**/*.md'))) > 0
+    assert len(list(tmp_path.glob('**/*.csv'))) > 0
+    assert len(list(tmp_path.glob('**/*.png'))) > 0
 
     shutil.rmtree(tmp_path)

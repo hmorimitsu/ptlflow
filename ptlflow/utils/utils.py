@@ -231,7 +231,7 @@ def get_list_of_available_models_list() -> List[str]:
     list[str]
         The list with the model names.
     """
-    return ['all'] + sorted(ptlflow.models_dict.keys())
+    return sorted(ptlflow.models_dict.keys())
 
 
 def make_divisible(

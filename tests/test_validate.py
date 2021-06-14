@@ -15,6 +15,7 @@
 # =============================================================================
 
 from pathlib import Path
+import shutil
 
 import ptlflow
 import validate
@@ -62,3 +63,5 @@ def test_validate(tmp_path: Path) -> None:
     validate.validate(args, model)
     for dname, dpath in dataset_name_path:
         assert (tmp_path / dname / 'flow' / (dpath+'.png')).exists()
+
+    shutil.rmtree(tmp_path)

@@ -15,6 +15,7 @@
 # =============================================================================
 
 from pathlib import Path
+import shutil
 
 import torch
 
@@ -48,6 +49,8 @@ def test_chairs(tmp_path: Path) -> None:
             assert len(inputs[k].shape) == 4
             assert min(inputs[k].shape) > 0
 
+    shutil.rmtree(tmp_path)
+
 
 def test_chairs2(tmp_path: Path) -> None:
     dummy_datasets.write_flying_chairs2(tmp_path)
@@ -75,6 +78,8 @@ def test_chairs2(tmp_path: Path) -> None:
             assert isinstance(inputs[k], torch.Tensor)
             assert len(inputs[k].shape) == 4
             assert min(inputs[k].shape) > 0
+
+    shutil.rmtree(tmp_path)
 
 
 def test_things(tmp_path: Path) -> None:
@@ -109,6 +114,8 @@ def test_things(tmp_path: Path) -> None:
                     assert len(inputs[k].shape) == 4
                     assert min(inputs[k].shape) > 0
 
+    shutil.rmtree(tmp_path)
+
 
 def test_things_subset(tmp_path: Path) -> None:
     dummy_datasets.write_things_subset(tmp_path)
@@ -142,6 +149,8 @@ def test_things_subset(tmp_path: Path) -> None:
                     assert len(inputs[k].shape) == 4
                     assert min(inputs[k].shape) > 0
 
+    shutil.rmtree(tmp_path)
+
 
 def test_hd1k(tmp_path: Path) -> None:
     dummy_datasets.write_hd1k(tmp_path)
@@ -168,6 +177,8 @@ def test_hd1k(tmp_path: Path) -> None:
             assert isinstance(inputs[k], torch.Tensor)
             assert len(inputs[k].shape) == 4
             assert min(inputs[k].shape) > 0
+
+    shutil.rmtree(tmp_path)
 
 
 def test_kitti(tmp_path: Path) -> None:
@@ -199,6 +210,8 @@ def test_kitti(tmp_path: Path) -> None:
                 assert len(inputs[k].shape) == 4
                 assert min(inputs[k].shape) > 0
 
+    shutil.rmtree(tmp_path)
+
 
 def test_sintel(tmp_path: Path) -> None:
     dummy_datasets.write_sintel(tmp_path)
@@ -229,3 +242,5 @@ def test_sintel(tmp_path: Path) -> None:
                 assert isinstance(inputs[k], torch.Tensor)
                 assert len(inputs[k].shape) == 4
                 assert min(inputs[k].shape) > 0
+
+    shutil.rmtree(tmp_path)

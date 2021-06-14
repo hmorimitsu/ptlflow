@@ -15,6 +15,7 @@
 # =============================================================================
 
 from pathlib import Path
+import shutil
 
 import ptlflow
 from ptlflow.models.base_model.base_model import BaseModel
@@ -28,6 +29,7 @@ def test_chairs(tmp_path: Path) -> None:
     model = _get_model(flying_chairs_root_dir=tmp_path / 'FlyingChairs_release')
     for is_train in [True, False]:
         model._get_chairs_dataset(is_train)
+    shutil.rmtree(tmp_path)
 
 
 def test_chairs2(tmp_path: Path) -> None:
@@ -35,6 +37,7 @@ def test_chairs2(tmp_path: Path) -> None:
     model = _get_model(flying_chairs2_root_dir=tmp_path / 'FlyingChairs2')
     for is_train in [True, False]:
         model._get_chairs2_dataset(is_train)
+    shutil.rmtree(tmp_path)
 
 
 def test_hd1k(tmp_path: Path) -> None:
@@ -42,6 +45,7 @@ def test_hd1k(tmp_path: Path) -> None:
     model = _get_model(hd1k_root_dir=tmp_path / 'HD1K')
     for is_train in [True, False]:
         model._get_hd1k_dataset(is_train)
+    shutil.rmtree(tmp_path)
 
 
 def test_kitti(tmp_path: Path) -> None:
@@ -50,6 +54,7 @@ def test_kitti(tmp_path: Path) -> None:
     for is_train in [True, False]:
         model._get_kitti_dataset(is_train, '2012')
         model._get_kitti_dataset(is_train, '2015')
+    shutil.rmtree(tmp_path)
 
 
 def test_sintel(tmp_path: Path) -> None:
@@ -57,6 +62,7 @@ def test_sintel(tmp_path: Path) -> None:
     model = _get_model(mpi_sintel_root_dir=tmp_path / 'MPI-Sintel')
     for is_train in [True, False]:
         model._get_sintel_dataset(is_train)
+    shutil.rmtree(tmp_path)
 
 
 def test_things(tmp_path: Path) -> None:
@@ -64,6 +70,7 @@ def test_things(tmp_path: Path) -> None:
     model = _get_model(flying_things3d_root_dir=tmp_path / 'FlyingThings3D')
     for is_train in [True, False]:
         model._get_things_dataset(is_train)
+    shutil.rmtree(tmp_path)
 
 
 def test_things_subset(tmp_path: Path) -> None:
@@ -71,6 +78,7 @@ def test_things_subset(tmp_path: Path) -> None:
     model = _get_model(flying_things3d_subset_root_dir=tmp_path / 'FlyingThings3D_subset')
     for is_train in [True, False]:
         model._get_things_dataset(is_train, 'subset')
+    shutil.rmtree(tmp_path)
 
 
 def _get_model(

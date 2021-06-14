@@ -30,13 +30,16 @@ from tqdm import tqdm
 import ptlflow
 from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils.timer import Timer
-from ptlflow.utils.utils import count_parameters, make_divisible
+from ptlflow.utils.utils import count_parameters, get_list_of_available_models_list, make_divisible
 
 TABLE_COLS = ['Model', 'Params', 'Time(ms)']
 
 
-def _parse_args() -> argparse.Namespace:
+def _init_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--model', type=str, default='all', choices=['all']+get_list_of_available_models_list(),
+        help=('Path to a csv file with the speed results.'))
     parser.add_argument(
         '--csv_path', type=str, default=None,
         help=('Path to a csv file with the speed results.'))
@@ -50,9 +53,7 @@ def _parse_args() -> argparse.Namespace:
         '--output_path', type=str, default=str(Path('outputs/speed')),
         help=('Path to a directory where the outputs will be saved.'))
 
-    args = parser.parse_args()
-
-    return args
+    return parser
 
 
 def benchmark(
@@ -78,7 +79,10 @@ def benchmark(
     output_path = Path(args.output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    model_names = ptlflow.models_dict.keys()
+    if args.model == 'all':
+        model_names = ptlflow.models_dict.keys()
+    else:
+        model_names = [args.model]
     for mname in tqdm(model_names):
         model = ptlflow.get_model(mname)
         model = model.eval()
@@ -89,8 +93,8 @@ def benchmark(
         values = [mname, model_params, infer_timer*1000]
         df = df.append({c: v for c, v in zip(df.columns, values)}, ignore_index=True)
         df = df.round(3)
-        df.to_csv(output_path / 'speed_benchmark.csv', index=False)
-        save_plot(output_path, df)
+        df.to_csv(output_path / f'speed_benchmark-{args.model}.csv', index=False)
+        save_plot(output_path, args.model, df)
     return df
 
 
@@ -131,6 +135,7 @@ def estimate_inference_time(
 
 def save_plot(
     output_dir: Union[str, Path],
+    model_name: str,
     df: pd.DataFrame
 ) -> None:
     """Create a plot of the results and save to disk.
@@ -139,6 +144,8 @@ def save_plot(
     ----------
     output_dir : Union[str, Path]
         Path to the directory where the plot will be saved.
+    model_name : str
+        Name of the model. Used just to name the resulting file.
     df : pd.DataFrame
         A DataFrame with the benchmark results.
     """
@@ -154,15 +161,17 @@ def save_plot(
     plt.legend(loc=2, borderaxespad=0)
     plt.title('Parameters x Forward time')
     plt.tight_layout()
-    plt.savefig(output_dir / 'speed_plot.png')
+    plt.savefig(output_dir / f'speed_plot-{model_name}.png')
     plt.close()
 
 
 if __name__ == '__main__':
-    args = _parse_args()
+    parser = _init_parser()
+    args = parser.parse_args()
 
     if args.csv_path is None:
         df = benchmark(args)
     else:
         df = pd.read_csv(args.csv_path)
-        save_plot(args.output_path, df)
+        save_plot(args.output_path, args.model, df)
+    print(f'Results saved to {str(args.output_path)}.')

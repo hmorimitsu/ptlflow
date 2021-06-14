@@ -42,7 +42,7 @@ config_logging()
 def _init_parser() -> ArgumentParser:
     parser = ArgumentParser()
     parser.add_argument(
-        'model', type=str, choices=get_list_of_available_models_list(),
+        'model', type=str, choices=['all']+get_list_of_available_models_list(),
         help='Name of the model to use.')
     parser.add_argument(
         '--datasets', type=str, nargs='+', default=['kitti', 'sintel'],
@@ -309,10 +309,6 @@ if __name__ == '__main__':
     add_datasets_to_parser(parser, 'datasets.yml')
 
     args = parser.parse_args()
-
-    if args.val_dataset is None:
-        args.val_dataset = 'sintel-final-trainval+sintel-clean-trainval+kitti-2012-trainval+kitti-2015-trainval'
-        logging.warning('--val_dataset is not set. It will be set to %s', args.val_dataset)
 
     if args.model != 'all':
         model_id = args.model
