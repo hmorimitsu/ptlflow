@@ -211,10 +211,14 @@ class ExternalScopeFlow(BaseModel):
             outputs['flow_preds'] = flows
             outputs['occ_preds'] = occs
             outputs['flows'] = (upsample2d_as(flow_f, x1_raw, mode="bilinear") / self.args.div_flow)[:, None]
-            outputs['occs'] = upsample2d_as(occ_f, x1_raw, mode="bilinear")[:, None]
+            outputs['occs'] = upsample2d_as(torch.sigmoid(occ_f), x1_raw, mode="bilinear")[:, None]
+            outputs['flows_b'] = (upsample2d_as(flow_b, x1_raw, mode="bilinear") / self.args.div_flow)[:, None]
+            outputs['occs_b'] = upsample2d_as(torch.sigmoid(occ_b), x1_raw, mode="bilinear")[:, None]
         else:
             outputs['flows'] = (upsample2d_as(flow_f, x1_raw, mode="bilinear") / self.args.div_flow)[:, None]
-            outputs['occs'] = upsample2d_as(occ_f, x1_raw, mode="bilinear")[:, None]
+            outputs['occs'] = upsample2d_as(torch.sigmoid(occ_f), x1_raw, mode="bilinear")[:, None]
+            outputs['flows_b'] = (upsample2d_as(flow_b, x1_raw, mode="bilinear") / self.args.div_flow)[:, None]
+            outputs['occs_b'] = upsample2d_as(torch.sigmoid(occ_b), x1_raw, mode="bilinear")[:, None]
         return outputs
 
     def submodules_summary(self):
