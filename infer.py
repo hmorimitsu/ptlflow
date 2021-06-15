@@ -124,6 +124,8 @@ def infer(
         preds = io_adapter.unpad(preds)
         preds_npy = tensor_dict_to_numpy(preds)
         preds_npy['flows_viz'] = flow_to_rgb(preds_npy['flows'])[:, :, ::-1]
+        if preds_npy.get('flows_b') is not None:
+            preds_npy['flows_b_viz'] = flow_to_rgb(preds_npy['flows_b'])[:, :, ::-1]
         if args.write_outputs:
             write_outputs(preds_npy, args.output_path, img_name, args.flow_format)
         if args.show:
@@ -269,11 +271,11 @@ def write_outputs(
         out_dir = Path(output_dir) / k
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / img_name
-        if k == 'flows':
+        if k == 'flows' or k == 'flows_b':
             if flow_format[0] != '.':
                 flow_format = '.' + flow_format
             flow_write(out_path.with_suffix(flow_format), v)
-        elif len(v.shape) == 2 or v.shape[2] == 1 or v.shape[2] == 3:
+        elif len(v.shape) == 2 or (len(v.shape) == 3 and (v.shape[2] == 1 or v.shape[2] == 3)):
             cv.imwrite(str(out_path.with_suffix('.png')), v*255)
 
 

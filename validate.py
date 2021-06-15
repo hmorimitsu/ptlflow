@@ -105,8 +105,12 @@ def generate_outputs(
     """
     inputs = tensor_dict_to_numpy(inputs)
     inputs['flows_viz'] = flow_utils.flow_to_rgb(inputs['flows'])[:, :, ::-1]
+    if inputs.get('flows_b') is not None:
+        inputs['flows_b_viz'] = flow_utils.flow_to_rgb(inputs['flows_b'])[:, :, ::-1]
     preds = tensor_dict_to_numpy(preds)
     preds['flows_viz'] = flow_utils.flow_to_rgb(preds['flows'])[:, :, ::-1]
+    if preds.get('flows_b') is not None:
+        preds['flows_b_viz'] = flow_utils.flow_to_rgb(preds['flows_b'])[:, :, ::-1]
 
     if args.show:
         _show(inputs, preds, args.max_show_side)
@@ -269,6 +273,7 @@ def _write_to_file(
 ) -> None:
     out_root_dir = Path(args.output_path) / dataloader_name
 
+    extra_dirs = ''
     if metadata is not None:
         img_path = Path(metadata['image_paths'][0][0])
         image_name = img_path.stem
@@ -276,7 +281,6 @@ def _write_to_file(
             seq_name = img_path.parts[-2]
             extra_dirs = seq_name
     else:
-        extra_dirs = ''
         image_name = f'{batch_idx:08d}'
 
     if args.flow_format != 'original':
@@ -291,9 +295,9 @@ def _write_to_file(
         if isinstance(v, np.ndarray):
             out_dir = out_root_dir / k / extra_dirs
             out_dir.mkdir(parents=True, exist_ok=True)
-            if k == 'flows':
+            if k == 'flows' or k == 'flows_b':
                 flow_utils.flow_write(out_dir / f'{image_name}.{flow_ext}', v)
-            else:
+            elif len(v.shape) == 2 or (len(v.shape) == 3 and (v.shape[2] == 1 or v.shape[2] == 3)):
                 if v.max() <= 1:
                     v = v * 255
                 cv.imwrite(str(out_dir / f'{image_name}.png'), v)
