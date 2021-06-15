@@ -35,6 +35,31 @@ If you are going to be doing training or validation, then be sure to edit the fi
 
 To know more details about how to use each script, please read the next pages in this documentation.
 
+Getting the names of available models
+-------------------------------------
+
+Using one of the initial scripts, you can get the name of the available models by simply running one script
+and providing any invalid model name as the first argument. For example, run:
+
+.. code-block:: bash
+
+    python validate.py which
+
+And you will see an error message showing you a list of valid model names.
+
+Getting the names of pretrained checkpoints of a model
+------------------------------------------------------
+
+Suppose you chose a model, let's say ``ext_raft_small``, but you do not know which pretrained checkpoints
+are available for it. You can find that out by using one of the initial scripts and passing any invalid
+checkpoint name to ``--pretrained_ckpt`` as follows:
+
+.. code-block:: bash
+
+    python validate.py ext_raft_small --pretrained_ckpt which
+
+This will show an error message with a list of the available checkpoint names.
+
 Conda environment
 =================
 
