@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import cv2 as cv
+import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
@@ -54,11 +55,8 @@ def _init_parser() -> ArgumentParser:
         '--prediction_keys', type=str, nargs='+', default=['flows', 'occs', 'mbs', 'confs'],
         help='Keys of the model output dict to retrieve to compute the validations metrics.')
     parser.add_argument(
-        '--write_flow', action='store_true',
+        '--write_outputs', action='store_true',
         help='If set, the estimated flow is saved to disk.')
-    parser.add_argument(
-        '--write_viz', action='store_true',
-        help='If set, an RGB version of the estimated flow is saved to disk.')
     parser.add_argument(
         '--show', action='store_true',
         help='If set, the results are shown on the screen.')
@@ -111,9 +109,9 @@ def generate_outputs(
     preds['flows_viz'] = flow_utils.flow_to_rgb(preds['flows'])[:, :, ::-1]
 
     if args.show:
-        _show(inputs, preds)
+        _show(inputs, preds, args.max_show_side)
 
-    if args.write_flow or args.write_viz:
+    if args.write_outputs:
         _write_to_file(args, preds, dataloader_name, batch_idx, metadata)
 
 
@@ -153,6 +151,7 @@ def validate(
     for dataset_name, dl in dataloaders.items():
         metrics_mean = validate_one_dataloader(args, model, dl, dataset_name)
         metrics_df[[f'{dataset_name}-{k}' for k in metrics_mean.keys()]] = metrics_mean.values()
+        metrics_df.T.to_csv(args.output_path / 'metrics.csv', header=False)
     metrics_df = metrics_df.round(3)
     return metrics_df
 
@@ -243,18 +242,19 @@ def _prepare_inputs(
 
 def _show(
     inputs: Dict[str, torch.Tensor],
-    preds: Dict[str, torch.Tensor]
+    preds: Dict[str, torch.Tensor],
+    max_show_side: int
 ) -> None:
     for k, v in inputs.items():
         if len(v.shape) == 2 or v.shape[2] == 1 or v.shape[2] == 3:
-            if max(v.shape[:2]) > args.max_show_side:
-                scale_factor = float(args.max_show_side) / max(v.shape[:2])
+            if max(v.shape[:2]) > max_show_side:
+                scale_factor = float(max_show_side) / max(v.shape[:2])
                 v = cv.resize(v, (int(scale_factor*v.shape[1]), int(scale_factor*v.shape[0])))
             cv.imshow(k, v)
     for k, v in preds.items():
         if len(v.shape) == 2 or v.shape[2] == 1 or v.shape[2] == 3:
-            if max(v.shape[:2]) > args.max_show_side:
-                scale_factor = float(args.max_show_side) / max(v.shape[:2])
+            if max(v.shape[:2]) > max_show_side:
+                scale_factor = float(max_show_side) / max(v.shape[:2])
                 v = cv.resize(v, (int(scale_factor*v.shape[1]), int(scale_factor*v.shape[0])))
             cv.imshow('pred_'+k, v)
     cv.waitKey(1)
@@ -267,17 +267,16 @@ def _write_to_file(
     batch_idx: int,
     metadata: Optional[Dict[str, Any]] = None
 ) -> None:
-    out_flow_dir = Path(args.output_path) / dataloader_name / 'flow'
-    out_viz_dir = Path(args.output_path) / dataloader_name / 'viz'
+    out_root_dir = Path(args.output_path) / dataloader_name
 
     if metadata is not None:
         img_path = Path(metadata['image_paths'][0][0])
         image_name = img_path.stem
         if 'sintel' in dataloader_name:
             seq_name = img_path.parts[-2]
-            out_flow_dir /= seq_name
-            out_viz_dir /= seq_name
+            extra_dirs = seq_name
     else:
+        extra_dirs = ''
         image_name = f'{batch_idx:08d}'
 
     if args.flow_format != 'original':
@@ -285,15 +284,19 @@ def _write_to_file(
     else:
         if 'kitti' in dataloader_name or 'hd1k' in dataloader_name:
             flow_ext = 'png'
-        elif 'sintel' in dataloader_name:
+        else:
             flow_ext = 'flo'
 
-    if args.write_flow:
-        out_flow_dir.mkdir(parents=True, exist_ok=True)
-        flow_utils.flow_write(out_flow_dir / f'{image_name}.{flow_ext}', preds['flows'])
-    if args.write_viz:
-        out_viz_dir.mkdir(parents=True, exist_ok=True)
-        cv.imwrite(str(out_viz_dir / f'{image_name}.png'), preds['flows_viz'])
+    for k, v in preds.items():
+        if isinstance(v, np.ndarray):
+            out_dir = out_root_dir / k / extra_dirs
+            out_dir.mkdir(parents=True, exist_ok=True)
+            if k == 'flows':
+                flow_utils.flow_write(out_dir / f'{image_name}.{flow_ext}', v)
+            else:
+                if v.max() <= 1:
+                    v = v * 255
+                cv.imwrite(str(out_dir / f'{image_name}.png'), v)
 
 
 if __name__ == '__main__':
@@ -316,10 +319,9 @@ if __name__ == '__main__':
             model_id += f'_{args.pretrained_ckpt}'
         args.output_path = Path(args.output_path) / model_id
         model = get_model(sys.argv[1], args.pretrained_ckpt, args)
+        args.output_path.mkdir(parents=True, exist_ok=True)
 
         metrics_df = validate(args, model)
-        args.output_path.mkdir(parents=True, exist_ok=True)
-        metrics_df.T.to_csv(args.output_path / 'metrics.csv', header=False)
     else:
         # Run validation on all models and checkpoints
         metrics_df = pd.DataFrame()
