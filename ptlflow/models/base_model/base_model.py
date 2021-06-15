@@ -85,15 +85,6 @@ class BaseModel(pl.LightningModule):
         self.last_inputs = None
         self.last_predictions = None
 
-        self.can_log_images_flag = None
-        if self.args.log_num_images > 0:
-            self.train_log_img_idx = []
-
-            self.log_image_keys = [
-                'images', 'flow_targets', 'flow_preds', 'epes', 'occ_targets', 'occ_preds', 'mb_targets', 'mb_preds',
-                'conf_targets', 'conf_preds']
-            self.train_log_images = []
-
         self.save_hyperparameters()
 
     @staticmethod
@@ -134,8 +125,6 @@ class BaseModel(pl.LightningModule):
         parser.add_argument('--train_transform_fp16', action='store_true', default=False, help='')
         parser.add_argument('--lr', type=float, default=1e-4)
         parser.add_argument('--wdecay', type=float, default=1e-4)
-        parser.add_argument('--log_num_images', type=int, default=10, help='')
-        parser.add_argument('--log_image_size', type=int, nargs=2, default=[200, 400], help='')
         parser.add_argument(
             '--train_dataset', type=str, default=None,
             help=('String specifying the dataset for training. See the docs of '
