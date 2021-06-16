@@ -94,8 +94,8 @@ class FlowMetrics(Metric):
         self.add_state("outlier_non_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum")
         self.add_state("outlier_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum")
 
-        self.add_state("occ_wf1", default=torch.tensor(0).float(), dist_reduce_fx="sum")
-        self.add_state("mb_wf1", default=torch.tensor(0).float(), dist_reduce_fx="sum")
+        self.add_state("occ_f1", default=torch.tensor(0).float(), dist_reduce_fx="sum")
+        self.add_state("mb_f1", default=torch.tensor(0).float(), dist_reduce_fx="sum")
         self.add_state("conf_l1", default=torch.tensor(0).float(), dist_reduce_fx="sum")
 
         self.add_state("sample_count", default=torch.tensor(0).float(), dist_reduce_fx="sum")
@@ -170,14 +170,14 @@ class FlowMetrics(Metric):
 
             if preds.get('occs') is not None:
                 occlusion_pred = self._fix_shape(preds['occs'], batch_size)
-                occ_wf1 = self._f1_score(occlusion_pred, occlusion_target, mode=self.f1_mode)
-                self.used_keys.extend([('occ_wf1', 'occ_wf1', 'valid_target')])
+                occ_f1 = self._f1_score(occlusion_pred, occlusion_target, mode=self.f1_mode)
+                self.used_keys.extend([('occ_f1', 'occ_f1', 'valid_target')])
 
         if preds.get('mbs') is not None and targets.get('mbs') is not None:
             mb_pred = self._fix_shape(preds['mbs'], batch_size)
             mb_target = self._fix_shape(targets['mbs'], batch_size)
-            mb_wf1 = self._f1_score(mb_pred, mb_target, mode=self.f1_mode)
-            self.used_keys.extend([('mb_wf1', 'mb_wf1', 'valid_target')])
+            mb_f1 = self._f1_score(mb_pred, mb_target, mode=self.f1_mode)
+            self.used_keys.extend([('mb_f1', 'mb_f1', 'valid_target')])
 
         if preds.get('confs') is not None:
             conf_target = torch.exp(-torch.pow(flow_target - flow_pred, 2).sum(dim=1, keepdim=True))
