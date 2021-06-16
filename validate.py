@@ -300,7 +300,7 @@ def _write_to_file(
             elif len(v.shape) == 2 or (len(v.shape) == 3 and (v.shape[2] == 1 or v.shape[2] == 3)):
                 if v.max() <= 1:
                     v = v * 255
-                cv.imwrite(str(out_dir / f'{image_name}.png'), v)
+                cv.imwrite(str(out_dir / f'{image_name}.png'), v.astype(np.uint8))
 
 
 if __name__ == '__main__':

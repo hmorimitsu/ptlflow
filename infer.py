@@ -276,7 +276,9 @@ def write_outputs(
                 flow_format = '.' + flow_format
             flow_write(out_path.with_suffix(flow_format), v)
         elif len(v.shape) == 2 or (len(v.shape) == 3 and (v.shape[2] == 1 or v.shape[2] == 3)):
-            cv.imwrite(str(out_path.with_suffix('.png')), v*255)
+            if v.max() <= 1:
+                v = v * 255
+            cv.imwrite(str(out_path.with_suffix('.png')), v.astype(np.uint8))
 
 
 if __name__ == '__main__':
