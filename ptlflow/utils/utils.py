@@ -18,6 +18,7 @@
 
 import logging
 from argparse import ArgumentParser
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -194,12 +195,14 @@ def add_datasets_to_parser(
 
 def config_logging() -> None:
     """Initialize logging parameters."""
+    log_dir = Path('ptlflow_logs')
+    log_dir.mkdir(exist_ok=True)
     logging.basicConfig(
         format='%(asctime)s - %(levelname)s: %(message)s',
         datefmt='%m/%d/%Y %H:%M:%S',
         level=logging.INFO,
         handlers=[
-            logging.FileHandler("ptlflow_logging.txt"),
+            logging.FileHandler(log_dir / 'log_run.txt'),
             logging.StreamHandler()
         ]
     )
