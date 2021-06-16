@@ -101,14 +101,8 @@ def infer(
 
     io_adapter = IOAdapter(model, prev_img.shape[:2], args.input_size)
 
-    is_img_valid = True
     for i in tqdm(range(1, num_imgs)):
-        if cap is not None:
-            is_img_valid, img = cap.read()
-            img_name = '{:08d}'.format(i)
-        else:
-            img = cv.imread(str(img_paths[i]))
-            img_name = img_paths[i-1].stem
+        img, img_name, is_img_valid = _read_image(cap, img_paths, i)
 
         if not is_img_valid:
             break
@@ -279,6 +273,21 @@ def write_outputs(
             if v.max() <= 1:
                 v = v * 255
             cv.imwrite(str(out_path.with_suffix('.png')), v.astype(np.uint8))
+
+
+def _read_image(
+    cap: cv.VideoCapture,
+    img_paths: List[Union[str, Path]],
+    i: int
+) -> Tuple[np.ndarray, str, bool]:
+    if cap is not None:
+        is_img_valid, img = cap.read()
+        img_name = '{:08d}'.format(i)
+    else:
+        img = cv.imread(str(img_paths[i]))
+        img_name = img_paths[i-1].stem
+        is_img_valid = True
+    return img, img_name, is_img_valid
 
 
 if __name__ == '__main__':
