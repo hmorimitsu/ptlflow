@@ -44,7 +44,8 @@ class FlowMetrics(Metric):
         dist_sync_on_step: bool = False,
         prefix: str = '',
         average_mode: str = 'epoch_mean',
-        ema_decay: float = 0.99
+        ema_decay: float = 0.99,
+        f1_mode: str = 'macro'
     ) -> None:
         """Initialize FlowMetrics.
 
@@ -58,6 +59,10 @@ class FlowMetrics(Metric):
             How the final metric is averaged. It can be either 'epoch_mean' or 'ema' (exponential moving average).
         ema_decay : float, default 0.99
             The decay to be applied if average_mode is 'ema'.
+        f1_mode : float, default 'macro'
+            How to calculate the f1-score. Accepts one of these options {binary, macro, weighted}. If binary, then the f1-score
+            is calculated only for the positive pixels. If macro, then the f1-score is the average of positive and negative
+            scores. If weighted, then the average is weighted according to the number of positive/negative samples.
         """
         super().__init__(dist_sync_on_step=dist_sync_on_step)
 
@@ -66,6 +71,7 @@ class FlowMetrics(Metric):
         self.average_mode = average_mode
         self.prefix = prefix
         self.ema_decay = ema_decay
+        self.f1_mode = f1_mode
         self.ema_max_count = min(100, int(1.0/(1.0-ema_decay)))
 
         self.add_state("epe", default=torch.tensor(0).float(), dist_reduce_fx="sum")
@@ -164,13 +170,13 @@ class FlowMetrics(Metric):
 
             if preds.get('occs') is not None:
                 occlusion_pred = self._fix_shape(preds['occs'], batch_size)
-                occ_wf1 = self._weighted_f1_score(occlusion_pred, occlusion_target)
+                occ_wf1 = self._f1_score(occlusion_pred, occlusion_target, mode=self.f1_mode)
                 self.used_keys.extend([('occ_wf1', 'occ_wf1', 'valid_target')])
 
         if preds.get('mbs') is not None and targets.get('mbs') is not None:
             mb_pred = self._fix_shape(preds['mbs'], batch_size)
             mb_target = self._fix_shape(targets['mbs'], batch_size)
-            mb_wf1 = self._weighted_f1_score(mb_pred, mb_target)
+            mb_wf1 = self._f1_score(mb_pred, mb_target, mode=self.f1_mode)
             self.used_keys.extend([('mb_wf1', 'mb_wf1', 'valid_target')])
 
         if preds.get('confs') is not None:
@@ -237,35 +243,50 @@ class FlowMetrics(Metric):
             tensor = tensor.mean()
         return tensor
 
-    def _weighted_f1_score(self,
-                           pred: torch.Tensor,
-                           target: torch.Tensor) -> torch.Tensor:
-        f1_pos = self._f1_score(pred, target)
-        f1_neg = self._f1_score(1-pred, 1-target)
+    def _f1_score(
+        self,
+        pred: torch.Tensor,
+        target: torch.Tensor,
+        mode: str = 'macro'
+    ) -> torch.Tensor:
+        f1_pos = self._single_f1_score(pred, target)
 
-        target_pos = (target > 0.5).float()
-        target_pos = target_pos.view(target_pos.shape[0], target_pos.shape[1], -1)
-        n_pos = target_pos.sum(dim=2)[:, :, None, None]
-        w_pos = n_pos / target_pos.shape[2]
+        if mode == 'binary':
+            return f1_pos
+        else:
+            f1_neg = self._single_f1_score(1-pred, 1-target)
+            if mode == 'macro':
+                return (f1_pos + f1_neg) / 2.0
+            else:  # weighted
+                target_pos = (target > 0.5).float()
+                target_pos = target_pos.view(target_pos.shape[0], target_pos.shape[1], -1)
+                n_pos = target_pos.sum(dim=2)[:, :, None, None]
+                w_pos = n_pos / target_pos.shape[2]
 
-        target_neg = (target <= 0.5).float()
-        target_neg = target_neg.view(target_neg.shape[0], target_neg.shape[1], -1)
-        n_neg = target_neg.sum(dim=2)[:, :, None, None]
-        w_neg = n_neg / target_neg.shape[2]
+                target_neg = (target <= 0.5).float()
+                target_neg = target_neg.view(target_neg.shape[0], target_neg.shape[1], -1)
+                n_neg = target_neg.sum(dim=2)[:, :, None, None]
+                w_neg = n_neg / target_neg.shape[2]
 
-        f1_weighted = w_pos*f1_pos + w_neg*f1_neg
+                f1_weighted = w_pos*f1_pos + w_neg*f1_neg
 
-        return f1_weighted
+                return f1_weighted
 
-    def _f1_score(self,
-                  pred: torch.Tensor,
-                  target: torch.Tensor) -> torch.Tensor:
+    def _single_f1_score(
+        self,
+        pred: torch.Tensor,
+        target: torch.Tensor
+    ) -> torch.Tensor:
         pred_bin = (pred > 0.5).float()
         target_bin = (target > 0.5).float()
 
-        tp = (pred_bin * target_bin)
-        fp = ((1-pred_bin) * target_bin)
-        fn = (pred_bin * (1-target_bin))
+        dims = pred_bin.shape
+        pred_bin = pred_bin.view(*dims[:-2], -1)
+        target_bin = target_bin.view(*dims[:-2], -1)
+
+        tp = (pred_bin * target_bin).sum(dim=-1)
+        fp = ((1-pred_bin) * target_bin).sum(dim=-1)
+        fn = (pred_bin * (1-target_bin)).sum(dim=-1)
 
         eps = torch.finfo(pred.dtype).eps
         precision = tp / (tp + fp + eps)
@@ -275,9 +296,11 @@ class FlowMetrics(Metric):
 
         return f1
 
-    def _fix_shape(self,
-                   tensor: torch.Tensor,
-                   batch_size: int) -> torch.Tensor:
+    def _fix_shape(
+        self,
+        tensor: torch.Tensor,
+        batch_size: int
+    ) -> torch.Tensor:
         if len(tensor.shape) == 2:
             tensor = tensor[None, None]
         elif len(tensor.shape) == 3:
@@ -289,8 +312,10 @@ class FlowMetrics(Metric):
             tensor = tensor.view(tensor.shape[0]*tensor.shape[1], tensor.shape[2], tensor.shape[3], tensor.shape[4])
         return tensor
 
-    def _get_batch_size(self,
-                        flow_tensor: torch.Tensor) -> int:
+    def _get_batch_size(
+        self,
+        flow_tensor: torch.Tensor
+    ) -> int:
         if len(flow_tensor.shape) < 4:
             return 1
         else:
