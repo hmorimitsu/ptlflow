@@ -408,7 +408,7 @@ class LoggerCallback(Callback):
         if isinstance(limit_batches, int):
             max_range = limit_batches - 1
         else:
-            max_range = int(limit_batches * dataloader_length)
+            max_range = int(limit_batches * dataloader_length) - 1
         return max_range
 
     def _make_image_grid(

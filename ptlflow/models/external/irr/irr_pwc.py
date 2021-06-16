@@ -194,8 +194,12 @@ class ExternalIRRPWC(BaseModel):
             outputs['flow_preds'] = flows
             outputs['occ_preds'] = occs
             outputs['flows'] = (upsample2d_as(flow_f, x1_raw, mode="bilinear") * (1.0 / self.args.div_flow))[:, None]
-            outputs['occs'] = upsample2d_as(occ_f, x1_raw, mode="bilinear")[:, None]
+            outputs['occs'] = upsample2d_as(torch.sigmoid(occ_f), x1_raw, mode="bilinear")[:, None]
+            outputs['flows_b'] = (upsample2d_as(flow_b, x1_raw, mode="bilinear") * (1.0 / self.args.div_flow))[:, None]
+            outputs['occs_b'] = upsample2d_as(torch.sigmoid(occ_b), x1_raw, mode="bilinear")[:, None]
         else:
             outputs['flows'] = (upsample2d_as(flow_f, x1_raw, mode="bilinear") * (1.0 / self.args.div_flow))[:, None]
-            outputs['occs'] = upsample2d_as(occ_f, x1_raw, mode="bilinear")[:, None]
+            outputs['occs'] = upsample2d_as(torch.sigmoid(occ_f), x1_raw, mode="bilinear")[:, None]
+            outputs['flows_b'] = (upsample2d_as(flow_b, x1_raw, mode="bilinear") * (1.0 / self.args.div_flow))[:, None]
+            outputs['occs_b'] = upsample2d_as(torch.sigmoid(occ_b), x1_raw, mode="bilinear")[:, None]
         return outputs

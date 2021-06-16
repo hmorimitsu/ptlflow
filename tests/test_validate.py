@@ -34,8 +34,7 @@ def test_validate(tmp_path: Path) -> None:
 
     args.datasets = ['kitti', 'sintel']
     args.output_path = tmp_path
-    args.write_flow = True
-    args.write_viz = True
+    args.write_outputs = True
     args.max_samples = 1
     args.mpi_sintel_root_dir = tmp_path / 'MPI-Sintel'
     args.kitti_2012_root_dir = tmp_path / 'KITTI/2012'
@@ -55,13 +54,13 @@ def test_validate(tmp_path: Path) -> None:
         ('sintel-clean-trainval', 'sequence_1/frame_0001'),
         ('sintel-final-trainval', 'sequence_1/frame_0001')]
     for dname, dpath in dataset_name_path:
-        assert (tmp_path / dname / 'flow' / (dpath+'.flo')).exists()
-        assert (tmp_path / dname / 'viz' / (dpath+'.png')).exists()
+        assert (tmp_path / dname / 'flows' / (dpath+'.flo')).exists()
+        assert (tmp_path / dname / 'flows_viz' / (dpath+'.png')).exists()
 
     args.flow_format = 'png'
     model = ptlflow.get_model(TEST_MODEL, None, args)
     validate.validate(args, model)
     for dname, dpath in dataset_name_path:
-        assert (tmp_path / dname / 'flow' / (dpath+'.png')).exists()
+        assert (tmp_path / dname / 'flows' / (dpath+'.png')).exists()
 
     shutil.rmtree(tmp_path)

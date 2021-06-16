@@ -60,16 +60,15 @@ You can use the argument ``--show`` to have the images and predictions displayed
 
     python validate.py ext_raft_small --pretrained_ckpt things --show
 
-Saving flow results to disk
-===========================
+Saving results to disk
+======================
 
-The predictions can also be saved to disk. Use ``--write_flow`` to write the optical flow array of values to disk.
-The structure of the outputs should be similar to the inputs. If you also want to save an RGB representation of the
-flow, then pass ``--write_viz``:
+The predictions can also be saved to disk. Use ``--write_outputs`` to write the optical flow and other
+predictions that the selected model may generate. The structure of the outputs should be similar to the inputs.
 
 .. code-block:: bash
 
-    python validate.py ext_raft_small --pretrained_ckpt things --write_flow --write_viz
+    python validate.py ext_raft_small --pretrained_ckpt things --write_outputs
 
 Viewing the validation metrics
 ==============================
