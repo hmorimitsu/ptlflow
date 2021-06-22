@@ -350,10 +350,10 @@ class BaseModel(pl.LightningModule):
             divider = len(divider)
         elif isinstance(divider, str):
             divider = len(divider.split(','))
-        else:
+        elif not isinstance(divider, int):
             raise ValueError('--gpus must be int, str or List[int].')
 
-        total_steps = self.args.max_steps / divider
+        total_steps = self.args.max_steps // divider
 
         optimizer = optim.AdamW(self.parameters(), lr=self.args.lr, weight_decay=self.args.wdecay)
         lr_scheduler = optim.lr_scheduler.OneCycleLR(
