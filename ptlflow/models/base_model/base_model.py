@@ -327,6 +327,11 @@ class BaseModel(pl.LightningModule):
             A dict with two keys:
             - 'optimizer': an optimizer from PyTorch.
             - 'lr_scheduler': Dict['str', Any], a dict with the selected scheduler and its required arguments.
+
+        Raises
+        ------
+        ValueError
+            When self.args.gpus has an invalid value.
         """
         assert self.loss_fn is not None, f'Model {self.__class__.__name__} cannot be trained. It does not have loss function.'
 
@@ -338,9 +343,21 @@ class BaseModel(pl.LightningModule):
                 logging.warning('--max_epochs is not set. It will be set to %d.', self.args.max_epochs)
             self.args.max_steps = self.args.max_epochs * self.train_dataloader_length
 
+        divider = self.args.gpus
+        if divider is None:
+            divider = 1
+        elif isinstance(divider, list) or isinstance(divider, tuple):
+            divider = len(divider)
+        elif isinstance(divider, str):
+            divider = len(divider.split(','))
+        else:
+            raise ValueError('--gpus must be int, str or List[int].')
+
+        total_steps = self.args.max_steps / divider
+
         optimizer = optim.AdamW(self.parameters(), lr=self.args.lr, weight_decay=self.args.wdecay)
         lr_scheduler = optim.lr_scheduler.OneCycleLR(
-            optimizer, self.args.lr, total_steps=self.args.max_steps, pct_start=0.05, cycle_momentum=False, anneal_strategy='linear')
+            optimizer, self.args.lr, total_steps=total_steps, pct_start=0.05, cycle_momentum=False, anneal_strategy='linear')
         return {'optimizer': optimizer,
                 'lr_scheduler': {'scheduler': lr_scheduler, 'interval': 'step'}}
 
