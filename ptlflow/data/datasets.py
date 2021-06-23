@@ -645,49 +645,10 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
 
         # Read paths from disk
         for split in split_dir_names:
-            for side in self.side_names:
-                for direcs, rev in zip(directions, reverts):
-                    flow_dir = Path(self.root_dir) / split / 'flow' / side / direcs[0]
-                    flow_paths = sorted(flow_dir.glob('*.flo'), reverse=rev)
-
-                    # Create groups to separate different sequences
-                    flow_groups_paths = [[flow_paths[0]]]
-                    prev_idx = int(flow_paths[0].stem)
-                    for path in flow_paths[1:]:
-                        idx = int(path.stem)
-                        if (idx - 1) == prev_idx:
-                            flow_groups_paths[-1].append(path)
-                        else:
-                            flow_groups_paths.append([path])
-                        prev_idx = idx
-
-                    for flow_group in flow_groups_paths:
-                        for i in range(len(flow_group)-self.sequence_length+2):
-                            flow_paths = flow_group[i:i+self.sequence_length-1]
-                            self.flow_paths.append(flow_paths)
-
-                            img_dir = Path(self.root_dir) / split / 'image_clean' / side
-                            img_paths = [img_dir / (fp.stem+'.png') for fp in flow_paths]
-                            if rev:
-                                idx = int(img_paths[0].stem) - 1
-                            else:
-                                idx = int(img_paths[-1].stem) + 1
-                            img_paths.append(img_dir / f'{idx:07d}.png')
-                            self.img_paths.append(img_paths)
-
-                            if (Path(self.root_dir) / split / 'flow_occlusions').exists():
-                                occ_paths = [
-                                    Path(str(fp).replace('flow', 'flow_occlusions').replace('.flo', '.png'))
-                                    for fp in flow_paths]
-                                self.occ_paths.append(occ_paths)
-                            if (Path(self.root_dir) / split / 'motion_boundaries').exists():
-                                mb_paths = [
-                                    Path(str(fp).replace('flow', 'motion_boundaries').replace('.flo', '.png'))
-                                    for fp in flow_paths]
-                                self.mb_paths.append(mb_paths)
-
-                    if self.get_backward:
-                        flow_dir = Path(self.root_dir) / split / 'flow' / side / direcs[1]
+            for pass_name in self.pass_names:
+                for side in self.side_names:
+                    for direcs, rev in zip(directions, reverts):
+                        flow_dir = Path(self.root_dir) / split / 'flow' / side / direcs[0]
                         flow_paths = sorted(flow_dir.glob('*.flo'), reverse=rev)
 
                         # Create groups to separate different sequences
@@ -704,18 +665,58 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
                         for flow_group in flow_groups_paths:
                             for i in range(len(flow_group)-self.sequence_length+2):
                                 flow_paths = flow_group[i:i+self.sequence_length-1]
-                                self.flow_b_paths.append(flow_paths)
+                                self.flow_paths.append(flow_paths)
+
+                                img_dir = Path(self.root_dir) / split / f'image_{pass_name}' / side
+                                img_paths = [img_dir / (fp.stem+'.png') for fp in flow_paths]
+                                if rev:
+                                    idx = int(img_paths[0].stem) - 1
+                                else:
+                                    idx = int(img_paths[-1].stem) + 1
+                                img_paths.append(img_dir / f'{idx:07d}.png')
+                                self.img_paths.append(img_paths)
 
                                 if (Path(self.root_dir) / split / 'flow_occlusions').exists():
                                     occ_paths = [
                                         Path(str(fp).replace('flow', 'flow_occlusions').replace('.flo', '.png'))
                                         for fp in flow_paths]
-                                    self.occ_b_paths.append(occ_paths)
+                                    self.occ_paths.append(occ_paths)
                                 if (Path(self.root_dir) / split / 'motion_boundaries').exists():
                                     mb_paths = [
                                         Path(str(fp).replace('flow', 'motion_boundaries').replace('.flo', '.png'))
                                         for fp in flow_paths]
-                                    self.mb_b_paths.append(mb_paths)
+                                    self.mb_paths.append(mb_paths)
+
+                        if self.get_backward:
+                            flow_dir = Path(self.root_dir) / split / 'flow' / side / direcs[1]
+                            flow_paths = sorted(flow_dir.glob('*.flo'), reverse=rev)
+
+                            # Create groups to separate different sequences
+                            flow_groups_paths = [[flow_paths[0]]]
+                            prev_idx = int(flow_paths[0].stem)
+                            for path in flow_paths[1:]:
+                                idx = int(path.stem)
+                                if (idx - 1) == prev_idx:
+                                    flow_groups_paths[-1].append(path)
+                                else:
+                                    flow_groups_paths.append([path])
+                                prev_idx = idx
+
+                            for flow_group in flow_groups_paths:
+                                for i in range(len(flow_group)-self.sequence_length+2):
+                                    flow_paths = flow_group[i:i+self.sequence_length-1]
+                                    self.flow_b_paths.append(flow_paths)
+
+                                    if (Path(self.root_dir) / split / 'flow_occlusions').exists():
+                                        occ_paths = [
+                                            Path(str(fp).replace('flow', 'flow_occlusions').replace('.flo', '.png'))
+                                            for fp in flow_paths]
+                                        self.occ_b_paths.append(occ_paths)
+                                    if (Path(self.root_dir) / split / 'motion_boundaries').exists():
+                                        mb_paths = [
+                                            Path(str(fp).replace('flow', 'motion_boundaries').replace('.flo', '.png'))
+                                            for fp in flow_paths]
+                                        self.mb_b_paths.append(mb_paths)
 
         assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs  {len(self.flow_paths)}'
         assert len(self.occ_paths) == 0 or len(self.img_paths) == len(self.occ_paths), (
