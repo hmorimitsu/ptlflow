@@ -2,6 +2,7 @@
 
 ![GitHub CI flake8 status](https://github.com/hmorimitsu/ptlflow/actions/workflows/flake8.yml/badge.svg)
 ![GitHub CI pytest status](https://github.com/hmorimitsu/ptlflow/actions/workflows/pytest.yml/badge.svg)
+![GitHub CI pytest pip status](https://github.com/hmorimitsu/ptlflow/actions/workflows/pytest_pip.yml/badge.svg)
 [![DOI](https://zenodo.org/badge/375416785.svg)](https://zenodo.org/badge/latestdoi/375416785)
 
 ## Introduction
