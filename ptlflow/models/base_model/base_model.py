@@ -351,7 +351,7 @@ class BaseModel(pl.LightningModule):
         elif isinstance(divider, str):
             divider = len(divider.split(','))
         elif not isinstance(divider, int):
-            raise ValueError('--gpus must be int, str or List[int].')
+            raise ValueError(f'--gpus must be int, str or List[int]. Received {type(divider)}.')
 
         total_steps = self.args.max_steps // divider
 
