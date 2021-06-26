@@ -327,11 +327,6 @@ class BaseModel(pl.LightningModule):
             A dict with two keys:
             - 'optimizer': an optimizer from PyTorch.
             - 'lr_scheduler': Dict['str', Any], a dict with the selected scheduler and its required arguments.
-
-        Raises
-        ------
-        ValueError
-            When self.args.gpus has an invalid value.
         """
         assert self.loss_fn is not None, f'Model {self.__class__.__name__} cannot be trained. It does not have loss function.'
 
@@ -344,14 +339,12 @@ class BaseModel(pl.LightningModule):
             self.args.max_steps = self.args.max_epochs * self.train_dataloader_length
 
         divider = self.args.gpus
-        if divider is None:
-            divider = 1
-        elif isinstance(divider, list) or isinstance(divider, tuple):
+        if isinstance(divider, list) or isinstance(divider, tuple):
             divider = len(divider)
         elif isinstance(divider, str):
             divider = len(divider.split(','))
         elif not isinstance(divider, int):
-            raise ValueError(f'--gpus must be int, str or List[int]. Received {type(divider)}.')
+            divider = 1
 
         total_steps = self.args.max_steps // divider
 
