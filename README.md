@@ -41,6 +41,8 @@ You can see a table with main evaluation results of the available models [here](
 
 Please take a look at the [documentation](https://ptlflow.readthedocs.io/) to learn how to install and use PTLFlow.
 
+You can also see an example of how to predict optical flow in [this Google Colab notebook](https://colab.research.google.com/drive/1YARBRUGplqTRnRuY9sKIs6LY_2kWAWZJ?usp=sharing).
+
 ## Licenses
 
 The original code of this repository is licensed under the [Apache 2.0 license](LICENSE).
