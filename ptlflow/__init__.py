@@ -16,6 +16,8 @@
 # limitations under the License.
 # =============================================================================
 
+__version__ = '0.1.5'
+
 import logging
 from argparse import Namespace
 from pathlib import Path
