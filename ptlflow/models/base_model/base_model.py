@@ -330,17 +330,27 @@ class BaseModel(pl.LightningModule):
         """
         assert self.loss_fn is not None, f'Model {self.__class__.__name__} cannot be trained. It does not have loss function.'
 
-        if self.args.max_epochs is None:
-            self.args.max_epochs = 10
-            logging.warning('--max_epochs is not set. It will be set to %d.', self.args.max_epochs)
-
         self.train_dataloader()  # Just to initialize dataloader variables
 
+        if self.args.max_steps is None:
+            if self.args.max_epochs is None:
+                self.args.max_epochs = 10
+                logging.warning('--max_epochs is not set. It will be set to %d.', self.args.max_epochs)
+            self.args.max_steps = self.args.max_epochs * self.train_dataloader_length
+
+        divider = self.args.gpus
+        if isinstance(divider, list) or isinstance(divider, tuple):
+            divider = len(divider)
+        elif isinstance(divider, str):
+            divider = len(divider.split(','))
+        elif not isinstance(divider, int):
+            divider = 1
+
+        total_steps = self.args.max_steps // divider
+
         optimizer = optim.AdamW(self.parameters(), lr=self.args.lr, weight_decay=self.args.wdecay)
-        assert self.args.max_epochs is not None, 'BasicModel optimizer requires --max_epochs to be set.'
         lr_scheduler = optim.lr_scheduler.OneCycleLR(
-            optimizer, self.args.lr, epochs=self.args.max_epochs, steps_per_epoch=self.train_dataloader_length, pct_start=0.05,
-            cycle_momentum=False, anneal_strategy='linear')
+            optimizer, self.args.lr, total_steps=total_steps, pct_start=0.05, cycle_momentum=False, anneal_strategy='linear')
         return {'optimizer': optimizer,
                 'lr_scheduler': {'scheduler': lr_scheduler, 'interval': 'step'}}
 

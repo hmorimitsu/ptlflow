@@ -300,9 +300,9 @@ def write_things_subset(
 
     root_dir = Path(root_dir) / 'FlyingThings3D_subset'
     for split in ['train', 'val']:
-        for cat in ['image_clean', 'flow', 'flow_occlusions', 'motion_boundaries']:
+        for cat in ['image_clean', 'image_final', 'flow', 'flow_occlusions', 'motion_boundaries']:
             for side in ['left', 'right']:
-                if cat == 'image_clean':
+                if cat == 'image_clean' or cat == 'image_final':
                     img_dir_path = root_dir / split / cat / side
                     img_dir_path.mkdir(parents=True, exist_ok=True)
                     cv.imwrite(str(img_dir_path / '0000000.png'), img)

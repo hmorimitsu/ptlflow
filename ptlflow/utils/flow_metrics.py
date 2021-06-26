@@ -294,7 +294,7 @@ class FlowMetrics(Metric):
 
         f1 = 2*precision*recall / (precision + recall + eps)
 
-        return f1
+        return f1[:, :, None]
 
     def _fix_shape(
         self,
