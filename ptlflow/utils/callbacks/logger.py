@@ -293,7 +293,7 @@ class LoggerCallback(Callback):
         image = Image.fromarray(image)
 
         this_dir = Path(__file__).resolve().parent
-        title_font = ImageFont.truetype(str(this_dir / '../../../assets/RobotoMono-Regular.ttf'), size//10)
+        title_font = ImageFont.truetype(str(this_dir / 'RobotoMono-Regular.ttf'), size//10)
 
         draw = ImageDraw.Draw(image)
         bb = (size//25, size//25, size//25+len(img_title)*size//15, size//25+size//8)
