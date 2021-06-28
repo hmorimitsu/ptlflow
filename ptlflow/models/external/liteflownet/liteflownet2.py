@@ -349,6 +349,10 @@ class PseudoRegularization(nn.Module):
 
 
 class ExternalLiteFlowNet2(BaseModel):
+    pretrained_checkpoints = {
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/liteflownet/ext_liteflownet2-sintel-1e1eb282.ckpt'
+    }
+
     def __init__(self,
                  args: Namespace):
         super(ExternalLiteFlowNet2, self).__init__(
@@ -430,6 +434,10 @@ class ExternalLiteFlowNet2(BaseModel):
 
 
 class ExternalLiteFlowNet2PseudoReg(ExternalLiteFlowNet2):
+    pretrained_checkpoints = {
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/liteflownet/ext_liteflownet2-kitti-da069fca.ckpt'
+    }
+
     def __init__(self,
                  args: Namespace):
         args.use_pseudo_regularization = True
