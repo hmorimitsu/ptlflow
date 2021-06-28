@@ -66,29 +66,29 @@ LiteFlowNet
 
 - Paper: **LiteFlowNet: A Lightweight Convolutional Neural Network for Optical Flow Estimation** - `https://arxiv.org/abs/1805.07036 <https://arxiv.org/abs/1805.07036>`_
 
-- Reference code: `https://github.com/twhui/LiteFlowNet <https://github.com/twhui/LiteFlowNet>`_
+- Reference code: `https://github.com/twhui/LiteFlowNet <https://github.com/twhui/LiteFlowNet>`__
 
 - Model name: ``ext_liteflownet``
 
 LiteFlowNet2
------------
+------------
 
 `[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/external/liteflownet>`__
 
 - Paper: **A Lightweight Optical Flow CNN - Revisiting Data Fidelity and Regularization** - `https://ieeexplore.ieee.org/document/9018073 <https://ieeexplore.ieee.org/document/9018073>`_
 
-- Reference code: `https://github.com/twhui/LiteFlowNet2 <https://github.com/twhui/LiteFlowNet2>`_
+- Reference code: `https://github.com/twhui/LiteFlowNet2 <https://github.com/twhui/LiteFlowNet2>`__
 
 - Model names: ``ext_liteflownet2``, ``ext_liteflownet2_pseudoreg``
 
 LiteFlowNet3
------------
+------------
 
 `[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/external/liteflownet>`__
 
 - Paper: **LiteFlowNet3: Resolving Correspondence Ambiguity for More Accurate Optical Flow Estimation** - `https://arxiv.org/abs/2007.09319 <https://arxiv.org/abs/2007.09319>`_
 
-- Reference code: `https://github.com/twhui/LiteFlowNet <https://github.com/twhui/LiteFlowNet3>`_
+- Reference code: `https://github.com/twhui/LiteFlowNet <https://github.com/twhui/LiteFlowNet3>`__
 
 - Model names: ``ext_liteflownet3``, ``ext_liteflownet3_pseudoreg``, ``ext_liteflownet3s``, ``ext_liteflownet3s_pseudoreg``
 
