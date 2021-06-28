@@ -117,7 +117,7 @@ class Matching(nn.Module):
 
         corr_stride = [1, 1, 1, 2, 2][level]
         flow_kernel_size = [3, 3, 5, 5, 7][level]
-        self.mult = [div_flow / 2**(num_levels-i) for i in range(5)][level]
+        self.mult = [div_flow / 2**(num_levels-i) for i in range(num_levels)][level]
 
         self.leaky_relu = nn.LeakyReLU(0.1, inplace=True)
 
@@ -176,7 +176,7 @@ class SubPixel(nn.Module):
 
         inputs_dims = [386, 258, 194, 130, 130][level]
         flow_kernel_size = [3, 3, 5, 5, 7][level]
-        self.mult = [div_flow / 2**(num_levels-i) for i in range(5)][level]
+        self.mult = [div_flow / 2**(num_levels-i) for i in range(num_levels)][level]
 
         self.leaky_relu = nn.LeakyReLU(0.1, inplace=True)
 
@@ -214,7 +214,7 @@ class Regularization(nn.Module):
 
         inputs_dims = [195, 131, 99, 67, 35][level]
         flow_kernel_size = [3, 3, 5, 5, 7][level]
-        self.mult = [div_flow / 2**(num_levels-i) for i in range(5)][level]
+        self.mult = [div_flow / 2**(num_levels-i) for i in range(num_levels)][level]
 
         self.leaky_relu = nn.LeakyReLU(0.1, inplace=True)
 
@@ -291,12 +291,13 @@ class ExternalLiteFlowNet(BaseModel):
             loss_fn=None,
             output_stride=32)
 
-        num_levels = 5
+        self.num_levels = 5
 
         self.feature_net = FeatureExtractor()
-        self.matching_nets = nn.ModuleList([Matching(i) for i in range(num_levels)])
-        self.subpixel_nets = nn.ModuleList([SubPixel(i) for i in range(num_levels)])
-        self.regularization_nets = nn.ModuleList([Regularization(i) for i in range(num_levels)])
+        self.matching_nets = nn.ModuleList([Matching(i, self.num_levels, self.args.div_flow) for i in range(self.num_levels)])
+        self.subpixel_nets = nn.ModuleList([SubPixel(i, self.num_levels, self.args.div_flow) for i in range(self.num_levels)])
+        self.regularization_nets = nn.ModuleList(
+            [Regularization(i, self.num_levels, self.args.div_flow) for i in range(self.num_levels)])
         self.feat2_conv = nn.Sequential(
             nn.Conv2d(32, 64, 1, 1, 0),
             nn.LeakyReLU(0.1, inplace=True)
@@ -323,9 +324,9 @@ class ExternalLiteFlowNet(BaseModel):
         flow_preds = []
         flow = None
 
-        for i in range(5):
+        for i in range(self.num_levels):
             feats2 = feats_pyr[i]
-            if i == 4:
+            if i == (self.num_levels - 1):
                 feats2 = self.feat2_conv(feats2.view(-1, *feats2.shape[2:])).view(*feats2.shape[:2], -1, *feats2.shape[3:])
             flow = self.matching_nets[i](feats2, flow)
             flow = self.subpixel_nets[i](feats2, flow)
