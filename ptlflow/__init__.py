@@ -39,6 +39,7 @@ from ptlflow.models.external.irr.pwcnet import ExternalIRRPWCNet
 from ptlflow.models.external.irr.pwcnet_irr import ExternalIRRPWCNetIRR
 from ptlflow.models.external.irr.irr_pwc import ExternalIRRPWC
 from ptlflow.models.external.liteflownet.liteflownet import ExternalLiteFlowNet
+from ptlflow.models.external.liteflownet.liteflownet2 import ExternalLiteFlowNet2, ExternalLiteFlowNet2PseudoReg
 from ptlflow.models.external.pwcnet.pwcnet import ExternalPWCNet, ExternalPWCDCNet
 from ptlflow.models.external.raft.raft import ExternalRAFT, ExternalRAFTSmall
 from ptlflow.models.external.scopeflow.irr_pwc_v2 import ExternalScopeFlow
@@ -61,6 +62,8 @@ models_dict = {
     'ext_irr_pwcnet': ExternalIRRPWCNet,
     'ext_irr_pwcnet_irr': ExternalIRRPWCNetIRR,
     'ext_liteflownet': ExternalLiteFlowNet,
+    'ext_liteflownet2': ExternalLiteFlowNet2,
+    'ext_liteflownet2_pseudoreg': ExternalLiteFlowNet2PseudoReg,
     'ext_pwcnet': ExternalPWCNet,
     'ext_pwcdcnet': ExternalPWCDCNet,
     'ext_raft': ExternalRAFT,
