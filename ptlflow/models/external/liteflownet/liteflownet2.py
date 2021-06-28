@@ -107,7 +107,7 @@ class Matching(nn.Module):
     def __init__(
         self,
         level: int,
-        num_levels: int = 5,
+        num_levels: int = 4,
         div_flow: float = 20.0
     ) -> None:
         super(Matching, self).__init__()
@@ -119,9 +119,9 @@ class Matching(nn.Module):
         self.leaky_relu = nn.LeakyReLU(0.1, inplace=True)
 
         if level == 0:
-            self.up_conv = None
+            self.up_flow = None
         else:
-            self.up_conv = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False, groups=2)
+            self.up_flow = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False, groups=2)
 
         if level < 3:
             self.up_corr = None
@@ -151,7 +151,7 @@ class Matching(nn.Module):
     ) -> torch.Tensor:
         warped_feat2 = feats[:, 1]
         if flow is not None:
-            flow = self.up_conv(flow)
+            flow = self.up_flow(flow)
             warped_feat2 = _warp(feats[:, 1], flow*self.mult)
 
         corr = self.leaky_relu(self.corr(feats[:, 0], warped_feat2))
@@ -169,7 +169,7 @@ class SubPixel(nn.Module):
     def __init__(
         self,
         level: int,
-        num_levels: int = 5,
+        num_levels: int = 4,
         div_flow: float = 20.0
     ) -> None:
         super(SubPixel, self).__init__()
@@ -213,7 +213,7 @@ class Regularization(nn.Module):
     def __init__(
         self,
         level: int,
-        num_levels: int = 5,
+        num_levels: int = 4,
         div_flow: float = 20.0
     ) -> None:
         super(Regularization, self).__init__()
@@ -290,11 +290,11 @@ class Regularization(nn.Module):
         return flow, x
 
 
-class PseudoMatching(nn.Module):
+class PseudoSubpixel(nn.Module):
     def __init__(
         self
     ) -> None:
-        super(PseudoMatching, self).__init__()
+        super(PseudoSubpixel, self).__init__()
 
         self.up_flow = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False, groups=2)
 
@@ -364,15 +364,11 @@ class ExternalLiteFlowNet2(BaseModel):
         self.regularization_nets = nn.ModuleList([Regularization(i, self.num_levels, self.args.div_flow) for i in range(self.num_levels)])
 
         if self.args.use_pseudo_regularization:
-            self.pseudo_matching = PseudoMatching()
+            self.pseudo_subpixel = PseudoSubpixel()
             self.pseudo_regularization = PseudoRegularization()
             self.up_flow = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False, groups=2)
         else:
             self.up_flow = nn.ConvTranspose2d(2, 2, 8, 4, 2, bias=False, groups=2)
-
-        # for n, p in self.named_parameters():
-        #     print(n, p.shape)
-        # sds
 
     @staticmethod
     def add_model_specific_args(parent_parser=None):
@@ -403,7 +399,7 @@ class ExternalLiteFlowNet2(BaseModel):
             flow_preds.append(flow)
         
         if self.args.use_pseudo_regularization:
-            flow = self.pseudo_matching(sub_feat, flow)
+            flow = self.pseudo_subpixel(sub_feat, flow)
             flow = self.pseudo_regularization(reg_feat, flow)
             flow = self.up_flow(flow)
         else:

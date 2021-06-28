@@ -122,9 +122,9 @@ class Matching(nn.Module):
         self.leaky_relu = nn.LeakyReLU(0.1, inplace=True)
 
         if level == 0:
-            self.up_conv = None
+            self.up_flow = None
         else:
-            self.up_conv = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False, groups=2)
+            self.up_flow = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False, groups=2)
 
         if level < 3:
             self.up_corr = None
@@ -143,7 +143,6 @@ class Matching(nn.Module):
 
         self.corr = SpatialCorrelationSampler(kernel_size=1, patch_size=7, padding=0, stride=corr_stride, dilation_patch=corr_stride)
 
-
     def forward(
         self,
         feats: torch.Tensor,
@@ -151,7 +150,7 @@ class Matching(nn.Module):
     ) -> torch.Tensor:
         warped_feat2 = feats[:, 1]
         if flow is not None:
-            flow = self.up_conv(flow)
+            flow = self.up_flow(flow)
             warped_feat2 = _warp(feats[:, 1], flow*self.mult)
 
         corr = self.leaky_relu(self.corr(feats[:, 0], warped_feat2))
