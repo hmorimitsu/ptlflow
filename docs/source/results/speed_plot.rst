@@ -2,7 +2,7 @@
 Inference speed vs. Trainable parameters
 ========================================
 
-.. image:: speed_plot.png
+.. image:: speed_plot-all.png
   :width: 600
   :alt: Plot of inference speed vs. trainable parameters of the available models.
 
