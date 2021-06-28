@@ -110,7 +110,8 @@ class FlowFieldDeformation(nn.Module):
     ) -> None:
         super(FlowFieldDeformation, self).__init__()
 
-        patch_size = [None, None, 7, 9][level]
+        patch_size = [None, 5, 7, 9][level]
+        pred_kernel_size = [None, 3, 5, 5][level]
 
         self.leaky_relu = nn.LeakyReLU(0.1, inplace=True)
 
@@ -129,10 +130,10 @@ class FlowFieldDeformation(nn.Module):
             self.leaky_relu,
         )
 
-        self.disp_pred = nn.Conv2d(32, 2, 5, 1, 2)
+        self.disp_pred = nn.Conv2d(32, 2, pred_kernel_size, 1, pred_kernel_size//2)
 
         self.conf_pred = nn.Sequential(
-            nn.Conv2d(32, 1, 5, 1, 2),
+            nn.Conv2d(32, 1, pred_kernel_size, 1, pred_kernel_size//2),
             nn.Sigmoid()
         )
 
@@ -170,7 +171,7 @@ class CostVolumeModulation(nn.Module):
     ) -> None:
         super().__init__()
 
-        input_dims = [None, None, 178, 146][level]
+        input_dims = [None, 210, 178, 146][level]
         self.mult = [div_flow / 2**(num_levels-i+1) for i in range(num_levels)][level]
         
         self.corr = SpatialCorrelationSampler(
@@ -224,7 +225,8 @@ class Matching(nn.Module):
         self,
         level: int,
         num_levels: int = 4,
-        div_flow: float = 20.0
+        div_flow: float = 20.0,
+        use_s_version: bool = False
     ) -> None:
         super(Matching, self).__init__()
 
@@ -233,7 +235,7 @@ class Matching(nn.Module):
 
         self.leaky_relu = nn.LeakyReLU(0.1, inplace=True)
 
-        if level == 1:
+        if level == 1 and not use_s_version:
             self.up_flow = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False, groups=2)
         else:
             self.up_flow = None
@@ -330,13 +332,14 @@ class Regularization(nn.Module):
         self,
         level: int,
         num_levels: int = 4,
-        div_flow: float = 20.0
+        div_flow: float = 20.0,
+        use_s_version: bool = False
     ) -> None:
         super(Regularization, self).__init__()
 
         inputs_dims = [195, 131, 99, 67][level]
         flow_kernel_size = [3, 3, 5, 5][level]
-        conf_kernel_size = [None, 3, 5, None][level]
+        conf_kernel_size = [3, 3, 5, None][level]
         self.mult = [div_flow / 2**(num_levels-i+1) for i in range(num_levels)][level]
 
         self.leaky_relu = nn.LeakyReLU(0.1, inplace=True)
@@ -375,7 +378,7 @@ class Regularization(nn.Module):
 
         self.unfold = nn.Unfold(flow_kernel_size, padding=flow_kernel_size//2)
 
-        if level == 0 or level == 3:
+        if (level == 0 and not use_s_version) or level == 3:
             self.conf_pred = None
         else:
             self.conf_pred = nn.Sequential(
@@ -487,12 +490,20 @@ class ExternalLiteFlowNet3(BaseModel):
 
         self.num_levels = 4
 
+        if args.use_s_version:
+            self.min_mod_level = 1
+        else:
+            self.min_mod_level = 2
+
         self.feature_net = FeatureExtractor()
-        self.deformation_nets = nn.ModuleList([FlowFieldDeformation(i) for i in range(2, self.num_levels)])
-        self.modulation_nets = nn.ModuleList([CostVolumeModulation(i, self.num_levels, self.args.div_flow) for i in range(2, self.num_levels)])
-        self.matching_nets = nn.ModuleList([Matching(i, self.num_levels, self.args.div_flow) for i in range(self.num_levels)])
+        self.deformation_nets = nn.ModuleList([FlowFieldDeformation(i) for i in range(self.min_mod_level, self.num_levels)])
+        self.modulation_nets = nn.ModuleList(
+            [CostVolumeModulation(i, self.num_levels, self.args.div_flow) for i in range(self.min_mod_level, self.num_levels)])
+        self.matching_nets = nn.ModuleList(
+            [Matching(i, self.num_levels, self.args.div_flow, self.args.use_s_version) for i in range(self.num_levels)])
         self.subpixel_nets = nn.ModuleList([SubPixel(i, self.num_levels, self.args.div_flow) for i in range(self.num_levels)])
-        self.regularization_nets = nn.ModuleList([Regularization(i, self.num_levels, self.args.div_flow) for i in range(self.num_levels)])
+        self.regularization_nets = nn.ModuleList(
+            [Regularization(i, self.num_levels, self.args.div_flow, self.args.use_s_version) for i in range(self.num_levels)])
 
         if self.args.use_pseudo_regularization:
             self.pseudo_subpixel = PseudoSubpixel()
@@ -507,6 +518,7 @@ class ExternalLiteFlowNet3(BaseModel):
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
         parser.add_argument('--div_flow', type=float, default=20.0)
         parser.add_argument('--use_pseudo_regularization', action='store_true')
+        parser.add_argument('--use_s_version', action='store_true')
         return parser
 
     def forward(
@@ -527,10 +539,10 @@ class ExternalLiteFlowNet3(BaseModel):
         corr = None
 
         for i in range(self.num_levels):
-            if i > 1:
-                flow, conf = self.deformation_nets[i-2](feats_pyr[i], flow, conf)
+            if i >= self.min_mod_level:
+                flow, conf = self.deformation_nets[i-self.min_mod_level](feats_pyr[i], flow, conf)
                 conf_preds.append(conf)
-                corr = self.modulation_nets[i-2](feats_pyr[i], flow, conf)
+                corr = self.modulation_nets[i-self.min_mod_level](feats_pyr[i], flow, conf)
             flow = self.matching_nets[i](feats_pyr[i], flow, corr)
             flow, sub_feat = self.subpixel_nets[i](feats_pyr[i], flow)
             flow, conf, reg_feat = self.regularization_nets[i](images_pyr[i], feats_pyr[i], flow)
@@ -574,3 +586,18 @@ class ExternalLiteFlowNet3PseudoReg(ExternalLiteFlowNet3):
                  args: Namespace):
         args.use_pseudo_regularization = True
         super(ExternalLiteFlowNet3PseudoReg, self).__init__(args=args)
+
+
+class ExternalLiteFlowNet3S(ExternalLiteFlowNet3):
+    def __init__(self,
+                 args: Namespace):
+        args.use_s_version = True
+        super(ExternalLiteFlowNet3S, self).__init__(args=args)
+
+
+class ExternalLiteFlowNet3SPseudoReg(ExternalLiteFlowNet3):
+    def __init__(self,
+                 args: Namespace):
+        args.use_s_version = True
+        args.use_pseudo_regularization = True
+        super(ExternalLiteFlowNet3SPseudoReg, self).__init__(args=args)
