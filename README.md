@@ -27,10 +27,15 @@ This is still under development, so some things may not work as intended. I plan
 - FlowNet2 - [https://arxiv.org/abs/1612.01925](https://arxiv.org/abs/1612.01925)
 - HD3 - [https://arxiv.org/abs/1812.06264](https://arxiv.org/abs/1812.06264)
 - IRR - [https://arxiv.org/abs/1904.05290](https://arxiv.org/abs/1904.05290)
+- LiteFlowNet [https://arxiv.org/abs/1805.07036](https://arxiv.org/abs/1805.07036)
+- LiteFlowNet2 [https://arxiv.org/abs/1903.07414](https://arxiv.org/abs/1903.07414)
+- LiteFlowNet3 [https://arxiv.org/abs/2007.09319](https://arxiv.org/abs/2007.09319)
 - PWCNet - [https://arxiv.org/abs/1709.02371](https://arxiv.org/abs/1709.02371)
 - RAFT - [https://arxiv.org/abs/2003.12039](https://arxiv.org/abs/2003.12039)
 - ScopeFlow -  [https://arxiv.org/abs/2002.10770](https://arxiv.org/abs/2002.10770)
 - VCN - [https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf](https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf)
+
+Read more details about the models on [https://ptlflow.readthedocs.io/en/latest/models/models_list.html](https://ptlflow.readthedocs.io/en/latest/models/models_list.html).
 
 # Results
 
