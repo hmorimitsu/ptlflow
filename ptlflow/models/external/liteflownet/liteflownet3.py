@@ -545,13 +545,15 @@ class ExternalLiteFlowNet3(BaseModel):
         for i in range(self.num_levels):
             if i >= self.min_mod_level:
                 flow, conf = self.deformation_nets[i-self.min_mod_level](feats_pyr[i], flow, conf)
-                conf_preds.append(conf)
+                if conf is not None:
+                    conf_preds.append(conf)
                 corr = self.modulation_nets[i-self.min_mod_level](feats_pyr[i], flow, conf)
             flow = self.matching_nets[i](feats_pyr[i], flow, corr)
             flow, sub_feat = self.subpixel_nets[i](feats_pyr[i], flow)
             flow, conf, reg_feat = self.regularization_nets[i](images_pyr[i], feats_pyr[i], flow)
             flow_preds.append(flow)
-            conf_preds.append(conf)
+            if conf is not None:
+                conf_preds.append(conf)
         
         if self.args.use_pseudo_regularization:
             flow = self.pseudo_subpixel(sub_feat, flow)
@@ -561,13 +563,17 @@ class ExternalLiteFlowNet3(BaseModel):
             flow = self.up_flow(flow)
         flow = flow * self.args.div_flow
 
+        conf = F.interpolate(conf_preds[-1], scale_factor=4, mode='bilinear', align_corners=False)
+
         outputs = {}
         if self.training:
             outputs['flow_preds'] = flow_preds
             outputs['conf_preds'] = conf_preds
             outputs['flows'] = flow[:, None]
+            outputs['confs'] = conf[:, None]
         else:
             outputs['flows'] = flow[:, None]
+            outputs['confs'] = conf[:, None]
         return outputs
 
 
