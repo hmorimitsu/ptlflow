@@ -57,7 +57,7 @@ IRR
 
 - Reference code: `https://github.com/visinf/irr <https://github.com/visinf/irr>`_
 
-- Model names: ``ext_irr_pwc``, ``ext_irr_pwcnet``, `ext_irr_pwcnet_irr`
+- Model names: ``ext_irr_pwc``, ``ext_irr_pwcnet``, ``ext_irr_pwcnet_irr``
 
 LiteFlowNet
 -----------
