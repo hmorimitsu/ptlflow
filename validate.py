@@ -159,6 +159,7 @@ def validate(
     for dataset_name, dl in dataloaders.items():
         metrics_mean = validate_one_dataloader(args, model, dl, dataset_name)
         metrics_df[[f'{dataset_name}-{k}' for k in metrics_mean.keys()]] = metrics_mean.values()
+        args.output_path.mkdir(parents=True, exist_ok=True)
         metrics_df.T.to_csv(args.output_path / 'metrics.csv', header=False)
     metrics_df = metrics_df.round(3)
     return metrics_df
