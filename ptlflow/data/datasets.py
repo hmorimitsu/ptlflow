@@ -687,6 +687,12 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
                                         for fp in flow_paths]
                                     self.mb_paths.append(mb_paths)
 
+                                self.metadata.append({
+                                    'image_paths': [str(p) for p in img_paths],
+                                    'is_val': False,
+                                    'misc': ''
+                                })
+
                         if self.get_backward:
                             flow_dir = Path(self.root_dir) / split / 'flow' / side / direcs[1]
                             flow_paths = sorted(flow_dir.glob('*.flo'), reverse=rev)

@@ -24,7 +24,7 @@ List of models
 Flownet
 -------
 
-`[source code] <https://github.com/hmorimitsu/ptlflow/tree/master/models/external/flownet>`__
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/external/flownet>`__
 
 - Papers:
 
@@ -39,7 +39,7 @@ Flownet
 HD3
 ---
 
-`[source code] <https://github.com/hmorimitsu/ptlflow/tree/master/models/external/hd3>`__
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/external/hd3>`__
 
 - Paper: **Hierarchical Discrete Distribution Decomposition for Match Density Estimation** - `https://arxiv.org/abs/1812.06264 <https://arxiv.org/abs/1812.06264>`_
 
@@ -51,18 +51,51 @@ HD3
 IRR
 ---
 
-`[source code] <https://github.com/hmorimitsu/ptlflow/tree/master/models/external/irr>`__
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/external/irr>`__
 
 - Paper: **Iterative Residual Refinement for Joint Optical Flow and Occlusion Estimation** - `https://arxiv.org/abs/1904.05290 <https://arxiv.org/abs/1904.05290>`_
 
 - Reference code: `https://github.com/visinf/irr <https://github.com/visinf/irr>`_
 
-- Model names: ``ext_irr_pwc``, ``ext_irr_pwcnet``, `ext_irr_pwcnet_irr`
+- Model names: ``ext_irr_pwc``, ``ext_irr_pwcnet``, ``ext_irr_pwcnet_irr``
+
+LiteFlowNet
+-----------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/external/liteflownet>`__
+
+- Paper: **LiteFlowNet: A Lightweight Convolutional Neural Network for Optical Flow Estimation** - `https://arxiv.org/abs/1805.07036 <https://arxiv.org/abs/1805.07036>`_
+
+- Reference code: `https://github.com/twhui/LiteFlowNet <https://github.com/twhui/LiteFlowNet>`__
+
+- Model name: ``ext_liteflownet``
+
+LiteFlowNet2
+------------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/external/liteflownet>`__
+
+- Paper: **A Lightweight Optical Flow CNN - Revisiting Data Fidelity and Regularization** - `https://ieeexplore.ieee.org/document/9018073 <https://ieeexplore.ieee.org/document/9018073>`_
+
+- Reference code: `https://github.com/twhui/LiteFlowNet2 <https://github.com/twhui/LiteFlowNet2>`__
+
+- Model names: ``ext_liteflownet2``, ``ext_liteflownet2_pseudoreg``
+
+LiteFlowNet3
+------------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/external/liteflownet>`__
+
+- Paper: **LiteFlowNet3: Resolving Correspondence Ambiguity for More Accurate Optical Flow Estimation** - `https://arxiv.org/abs/2007.09319 <https://arxiv.org/abs/2007.09319>`_
+
+- Reference code: `https://github.com/twhui/LiteFlowNet <https://github.com/twhui/LiteFlowNet3>`__
+
+- Model names: ``ext_liteflownet3``, ``ext_liteflownet3_pseudoreg``, ``ext_liteflownet3s``, ``ext_liteflownet3s_pseudoreg``
 
 PWCNet
 ------
 
-`[source code] <https://github.com/hmorimitsu/ptlflow/tree/master/models/external/pwcnet>`__
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/external/pwcnet>`__
 
 - Paper: **PWC-Net: CNNs for Optical Flow Using Pyramid, Warping, and Cost Volume** - `https://arxiv.org/abs/1709.02371 <https://arxiv.org/abs/1709.02371>`_
 
@@ -73,7 +106,7 @@ PWCNet
 RAFT
 ----
 
-`[source code] <https://github.com/hmorimitsu/ptlflow/tree/master/models/external/raft>`__
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/external/raft>`__
 
 - Paper: **RAFT: Recurrent All-Pairs Field Transforms for Optical Flow** - `https://arxiv.org/abs/2003.12039 <https://arxiv.org/abs/2003.12039>`_
 
@@ -84,7 +117,7 @@ RAFT
 ScopeFlow
 ---------
 
-`[source code] <https://github.com/hmorimitsu/ptlflow/tree/master/models/external/scopeflow>`__
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/external/scopeflow>`__
 
 - Paper: **ScopeFlow: Dynamic Scene Scoping for Optical Flow** - `https://arxiv.org/abs/2002.10770 <https://arxiv.org/abs/2002.10770>`_
 
@@ -95,7 +128,7 @@ ScopeFlow
 VCN
 ---
 
-`[source code] <https://github.com/hmorimitsu/ptlflow/tree/master/models/external/vcn>`__
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/external/vcn>`__
 
 - Paper: **Volumetric Correspondence Networks for Optical Flow** - `https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf <https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf>`_
 

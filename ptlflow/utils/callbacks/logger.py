@@ -382,7 +382,7 @@ class LoggerCallback(Callback):
         torch.Tensor
             The confidence score for each pixel of the input.
         """
-        conf_gt = torch.exp(-torch.pow(pred_flows - target_flows, 2).sum(dim=1, keepdim=True))
+        conf_gt = torch.exp(-torch.pow(pred_flows - target_flows, 2).sum(dim=2, keepdim=True))
         return conf_gt
 
     def _compute_max_range(

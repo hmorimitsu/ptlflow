@@ -19,6 +19,15 @@ ext_irr_pwc-sintel-6ad65777.ckpt,IRR-PWC_sintel-best,
 ext_irr_pwc-things-c143e848.ckpt,IRR-PWC_things3d-best,
 ext_irr_pwcnet-things-3f7fb8ca.ckpt,PWCNet-best,
 ext_irr_pwcnet_irr-things-41a07190.ckpt,PWCNet-irr-best,
+ext_liteflownet-kitti-49f1991a.ckpt,liteflownet-ft-kitti.caffemodel,https://github.com/twhui/LiteFlowNet
+ext_liteflownet-sintel-17991e50.ckpt,liteflownet-ft-sintel.caffemodel,
+ext_liteflownet-things-a4d066e2.ckpt,liteflownet.caffemodel,
+ext_liteflownet2-kitti-da069fca.ckpt,LiteFlowNet2-ft-kitti.caffemodel,https://github.com/twhui/LiteFlowNet2
+ext_liteflownet2-sintel-1e1eb282.ckpt,LiteFlowNet2-ft-sintel.caffemodel,
+ext_liteflownet3-kitti-b5d32443.ckpt,LiteFlowNet3-ft-kitti.caffemodel,https://github.com/twhui/LiteFlowNet3
+ext_liteflownet3-sintel-d985929f.ckpt,LiteFlowNet3-ft-sintel.caffemodel,
+ext_liteflownet3s-kitti-5dffb261.ckpt,LiteFlowNet3-S-ft-kitti.caffemodel,
+ext_liteflownet3s-sintel-89793e34.ckpt,LiteFlowNet3-S-ft-sintel.caffemodel,
 ext_pwcdcnet-sintel-0f9cc3bf.ckpt,pwc_net.pth.tar,https://github.com/NVlabs/PWC-Net/tree/master/PyTorch
 ext_pwcdcnet-things-cc223701.ckpt,pwc_net_chairs.pth.tar,
 ext_pwcnet-sintel-0916cff4.ckpt,pwc_net.pth.tar,

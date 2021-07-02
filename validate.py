@@ -20,7 +20,7 @@ import logging
 import sys
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2 as cv
 import numpy as np
@@ -43,8 +43,12 @@ config_logging()
 def _init_parser() -> ArgumentParser:
     parser = ArgumentParser()
     parser.add_argument(
-        'model', type=str, choices=['all']+get_list_of_available_models_list(),
+        'model', type=str, choices=['all', 'select']+get_list_of_available_models_list(),
         help='Name of the model to use.')
+    parser.add_argument(
+        '--selection', type=str, nargs='+', default=None,
+        help=('Used in combination with model=select. The select mode can be used to run the validation on multiple models '
+              'at once. Put a list of model names here separated by spaces.'))
     parser.add_argument(
         '--datasets', type=str, nargs='+', default=['kitti', 'sintel'],
         help='Names of the datasets to use for the validation. Supported datasets are {{\'kitti\',\'sintel\'}}')
@@ -155,6 +159,7 @@ def validate(
     for dataset_name, dl in dataloaders.items():
         metrics_mean = validate_one_dataloader(args, model, dl, dataset_name)
         metrics_df[[f'{dataset_name}-{k}' for k in metrics_mean.keys()]] = metrics_mean.values()
+        args.output_path.mkdir(parents=True, exist_ok=True)
         metrics_df.T.to_csv(args.output_path / 'metrics.csv', header=False)
     metrics_df = metrics_df.round(3)
     return metrics_df
@@ -227,6 +232,18 @@ def validate_one_dataloader(
     for k, v in metrics_sum.items():
         metrics_mean[k] = v / len(dataloader)
     return metrics_mean
+
+
+def _get_model_names(
+    args: Namespace
+) -> List[str]:
+    if args.model == 'all':
+        model_names = ptlflow.models_dict.keys()
+    elif args.model == 'select':
+        if args.selection is None:
+            raise ValueError('When select is chosen, model names must be provided to --selection.')
+        model_names = args.selection
+    return model_names
 
 
 def _prepare_inputs(
@@ -309,7 +326,7 @@ if __name__ == '__main__':
     # TODO: It is ugly that the model has to be gotten from the argv rather than the argparser.
     # However, I do not see another way, since the argparser requires the model to load some of the args.
     FlowModel = None
-    if len(sys.argv) > 1 and sys.argv[1] != '-h' and sys.argv[1] != '--help' and sys.argv[1] != 'all':
+    if len(sys.argv) > 1 and sys.argv[1] not in ['-h', '--help', 'all', 'select']:
         FlowModel = get_model_reference(sys.argv[1])
         parser = FlowModel.add_model_specific_args(parser)
 
@@ -317,7 +334,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if args.model != 'all':
+    if args.model not in ['all', 'select']:
         model_id = args.model
         if args.pretrained_ckpt is not None:
             model_id += f'_{args.pretrained_ckpt}'
@@ -330,7 +347,8 @@ if __name__ == '__main__':
         # Run validation on all models and checkpoints
         metrics_df = pd.DataFrame()
 
-        model_names = ptlflow.models_dict.keys()
+        model_names = _get_model_names(args)
+
         for mname in model_names:
             logging.info(mname)
             model_ref = ptlflow.get_model_reference(mname)

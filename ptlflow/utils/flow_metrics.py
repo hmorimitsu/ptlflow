@@ -96,7 +96,7 @@ class FlowMetrics(Metric):
 
         self.add_state("occ_f1", default=torch.tensor(0).float(), dist_reduce_fx="sum")
         self.add_state("mb_f1", default=torch.tensor(0).float(), dist_reduce_fx="sum")
-        self.add_state("conf_l1", default=torch.tensor(0).float(), dist_reduce_fx="sum")
+        self.add_state("conf_f1", default=torch.tensor(0).float(), dist_reduce_fx="sum")
 
         self.add_state("sample_count", default=torch.tensor(0).float(), dist_reduce_fx="sum")
         self.add_state("step_count", default=torch.tensor(0).float(), dist_reduce_fx="sum")
@@ -182,8 +182,8 @@ class FlowMetrics(Metric):
         if preds.get('confs') is not None:
             conf_target = torch.exp(-torch.pow(flow_target - flow_pred, 2).sum(dim=1, keepdim=True))
             conf_pred = self._fix_shape(preds['confs'], batch_size)
-            conf_l1 = torch.abs(conf_target - conf_pred)
-            self.used_keys.extend([('conf_l1', 'conf_l1', 'valid_target')])
+            conf_f1 = self._f1_score(conf_pred, conf_target, mode=self.f1_mode)
+            self.used_keys.extend([('conf_f1', 'conf_f1', 'valid_target')])
 
         for v1, v2, v3 in self.used_keys:
             setattr(self, v1, prev_weight*getattr(self, v1) + next_weight*self._compute_total(locals()[v2], locals()[v3]))

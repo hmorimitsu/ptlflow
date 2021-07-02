@@ -75,6 +75,34 @@ reference_accuracy = {
     'ext_irr_pwcnet_irr_things_flyingthings3d': 12.492,
     'ext_irr_pwcnet_irr_things_kitti': 13.227,
     'ext_irr_pwcnet_irr_things_sintel': 0.326,
+    'ext_liteflownet_kitti_flyingchairs': 1.997,
+    'ext_liteflownet_kitti_flyingthings3d': 34.782,
+    'ext_liteflownet_kitti_kitti': 2.193,
+    'ext_liteflownet_kitti_sintel': 0.365,
+    'ext_liteflownet2_sintel_flyingchairs': 1.013,
+    'ext_liteflownet2_sintel_flyingthings3d': 13.676,
+    'ext_liteflownet2_sintel_kitti': 2.571,
+    'ext_liteflownet2_sintel_sintel': 0.259,
+    'ext_liteflownet2_pseudoreg_kitti_flyingchairs': 1.934,
+    'ext_liteflownet2_pseudoreg_kitti_flyingthings3d': 33.268,
+    'ext_liteflownet2_pseudoreg_kitti_kitti': 2.271,
+    'ext_liteflownet2_pseudoreg_kitti_sintel': 0.395,
+    'ext_liteflownet3_sintel_flyingchairs': 1.405,
+    'ext_liteflownet3_sintel_flyingthings3d': 12.914,
+    'ext_liteflownet3_sintel_kitti': 2.814,
+    'ext_liteflownet3_sintel_sintel': 0.240,
+    'ext_liteflownet3_pseudoreg_kitti_flyingchairs': 1.704,
+    'ext_liteflownet3_pseudoreg_kitti_flyingthings3d': 33.071,
+    'ext_liteflownet3_pseudoreg_kitti_kitti': 1.884,
+    'ext_liteflownet3_pseudoreg_kitti_sintel': 0.447,
+    'ext_liteflownet3s_sintel_flyingchairs': 1.307,
+    'ext_liteflownet3s_sintel_flyingthings3d': 12.512,
+    'ext_liteflownet3s_sintel_kitti': 4.478,
+    'ext_liteflownet3s_sintel_sintel': 0.252,
+    'ext_liteflownet3s_pseudoreg_kitti_flyingchairs': 1.894,
+    'ext_liteflownet3s_pseudoreg_kitti_flyingthings3d': 27.463,
+    'ext_liteflownet3s_pseudoreg_kitti_kitti': 2.177,
+    'ext_liteflownet3s_pseudoreg_kitti_sintel': 0.393,
     'ext_pwcnet_things_flyingchairs': 2.056,
     'ext_pwcnet_things_flyingthings3d': 20.956,
     'ext_pwcnet_things_kitti': 11.156,
@@ -154,8 +182,9 @@ def test_accuracy() -> None:
 
             id_str = f'{mname}_{cname}_{dataset_name}'
             if cname is not None:
-                ref_epe = reference_accuracy[id_str]
-                assert epe < 1.1*ref_epe, id_str
+                if reference_accuracy.get(id_str) is not None:
+                    ref_epe = reference_accuracy[id_str]
+                    assert epe < 1.1*ref_epe, id_str
 
                 print(f'    \'{id_str}\': {epe:.03f},')
 
