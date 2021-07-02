@@ -482,7 +482,7 @@ class PseudoRegularization(nn.Module):
 
 class ExternalLiteFlowNet3(BaseModel):
     pretrained_checkpoints = {
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/liteflownet/ext_liteflownet3-sintel-d985929f.ckpt'
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet3-sintel-d985929f.ckpt'
     }
 
     def __init__(self,
@@ -593,7 +593,7 @@ class ExternalLiteFlowNet3(BaseModel):
 
 class ExternalLiteFlowNet3PseudoReg(ExternalLiteFlowNet3):
     pretrained_checkpoints = {
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/liteflownet/ext_liteflownet3-kitti-b5d32443.ckpt'
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet3-kitti-b5d32443.ckpt'
     }
 
     def __init__(self,
@@ -604,7 +604,7 @@ class ExternalLiteFlowNet3PseudoReg(ExternalLiteFlowNet3):
 
 class ExternalLiteFlowNet3S(ExternalLiteFlowNet3):
     pretrained_checkpoints = {
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/liteflownet/ext_liteflownet3s-sintel-89793e34.ckpt'
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet3s-sintel-89793e34.ckpt'
     }
 
     def __init__(self,
@@ -615,7 +615,7 @@ class ExternalLiteFlowNet3S(ExternalLiteFlowNet3):
 
 class ExternalLiteFlowNet3SPseudoReg(ExternalLiteFlowNet3):
     pretrained_checkpoints = {
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/liteflownet/ext_liteflownet3s-kitti-5dffb261.ckpt'
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet3s-kitti-5dffb261.ckpt'
     }
 
     def __init__(self,

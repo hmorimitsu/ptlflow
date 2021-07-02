@@ -284,9 +284,9 @@ class Regularization(nn.Module):
 
 class ExternalLiteFlowNet(BaseModel):
     pretrained_checkpoints = {
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/liteflownet/ext_liteflownet-kitti-49f1991a.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/liteflownet/ext_liteflownet-sintel-17991e50.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/liteflownet/ext_liteflownet-things-a4d066e2.ckpt'
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet-kitti-49f1991a.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet-sintel-17991e50.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet-things-a4d066e2.ckpt'
     }
 
     def __init__(self,
