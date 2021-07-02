@@ -393,7 +393,7 @@ class Regularization(nn.Module):
         flow: torch.Tensor
     ) -> torch.Tensor:
         img2_warped = _warp(images[:, 1], flow*self.mult)
-        img_diff_norm = torch.norm(images[:, 0] - img2_warped[:, 1], p=2, dim=1, keepdim=True)
+        img_diff_norm = torch.norm(images[:, 0] - img2_warped, p=2, dim=1, keepdim=True)
 
         flow_mean = flow.view(*flow.shape[:2], -1).mean(dim=-1)[..., None, None]
         flow_nomean = flow - flow_mean
