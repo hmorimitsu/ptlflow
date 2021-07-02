@@ -20,7 +20,7 @@ import logging
 import sys
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2 as cv
 import numpy as np
@@ -234,6 +234,18 @@ def validate_one_dataloader(
     return metrics_mean
 
 
+def _get_model_names(
+    args: Namespace
+) -> List[str]:
+    if args.model == 'all':
+        model_names = ptlflow.models_dict.keys()
+    elif args.model == 'select':
+        if args.selection is None:
+            raise ValueError('When select is chosen, model names must be provided to --selection.')
+        model_names = args.selection
+    return model_names
+
+
 def _prepare_inputs(
     inputs: Dict[str, torch.Tensor],
     model: BaseModel,
@@ -335,12 +347,7 @@ if __name__ == '__main__':
         # Run validation on all models and checkpoints
         metrics_df = pd.DataFrame()
 
-        if args.model == 'all':
-            model_names = ptlflow.models_dict.keys()
-        elif args.model == 'select':
-            if args.selection is None:
-                raise ValueError('When select is chosen, model names must be provided to --selection.')
-            model_names = args.selection
+        model_names = _get_model_names(args)
 
         for mname in model_names:
             logging.info(mname)
