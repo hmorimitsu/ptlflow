@@ -21,7 +21,7 @@ import ptlflow
 import validate
 from ptlflow.utils.dummy_datasets import write_kitti, write_sintel
 
-TEST_MODEL = 'ext_raft_small'
+TEST_MODEL = 'raft_small'
 
 
 def test_validate(tmp_path: Path) -> None:

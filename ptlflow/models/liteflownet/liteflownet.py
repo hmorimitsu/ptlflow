@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .warp import WarpingLayer
-from ...base_model.base_model import BaseModel
+from ..base_model.base_model import BaseModel
 
 
 class FeatureExtractor(nn.Module):
@@ -251,16 +251,16 @@ class Regularization(nn.Module):
 
         return flow
 
-class ExternalLiteFlowNet(BaseModel):
+class LiteFlowNet(BaseModel):
     pretrained_checkpoints = {
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet-kitti-49f1991a.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet-sintel-17991e50.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet-things-a4d066e2.ckpt'
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet-kitti-49f1991a.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet-sintel-17991e50.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet-things-a4d066e2.ckpt'
     }
 
     def __init__(self,
                  args: Namespace):
-        super(ExternalLiteFlowNet, self).__init__(
+        super(LiteFlowNet, self).__init__(
             args=args,
             loss_fn=None,
             output_stride=32)

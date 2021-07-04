@@ -11,12 +11,12 @@ from .submodules import *
 from .flownet_base import FlowNetBase
 
 
-class ExternalFlowNetFusion(FlowNetBase):
+class FlowNetFusion(FlowNetBase):
     def __init__(self,
                  args: Namespace):
         args.loss_start_scale = 1
         args.loss_num_scales = 3
-        super(ExternalFlowNetFusion, self).__init__(args)
+        super(FlowNetFusion, self).__init__(args)
 
         self.conv0   = conv(self.args.batch_norm,  11,   64)
         self.conv1   = conv(self.args.batch_norm,  64,   64, stride=2)

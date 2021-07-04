@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .warp import WarpingLayer
-from ...base_model.base_model import BaseModel
+from ..base_model.base_model import BaseModel
 
 
 class FeatureExtractor(nn.Module):
@@ -319,14 +319,14 @@ class PseudoRegularization(nn.Module):
         return flow
 
 
-class ExternalLiteFlowNet2(BaseModel):
+class LiteFlowNet2(BaseModel):
     pretrained_checkpoints = {
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet2-sintel-1e1eb282.ckpt'
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet2-sintel-1e1eb282.ckpt'
     }
 
     def __init__(self,
                  args: Namespace):
-        super(ExternalLiteFlowNet2, self).__init__(
+        super(LiteFlowNet2, self).__init__(
             args=args,
             loss_fn=None,
             output_stride=32)
@@ -404,12 +404,12 @@ class ExternalLiteFlowNet2(BaseModel):
         return images_pyr
 
 
-class ExternalLiteFlowNet2PseudoReg(ExternalLiteFlowNet2):
+class LiteFlowNet2PseudoReg(LiteFlowNet2):
     pretrained_checkpoints = {
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet2-kitti-da069fca.ckpt'
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet2-kitti-da069fca.ckpt'
     }
 
     def __init__(self,
                  args: Namespace):
         args.use_pseudo_regularization = True
-        super(ExternalLiteFlowNet2PseudoReg, self).__init__(args=args)
+        super(LiteFlowNet2PseudoReg, self).__init__(args=args)

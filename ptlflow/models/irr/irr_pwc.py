@@ -7,20 +7,20 @@ import torch.nn as nn
 from .pwc_modules import conv, upsample2d_as, rescale_flow, initialize_msra, compute_cost_volume
 from .pwc_modules import WarpingLayer, FeatureExtractor, ContextNetwork, FlowEstimatorDense, OccContextNetwork, OccEstimatorDense
 from .irr_modules import OccUpsampleNetwork, RefineFlow, RefineOcc
-from ...base_model.base_model import BaseModel
+from ..base_model.base_model import BaseModel
 from .losses import MultiScaleEPE_PWC_Bi_Occ_upsample
 
 
-class ExternalIRRPWC(BaseModel):
+class IRRPWC(BaseModel):
     pretrained_checkpoints = {
-        'chairs_occ': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_irr_pwc-chairs_occ-02066cc4.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_irr_pwc-things-c143e848.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_irr_pwc-sintel-6ad65777.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_irr_pwc-kitti-74d8868f.ckpt'
+        'chairs_occ': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/irr_pwc-chairs_occ-02066cc4.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/irr_pwc-things-c143e848.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/irr_pwc-sintel-6ad65777.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/irr_pwc-kitti-74d8868f.ckpt'
     }
 
     def __init__(self, args):
-        super(ExternalIRRPWC, self).__init__(
+        super(IRRPWC, self).__init__(
             args=args,
             loss_fn=MultiScaleEPE_PWC_Bi_Occ_upsample(args),
             output_stride=64)

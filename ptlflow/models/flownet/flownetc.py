@@ -8,13 +8,13 @@ from torch.nn import init
 from .submodules import *
 from .flownet_base import FlowNetBase
 
-class ExternalFlowNetC(FlowNetBase):
+class FlowNetC(FlowNetBase):
     pretrained_checkpoints = {
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_flownetc-things-cc8ac7fd.ckpt'
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flownetc-things-cc8ac7fd.ckpt'
     }
 
     def __init__(self, args: Namespace):
-        super(ExternalFlowNetC,self).__init__(args)
+        super(FlowNetC,self).__init__(args)
 
         self.args = args
 

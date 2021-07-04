@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .warp import WarpingLayer
-from ...base_model.base_model import BaseModel
+from ..base_model.base_model import BaseModel
 
 
 class FeatureExtractor(nn.Module):
@@ -455,14 +455,14 @@ class PseudoRegularization(nn.Module):
         return flow
 
 
-class ExternalLiteFlowNet3(BaseModel):
+class LiteFlowNet3(BaseModel):
     pretrained_checkpoints = {
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet3-sintel-d985929f.ckpt'
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet3-sintel-d985929f.ckpt'
     }
 
     def __init__(self,
                  args: Namespace):
-        super(ExternalLiteFlowNet3, self).__init__(
+        super(LiteFlowNet3, self).__init__(
             args=args,
             loss_fn=None,
             output_stride=32)
@@ -566,35 +566,35 @@ class ExternalLiteFlowNet3(BaseModel):
         return images_pyr
 
 
-class ExternalLiteFlowNet3PseudoReg(ExternalLiteFlowNet3):
+class LiteFlowNet3PseudoReg(LiteFlowNet3):
     pretrained_checkpoints = {
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet3-kitti-b5d32443.ckpt'
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet3-kitti-b5d32443.ckpt'
     }
 
     def __init__(self,
                  args: Namespace):
         args.use_pseudo_regularization = True
-        super(ExternalLiteFlowNet3PseudoReg, self).__init__(args=args)
+        super(LiteFlowNet3PseudoReg, self).__init__(args=args)
 
 
-class ExternalLiteFlowNet3S(ExternalLiteFlowNet3):
+class LiteFlowNet3S(LiteFlowNet3):
     pretrained_checkpoints = {
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet3s-sintel-89793e34.ckpt'
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet3s-sintel-89793e34.ckpt'
     }
 
     def __init__(self,
                  args: Namespace):
         args.use_s_version = True
-        super(ExternalLiteFlowNet3S, self).__init__(args=args)
+        super(LiteFlowNet3S, self).__init__(args=args)
 
 
-class ExternalLiteFlowNet3SPseudoReg(ExternalLiteFlowNet3):
+class LiteFlowNet3SPseudoReg(LiteFlowNet3):
     pretrained_checkpoints = {
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_liteflownet3s-kitti-5dffb261.ckpt'
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet3s-kitti-5dffb261.ckpt'
     }
 
     def __init__(self,
                  args: Namespace):
         args.use_s_version = True
         args.use_pseudo_regularization = True
-        super(ExternalLiteFlowNet3SPseudoReg, self).__init__(args=args)
+        super(LiteFlowNet3SPseudoReg, self).__init__(args=args)

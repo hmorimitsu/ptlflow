@@ -5,28 +5,28 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 
-from .flownetc import ExternalFlowNetC
-from .flownets import ExternalFlowNetS
+from .flownetc import FlowNetC
+from .flownets import FlowNetS
 from .submodules import *
 from .flownet_base import FlowNetBase
 
-class ExternalFlowNetCS(FlowNetBase):
+class FlowNetCS(FlowNetBase):
     pretrained_checkpoints = {
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_flownetcs-things-4bdecffa.ckpt'
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flownetcs-things-4bdecffa.ckpt'
     }
 
     def __init__(self, args: Namespace):
         args.input_channels = 12
-        super(ExternalFlowNetCS,self).__init__(args)
+        super(FlowNetCS,self).__init__(args)
 
         self.args = args
         self.rgb_max = 1
 
         # First Block (FlowNetC)
-        self.flownetc = ExternalFlowNetC(args)
+        self.flownetc = FlowNetC(args)
 
         # Block (FlowNetS)
-        self.flownets_1 = ExternalFlowNetS(args)
+        self.flownets_1 = FlowNetS(args)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):

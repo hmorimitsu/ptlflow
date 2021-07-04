@@ -5,39 +5,39 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 
-from .flownetc import ExternalFlowNetC
-from .flownets import ExternalFlowNetS
-from .flownetsd import ExternalFlowNetSD
-from .flownet_fusion import ExternalFlowNetFusion
+from .flownetc import FlowNetC
+from .flownets import FlowNetS
+from .flownetsd import FlowNetSD
+from .flownet_fusion import FlowNetFusion
 from .submodules import *
 from .flownet_base import FlowNetBase
 
-class ExternalFlowNet2(FlowNetBase):
+class FlowNet2(FlowNetBase):
     pretrained_checkpoints = {
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_flownet2-things-d63b53a7.ckpt'
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flownet2-things-d63b53a7.ckpt'
     }
     
     def __init__(self, args: Namespace):
         args.input_channels = 12
         args.loss_start_scale = 1
         args.loss_num_scales = 3
-        super(ExternalFlowNet2, self).__init__(args)
+        super(FlowNet2, self).__init__(args)
 
         self.args = args
         self.rgb_max = 1
 
         # First Block (FlowNetC)
-        self.flownetc = ExternalFlowNetC(args)
+        self.flownetc = FlowNetC(args)
 
         # Block (FlowNetS)
-        self.flownets_1 = ExternalFlowNetS(args)
-        self.flownets_2 = ExternalFlowNetS(args)
+        self.flownets_1 = FlowNetS(args)
+        self.flownets_2 = FlowNetS(args)
 
         # Block (FlowNetSD)
-        self.flownets_d = ExternalFlowNetSD(args)
+        self.flownets_d = FlowNetSD(args)
 
         # Block (FLowNetFusion)
-        self.flownetfusion = ExternalFlowNetFusion(args)
+        self.flownetfusion = FlowNetFusion(args)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):

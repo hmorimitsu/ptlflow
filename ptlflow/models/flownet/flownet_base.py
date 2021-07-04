@@ -2,7 +2,7 @@ from argparse import ArgumentParser, Namespace
 
 from torch.functional import norm
 
-from ...base_model.base_model import BaseModel
+from ..base_model.base_model import BaseModel
 from .losses import MultiScale
 
 

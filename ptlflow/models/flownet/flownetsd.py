@@ -12,14 +12,14 @@ from .submodules import *
 from .flownet_base import FlowNetBase
 
 
-class ExternalFlowNetSD(FlowNetBase):
+class FlowNetSD(FlowNetBase):
     pretrained_checkpoints = {
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_flownetsd-things-c5f3124e.ckpt'
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flownetsd-things-c5f3124e.ckpt'
     }
 
     def __init__(self,
                  args: Namespace):
-        super(ExternalFlowNetSD, self).__init__(args)
+        super(FlowNetSD, self).__init__(args)
 
         self.conv0   = conv(self.args.batch_norm,  6,   64)
         self.conv1   = conv(self.args.batch_norm,  64,   64, stride=2)

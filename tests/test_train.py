@@ -27,7 +27,7 @@ import ptlflow
 import train
 from ptlflow.utils.dummy_datasets import write_flying_chairs, write_kitti, write_sintel
 
-TEST_MODEL = 'ext_raft_small'
+TEST_MODEL = 'raft_small'
 TRAIN_DATASET = 'chairs-train'
 TRAIN_LOG_SUFFIX = 'chairs'
 

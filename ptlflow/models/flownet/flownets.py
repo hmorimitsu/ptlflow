@@ -12,14 +12,14 @@ from .submodules import *
 from .flownet_base import FlowNetBase
 
 
-class ExternalFlowNetS(FlowNetBase):
+class FlowNetS(FlowNetBase):
     pretrained_checkpoints = {
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_flownets-things-98cde14d.ckpt'
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flownets-things-98cde14d.ckpt'
     }
 
     def __init__(self,
                  args: Namespace):
-        super(ExternalFlowNetS, self).__init__(args)
+        super(FlowNetS, self).__init__(args)
 
         self.conv1   = conv(self.args.batch_norm,  self.args.input_channels,   64, kernel_size=7, stride=2)
         self.conv2   = conv(self.args.batch_norm,  64,  128, kernel_size=5, stride=2)
