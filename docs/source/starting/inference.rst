@@ -13,13 +13,13 @@ Using this script, you can perform the same operation as in the example above by
 
 .. code-block:: bash
 
-    python infer.py ext_raft_small --pretrained_ckpt things --input_path /path/to/img1.jpg /path/to/img2.jpg --show
+    python infer.py raft_small --pretrained_ckpt things --input_path /path/to/img1.jpg /path/to/img2.jpg --show
 
 Note that you can also give a path to a local checkpoint file to ``--pretrained_ckpt`` as well, like:
 
 .. code-block:: bash
 
-    python infer.py ext_raft_small --pretrained_ckpt /path/to/checkpoint --input_path /path/to/img1.jpg /path/to/img2.jpg --show
+    python infer.py raft_small --pretrained_ckpt /path/to/checkpoint --input_path /path/to/img1.jpg /path/to/img2.jpg --show
 
 You can see all the available options of this script with:
 
@@ -51,7 +51,7 @@ The code below shows a way to do this:
 
     # Get an optical flow model. As as example, we will use RAFT Small
     # with the weights pretrained on the FlyingThings3D dataset
-    model = ptlflow.get_model('ext_raft_small', pretrained_ckpt='things')
+    model = ptlflow.get_model('raft_small', pretrained_ckpt='things')
 
     # Load the images
     images = [

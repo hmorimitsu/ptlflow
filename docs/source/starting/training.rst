@@ -4,9 +4,24 @@
 Train an existing model
 =======================
 
-Models designed for PTLFlow (also called "internal" models) can be seamlessly trained inside the platform.
-"External" models, on the other hand, although should also be able to be trained, are not guaranteed to work
-(read more about :ref:`external-models`).
+Introduction (important, please read it!)
+=========================================
+
+Most models in PTLFlow support training (see :ref:`trainable-models`). The instructions below
+will show how to select a model and train it inside PTLFlow.
+
+That being said, at the moment, most models just use the default training routine provided by the ``BaseModel``.
+Therefore, there is no guarantee that the models trained in this platform will provide results
+close to the original ones. In fact, it is possible that some models will not converge with these
+settings.
+
+I would like to, at some point, be able to test and configure the correct training settings
+for each model. However, at the moment, I do not have the resources for this. If you have successfully
+trained some model inside PTLFlow, please feel free to contribute your results by opening an issue on 
+[the GitHub repository](https://github.com/hmorimitsu/ptlflow).
+
+How to train a model
+====================
 
 You can use the script `train.py <https://github.com/hmorimitsu/ptlflow/tree/master/train.py>`_
 Read :ref:`initial-scripts` to know how to download it.
@@ -20,7 +35,7 @@ Once you have both files, training a model from scratch should be as simple as r
 
 .. code-block:: bash
 
-    python train.py ext_raft_small --train_dataset chairs-train --gpus 1
+    python train.py raft_small --train_dataset chairs-train --gpus 1
 
 This code would train a RAFT Small model on the train split of the FlyingChairs dataset.
 The ``--gpus`` option specifies one GPU will be used for training (see the
@@ -31,7 +46,7 @@ If you want to have more control over the training hyperparameters, you can add 
 
 .. code-block:: bash
 
-    python train.py ext_raft_small --train_dataset chairs-train --lr 0.0001 --train_batch_size 4 --max_epochs 5 --gpus 1
+    python train.py raft_small --train_dataset chairs-train --lr 0.0001 --train_batch_size 4 --max_epochs 5 --gpus 1
 
 You can see all the available options with:
 
@@ -67,7 +82,7 @@ To do so, just use the argument ``--resume_from_checkpoint`` giving the path to 
 
 .. code-block:: bash
 
-    python train.py ext_raft_small --train_dataset chairs-train --gpus 1 --resume_from_checkpoint /path/to/train_checkpoint
+    python train.py raft_small --train_dataset chairs-train --gpus 1 --resume_from_checkpoint /path/to/train_checkpoint
 
 .. _finetuning:
 
@@ -82,7 +97,7 @@ an additional argument ``--clear_train_state``, which will make sure that only t
 
 .. code-block:: bash
 
-    python train.py ext_raft_small --train_dataset things-train --gpus 1 --resume_from_checkpoint /path/to/train_checkpoint --clear_train_state
+    python train.py raft_small --train_dataset things-train --gpus 1 --resume_from_checkpoint /path/to/train_checkpoint --clear_train_state
 
 Finetuning from pretrained weights
 ==================================
@@ -93,7 +108,7 @@ For this, just use ``--pretrained_ckpt`` instead of ``--resume_from_checkpoint``
 
 .. code-block:: bash
 
-    python train.py ext_raft_small --train_dataset sintel-train --gpus 1 --pretrained_ckpt things --clear_train_state
+    python train.py raft_small --train_dataset sintel-train --gpus 1 --pretrained_ckpt things --clear_train_state
 
 .. _saved-checkpoints:
 
@@ -114,6 +129,8 @@ By default, 3 checkpoints will be saved at the end of each epoch:
   the previous "best" checkpoint. By default, ``metric-name`` will be the EPE (End-Point-Error) value obtained from the
   first dataset specified in ``--val_dataset`` (if not specified, it will be the trainval split of the Sintel Final dataset by default).
   You can check :ref:`train-val-dataset` for more details about the ``val_dataset`` string options.
+
+.. _trainable-models:
 
 Trainable models
 ================
