@@ -50,13 +50,13 @@ And you will see an error message showing you a list of valid model names.
 Getting the names of pretrained checkpoints of a model
 ------------------------------------------------------
 
-Suppose you chose a model, let's say ``ext_raft_small``, but you do not know which pretrained checkpoints
+Suppose you chose a model, let's say ``raft_small``, but you do not know which pretrained checkpoints
 are available for it. You can find that out by using one of the initial scripts and passing any invalid
 checkpoint name to ``--pretrained_ckpt`` as follows:
 
 .. code-block:: bash
 
-    python validate.py ext_raft_small --pretrained_ckpt which
+    python validate.py raft_small --pretrained_ckpt which
 
 This will show an error message with a list of the available checkpoint names.
 

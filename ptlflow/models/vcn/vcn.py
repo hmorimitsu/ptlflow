@@ -20,7 +20,7 @@ import time
 
 from .submodule import pspnet_s, pspnet, conv
 from .conv4d import sepConv4d, butterfly4D
-from ...base_model.base_model import BaseModel
+from ..base_model.base_model import BaseModel
 
 
 class VCNLoss(nn.Module):
@@ -202,7 +202,7 @@ class WarpModule(nn.Module):
         return output*mask.unsqueeze(1).float(), mask
 
 
-class ExternalVCNSmall(BaseModel):
+class VCNSmall(BaseModel):
     """
     VCN.
     md defines maximum displacement for each level, following a coarse-to-fine-warping scheme
@@ -210,12 +210,12 @@ class ExternalVCNSmall(BaseModel):
     """
 
     pretrained_checkpoints = {
-        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_vcn_small-chairs-2a5f72ba.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_vcn_small-things-e5a44ada.ckpt'
+        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn_small-chairs-2a5f72ba.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn_small-things-e5a44ada.ckpt'
     }
 
     def __init__(self, args, md=[4,4,4,4,4]):
-        super(ExternalVCNSmall, self).__init__(
+        super(VCNSmall, self).__init__(
             args=args,
             loss_fn=VCNLoss(args),
             output_stride=64)
@@ -587,7 +587,7 @@ class ExternalVCNSmall(BaseModel):
         return outputs
 
 
-class ExternalVCN(ExternalVCNSmall):
+class VCN(VCNSmall):
     """
     VCN.
     md defines maximum displacement for each level, following a coarse-to-fine-warping scheme
@@ -595,14 +595,14 @@ class ExternalVCN(ExternalVCNSmall):
     """
 
     pretrained_checkpoints = {
-        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_vcn-chairs-792544a0.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_vcn-things-c28ef6e7.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_vcn-sintel-4cc40de9.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_vcn-kitti-3fb41a53.ckpt'
+        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-chairs-792544a0.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-things-c28ef6e7.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-sintel-4cc40de9.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-kitti-3fb41a53.ckpt'
     }
 
     def __init__(self, args, md=[4,4,4,4,4]):
-        super(ExternalVCN, self).__init__(
+        super(VCN, self).__init__(
             args=args, md=md)
         use_entropy = True
         withbn = True

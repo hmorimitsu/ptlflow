@@ -1,4 +1,4 @@
-"""Prepare and return the models."""
+"""Provide useful functions for using PTLFlow."""
 
 # =============================================================================
 # Copyright 2021 Henrique Morimitsu
@@ -16,7 +16,7 @@
 # limitations under the License.
 # =============================================================================
 
-__version__ = '0.1.6'
+__version__ = '0.2.0'
 
 import logging
 from argparse import Namespace
@@ -28,55 +28,55 @@ import torch
 from torch import hub
 
 from ptlflow.models.base_model.base_model import BaseModel
-from ptlflow.models.external.flownet.flownet2 import ExternalFlowNet2
-from ptlflow.models.external.flownet.flownetc import ExternalFlowNetC
-from ptlflow.models.external.flownet.flownetcs import ExternalFlowNetCS
-from ptlflow.models.external.flownet.flownetcss import ExternalFlowNetCSS
-from ptlflow.models.external.flownet.flownets import ExternalFlowNetS
-from ptlflow.models.external.flownet.flownetsd import ExternalFlowNetSD
-from ptlflow.models.external.hd3.hd3 import ExternalHD3, ExternalHD3Context
-from ptlflow.models.external.irr.pwcnet import ExternalIRRPWCNet
-from ptlflow.models.external.irr.pwcnet_irr import ExternalIRRPWCNetIRR
-from ptlflow.models.external.irr.irr_pwc import ExternalIRRPWC
-from ptlflow.models.external.liteflownet.liteflownet import ExternalLiteFlowNet
-from ptlflow.models.external.liteflownet.liteflownet3 import (
-    ExternalLiteFlowNet3, ExternalLiteFlowNet3PseudoReg, ExternalLiteFlowNet3S, ExternalLiteFlowNet3SPseudoReg)
-from ptlflow.models.external.liteflownet.liteflownet2 import ExternalLiteFlowNet2, ExternalLiteFlowNet2PseudoReg
-from ptlflow.models.external.pwcnet.pwcnet import ExternalPWCNet, ExternalPWCDCNet
-from ptlflow.models.external.raft.raft import ExternalRAFT, ExternalRAFTSmall
-from ptlflow.models.external.scopeflow.irr_pwc_v2 import ExternalScopeFlow
-from ptlflow.models.external.vcn.vcn import ExternalVCN, ExternalVCNSmall
+from ptlflow.models.flownet.flownet2 import FlowNet2
+from ptlflow.models.flownet.flownetc import FlowNetC
+from ptlflow.models.flownet.flownetcs import FlowNetCS
+from ptlflow.models.flownet.flownetcss import FlowNetCSS
+from ptlflow.models.flownet.flownets import FlowNetS
+from ptlflow.models.flownet.flownetsd import FlowNetSD
+from ptlflow.models.hd3.hd3 import HD3, HD3Context
+from ptlflow.models.irr.pwcnet import IRRPWCNet
+from ptlflow.models.irr.pwcnet_irr import IRRPWCNetIRR
+from ptlflow.models.irr.irr_pwc import IRRPWC
+from ptlflow.models.liteflownet.liteflownet import LiteFlowNet
+from ptlflow.models.liteflownet.liteflownet3 import (
+    LiteFlowNet3, LiteFlowNet3PseudoReg, LiteFlowNet3S, LiteFlowNet3SPseudoReg)
+from ptlflow.models.liteflownet.liteflownet2 import LiteFlowNet2, LiteFlowNet2PseudoReg
+from ptlflow.models.pwcnet.pwcnet import PWCNet, PWCDCNet
+from ptlflow.models.raft.raft import RAFT, RAFTSmall
+from ptlflow.models.scopeflow.irr_pwc_v2 import ScopeFlow
+from ptlflow.models.vcn.vcn import VCN, VCNSmall
 from ptlflow.utils.utils import config_logging
 
 config_logging()
 
 
 models_dict = {
-    'ext_flownet2': ExternalFlowNet2,
-    'ext_flownetc': ExternalFlowNetC,
-    'ext_flownetcs': ExternalFlowNetCS,
-    'ext_flownetcss': ExternalFlowNetCSS,
-    'ext_flownets': ExternalFlowNetS,
-    'ext_flownetsd': ExternalFlowNetSD,
-    'ext_hd3': ExternalHD3,
-    'ext_hd3_ctxt': ExternalHD3Context,
-    'ext_irr_pwc': ExternalIRRPWC,
-    'ext_irr_pwcnet': ExternalIRRPWCNet,
-    'ext_irr_pwcnet_irr': ExternalIRRPWCNetIRR,
-    'ext_liteflownet': ExternalLiteFlowNet,
-    'ext_liteflownet2': ExternalLiteFlowNet2,
-    'ext_liteflownet2_pseudoreg': ExternalLiteFlowNet2PseudoReg,
-    'ext_liteflownet3': ExternalLiteFlowNet3,
-    'ext_liteflownet3_pseudoreg': ExternalLiteFlowNet3PseudoReg,
-    'ext_liteflownet3s': ExternalLiteFlowNet3S,
-    'ext_liteflownet3s_pseudoreg': ExternalLiteFlowNet3SPseudoReg,
-    'ext_pwcnet': ExternalPWCNet,
-    'ext_pwcdcnet': ExternalPWCDCNet,
-    'ext_raft': ExternalRAFT,
-    'ext_raft_small': ExternalRAFTSmall,
-    'ext_scopeflow': ExternalScopeFlow,
-    'ext_vcn': ExternalVCN,
-    'ext_vcn_small': ExternalVCNSmall,
+    'flownet2': FlowNet2,
+    'flownetc': FlowNetC,
+    'flownetcs': FlowNetCS,
+    'flownetcss': FlowNetCSS,
+    'flownets': FlowNetS,
+    'flownetsd': FlowNetSD,
+    'hd3': HD3,
+    'hd3_ctxt': HD3Context,
+    'irr_pwc': IRRPWC,
+    'irr_pwcnet': IRRPWCNet,
+    'irr_pwcnet_irr': IRRPWCNetIRR,
+    'liteflownet': LiteFlowNet,
+    'liteflownet2': LiteFlowNet2,
+    'liteflownet2_pseudoreg': LiteFlowNet2PseudoReg,
+    'liteflownet3': LiteFlowNet3,
+    'liteflownet3_pseudoreg': LiteFlowNet3PseudoReg,
+    'liteflownet3s': LiteFlowNet3S,
+    'liteflownet3s_pseudoreg': LiteFlowNet3SPseudoReg,
+    'pwcnet': PWCNet,
+    'pwcdcnet': PWCDCNet,
+    'raft': RAFT,
+    'raft_small': RAFTSmall,
+    'scopeflow': ScopeFlow,
+    'vcn': VCN,
+    'vcn_small': VCNSmall,
 }
 
 

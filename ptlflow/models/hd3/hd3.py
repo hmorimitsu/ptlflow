@@ -15,7 +15,7 @@ from .dla_up import DLAEncoder as dlaup_encoder
 from .vgg import VGGEncoder as vgg_encoder
 from . import decoder as PreDecoder
 from .hd3losses import LossCalculator
-from ...base_model.base_model import BaseModel
+from ..base_model.base_model import BaseModel
 
 BatchNorm = nn.BatchNorm2d
 
@@ -80,9 +80,9 @@ class Decoder(nn.Module):
         return prob, up_feat
 
 
-class BaseExternalHD3(BaseModel):
+class BaseHD3(BaseModel):
     def __init__(self, args, context):
-        super(BaseExternalHD3, self).__init__(
+        super(BaseHD3, self).__init__(
             args, LossCalculator(args.task), int(2**args.downsample))
 
         self.context = context
@@ -240,27 +240,27 @@ class BaseExternalHD3(BaseModel):
         return outputs
 
 
-class ExternalHD3(BaseExternalHD3):
+class HD3(BaseHD3):
     pretrained_checkpoints = {
-        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_hd3-chairs-0d46c9fd.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_hd3-things-49e21fdc.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_hd3-sintel-cb6ba230.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_hd3-kitti-094951e4.ckpt'
+        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-chairs-0d46c9fd.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-things-49e21fdc.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-sintel-cb6ba230.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-kitti-094951e4.ckpt'
     }
 
     def __init__(self, args):
-        super(ExternalHD3, self).__init__(
+        super(HD3, self).__init__(
             args, context=False)
 
 
-class ExternalHD3Context(BaseExternalHD3):
+class HD3Context(BaseHD3):
     pretrained_checkpoints = {
-        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_hd3_ctxt-chairs-d7448468.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_hd3_ctxt-things-d855f224.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_hd3_ctxt-sintel-eefbeae3.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_hd3_ctxt-kitti-c307822d.ckpt'
+        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-chairs-d7448468.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-things-d855f224.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-sintel-eefbeae3.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-kitti-c307822d.ckpt'
     }
 
     def __init__(self, args):
-        super(ExternalHD3Context, self).__init__(
+        super(HD3Context, self).__init__(
             args, context=True)

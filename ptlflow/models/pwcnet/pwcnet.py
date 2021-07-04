@@ -13,7 +13,7 @@ except ModuleNotFoundError:
 import torch
 import torch.nn as nn
 
-from ...base_model.base_model import BaseModel
+from ..base_model.base_model import BaseModel
 from ..flownet.losses import MultiScale
 
 
@@ -32,15 +32,15 @@ def deconv(in_planes, out_planes, kernel_size=4, stride=2, padding=1):
     return nn.ConvTranspose2d(in_planes, out_planes, kernel_size, stride, padding, bias=True)
 
 
-class ExternalPWCNet(BaseModel):
+class PWCNet(BaseModel):
     pretrained_checkpoints = {
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_pwcnet-things-6a2e540b.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_pwcnet-sintel-0916cff4.ckpt'
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/pwcnet-things-6a2e540b.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/pwcnet-sintel-0916cff4.ckpt'
     }
 
     def __init__(self,
                  args: Namespace):
-        super(ExternalPWCNet, self).__init__(
+        super(PWCNet, self).__init__(
             args=args,
             loss_fn=MultiScale(
                 startScale=args.loss_start_scale,
@@ -284,15 +284,15 @@ class ExternalPWCNet(BaseModel):
         return outputs
 
 
-class ExternalPWCDCNet(ExternalPWCNet):
+class PWCDCNet(PWCNet):
     pretrained_checkpoints = {
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_pwcdcnet-things-cc223701.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_pwcdcnet-sintel-0f9cc3bf.ckpt'
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/pwcdcnet-things-cc223701.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/pwcdcnet-sintel-0f9cc3bf.ckpt'
     }
 
     def __init__(self,
                  args: Namespace):
-        super(ExternalPWCDCNet, self).__init__(args=args)
+        super(PWCDCNet, self).__init__(args=args)
         
         nd = (2*self.args.md+1)**2
         dd = np.cumsum([128,128,96,64,32])

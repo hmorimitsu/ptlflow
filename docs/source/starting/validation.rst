@@ -11,9 +11,9 @@ Once you have the script, you can run a validation as follows:
 
 .. code-block:: bash
 
-    python validate.py ext_raft_small --pretrained_ckpt things
+    python validate.py raft_small --pretrained_ckpt things
 
-This will use the ``ext_raft_small`` model loaded with the weights trained on the FlyingThings3D dataset.
+This will use the ``raft_small`` model loaded with the weights trained on the FlyingThings3D dataset.
 
 By default, the validation will be run on the following datasets:
 
@@ -29,7 +29,7 @@ If you want to validate on different datasets, you can do so by using the argume
 
 .. code-block:: bash
 
-    python validate.py ext_raft_small --pretrained_ckpt things --val_dataset chairs-val+sintel-clean-val
+    python validate.py raft_small --pretrained_ckpt things --val_dataset chairs-val+sintel-clean-val
 
 would use the following two datasets for the validation:
 
@@ -49,7 +49,7 @@ If you have a local checkpoint which is not one of the pretrained ones, you can 
 
 .. code-block:: bash
 
-    python validate.py ext_raft_small --pretrained_ckpt /path/to/checkpoint
+    python validate.py raft_small --pretrained_ckpt /path/to/checkpoint
 
 Visualizing the predictions during validation
 =============================================
@@ -58,7 +58,7 @@ You can use the argument ``--show`` to have the images and predictions displayed
 
 .. code-block:: bash
 
-    python validate.py ext_raft_small --pretrained_ckpt things --show
+    python validate.py raft_small --pretrained_ckpt things --show
 
 Saving results to disk
 ======================
@@ -68,7 +68,7 @@ predictions that the selected model may generate. The structure of the outputs s
 
 .. code-block:: bash
 
-    python validate.py ext_raft_small --pretrained_ckpt things --write_outputs
+    python validate.py raft_small --pretrained_ckpt things --write_outputs
 
 Viewing the validation metrics
 ==============================

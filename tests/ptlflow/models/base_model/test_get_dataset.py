@@ -21,7 +21,7 @@ import ptlflow
 from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils import dummy_datasets
 
-MODEL_NAME = 'ext_raft_small'
+MODEL_NAME = 'raft_small'
 
 
 def test_chairs(tmp_path: Path) -> None:
@@ -89,5 +89,5 @@ def _get_model(
     args = parser.parse_args([])
     for k, v in kwargs.items():
         setattr(args, k, v)
-    model = ptlflow.get_model('ext_raft_small', None, args)
+    model = ptlflow.get_model(MODEL_NAME, None, args)
     return model

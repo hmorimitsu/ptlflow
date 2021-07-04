@@ -23,7 +23,7 @@ import numpy as np
 import infer
 import ptlflow
 
-TEST_MODEL = 'ext_raft_small'
+TEST_MODEL = 'raft_small'
 
 
 def test_infer(tmp_path: Path) -> None:

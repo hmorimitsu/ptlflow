@@ -13,20 +13,20 @@ from .pwc_modules import conv, upsample2d_as, rescale_flow, initialize_msra
 from .pwc_modules import WarpingLayer, FeatureExtractor, ContextNetwork,\
     FlowEstimatorDense, OccContextNetwork, OccEstimatorDense
 from .irr_modules import OccUpsampleNetwork, RefineFlow, RefineOcc
-from ...base_model.base_model import BaseModel
+from ..base_model.base_model import BaseModel
 from .losses import MultiScaleEPE_PWC_Bi_Occ_upsample
 
 
-class ExternalScopeFlow(BaseModel):
+class ScopeFlow(BaseModel):
     pretrained_checkpoints = {
-        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_scopeflow-chairs-ebfaa62d.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_scopeflow-things-70e22d63.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_scopeflow-kitti-a20c434d.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_scopeflow-sintel-21a91683.ckpt'
+        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/scopeflow-chairs-ebfaa62d.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/scopeflow-things-70e22d63.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/scopeflow-kitti-a20c434d.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/scopeflow-sintel-21a91683.ckpt'
     }
 
     def __init__(self, args):
-        super(ExternalScopeFlow, self).__init__(
+        super(ScopeFlow, self).__init__(
             args=args,
             loss_fn=MultiScaleEPE_PWC_Bi_Occ_upsample(args),
             output_stride=64)

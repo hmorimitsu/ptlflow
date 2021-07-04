@@ -5,28 +5,39 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 
-from .flownetc import ExternalFlowNetC
-from .flownets import ExternalFlowNetS
+from .flownetc import FlowNetC
+from .flownets import FlowNetS
+from .flownetsd import FlowNetSD
+from .flownet_fusion import FlowNetFusion
 from .submodules import *
 from .flownet_base import FlowNetBase
 
-class ExternalFlowNetCS(FlowNetBase):
+class FlowNet2(FlowNetBase):
     pretrained_checkpoints = {
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_flownetcs-things-4bdecffa.ckpt'
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flownet2-things-d63b53a7.ckpt'
     }
-
+    
     def __init__(self, args: Namespace):
         args.input_channels = 12
-        super(ExternalFlowNetCS,self).__init__(args)
+        args.loss_start_scale = 1
+        args.loss_num_scales = 3
+        super(FlowNet2, self).__init__(args)
 
         self.args = args
         self.rgb_max = 1
 
         # First Block (FlowNetC)
-        self.flownetc = ExternalFlowNetC(args)
+        self.flownetc = FlowNetC(args)
 
         # Block (FlowNetS)
-        self.flownets_1 = ExternalFlowNetS(args)
+        self.flownets_1 = FlowNetS(args)
+        self.flownets_2 = FlowNetS(args)
+
+        # Block (FlowNetSD)
+        self.flownets_d = FlowNetSD(args)
+
+        # Block (FLowNetFusion)
+        self.flownetfusion = FlowNetFusion(args)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -90,6 +101,32 @@ class ExternalFlowNetCS(FlowNetBase):
         concat1 = torch.cat((inputs['images'][:, 0], inputs['images'][:, 1], resampled_img1, flownetc_flow/self.args.div_flow, norm_diff_img0), dim=1)
         
         # flownets1
-        flownets1_preds = self.flownets_1({'images': concat1[:, None]})
+        flownets1_flow = self.flownets_1({'images': concat1[:, None]})['flows'][:, 0]
 
-        return flownets1_preds
+        # warp img1 to img0; magnitude of diff between img0 and and warped_img1, 
+        resampled_img1 = self.warp(inputs['images'][:, 1], flownets1_flow)
+        diff_img0 = inputs['images'][:, 0] - resampled_img1 
+        norm_diff_img0 = torch.norm(diff_img0, p=2, dim=1, keepdim=True)
+
+        # concat img0, img1, img1->img0, flow, diff-mag ; 
+        concat2 = torch.cat((inputs['images'][:, 0], inputs['images'][:, 1], resampled_img1, flownets1_flow/self.args.div_flow, norm_diff_img0), dim=1)
+        
+        # flownets2
+        flownets2_flow = self.flownets_2({'images': concat2[:, None]})['flows'][:, 0]
+        norm_flownets2_flow = torch.norm(flownets2_flow, p=2, dim=1, keepdim=True)
+
+        diff_flownets2_flow = self.warp(inputs['images'][:, 1], flownets2_flow)
+        diff_flownets2_img1 = torch.norm(inputs['images'][:, 0]-diff_flownets2_flow, p=2, dim=1, keepdim=True)
+
+        # flownetsd
+        flownetsd_flow = self.flownets_d(inputs)['flows'][:, 0] / self.args.div_flow**2
+        norm_flownetsd_flow = torch.norm(flownetsd_flow, p=2, dim=1, keepdim=True)
+        
+        diff_flownetsd_flow = self.warp(inputs['images'][:, 1], flownetsd_flow)
+        diff_flownetsd_img1 = torch.norm(inputs['images'][:, 0]-diff_flownetsd_flow, p=2, dim=1, keepdim=True)
+
+        # concat img1 flownetsd, flownets2, norm_flownetsd, norm_flownets2, diff_flownetsd_img1, diff_flownets2_img1
+        concat3 = torch.cat((inputs['images'][:, 0], flownetsd_flow, flownets2_flow, norm_flownetsd_flow, norm_flownets2_flow, diff_flownetsd_img1, diff_flownets2_img1), dim=1)
+        flownetfusion_preds = self.flownetfusion({'images': concat3[:, None]})
+
+        return flownetfusion_preds

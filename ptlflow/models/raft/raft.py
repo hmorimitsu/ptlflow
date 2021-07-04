@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from .update import BasicUpdateBlock, SmallUpdateBlock
 from .extractor import BasicEncoder, SmallEncoder
 from .corr import CorrBlock
-from ...base_model.base_model import BaseModel
+from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
@@ -40,12 +40,12 @@ class SequenceLoss(nn.Module):
         return flow_loss
 
 
-class ExternalRAFT(BaseModel):
+class RAFT(BaseModel):
     pretrained_checkpoints = {
-        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_raft-chairs-590f38f7.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_raft-things-802bbcfd.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_raft-sintel-cb6706f6.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_raft-kitti-7ab30aad.ckpt'
+        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/raft-chairs-590f38f7.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/raft-things-802bbcfd.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/raft-sintel-cb6706f6.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/raft-kitti-7ab30aad.ckpt'
     }
 
     def __init__(self,
@@ -182,9 +182,9 @@ class ExternalRAFT(BaseModel):
         return outputs
 
 
-class ExternalRAFTSmall(ExternalRAFT):
+class RAFTSmall(RAFT):
     pretrained_checkpoints = {
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_raft_small-things-b7d9f997.ckpt'
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/raft_small-things-b7d9f997.ckpt'
     }
 
     def __init__(self,

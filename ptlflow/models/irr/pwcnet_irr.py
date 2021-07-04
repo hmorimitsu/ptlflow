@@ -10,16 +10,16 @@ import torch.nn as nn
 
 from .pwc_modules import conv, rescale_flow, upsample2d_as, initialize_msra
 from .pwc_modules import WarpingLayer, FeatureExtractor, ContextNetwork, FlowEstimatorDense
-from ...base_model.base_model import BaseModel
+from ..base_model.base_model import BaseModel
 from .losses import MultiScaleEPE_PWC
 
-class ExternalIRRPWCNetIRR(BaseModel):
+class IRRPWCNetIRR(BaseModel):
     pretrained_checkpoints = {
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ext_irr_pwcnet_irr-things-41a07190.ckpt'
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/irr_pwcnet_irr-things-41a07190.ckpt'
     }
 
     def __init__(self, args):
-        super(ExternalIRRPWCNetIRR, self).__init__(
+        super(IRRPWCNetIRR, self).__init__(
             args=args,
             loss_fn=MultiScaleEPE_PWC(args),
             output_stride=64)
