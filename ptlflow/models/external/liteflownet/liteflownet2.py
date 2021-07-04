@@ -9,42 +9,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .warp import WarpingLayer
 from ...base_model.base_model import BaseModel
-
-
-def _warp(x, flo):
-    """
-    This function was taken from https://github.com/NVlabs/PWC-Net
-
-    warp an image/tensor (im2) back to im1, according to the optical flow
-    x: [B, C, H, W] (im2)
-    flo: [B, 2, H, W] flow
-    """
-    B, C, H, W = x.size()
-    # mesh grid 
-    xx = torch.arange(0, W).view(1,-1).repeat(H,1)
-    yy = torch.arange(0, H).view(-1,1).repeat(1,W)
-    xx = xx.view(1,1,H,W).repeat(B,1,1,1)
-    yy = yy.view(1,1,H,W).repeat(B,1,1,1)
-    grid = torch.cat((xx,yy),1).float()
-
-    if x.is_cuda:
-        grid = grid.to(dtype=x.dtype, device=x.device)
-    vgrid = grid + flo
-
-    # scale grid to [-1,1] 
-    vgrid[:,0,:,:] = 2.0*vgrid[:,0,:,:].clone() / max(W-1,1)-1.0
-    vgrid[:,1,:,:] = 2.0*vgrid[:,1,:,:].clone() / max(H-1,1)-1.0
-
-    vgrid = vgrid.permute(0,2,3,1)  
-    output = nn.functional.grid_sample(x, vgrid, padding_mode='zeros', mode='bilinear', align_corners=True)
-    mask = torch.ones(x.size()).to(dtype=x.dtype, device=x.device)
-    mask = nn.functional.grid_sample(mask, vgrid, padding_mode='zeros', mode='bilinear', align_corners=True)
-    
-    mask[mask<0.9999] = 0
-    mask[mask>0] = 1
-    
-    return output*mask
 
 
 class FeatureExtractor(nn.Module):
@@ -144,6 +110,8 @@ class Matching(nn.Module):
 
         self.corr = SpatialCorrelationSampler(kernel_size=1, patch_size=7, padding=0, stride=corr_stride, dilation_patch=corr_stride)
 
+        self.warp = WarpingLayer()
+
     def forward(
         self,
         feats: torch.Tensor,
@@ -152,7 +120,7 @@ class Matching(nn.Module):
         warped_feat2 = feats[:, 1]
         if flow is not None:
             flow = self.up_flow(flow)
-            warped_feat2 = _warp(feats[:, 1], flow*self.mult)
+            warped_feat2 = self.warp(feats[:, 1], flow, feats.shape[-2], feats.shape[-1], 1.0/self.mult)
 
         corr = self.leaky_relu(self.corr(feats[:, 0], warped_feat2))
         corr = corr.view(corr.shape[0], -1, corr.shape[3], corr.shape[4])
@@ -194,14 +162,15 @@ class SubPixel(nn.Module):
         )
 
         self.flow_net = nn.Conv2d(32, 2, flow_kernel_size, 1, flow_kernel_size//2)
-
+        
+        self.warp = WarpingLayer()
 
     def forward(
         self,
         feats: torch.Tensor,
         flow: torch.Tensor
     ) -> torch.Tensor:
-        feat_warped = _warp(feats[:, 1], flow*self.mult)
+        feat_warped = self.warp(feats[:, 1], flow, feats.shape[-2], feats.shape[-1], 1.0/self.mult)
         x = torch.cat([feats[:, 0], feat_warped, flow], dim=1)
         x = self.feat_net(x)
         new_flow = self.flow_net(x)
@@ -258,13 +227,15 @@ class Regularization(nn.Module):
 
         self.unfold = nn.Unfold(flow_kernel_size, padding=flow_kernel_size//2)
 
+        self.warp = WarpingLayer()
+
     def forward(
         self,
         images: torch.Tensor,
         feats: torch.Tensor,
         flow: torch.Tensor
     ) -> torch.Tensor:
-        img2_warped = _warp(images[:, 1], flow*self.mult)
+        img2_warped = self.warp(images[:, 1], flow, images.shape[-2], images.shape[-1], 1.0/self.mult)
         img_diff_norm = torch.norm(images[:, 0] - img2_warped[:, 1], p=2, dim=1, keepdim=True)
 
         flow_mean = flow.view(*flow.shape[:2], -1).mean(dim=-1)[..., None, None]
