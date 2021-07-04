@@ -14,6 +14,8 @@ See
 - [LICENSE_LFN2](LICENSE_LFN2).
 - [LICENSE_LFN3](LICENSE_LFN3).
 
+The warping layer comes from IRR (https://github.com/visinf/irr). See [LICENSE_IRR](LICENSE_IRR).
+
 ## Pretrained weights license
 
 Not specified.
