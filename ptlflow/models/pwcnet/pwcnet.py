@@ -35,7 +35,7 @@ def deconv(in_planes, out_planes, kernel_size=4, stride=2, padding=1):
 class PWCNet(BaseModel):
     pretrained_checkpoints = {
         'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/pwcnet-things-6a2e540b.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/pwcnet-sintel-0916cff4.ckpt'
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/pwcnet-sintel-533815e5.ckpt'
     }
 
     def __init__(self,
@@ -287,7 +287,7 @@ class PWCNet(BaseModel):
 class PWCDCNet(PWCNet):
     pretrained_checkpoints = {
         'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/pwcdcnet-things-cc223701.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/pwcdcnet-sintel-0f9cc3bf.ckpt'
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/pwcdcnet-sintel-c7d08a46.ckpt'
     }
 
     def __init__(self,
