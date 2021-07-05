@@ -226,7 +226,7 @@ reference_accuracy = {
 }
 
 
-# @pytest.mark.skip(reason='Requires to download all checkpoints. Just run occasionally.')
+@pytest.mark.skip(reason='Requires to download all checkpoints. Just run occasionally.')
 def test_accuracy() -> None:
     data = _load_data()
     model_names = ptlflow.models_dict.keys()
