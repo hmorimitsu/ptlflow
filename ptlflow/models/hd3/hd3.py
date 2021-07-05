@@ -243,9 +243,9 @@ class BaseHD3(BaseModel):
 class HD3(BaseHD3):
     pretrained_checkpoints = {
         'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-chairs-0d46c9fd.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-things-49e21fdc.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-sintel-cb6ba230.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-kitti-094951e4.ckpt'
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-things-afcd2eb4.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-sintel-10689995.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-kitti-6eb77dd3.ckpt'
     }
 
     def __init__(self, args):
@@ -256,9 +256,9 @@ class HD3(BaseHD3):
 class HD3Context(BaseHD3):
     pretrained_checkpoints = {
         'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-chairs-d7448468.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-things-d855f224.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-sintel-eefbeae3.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-kitti-c307822d.ckpt'
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-things-f1681f75.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-sintel-22e655e9.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-kitti-e7d69776.ckpt'
     }
 
     def __init__(self, args):

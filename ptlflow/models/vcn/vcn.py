@@ -596,9 +596,9 @@ class VCN(VCNSmall):
 
     pretrained_checkpoints = {
         'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-chairs-792544a0.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-things-c28ef6e7.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-sintel-4cc40de9.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-kitti-3fb41a53.ckpt'
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-things-afc0f455.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-sintel-5aac0540.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-kitti-29aa0c1a.ckpt'
     }
 
     def __init__(self, args, md=[4,4,4,4,4]):

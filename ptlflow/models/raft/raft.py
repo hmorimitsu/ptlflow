@@ -44,8 +44,8 @@ class RAFT(BaseModel):
     pretrained_checkpoints = {
         'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/raft-chairs-590f38f7.ckpt',
         'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/raft-things-802bbcfd.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/raft-sintel-cb6706f6.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/raft-kitti-7ab30aad.ckpt'
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/raft-sintel-fb44381e.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/raft-kitti-3a831a4b.ckpt'
     }
 
     def __init__(self,
