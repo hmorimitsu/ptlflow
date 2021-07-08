@@ -64,7 +64,6 @@ class StarFlow(BaseModel):
 
     def forward(self, inputs):
         images = inputs['images']
-        images = images.flip((2))
         list_imgs = [images[:, i] for i in range(images.shape[1])]
 
         _, _, height_im, width_im = list_imgs[0].size()
