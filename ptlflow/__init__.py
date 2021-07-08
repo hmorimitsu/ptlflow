@@ -45,6 +45,7 @@ from ptlflow.models.liteflownet.liteflownet2 import LiteFlowNet2, LiteFlowNet2Ps
 from ptlflow.models.pwcnet.pwcnet import PWCNet, PWCDCNet
 from ptlflow.models.raft.raft import RAFT, RAFTSmall
 from ptlflow.models.scopeflow.irr_pwc_v2 import ScopeFlow
+from ptlflow.models.starflow.starflow import StarFlow
 from ptlflow.models.vcn.vcn import VCN, VCNSmall
 from ptlflow.utils.utils import config_logging
 
@@ -75,6 +76,7 @@ models_dict = {
     'raft': RAFT,
     'raft_small': RAFTSmall,
     'scopeflow': ScopeFlow,
+    'starflow': StarFlow,
     'vcn': VCN,
     'vcn_small': VCNSmall,
 }
