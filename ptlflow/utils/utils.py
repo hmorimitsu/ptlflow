@@ -98,7 +98,6 @@ class InputScaler(object):
         self.interpolation_mode = interpolation_mode
         self.interpolation_align_corners = interpolation_align_corners
 
-
     def scale(
         self,
         x: torch.Tensor,
@@ -110,6 +109,8 @@ class InputScaler(object):
         ----------
         x : torch.Tensor
             The input to be scaled. Its shape must be (..., C, H, W), where ... means any number of dimensions.
+        is_flow : bool
+            Whether the input is a flow field or not. If it is, then its values are multiplied by the rescale factor.
 
         Returns
         -------
@@ -129,6 +130,8 @@ class InputScaler(object):
         ----------
         x : torch.Tensor
             The input to be rescaled back. Its shape must be (..., C, H, W), where ... means any number of dimensions.
+        is_flow : bool
+            Whether the input is a flow field or not. If it is, then its values are multiplied by the rescale factor.
 
         Returns
         -------
@@ -151,6 +154,8 @@ class InputScaler(object):
             The input to be rescaled back. Its shape must be (..., C, H, W), where ... means any number of dimensions.
         size : Tuple[int, int]
             The target size to scale the input.
+        is_flow : bool
+            Whether the input is a flow field or not. If it is, then its values are multiplied by the rescale factor.
 
         Returns
         -------
