@@ -84,12 +84,6 @@ use the its original code.
    api/ptlflow.data
    api/ptlflow.utils
 
-.. toctree::
-   :maxdepth: 1
-   :caption: Recent changes:
-
-   changes/changelog
-
 Indices and tables
 ==================
 
