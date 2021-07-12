@@ -33,6 +33,7 @@ This is still under development, so some things may not work as intended. I plan
 - PWCNet - [https://arxiv.org/abs/1709.02371](https://arxiv.org/abs/1709.02371)
 - RAFT - [https://arxiv.org/abs/2003.12039](https://arxiv.org/abs/2003.12039)
 - ScopeFlow -  [https://arxiv.org/abs/2002.10770](https://arxiv.org/abs/2002.10770)
+- STaRFlow -  [https://arxiv.org/abs/2007.05481](https://arxiv.org/abs/2007.05481)
 - VCN - [https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf](https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf)
 
 Read more details about the models on [https://ptlflow.readthedocs.io/en/latest/models/models_list.html](https://ptlflow.readthedocs.io/en/latest/models/models_list.html).
@@ -56,7 +57,7 @@ You can also check the notebooks below running on Google Colab for some practica
 
 The original code of this repository is licensed under the [Apache 2.0 license](LICENSE).
 
-I have tried to only include or adapt external codes whose licenses are compatible with ours. That being said, it is your responsibility to make sure that your project is in compliance with all the licenses and conditions involved.
+Each model may be subjected to different licenses. The license of each model is included in their respective folders. It is your responsibility to make sure that your project is in compliance with all the licenses and conditions involved.
 
 The external pretrained weights all have different licenses, which are listed in their respective folders.
 
