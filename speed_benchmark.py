@@ -20,10 +20,9 @@ import argparse
 from pathlib import Path
 from typing import Union
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
+import plotly.express as px
 import torch
 from tqdm import tqdm
 
@@ -156,13 +155,18 @@ def save_plot(
     log10_col = TABLE_COLS[1]+'(Log10)'
     df_tmp = df.copy()
     df_tmp[log10_col] = np.log10(df[TABLE_COLS[1]])
-    plt.figure(figsize=(10, 10))
-    sns.scatterplot(data=df_tmp, x=log10_col, y=TABLE_COLS[2], hue=TABLE_COLS[0], style=TABLE_COLS[0], s=300)
-    plt.legend(loc=2, borderaxespad=0)
-    plt.title('Parameters x Forward time')
-    plt.tight_layout()
-    plt.savefig(output_dir / f'speed_plot-{model_name}.png')
-    plt.close()
+
+    fig = px.scatter(
+        df, x=TABLE_COLS[1], y=TABLE_COLS[2], color=TABLE_COLS[0], symbol=TABLE_COLS[0], log_x=True,
+        title='Parameters x Forward time')
+    fig.update_traces(
+        marker=dict(
+            size=20, line=dict(width=2, color='DarkSlateGrey')),
+            selector=dict(mode='markers'))
+    fig.update_layout(
+        title_font_size=30
+    )
+    fig.write_html(output_dir / f'speed_plot-{model_name}.html')
 
 
 if __name__ == '__main__':
@@ -173,5 +177,6 @@ if __name__ == '__main__':
         df = benchmark(args)
     else:
         df = pd.read_csv(args.csv_path)
+        Path(args.output_path).mkdir(parents=True, exist_ok=True)
         save_plot(args.output_path, args.model, df)
     print(f'Results saved to {str(args.output_path)}.')
