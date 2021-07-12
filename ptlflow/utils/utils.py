@@ -98,9 +98,11 @@ class InputScaler(object):
         self.interpolation_mode = interpolation_mode
         self.interpolation_align_corners = interpolation_align_corners
 
+
     def scale(
         self,
-        x: torch.Tensor
+        x: torch.Tensor,
+        is_flow: bool = False
     ) -> torch.Tensor:
         """Scale the input to the target size specified during initialization.
 
@@ -114,11 +116,12 @@ class InputScaler(object):
         torch.Tensor
             The scaled input.
         """
-        return self._scale_keep_dims(x, (self.tgt_height, self.tgt_width))
+        return self._scale_keep_dims(x, (self.tgt_height, self.tgt_width), is_flow)
 
     def unscale(
         self,
-        x: torch.Tensor
+        x: torch.Tensor,
+        is_flow: bool = False
     ) -> torch.Tensor:
         """Scale the input to back to the original size defined during initialization.
 
@@ -132,12 +135,13 @@ class InputScaler(object):
         torch.Tensor
             The rescaled input.
         """
-        return self._scale_keep_dims(x, (self.orig_height, self.orig_width))
+        return self._scale_keep_dims(x, (self.orig_height, self.orig_width), is_flow)
 
     def _scale_keep_dims(
         self,
         x: torch.Tensor,
-        size: Tuple[int, int]
+        size: Tuple[int, int],
+        is_flow: bool
     ) -> torch.Tensor:
         """Scale the input to a given size while keeping the other dimensions intact.
 
@@ -158,6 +162,11 @@ class InputScaler(object):
         x = F.interpolate(
             x, size=size, mode=self.interpolation_mode,
             align_corners=self.interpolation_align_corners)
+
+        if is_flow:
+            x[:, 0] = x[:, 0] * (float(x.shape[-1]) / x_shape[-1])
+            x[:, 1] = x[:, 1] * (float(x.shape[-2]) / x_shape[-2])
+
         new_shape = list(x_shape)
         new_shape[-2], new_shape[-1] = x.shape[-2], x.shape[-1]
         x = x.view(new_shape)
