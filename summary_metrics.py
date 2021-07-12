@@ -113,9 +113,10 @@ def save_plots(
             df, x=col1, y=col2, color=df.columns[0], symbol=df.columns[1],
             title=f'{dataset_name} - {args.chosen_metrics[0]} x {args.chosen_metrics[1]}')
         fig.update_traces(
-            marker=dict(
-                size=20, line=dict(width=2, color='DarkSlateGrey')),
-                selector=dict(mode='markers'))
+            marker={
+                'size': 20,
+                'line': {'width': 2, 'color': 'DarkSlateGrey'}},
+            selector={'mode': 'markers'})
         fig.update_layout(
             title_font_size=30
         )

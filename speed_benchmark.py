@@ -160,9 +160,10 @@ def save_plot(
         df, x=TABLE_COLS[1], y=TABLE_COLS[2], color=TABLE_COLS[0], symbol=TABLE_COLS[0], log_x=True,
         title='Parameters x Forward time')
     fig.update_traces(
-        marker=dict(
-            size=20, line=dict(width=2, color='DarkSlateGrey')),
-            selector=dict(mode='markers'))
+        marker={
+            'size': 20,
+            'line': {'width': 2, 'color': 'DarkSlateGrey'}},
+        selector={'mode': 'markers'})
     fig.update_layout(
         title_font_size=30
     )
