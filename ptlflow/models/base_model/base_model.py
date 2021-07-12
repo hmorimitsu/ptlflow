@@ -432,7 +432,8 @@ class BaseModel(pl.LightningModule):
             valid dataset strings.
         """
         if self.args.val_dataset is None:
-            self.args.val_dataset = 'sintel-final-trainval+sintel-clean-trainval+kitti-2012-trainval+kitti-2015-trainval'
+            self.args.val_dataset = (
+                'sintel-final-trainval-occ+sintel-clean-trainval-occ+kitti-2012-trainval+kitti-2015-trainval')
             logging.warning(
                 '--val_dataset is not set. It will be set as %s. If you want to skip validation, then set --val_dataset none.',
                 self.args.val_dataset)
@@ -626,11 +627,26 @@ class BaseModel(pl.LightningModule):
             transform = ft.ToTensor()
 
         split = 'trainval'
-        if len(args) > 0 and args[0] in ['train', 'val', 'trainval']:
-            split = args[0]
+        add_reverse = False
+        get_occlusion_mask = False
+        get_motion_boundary_mask = False
+        get_backward = False
+        for v in args:
+            if v in ['train', 'val', 'trainval']:
+                split = v
+            elif v == 'rev':
+                add_reverse = True
+            elif v == 'occ':
+                get_occlusion_mask = True
+            elif v == 'mb':
+                get_motion_boundary_mask = True
+            elif v == 'back':
+                get_backward = True
+
         dataset = FlyingChairs2Dataset(
-            self.args.flying_chairs2_root_dir, split=split, transform=transform, add_reverse=True, get_occlusion_mask=False,
-            get_motion_boundary_mask=False, get_backward=False)
+            self.args.flying_chairs2_root_dir, split=split, transform=transform, add_reverse=add_reverse,
+            get_occlusion_mask=get_occlusion_mask, get_motion_boundary_mask=get_motion_boundary_mask,
+            get_backward=get_backward)
         return dataset
 
     def _get_hd1k_dataset(
@@ -699,12 +715,11 @@ class BaseModel(pl.LightningModule):
 
         versions = ['2012', '2015']
         split = 'trainval'
-        if len(args) > 0:
-            for v in args:
-                if v in ['2012', '2015']:
-                    versions = [v]
-                elif v in ['train', 'val', 'trainval', 'test']:
-                    split = v
+        for v in args:
+            if v in ['2012', '2015']:
+                versions = [v]
+            elif v in ['train', 'val', 'trainval', 'test']:
+                split = v
 
         dataset = KittiDataset(
             self.args.kitti_2012_root_dir, self.args.kitti_2015_root_dir, versions=versions, split=split, transform=transform)
@@ -741,16 +756,18 @@ class BaseModel(pl.LightningModule):
 
         pass_names = ['clean', 'final']
         split = 'trainval'
-        if len(args) > 0:
-            for v in args:
-                if v in ['clean', 'final']:
-                    pass_names = [v]
-                elif v in ['train', 'val', 'trainval', 'test']:
-                    split = v
+        get_occlusion_mask = False
+        for v in args:
+            if v in ['clean', 'final']:
+                pass_names = [v]
+            elif v in ['train', 'val', 'trainval', 'test']:
+                split = v
+            elif v == 'occ':
+                get_occlusion_mask = True
 
         dataset = SintelDataset(
             self.args.mpi_sintel_root_dir, split=split, pass_names=pass_names, transform=transform,
-            get_occlusion_mask=False)
+            get_occlusion_mask=get_occlusion_mask)
         return dataset
 
     def _get_things_dataset(
@@ -785,25 +802,38 @@ class BaseModel(pl.LightningModule):
         pass_names = ['clean', 'final']
         split = 'trainval'
         is_subset = False
-        if len(args) > 0:
-            for v in args:
-                if v in ['clean', 'final']:
-                    pass_names = [v]
-                elif v in ['train', 'val', 'trainval']:
-                    split = v
-                elif v == 'subset':
-                    is_subset = True
+        add_reverse = False
+        get_occlusion_mask = False
+        get_motion_boundary_mask = False
+        get_backward = False
+        for v in args:
+            if v in ['clean', 'final']:
+                pass_names = [v]
+            elif v in ['train', 'val', 'trainval']:
+                split = v
+            elif v == 'subset':
+                is_subset = True
+            elif v == 'rev':
+                add_reverse = True
+            elif v == 'occ':
+                get_occlusion_mask = True
+            elif v == 'mb':
+                get_motion_boundary_mask = True
+            elif v == 'back':
+                get_backward = True
 
         if is_subset:
             dataset = FlyingThings3DSubsetDataset(
                 self.args.flying_things3d_subset_root_dir, split=split, pass_names=pass_names,
-                side_names=['left', 'right'], add_reverse=True, transform=transform,
-                get_occlusion_mask=False, get_motion_boundary_mask=False, get_backward=False)
+                side_names=['left', 'right'], add_reverse=add_reverse, transform=transform,
+                get_occlusion_mask=get_occlusion_mask, get_motion_boundary_mask=get_motion_boundary_mask,
+                get_backward=get_backward)
         else:
             dataset = FlyingThings3DDataset(
                 self.args.flying_things3d_root_dir, split=split, pass_names=pass_names,
-                side_names=['left', 'right'], add_reverse=True, transform=transform,
-                get_occlusion_mask=False, get_motion_boundary_mask=False, get_backward=False)
+                side_names=['left', 'right'], add_reverse=add_reverse, transform=transform,
+                get_occlusion_mask=get_occlusion_mask, get_motion_boundary_mask=get_motion_boundary_mask,
+                get_backward=get_backward)
         return dataset
 
     def _get_overfit_dataset(
