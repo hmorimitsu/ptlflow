@@ -74,7 +74,7 @@ LiteFlowNet3
 
 - Paper: **LiteFlowNet3: Resolving Correspondence Ambiguity for More Accurate Optical Flow Estimation** - `https://arxiv.org/abs/2007.09319 <https://arxiv.org/abs/2007.09319>`_
 
-- Reference code: `https://github.com/twhui/LiteFlowNet <https://github.com/twhui/LiteFlowNet3>`__
+- Reference code: `https://github.com/twhui/LiteFlowNet3 <https://github.com/twhui/LiteFlowNet3>`__
 
 - Model names: ``liteflownet3``, ``liteflownet3_pseudoreg``, ``liteflownet3s``, ``liteflownet3s_pseudoreg``
 
@@ -110,6 +110,17 @@ ScopeFlow
 - Reference code: `https://github.com/avirambh/ScopeFlow <https://github.com/avirambh/ScopeFlow>`_
 
 - Model names: ``scopeflow``
+
+STaRFlow
+--------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/starflow>`__
+
+- Paper: **STaRFlow: A SpatioTemporal Recurrent Cell for Lightweight Multi-Frame Optical Flow Estimation** - `https://arxiv.org/abs/2007.05481 <https://arxiv.org/abs/2007.05481>`_
+
+- Reference code: `https://github.com/pgodet/star_flow <https://github.com/pgodet/star_flow>`_
+
+- Model names: ``starflow``
 
 VCN
 ---
