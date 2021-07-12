@@ -210,7 +210,7 @@ def validate_one_dataloader(
                 if k in preds:
                     v = padder.unpad(preds[k])
                     if scaler is not None:
-                        v = scaler.unscale(v)
+                        v = scaler.unscale(v, is_flow=('flows' in k))
                     preds[k] = v
 
             metrics = model.val_metrics(preds, inputs)

@@ -23,7 +23,7 @@ import summary_metrics
 def test_summary(tmp_path: Path) -> None:
     parser = summary_metrics._init_parser()
     args = parser.parse_args([])
-    args.metrics_path = Path('results/metrics_all.csv')
+    args.metrics_path = Path('docs/source/results/metrics_all.csv')
     args.output_dir = tmp_path
     summary_metrics.summarize(args)
 

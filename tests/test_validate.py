@@ -51,8 +51,8 @@ def test_validate(tmp_path: Path) -> None:
     dataset_name_path = [
         ('kitti-2012-trainval', '000000_10'),
         ('kitti-2015-trainval', '000000_10'),
-        ('sintel-clean-trainval', 'sequence_1/frame_0001'),
-        ('sintel-final-trainval', 'sequence_1/frame_0001')]
+        ('sintel-clean-trainval-occ', 'sequence_1/frame_0001'),
+        ('sintel-final-trainval-occ', 'sequence_1/frame_0001')]
     for dname, dpath in dataset_name_path:
         assert (tmp_path / dname / 'flows' / (dpath+'.flo')).exists()
         assert (tmp_path / dname / 'flows_viz' / (dpath+'.png')).exists()

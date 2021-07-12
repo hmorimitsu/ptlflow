@@ -41,6 +41,9 @@ scopeflow-chairs-ebfaa62d.ckpt,c1.ckpt,https://github.com/avirambh/ScopeFlow
 scopeflow-kitti-a20c434d.ckpt,kitti_comb.ckpt,
 scopeflow-sintel-21a91683.ckpt,sintel_comb.ckpt,
 scopeflow-things-70e22d63.ckpt,t3.ckpt,
+starflow-kitti-34b9a3ed.ckpt,StarFlow_kitti,https://github.com/pgodet/star_flow
+starflow-sintel-3c06b844.ckpt,StarFlow_sintel,
+starflow-things-d3966a93.ckpt,StarFlow_things,
 vcn-chairs-792544a0.ckpt,vcn_chairs_finetune_141999.tar,https://github.com/gengshan-y/VCN
 vcn-kitti-29aa0c1a.ckpt,vcn_kitti_ft_finetune_149999.tar,
 vcn-sintel-5aac0540.ckpt,vcn_sintel_ft_finetune_67999.tar,

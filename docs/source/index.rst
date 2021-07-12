@@ -62,7 +62,8 @@ use the its original code.
    :maxdepth: 1
    :caption: Results:
 
-   results/accuracy
+   results/accuracy_epe
+   results/accuracy_epe_outlier
    results/accuracy_plot
    results/speed
    results/speed_plot
@@ -83,12 +84,6 @@ use the its original code.
    api/ptlflow.models
    api/ptlflow.data
    api/ptlflow.utils
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Recent changes:
-
-   changes/changelog
 
 Indices and tables
 ==================
