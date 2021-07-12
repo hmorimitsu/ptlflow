@@ -15,6 +15,12 @@ from ptlflow.models.base_model.base_model import BaseModel
 
 
 class StarFlow(BaseModel):
+    pretrained_checkpoints = {
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/starflow-things-d3966a93.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/starflow-sintel-3c06b844.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/starflow-kitti-34b9a3ed.ckpt'
+    }
+
     def __init__(self, args):
         super(StarFlow, self).__init__(
             args=args,
