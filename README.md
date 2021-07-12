@@ -40,7 +40,7 @@ Read more details about the models on [https://ptlflow.readthedocs.io/en/latest/
 
 # Results
 
-You can see a table with main evaluation results of the available models [here](results/summarized_metrics-epe.csv). More results are also available in the folder [results](results).
+You can see a table with main evaluation results of the available models [here](https://ptlflow.readthedocs.io/en/latest/results/accuracy_epe.html). More results are also available in the folder [docs/source/results](docs/source/results).
 
 **Disclaimer**: These results are the ones obtained by evaluating the available models in this framework in my machine. Your results may be different due to differences in hardware and software. I also do not guarantee that the results of each model will be similar to the ones presented in the respective papers or other original sources. If you need to replicate the original results from a paper, you should use the original implementations.
 

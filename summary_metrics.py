@@ -34,7 +34,7 @@ import seaborn as sns
 def _init_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--metrics_path', type=str, default=str(Path('results/metrics_all.csv')),
+        '--metrics_path', type=str, default=str(Path('docs/source/results/metrics_all.csv')),
         help=('Path to the csv file containing the validation metrics.'))
     parser.add_argument(
         '--chosen_metrics', type=str, nargs='+', default=('epe', 'outlier'),

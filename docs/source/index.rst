@@ -62,7 +62,8 @@ use the its original code.
    :maxdepth: 1
    :caption: Results:
 
-   results/accuracy
+   results/accuracy_epe
+   results/accuracy_epe_outlier
    results/accuracy_plot
    results/speed
    results/speed_plot

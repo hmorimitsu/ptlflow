@@ -13,4 +13,4 @@ Environment
 
 - CUDA: 11.2
 
-- PyTorch: 1.8.1
+- PyTorch: 1.9.0
