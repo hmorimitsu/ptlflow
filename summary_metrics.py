@@ -26,9 +26,8 @@ Tha parsing of this script is tightly connected to how the results are output by
 import argparse
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
+import plotly.express as px
 
 
 def _init_parser() -> argparse.ArgumentParser:
@@ -110,16 +109,21 @@ def save_plots(
 
     for dataset_name, col_pair_dict in metric_pairs.items():
         col1, col2 = col_pair_dict.values()
-        plt.figure(figsize=(10, 10))
-        sns.scatterplot(data=df, x=col1, y=col2, hue=df.columns[0], style=df.columns[1], s=300)
-        plt.legend(loc=4, borderaxespad=0)
-        plt.title(f'{dataset_name} - {args.chosen_metrics[0]} x {args.chosen_metrics[1]}')
-        plt.tight_layout()
+        fig = px.scatter(
+            df, x=col1, y=col2, color=df.columns[0], symbol=df.columns[1],
+            title=f'{dataset_name} - {args.chosen_metrics[0]} x {args.chosen_metrics[1]}')
+        fig.update_traces(
+            marker={
+                'size': 20,
+                'line': {'width': 2, 'color': 'DarkSlateGrey'}},
+            selector={'mode': 'markers'})
+        fig.update_layout(
+            title_font_size=30
+        )
         file_name = f'{dataset_name}_{args.chosen_metrics[0]}_{args.chosen_metrics[1]}'
         if args.drop_checkpoints is not None and len(args.drop_checkpoints) > 0:
             file_name += f'-drop_{"_".join(args.drop_checkpoints)}'
-        plt.savefig(args.output_dir / (file_name+'.png'))
-        plt.close()
+        fig.write_html(args.output_dir / (file_name+'.html'))
 
 
 def summarize(

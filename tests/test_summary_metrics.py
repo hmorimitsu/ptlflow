@@ -29,6 +29,6 @@ def test_summary(tmp_path: Path) -> None:
 
     assert len(list(tmp_path.glob('**/*.md'))) > 0
     assert len(list(tmp_path.glob('**/*.csv'))) > 0
-    assert len(list(tmp_path.glob('**/*.png'))) > 0
+    assert len(list(tmp_path.glob('**/*.html'))) > 0
 
     shutil.rmtree(tmp_path)

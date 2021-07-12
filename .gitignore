@@ -2,8 +2,6 @@ ptlflow_logs/
 ptlflow_scripts/
 outputs/
 
-docs/source/_*
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
