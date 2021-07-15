@@ -35,7 +35,7 @@ from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils import flow_utils
 from ptlflow.utils.external.raft import InputPadder
 from ptlflow.utils.utils import (
-    add_datasets_to_parser, config_logging, get_list_of_available_models_list, release_gpu, tensor_dict_to_numpy, InputScaler)
+    add_datasets_to_parser, config_logging, get_list_of_available_models_list, tensor_dict_to_numpy, InputScaler)
 
 config_logging()
 
@@ -55,9 +55,6 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         '--output_path', type=str, default=str(Path('outputs/validate')),
         help='Path to the directory where the validation results will be saved.')
-    parser.add_argument(
-        '--prediction_keys', type=str, nargs='+', default=['flows', 'occs', 'mbs', 'confs'],
-        help='Keys of the model output dict to retrieve to compute the validations metrics.')
     parser.add_argument(
         '--write_outputs', action='store_true',
         help='If set, the estimated flow is saved to disk.')
@@ -196,22 +193,14 @@ def validate_one_dataloader(
             inputs['images_orig'] = inputs['images'].clone()
             inputs, scaler, padder = _prepare_inputs(inputs, model, args.max_forward_side)
 
-            if torch.cuda.is_available():
-                for k, v in inputs.items():
-                    if isinstance(v, torch.Tensor):
-                        inputs[k] = v.cuda()
+            inputs = _dict_to_cuda(inputs)
             preds = model(inputs)
 
-            # Release GPU memory and upscale outputs, if necessary
+            # Upscale outputs, if necessary
             inputs['images'] = inputs['images_orig'].clone()
             del inputs['images_orig']
 
-            for k in args.prediction_keys:
-                if k in preds:
-                    v = padder.unpad(preds[k])
-                    if scaler is not None:
-                        v = scaler.unscale(v, is_flow=('flows' in k))
-                    preds[k] = v
+            preds = _unpad_and_unscale(preds, padder, scaler)
 
             metrics = model.val_metrics(preds, inputs)
 
@@ -230,6 +219,16 @@ def validate_one_dataloader(
     for k, v in metrics_sum.items():
         metrics_mean[k] = v / len(dataloader)
     return metrics_mean
+
+
+def _dict_to_cuda(
+    tensor_dict: Dict[str, Any]
+) -> Dict[str, Any]:
+    if torch.cuda.is_available():
+        for k, v in tensor_dict.items():
+            if isinstance(v, torch.Tensor):
+                tensor_dict[k] = v.cuda()
+    return tensor_dict
 
 
 def _get_model_names(
@@ -277,6 +276,20 @@ def _show(
                 v = cv.resize(v, (int(scale_factor*v.shape[1]), int(scale_factor*v.shape[0])))
             cv.imshow('pred_'+k, v)
     cv.waitKey(1)
+
+
+def _unpad_and_unscale(
+    tensor_dict: Dict[str, Any],
+    padder: InputPadder,
+    scaler: Optional[InputScaler],
+) -> Dict[str, Any]:
+    for k, v in tensor_dict.items():
+        if isinstance(v, torch.Tensor):
+            v = padder.unpad(v)
+            if scaler is not None:
+                v = scaler.unscale(v, is_flow=('flows' in k))
+            tensor_dict[k] = v
+    return tensor_dict
 
 
 def _write_to_file(
