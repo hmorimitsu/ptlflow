@@ -38,7 +38,7 @@ from ptlflow import get_model, get_model_reference
 from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils.flow_utils import flow_to_rgb, flow_write
 from ptlflow.utils.io_adapter import IOAdapter
-from ptlflow.utils.utils import get_list_of_available_models_list, release_gpu, tensor_dict_to_numpy
+from ptlflow.utils.utils import get_list_of_available_models_list, tensor_dict_to_numpy
 
 
 def _init_parser() -> ArgumentParser:
