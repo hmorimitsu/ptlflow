@@ -76,6 +76,7 @@ def _init_parser() -> ArgumentParser:
     return parser
 
 
+@torch.no_grad()
 def infer(
     args: Namespace,
     model: BaseModel
@@ -111,9 +112,6 @@ def infer(
         if torch.cuda.is_available():
             inputs = {k: v.cuda() for k, v in inputs.items()}
         preds = model(inputs)
-
-        inputs = release_gpu(inputs)
-        preds = release_gpu(preds)
 
         preds = io_adapter.unpad(preds)
         preds_npy = tensor_dict_to_numpy(preds)

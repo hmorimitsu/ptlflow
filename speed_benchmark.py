@@ -97,6 +97,7 @@ def benchmark(
     return df
 
 
+@torch.no_grad()
 def estimate_inference_time(
     args: argparse.Namespace,
     model: BaseModel

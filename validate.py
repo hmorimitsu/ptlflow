@@ -165,6 +165,7 @@ def validate(
     return metrics_df
 
 
+@torch.no_grad()
 def validate_one_dataloader(
     args: Namespace,
     model: BaseModel,
@@ -196,15 +197,14 @@ def validate_one_dataloader(
             inputs, scaler, padder = _prepare_inputs(inputs, model, args.max_forward_side)
 
             if torch.cuda.is_available():
-                inputs['images'] = inputs['images'].cuda()
+                for k, v in inputs.items():
+                    if isinstance(v, torch.Tensor):
+                        inputs[k] = v.cuda()
             preds = model(inputs)
 
             # Release GPU memory and upscale outputs, if necessary
             inputs['images'] = inputs['images_orig'].clone()
             del inputs['images_orig']
-
-            inputs = release_gpu(inputs)
-            preds = release_gpu(preds)
 
             for k in args.prediction_keys:
                 if k in preds:
@@ -214,10 +214,8 @@ def validate_one_dataloader(
                     preds[k] = v
 
             metrics = model.val_metrics(preds, inputs)
-            metrics = release_gpu(metrics)
 
             for k in metrics.keys():
-                metrics[k] = metrics[k].detach().cpu()
                 if metrics_sum.get(k) is None:
                     metrics_sum[k] = 0.0
                 metrics_sum[k] += metrics[k].item()
