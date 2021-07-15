@@ -102,7 +102,7 @@ def save_plots(
     for col in df.columns[2:]:
         for cmet in args.chosen_metrics:
             if col.endswith(cmet):
-                dataset_name = col.split('-')[0]
+                dataset_name = '_'.join(col.split('-')[:2])
                 if metric_pairs.get(dataset_name) is None:
                     metric_pairs[dataset_name] = {}
                 metric_pairs[dataset_name][cmet] = col
@@ -139,7 +139,7 @@ def summarize(
     args.output_dir = Path(args.output_dir)
     df = load_summarized_table(args)
 
-    df = _shorten_columns_names(df)
+    df = _shorten_columns_names(df, len(args.chosen_metrics) > 1)
 
     if args.drop_checkpoints is not None and len(args.drop_checkpoints) > 0:
         ignore_idx = [i for i in df.index if any(c in df.loc[i, 'checkpoint'] for c in args.drop_checkpoints)]
@@ -159,14 +159,18 @@ def summarize(
 
 
 def _shorten_columns_names(
-    df: pd.DataFrame
+    df: pd.DataFrame,
+    keep_metric_name: bool
 ) -> pd.DataFrame:
     change_dict = {}
     for col in df.columns:
         tokens = col.split('-')
         if len(tokens) > 1:
-            metric_name = tokens[1].split('/')[1]
-            change_dict[col] = f'{tokens[0]}-{metric_name}'
+            metric_name = tokens[-1].split('/')[1]
+            new_col_name = f'{tokens[0]}-{tokens[1]}'
+            if keep_metric_name:
+                new_col_name += f'-{metric_name}'
+            change_dict[col] = new_col_name
 
     df = df.rename(columns=change_dict)
     return df
