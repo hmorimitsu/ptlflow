@@ -146,7 +146,7 @@ class FlowMetrics(Metric):
         px3_mask = (epe < 3).float()
         px5_mask = (epe < 5).float()
         target_norm = torch.norm(flow_target, p=2, dim=1)
-        outlier_mask = ((epe > 8) & (epe > (0.1*target_norm))).float()
+        outlier_mask = ((epe > 3) & (epe > (0.05*target_norm))).float()
         self.used_keys = [('epe', 'epe', 'valid_target'),
                           ('px1', 'px1_mask', 'valid_target'),
                           ('px3', 'px3_mask', 'valid_target'),
@@ -319,4 +319,4 @@ class FlowMetrics(Metric):
         if len(flow_tensor.shape) < 4:
             return 1
         else:
-            return flow_tensor.shape[0]
+            return flow_tensor.view(-1, *flow_tensor.shape[-3:]).shape[0]
