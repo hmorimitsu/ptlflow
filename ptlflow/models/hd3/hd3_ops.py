@@ -192,8 +192,11 @@ def _prob2cornerflow(prob, normalize=True):
     # prob: [B,C,H,W]
     def indice2flow(ind, d):
         # ind [B,1,H,W]
-        return torch.cat([ind % d - d // 2, ind // d - d // 2], 1)
-
+        return torch.cat(
+            [ind % d - torch.div(d, 2, rounding_mode='floor'),
+             torch.div(ind, d, rounding_mode='floor') - torch.div(d, 2, rounding_mode='floor')],
+            1)
+        
     if normalize:
         normalizer = nn.Softmax(dim=1)
         prob = normalizer(prob)
@@ -203,7 +206,7 @@ def _prob2cornerflow(prob, normalize=True):
     avg_pool = nn.AvgPool2d(kernel_size=2, stride=1, padding=0)
     max_pool = nn.MaxPool2d(kernel_size=d - 1, stride=1, return_indices=True)
     out, indice = max_pool(avg_pool(pr))
-    indice += indice // (d - 1)  # in original coordinate
+    indice += torch.div(indice, (d - 1), rounding_mode='floor')  # in original coordinate
     indice = indice.squeeze().reshape(B, H, W).unsqueeze(1)
     lt_prob = torch.gather(prob, 1, indice)
     lt_flow = indice2flow(indice, d).float()
