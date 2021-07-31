@@ -28,6 +28,10 @@ liteflownet3-kitti-b5d32443.ckpt,LiteFlowNet3-ft-kitti.caffemodel,https://github
 liteflownet3-sintel-d985929f.ckpt,LiteFlowNet3-ft-sintel.caffemodel,
 liteflownet3s-kitti-5dffb261.ckpt,LiteFlowNet3-S-ft-kitti.caffemodel,
 liteflownet3s-sintel-89793e34.ckpt,LiteFlowNet3-S-ft-sintel.caffemodel,
+maskflownet-kitti-d2ccb09b.ckpt,8caNov12-1532_300000.pth,https://github.com/cattaneod/MaskFlownet-Pytorch
+maskflownet-sintel-c52423aa.ckpt,5adNov03-0005_1000000.pth,
+maskflownet_s-sintel-79196ff3.ckpt,771Sep25-0735_500000.pth,
+maskflownet_s-things-a8a8ed9e.ckpt,dbbSep30-1206_1000000.pth,
 pwcdcnet-sintel-c7d08a46.ckpt,pwc_net.pth.tar,https://github.com/NVlabs/PWC-Net/tree/master/PyTorch
 pwcdcnet-things-cc223701.ckpt,pwc_net_chairs.pth.tar,
 pwcnet-sintel-533815e5.ckpt,pwc_net.pth.tar,

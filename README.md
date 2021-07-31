@@ -30,6 +30,7 @@ This is still under development, so some things may not work as intended. I plan
 - LiteFlowNet [https://arxiv.org/abs/1805.07036](https://arxiv.org/abs/1805.07036)
 - LiteFlowNet2 [https://arxiv.org/abs/1903.07414](https://arxiv.org/abs/1903.07414)
 - LiteFlowNet3 [https://arxiv.org/abs/2007.09319](https://arxiv.org/abs/2007.09319)
+- MaskFlownet [https://arxiv.org/abs/2003.10955](https://arxiv.org/abs/2003.10955)
 - PWCNet - [https://arxiv.org/abs/1709.02371](https://arxiv.org/abs/1709.02371)
 - RAFT - [https://arxiv.org/abs/2003.12039](https://arxiv.org/abs/2003.12039)
 - ScopeFlow -  [https://arxiv.org/abs/2002.10770](https://arxiv.org/abs/2002.10770)

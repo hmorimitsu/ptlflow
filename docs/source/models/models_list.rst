@@ -78,6 +78,17 @@ LiteFlowNet3
 
 - Model names: ``liteflownet3``, ``liteflownet3_pseudoreg``, ``liteflownet3s``, ``liteflownet3s_pseudoreg``
 
+MaskFlownet
+-----------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/maskflownet>`__
+
+- Paper: **MaskFlownet: Asymmetric Feature Matching with Learnable Occlusion Mask** - `https://arxiv.org/abs/2003.10955 <https://arxiv.org/abs/2003.10955>`_
+
+- Reference code: `https://github.com/cattaneod/MaskFlownet-Pytorch <https://github.com/cattaneod/MaskFlownet-Pytorch>`__
+
+- Model names: ``maskflownet``, ``maskflownet_s``
+
 PWCNet
 ------
 
