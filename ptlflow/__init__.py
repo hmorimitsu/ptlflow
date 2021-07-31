@@ -93,6 +93,7 @@ def download_scripts(
     script_names = [
         'datasets.yml',
         'infer.py',
+        'test.py',
         'train.py',
         'validate.py'
     ]
