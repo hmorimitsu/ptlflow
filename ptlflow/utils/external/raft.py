@@ -44,13 +44,16 @@ class InputPadder:
         self.ht, self.wd = dims[-2:]
         pad_ht = (((self.ht // stride) + 1) * stride - self.ht) % stride
         pad_wd = (((self.wd // stride) + 1) * stride - self.wd) % stride
-        if len(dims) < 5:
-            self._pad = [pad_wd//2, pad_wd - pad_wd//2, 0, pad_ht]
-        else:
-            self._pad = [pad_wd//2, pad_wd - pad_wd//2, 0, pad_ht, 0, 0]
+        self._pad = [pad_wd//2, pad_wd - pad_wd//2, 0, pad_ht]
 
     def pad(self, x):
-        return F.pad(x, self._pad, mode='replicate')
+        in_shape = x.shape
+        if len(in_shape) > 4:
+            x = x.view(-1, *in_shape[-3:])
+        x = F.pad(x, self._pad, mode='replicate')
+        if len(in_shape) > 4:
+            x = x.view(*in_shape[:-2], *x.shape[-2:])
+        return x
 
     def unpad(self, x):
         ht, wd = x.shape[-2:]
