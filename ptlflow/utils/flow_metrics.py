@@ -234,7 +234,7 @@ class FlowMetrics(Metric):
     ) -> torch.Tensor:
         tensor = tensor * valid_mask
         tensor = tensor.view(tensor.shape[0], -1)
-        valid_sum = valid_mask.view(valid_mask.shape[0], -1).sum(dim=1)
+        valid_sum = valid_mask.reshape(valid_mask.shape[0], -1).sum(dim=1)
         valid_sum = torch.clamp(valid_sum, 1)
         tensor = tensor.sum(dim=1) / valid_sum
         if self.average_mode == 'epoch_mean':
