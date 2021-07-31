@@ -20,7 +20,7 @@ import logging
 import sys
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import cv2 as cv
 import numpy as np
@@ -33,9 +33,9 @@ import ptlflow
 from ptlflow import get_model, get_model_reference
 from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils import flow_utils
-from ptlflow.utils.external.raft import InputPadder
+from ptlflow.utils.io_adapter import IOAdapter
 from ptlflow.utils.utils import (
-    add_datasets_to_parser, config_logging, get_list_of_available_models_list, tensor_dict_to_numpy, InputScaler)
+    add_datasets_to_parser, config_logging, get_list_of_available_models_list, tensor_dict_to_numpy)
 
 config_logging()
 
@@ -49,9 +49,6 @@ def _init_parser() -> ArgumentParser:
         '--selection', type=str, nargs='+', default=None,
         help=('Used in combination with model=select. The select mode can be used to run the validation on multiple models '
               'at once. Put a list of model names here separated by spaces.'))
-    parser.add_argument(
-        '--datasets', type=str, nargs='+', default=['kitti', 'sintel'],
-        help='Names of the datasets to use for the validation. Supported datasets are {{\'kitti\',\'sintel\'}}')
     parser.add_argument(
         '--output_path', type=str, default=str(Path('outputs/validate')),
         help='Path to the directory where the validation results will be saved.')
@@ -190,17 +187,17 @@ def validate_one_dataloader(
     metrics_sum = {}
     with tqdm(dataloader) as tdl:
         for i, inputs in enumerate(tdl):
-            inputs['images_orig'] = inputs['images'].clone()
-            inputs, scaler, padder = _prepare_inputs(inputs, model, args.max_forward_side)
+            scale_factor = (
+                None if args.max_forward_side is None else float(args.max_forward_side) / min(inputs['images'].shape[-2:]))
+            
+            io_adapter = IOAdapter(
+                model, inputs['images'].shape[-2:], target_scale_factor=scale_factor, cuda=torch.cuda.is_available())
+            inputs = io_adapter.prepare_inputs(inputs=inputs)
 
-            inputs = _dict_to_cuda(inputs)
             preds = model(inputs)
 
-            # Upscale outputs, if necessary
-            inputs['images'] = inputs['images_orig'].clone()
-            del inputs['images_orig']
-
-            preds = _unpad_and_unscale(preds, padder, scaler)
+            inputs = io_adapter.unpad_and_unscale(inputs)
+            preds = io_adapter.unpad_and_unscale(preds)
 
             metrics = model.val_metrics(preds, inputs)
 
@@ -221,16 +218,6 @@ def validate_one_dataloader(
     return metrics_mean
 
 
-def _dict_to_cuda(
-    tensor_dict: Dict[str, Any]
-) -> Dict[str, Any]:
-    if torch.cuda.is_available():
-        for k, v in tensor_dict.items():
-            if isinstance(v, torch.Tensor):
-                tensor_dict[k] = v.cuda()
-    return tensor_dict
-
-
 def _get_model_names(
     args: Namespace
 ) -> List[str]:
@@ -241,21 +228,6 @@ def _get_model_names(
             raise ValueError('When select is chosen, model names must be provided to --selection.')
         model_names = args.selection
     return model_names
-
-
-def _prepare_inputs(
-    inputs: Dict[str, torch.Tensor],
-    model: BaseModel,
-    max_forward_side: int
-) -> Tuple[Dict[str, torch.Tensor], InputScaler, InputPadder]:
-    scaler = None
-    if max_forward_side is not None and max(inputs['images'].shape[-2:]) > max_forward_side:
-        scale_factor = float(max_forward_side) / max(inputs['images'].shape[-2:])
-        scaler = InputScaler(inputs['images'].shape, scale_factor=scale_factor)
-        inputs['images'] = scaler.scale(inputs['images'])
-    padder = InputPadder(inputs['images'].shape, stride=model.output_stride)
-    inputs['images'] = padder.pad(inputs['images'])
-    return inputs, scaler, padder
 
 
 def _show(
@@ -276,20 +248,6 @@ def _show(
                 v = cv.resize(v, (int(scale_factor*v.shape[1]), int(scale_factor*v.shape[0])))
             cv.imshow('pred_'+k, v)
     cv.waitKey(1)
-
-
-def _unpad_and_unscale(
-    tensor_dict: Dict[str, Any],
-    padder: InputPadder,
-    scaler: Optional[InputScaler],
-) -> Dict[str, Any]:
-    for k, v in tensor_dict.items():
-        if isinstance(v, torch.Tensor):
-            v = padder.unpad(v)
-            if scaler is not None:
-                v = scaler.unscale(v, is_flow=('flows' in k))
-            tensor_dict[k] = v
-    return tensor_dict
 
 
 def _write_to_file(
