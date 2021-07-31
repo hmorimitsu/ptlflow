@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import torch
 
-from ptlflow.data.flow_transforms import Compose, Resize, ToTensor
+from ptlflow.data.flow_transforms import ToTensor
 from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils.utils import InputPadder, InputScaler
 
@@ -51,6 +51,14 @@ class IOAdapter(object):
             elements are (height, with).
         target_size : Optional[Tuple[int, int]], optional
             If provided, the inputs will be resized to target_size. target_size is defined as a tuple (height, with).
+        target_scale_factor : Optional[float], default 1.0
+            This value is only used if size is None. The multiplier that will be applied to the original shape to scale
+            the input.
+        interpolation_mode : str, default 'bilinear'
+            How to perform the interpolation. It must be a value accepted by the 'mode' argument from
+            torch.nn.functional.interpolate function.
+        interpolation_align_corners : bool, default False
+            Whether the interpolation keep the corners aligned. As defined in torch.nn.functional.interpolate.
         cuda : bool
             If True, the input tensors are transferred to GPU (if a GPU is available).
         """
@@ -68,7 +76,7 @@ class IOAdapter(object):
             self.scaler = InputScaler(
                 orig_shape=input_size, size=target_size, scale_factor=target_scale_factor,
                 interpolation_mode=interpolation_mode, interpolation_align_corners=interpolation_align_corners)
-        
+
             if (target_size is not None and min(target_size) > 0):
                 padder_input_size = target_size
             else:
@@ -94,6 +102,8 @@ class IOAdapter(object):
             HWC format.
         flows : Optional[Union[np.ndarray, List[np.ndarray]]], optional
             One or more groundtruth optical flow, which can be used for validation. Typically it will be an array HWC.
+        inputs : Optional[Dict[str, Any]]
+            Dict containing input tensors or other metadata. Only the tensors will be transformed.
         kwargs : Union[np.ndarray, List[np.ndarray]]
             Any other array inputs can be provided as keyworded arguments. This function will create an entry in the input dict
             for each keyworded array given.
@@ -123,12 +133,7 @@ class IOAdapter(object):
                 v = self.padder.pad(v)
                 inputs[k] = v
 
-        if self.cuda:
-            if torch.cuda.is_available():
-                inputs = {k: v.cuda() if isinstance(v, torch.Tensor) else v for k, v in inputs.items()}
-            else:
-                logging.warning(
-                    'IOAdapter was asked to use cuda, but torch.cuda.is_available() == False. Tensors will remain on CPU.')
+        inputs = self._to_cuda(inputs)
 
         return inputs
 
@@ -167,3 +172,15 @@ class IOAdapter(object):
                 outputs[k] = v
 
         return outputs
+
+    def _to_cuda(
+        self,
+        inputs: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        if self.cuda:
+            if torch.cuda.is_available():
+                inputs = {k: v.cuda() if isinstance(v, torch.Tensor) else v for k, v in inputs.items()}
+            else:
+                logging.warning(
+                    'IOAdapter was asked to use cuda, but torch.cuda.is_available() == False. Tensors will remain on CPU.')
+        return inputs

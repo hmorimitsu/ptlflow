@@ -33,7 +33,7 @@ from typing import Any, Dict, Optional
 import cv2 as cv
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, dataloader
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from ptlflow import get_model, get_model_reference
@@ -156,7 +156,7 @@ def test_one_dataloader(
     for i, inputs in enumerate(tqdm(dataloader)):
         scale_factor = (
             None if args.max_forward_side is None else float(args.max_forward_side) / min(inputs['images'].shape[-2:]))
-        
+
         io_adapter = IOAdapter(
             model, inputs['images'].shape[-2:], target_scale_factor=scale_factor, cuda=torch.cuda.is_available())
         inputs = io_adapter.prepare_inputs(inputs=inputs)

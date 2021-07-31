@@ -189,7 +189,7 @@ def validate_one_dataloader(
         for i, inputs in enumerate(tdl):
             scale_factor = (
                 None if args.max_forward_side is None else float(args.max_forward_side) / min(inputs['images'].shape[-2:]))
-            
+
             io_adapter = IOAdapter(
                 model, inputs['images'].shape[-2:], target_scale_factor=scale_factor, cuda=torch.cuda.is_available())
             inputs = io_adapter.prepare_inputs(inputs=inputs)
