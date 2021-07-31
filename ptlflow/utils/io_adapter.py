@@ -125,7 +125,7 @@ class IOAdapter(object):
 
         if self.cuda:
             if torch.cuda.is_available():
-                inputs = {k: v.cuda() for k, v in inputs.items() if isinstance(v, torch.Tensor)}
+                inputs = {k: v.cuda() if isinstance(v, torch.Tensor) else v for k, v in inputs.items()}
             else:
                 logging.warning(
                     'IOAdapter was asked to use cuda, but torch.cuda.is_available() == False. Tensors will remain on CPU.')
