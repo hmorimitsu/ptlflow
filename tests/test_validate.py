@@ -32,7 +32,6 @@ def test_validate(tmp_path: Path) -> None:
 
     args = parser.parse_args([TEST_MODEL])
 
-    args.datasets = ['kitti', 'sintel']
     args.output_path = tmp_path
     args.write_outputs = True
     args.max_samples = 1
