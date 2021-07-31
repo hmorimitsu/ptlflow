@@ -112,14 +112,15 @@ class IOAdapter(object):
                     keys_to_remove.append(k)
             for k in keys_to_remove:
                 del inputs[k]
+            inputs = self.transform(inputs)
 
-        inputs = self.transform(inputs)
         for k, v in inputs.items():
             if isinstance(v, torch.Tensor):
+                while len(v.shape) < 5:
+                    v = v.unsqueeze(0)
                 if self.scaler is not None:
                     v = self.scaler.scale(v, is_flow=k.startswith('flow'))
                 v = self.padder.pad(v)
-                v = v.unsqueeze(0)
                 inputs[k] = v
 
         if self.cuda:
