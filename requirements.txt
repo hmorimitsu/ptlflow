@@ -1,5 +1,6 @@
 numpy >= 1.17.0
 opencv-python >= 4.0.0.21
+packaging >= 20.0
 pandas >= 1.1.0
 pillow >= 5.0
 plotly >= 5.0.0
