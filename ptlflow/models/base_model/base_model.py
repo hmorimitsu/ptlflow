@@ -82,6 +82,8 @@ class BaseModel(pl.LightningModule):
         self.val_dataloader_names = []
         self.val_dataloader_lengths = []
 
+        self.test_dataloader_names = []
+
         self.last_inputs = None
         self.last_predictions = None
 
@@ -136,6 +138,10 @@ class BaseModel(pl.LightningModule):
             help=('String specifying the dataset for validation. See the docs of '
                   'ptlflow.models.base_model.base_model.BaseModel.parse_dataset_selection for more details about this '
                   'string.'))
+        parser.add_argument(
+            '--test_dataset', type=str, nargs='+', default=None, choices=['kitti-2012', 'kitti-2015', 'sintel'],
+            help=('Specify the datasets for testing. This option should be used to generate predictions on the'
+                  'test set of datasets that have official benchmarks.'))
         parser.add_argument(
             '--pretrained_ckpt', type=str, default=None,
             help=('A string identifier of the pretrained checkpoint to load. The string will be first checked against the '
@@ -451,6 +457,40 @@ class BaseModel(pl.LightningModule):
 
             self.val_dataloader_names.append('-'.join(parsed_vals[1:]))
             self.val_dataloader_lengths.append(len(dataset))
+
+        return dataloaders
+
+    def test_dataloader(self) -> List[DataLoader]:
+        """Initialize and return the list of test dataloaders.
+
+        The list of datasets to load is provided by the --test_dataset argument.
+
+        Returns
+        -------
+        Optional[List[DataLoader]]
+            A list of dataloaders each for one dataset.
+
+        Raises
+        ------
+        ValueError
+            If --test_dataset is not provided.
+        """
+        if self.args.test_dataset is None:
+            raise ValueError('--test_dataset is not set. Please inform at least one dataset for the testing.')
+
+        dataset_ids = self.args.test_dataset
+        if 'sintel' in dataset_ids:
+            dataset_ids.remove('sintel')
+            dataset_ids.extend(['sintel-clean', 'sintel-final'])
+
+        dataloaders = []
+        for dataset_id in self.args.test_dataset:
+            dataset_id += '-test'
+            dataset_tokens = dataset_id.split('-')
+            dataset = getattr(self, f'_get_{dataset_tokens[0]}_dataset')(False, *dataset_tokens[1:])
+            dataloaders.append(DataLoader(dataset, 1, shuffle=False, num_workers=1, pin_memory=False, drop_last=False))
+
+            self.test_dataloader_names.append(dataset_id)
 
         return dataloaders
 

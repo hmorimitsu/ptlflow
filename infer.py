@@ -100,7 +100,7 @@ def infer(
 
     cap, img_paths, num_imgs, prev_img = init_input(args.input_path)
 
-    io_adapter = IOAdapter(model, prev_img.shape[:2], args.input_size)
+    io_adapter = IOAdapter(model, prev_img.shape[:2], args.input_size, cuda=torch.cuda.is_available())
 
     for i in tqdm(range(1, num_imgs)):
         img, img_name, is_img_valid = _read_image(cap, img_paths, i)
@@ -109,11 +109,9 @@ def infer(
             break
 
         inputs = io_adapter.prepare_inputs([prev_img, img])
-        if torch.cuda.is_available():
-            inputs = {k: v.cuda() for k, v in inputs.items()}
         preds = model(inputs)
 
-        preds = io_adapter.unpad(preds)
+        preds = io_adapter.unpad_and_unscale(preds)
         preds_npy = tensor_dict_to_numpy(preds)
         preds_npy['flows_viz'] = flow_to_rgb(preds_npy['flows'])[:, :, ::-1]
         if preds_npy.get('flows_b') is not None:

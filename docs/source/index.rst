@@ -44,6 +44,7 @@ use the its original code.
    starting/inference
    starting/validation
    starting/training
+   starting/testing
 
 .. toctree::
    :maxdepth: 1

@@ -316,12 +316,15 @@ def tensor_dict_to_numpy(
     dict[str, np.ndarray]
         The torch.Tensor entries from tensor_dict converted to numpy format.
     """
-    npy_dict = {k: v.detach().cpu() for k, v in tensor_dict.items() if isinstance(v, torch.Tensor)}
-    if padder is not None:
-        npy_dict = {k: padder.unpad(v) for k, v in npy_dict.items()}
-    for k, v in npy_dict.items():
-        while len(v.shape) > 3:
-            v = v[0]
+    npy_dict = {}
+    for k, v in tensor_dict.items():
+        if isinstance(v, torch.Tensor):
+            v = v.detach().cpu()
+            if padder is not None:
+                v = padder.unpad(v)
+
+            while len(v.shape) > 3:
+                v = v[0]
+            v = v.permute(1, 2, 0).numpy()
         npy_dict[k] = v
-    npy_dict = {k: v.permute(1, 2, 0).numpy() for k, v in npy_dict.items()}
     return npy_dict

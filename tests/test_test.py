@@ -18,23 +18,22 @@ from pathlib import Path
 import shutil
 
 import ptlflow
-import validate
+import test
 from ptlflow.utils.dummy_datasets import write_kitti, write_sintel
 
 TEST_MODEL = 'raft_small'
 
 
-def test_validate(tmp_path: Path) -> None:
-    parser = validate._init_parser()
+def test_test(tmp_path: Path) -> None:
+    parser = test._init_parser()
 
     model_ref = ptlflow.get_model_reference(TEST_MODEL)
     parser = model_ref.add_model_specific_args(parser)
 
     args = parser.parse_args([TEST_MODEL])
 
+    args.test_dataset = ['kitti-2012', 'kitti-2015', 'sintel']
     args.output_path = tmp_path
-    args.write_outputs = True
-    args.max_samples = 1
     args.mpi_sintel_root_dir = tmp_path / 'MPI-Sintel'
     args.kitti_2012_root_dir = tmp_path / 'KITTI/2012'
     args.kitti_2015_root_dir = tmp_path / 'KITTI/2015'
@@ -42,24 +41,15 @@ def test_validate(tmp_path: Path) -> None:
     write_kitti(tmp_path)
     write_sintel(tmp_path)
 
-    args.flow_format = 'flo'
     model = ptlflow.get_model(TEST_MODEL, None, args)
-    metrics_df = validate.validate(args, model)
-    assert min(metrics_df.shape) > 0
+    test.test(args, model)
 
     dataset_name_path = [
-        ('kitti-2012-trainval', '000000_10'),
-        ('kitti-2015-trainval', '000000_10'),
-        ('sintel-clean-trainval-occ', 'sequence_1/frame_0001'),
-        ('sintel-final-trainval-occ', 'sequence_1/frame_0001')]
+        ('kitti2012', '000000_10.png'),
+        ('kitti2015', '000000_10.png'),
+        ('sintel/clean', 'sequence_1/frame_0001.flo'),
+        ('sintel/final', 'sequence_1/frame_0001.flo')]
     for dname, dpath in dataset_name_path:
-        assert (tmp_path / dname / 'flows' / (dpath+'.flo')).exists()
-        assert (tmp_path / dname / 'flows_viz' / (dpath+'.png')).exists()
-
-    args.flow_format = 'png'
-    model = ptlflow.get_model(TEST_MODEL, None, args)
-    validate.validate(args, model)
-    for dname, dpath in dataset_name_path:
-        assert (tmp_path / dname / 'flows' / (dpath+'.png')).exists()
+        assert (tmp_path / dname / dpath).exists()
 
     shutil.rmtree(tmp_path)

@@ -135,7 +135,7 @@ class flow_reg(nn.Module):
             mask = self.pool3d(mask)[:,0].view(b,u,v,h,w)
 
             ninf = x.clone().fill_(-np.inf).view(b,u,v,h,w)
-            x = torch.where(mask.byte(),oldx,ninf)
+            x = torch.where(mask.bool(),oldx,ninf)
         else:
             self.wsize = (np.sqrt(u*v)-1)/2
 
