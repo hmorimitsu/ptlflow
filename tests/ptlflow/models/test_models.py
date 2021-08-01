@@ -38,6 +38,7 @@ DATASET = 'overfit'
 def test_forward() -> None:
     model_names = ptlflow.models_dict.keys()
     for mname in model_names:
+        print('forward', mname)
         model = ptlflow.get_model(mname)
         model = model.eval()
 
@@ -56,7 +57,7 @@ def test_train(tmp_path: Path):
 
     model_names = ptlflow.models_dict.keys()
     for mname in model_names:
-        print(mname)
+        print('train', mname)
         _train_one_pass(tmp_path, mname)
 
     shutil.rmtree(tmp_path)
