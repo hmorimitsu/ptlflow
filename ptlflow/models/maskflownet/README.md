@@ -1,4 +1,4 @@
-# RAFT
+# MaskFlownet
 
 ## Original code
 
