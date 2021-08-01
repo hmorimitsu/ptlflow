@@ -38,7 +38,7 @@ DATASET = 'overfit'
 def test_forward() -> None:
     model_names = ptlflow.models_dict.keys()
     for mname in model_names:
-        print('forward', mname)
+        print('forward2', mname)
         model = ptlflow.get_model(mname)
         model = model.eval()
 
