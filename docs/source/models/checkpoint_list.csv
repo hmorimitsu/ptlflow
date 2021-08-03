@@ -1,4 +1,8 @@
 PTLFlow name,Original name,Source
+dicl-chairs-fdc24e2f.ckpt,ckpt_chairs.pth.tar,https://github.com/jytime/DICL-Flow
+dicl-kitti-4813ccab.ckpt,ckpt_kitti.pth.tar,
+dicl-sintel-fa9fc259.ckpt,ckpt_sintel.pth.tar,
+dicl-things-20bc573d.ckpt,ckpt_things.pth.tar,
 flownet2-things-d63b53a7.ckpt,FlowNet2_checkpoint.pth.tar,https://github.com/NVIDIA/flownet2-pytorch
 flownetc-things-cc8ac7fd.ckpt,FlowNet2-C_checkpoint,
 flownetcs-things-4bdecffa.ckpt,FlowNet2-CS_checkpoint,
@@ -19,6 +23,8 @@ irr_pwc-sintel-6ad65777.ckpt,IRR-PWC_sintel-best,
 irr_pwc-things-c143e848.ckpt,IRR-PWC_things3d-best,
 irr_pwcnet-things-3f7fb8ca.ckpt,PWCNet-best,
 irr_pwcnet_irr-things-41a07190.ckpt,PWCNet-irr-best,
+lcv_raft-chairs-8063d698.ckpt,Original,PTLFlow
+lcv_raft-things-4c7233b8.ckpt,Original,
 liteflownet-kitti-49f1991a.ckpt,liteflownet-ft-kitti.caffemodel,https://github.com/twhui/LiteFlowNet
 liteflownet-sintel-17991e50.ckpt,liteflownet-ft-sintel.caffemodel,
 liteflownet-things-a4d066e2.ckpt,liteflownet.caffemodel,

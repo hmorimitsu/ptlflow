@@ -1,4 +1,4 @@
-.. _validation:
+.. _testing:
 
 ========================================
 Predicting optical flow on test datasets

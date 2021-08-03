@@ -16,7 +16,7 @@
 # limitations under the License.
 # =============================================================================
 
-__version__ = '0.2.2'
+__version__ = '0.2.3'
 
 import logging
 from argparse import Namespace
@@ -28,6 +28,7 @@ import torch
 from torch import hub
 
 from ptlflow.models.base_model.base_model import BaseModel
+from ptlflow.models.dicl.dicl import DICL
 from ptlflow.models.flownet.flownet2 import FlowNet2
 from ptlflow.models.flownet.flownetc import FlowNetC
 from ptlflow.models.flownet.flownetcs import FlowNetCS
@@ -38,6 +39,7 @@ from ptlflow.models.hd3.hd3 import HD3, HD3Context
 from ptlflow.models.irr.pwcnet import IRRPWCNet
 from ptlflow.models.irr.pwcnet_irr import IRRPWCNetIRR
 from ptlflow.models.irr.irr_pwc import IRRPWC
+from ptlflow.models.lcv.lcv_raft import LCV_RAFT, LCV_RAFTSmall
 from ptlflow.models.liteflownet.liteflownet import LiteFlowNet
 from ptlflow.models.liteflownet.liteflownet3 import (
     LiteFlowNet3, LiteFlowNet3PseudoReg, LiteFlowNet3S, LiteFlowNet3SPseudoReg)
@@ -54,6 +56,7 @@ config_logging()
 
 
 models_dict = {
+    'dicl': DICL,
     'flownet2': FlowNet2,
     'flownetc': FlowNetC,
     'flownetcs': FlowNetCS,
@@ -65,6 +68,8 @@ models_dict = {
     'irr_pwc': IRRPWC,
     'irr_pwcnet': IRRPWCNet,
     'irr_pwcnet_irr': IRRPWCNetIRR,
+    'lcv_raft': LCV_RAFT,
+    'lcv_raft_small': LCV_RAFTSmall,
     'liteflownet': LiteFlowNet,
     'liteflownet2': LiteFlowNet2,
     'liteflownet2_pseudoreg': LiteFlowNet2PseudoReg,
