@@ -181,6 +181,8 @@ class LCV_RAFT(BaseModel):
 
 
 class LCV_RAFTSmall(LCV_RAFT):
+    pretrained_checkpoints = {}
+
     def __init__(self,
                  args: Namespace) -> None:
         super().__init__(
