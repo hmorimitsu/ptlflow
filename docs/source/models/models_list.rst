@@ -7,6 +7,17 @@ Below is a list and a brief explanation about the models currently available on 
 List of models
 ==============
 
+DICL-Flow
+---------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/dicl>`__
+
+- Paper: **Displacement-Invariant Matching Cost Learning for Accurate Optical Flow Estimation** - `https://arxiv.org/abs/2010.14851 <https://arxiv.org/abs/2010.14851>`_
+
+- Reference code: `https://github.com/jytime/DICL-Flow <https://github.com/jytime/DICL-Flow>`_
+
+- Model names: ``dicl``
+
 Flownet
 -------
 
@@ -44,6 +55,18 @@ IRR
 - Reference code: `https://github.com/visinf/irr <https://github.com/visinf/irr>`_
 
 - Model names: ``irr_pwc``, ``irr_pwcnet``, ``irr_pwcnet_irr``
+
+
+LCV
+---
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/lcv>`__
+
+- Paper: **Learnable Cost Volume Using the Cayley Representation** - `https://arxiv.org/abs/2007.11431 <https://arxiv.org/abs/2007.11431>`_
+
+- Reference code: `https://github.com/Prinsphield/LCV <https://github.com/Prinsphield/LCV>`_
+
+- Model names: ``lcv_raft``, ``lcv_raft_small``
 
 LiteFlowNet
 -----------

@@ -23,10 +23,12 @@ This is still under development, so some things may not work as intended. I plan
 
 ## Available models
 
+- DICL-Flow [https://arxiv.org/abs/2010.14851](https://arxiv.org/abs/2010.14851)
 - FlowNet - [https://arxiv.org/abs/1504.06852](https://arxiv.org/abs/1504.06852)
 - FlowNet2 - [https://arxiv.org/abs/1612.01925](https://arxiv.org/abs/1612.01925)
 - HD3 - [https://arxiv.org/abs/1812.06264](https://arxiv.org/abs/1812.06264)
 - IRR - [https://arxiv.org/abs/1904.05290](https://arxiv.org/abs/1904.05290)
+- LCV - [https://arxiv.org/abs/2007.11431](https://arxiv.org/abs/2007.11431)
 - LiteFlowNet [https://arxiv.org/abs/1805.07036](https://arxiv.org/abs/1805.07036)
 - LiteFlowNet2 [https://arxiv.org/abs/1903.07414](https://arxiv.org/abs/1903.07414)
 - LiteFlowNet3 [https://arxiv.org/abs/2007.09319](https://arxiv.org/abs/2007.09319)
