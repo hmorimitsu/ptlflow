@@ -41,6 +41,11 @@ class SequenceLoss(nn.Module):
 
 
 class LCV_RAFT(BaseModel):
+    pretrained_checkpoints = {
+        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/lcv_raft-chairs-8063d698.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/lcv_raft-things-4c7233b8.ckpt'
+    }
+
     def __init__(self,
                  args: Namespace) -> None:
         super().__init__(
