@@ -236,13 +236,13 @@ def _show(
     max_show_side: int
 ) -> None:
     for k, v in inputs.items():
-        if len(v.shape) == 2 or v.shape[2] == 1 or v.shape[2] == 3:
+        if isinstance(v, np.ndarray) and (len(v.shape) == 2 or v.shape[2] == 1 or v.shape[2] == 3):
             if max(v.shape[:2]) > max_show_side:
                 scale_factor = float(max_show_side) / max(v.shape[:2])
                 v = cv.resize(v, (int(scale_factor*v.shape[1]), int(scale_factor*v.shape[0])))
             cv.imshow(k, v)
     for k, v in preds.items():
-        if len(v.shape) == 2 or v.shape[2] == 1 or v.shape[2] == 3:
+        if isinstance(v, np.ndarray) and (len(v.shape) == 2 or v.shape[2] == 1 or v.shape[2] == 3):
             if max(v.shape[:2]) > max_show_side:
                 scale_factor = float(max_show_side) / max(v.shape[:2])
                 v = cv.resize(v, (int(scale_factor*v.shape[1]), int(scale_factor*v.shape[0])))
