@@ -103,15 +103,31 @@ Running from the source code
 ============================
 
 If you want to modify PTLFlow in some way (to add a new model, change parameters, etc.), you will have
-to clone and use the source code instead. You can first clone the source code to your local machine as:
+to clone and use the source code instead. You can first clone the source code to your local machine
+and enter the downloaded folder as:
 
 .. code-block:: bash
 
     git clone https://github.com/hmorimitsu/ptlflow
+    cd ptlflow
 
-Then you can just enter the ``ptlflow`` and work directly from there. Another option is to install
-PTLFlow to your environment after your modifications. For that, you will have to build the wheel
-package and then install with ``pip``.
+You may also have to install the dependencies to run PTLFlow (in case you do not have them).
+The instructions below show how to create a conda environment and install the requirements:
+
+.. code-block:: bash
+
+    conda create --name ptlflow-env
+    conda activate ptlflow-env
+    pip install -r requirements.txt
+
+Then you should be able to use PTLFlow from inside this directory.
+
+Another option is to install PTLFlow to your environment. The benefit is that ptlflow will be
+accessible from anywhere while using the environment. The drawback is that you will have to reinstall
+it everytime you modify the code. Therefore, this option is not recommended if you are
+making changes to the code.
+
+To install PTLFlow, you will have to build the wheel package and then install with ``pip``.
 
 First, install ``build``, if you do not already have it:
 

@@ -9,7 +9,7 @@ infer.py
 
 We provide a script for making it easier to perform inference on different inputs.
 Read :ref:`initial-scripts` to know how to download it.
-Using this script, you can perform the same operation as in the example above by typing:
+Using this script, you can estimate the optical flow between two images by typing:
 
 .. code-block:: bash
 
@@ -81,7 +81,7 @@ The code below shows a way to do this:
     # This example should print a shape (1, 1, 2, H, W).
     print(flows.shape)
 
-    # Show the optical flow on the screen
+    # Create an RGB representation of the flow to show it on the screen
     flow_rgb = flow_utils.flow_to_rgb(flows)
     # Make it a numpy array with HWC shape
     flow_rgb = flow_rgb[0, 0].permute(1, 2, 0)
