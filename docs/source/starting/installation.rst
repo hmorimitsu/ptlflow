@@ -122,8 +122,12 @@ The instructions below show how to create a conda environment and install the re
 
 Then you should be able to use PTLFlow from inside this directory.
 
-Another option is to install PTLFlow to your environment. For that, you will have to build the wheel
-package and then install with ``pip``.
+Another option is to install PTLFlow to your environment. The benefit is that ptlflow will be
+accessible from anywhere while using the environment. The drawback is that you will have to reinstall
+it everytime you modify the code. Therefore, this option is not recommended if you are
+making changes to the code.
+
+To install PTLFlow, you will have to build the wheel package and then install with ``pip``.
 
 First, install ``build``, if you do not already have it:
 
