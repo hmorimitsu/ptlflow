@@ -33,6 +33,17 @@ Flownet
 
 - Model names: ``flownets``, ``flownetc``, ``flownet2``, ``flownetcs``, ``flownetcss``, ``flownetsd``
 
+GMA
+---
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/gma>`__
+
+- Paper: **Learning to Estimate Hidden Motions with Global Motion Aggregation** - `https://arxiv.org/abs/2104.02409 <https://arxiv.org/abs/2104.02409>`_
+
+- Reference code: `https://github.com/zacjiang/GMA <https://github.com/zacjiang/GMA>`_
+
+- Model names: ``gma``
+
 HD3
 ---
 
@@ -144,6 +155,17 @@ ScopeFlow
 - Reference code: `https://github.com/avirambh/ScopeFlow <https://github.com/avirambh/ScopeFlow>`_
 
 - Model names: ``scopeflow``
+
+SCV
+---
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/scv>`__
+
+- Paper: **Learning Optical Flow from a Few Matches** - `https://arxiv.org/abs/2104.02166 <https://arxiv.org/abs/2104.02166>`_
+
+- Reference code: `https://github.com/zacjiang/SCV <https://github.com/zacjiang/SCV>`_
+
+- Model names: ``scv4``, ``scv8``
 
 STaRFlow
 --------

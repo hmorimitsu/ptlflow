@@ -9,6 +9,10 @@ flownetcs-things-4bdecffa.ckpt,FlowNet2-CS_checkpoint,
 flownetcss-things-b42e67d0.ckpt,FlowNet2-CSS_checkpoint,
 flownets-things-98cde14d.ckpt,FlowNet2-S_checkpoint,
 flownetsd-things-c5f3124e.ckpt,FlowNet2-SD_checkpoint,
+gma-chairs-d4ec321d.ckpt,gma-chairs.pth,https://github.com/zacjiang/GMA
+gma-things-90aafb63.ckpt,gma-things.pth,
+gma-sintel-98d6f3d0.ckpt,gma-sintel.pth,
+gma-kitti-8ca3ec80.ckpt,gma-kitti.pth,
 hd3-chairs-0d46c9fd.ckpt,hd3f_chairs-04bf114d.pth,https://github.com/ucbdrive/hd3
 hd3-kitti-6eb77dd3.ckpt,hd3f_chairs_things-462a3896.pth,
 hd3-sintel-10689995.ckpt,hd3f_chairs_things_kitti-41b15827.pth,
@@ -51,6 +55,12 @@ scopeflow-chairs-ebfaa62d.ckpt,c1.ckpt,https://github.com/avirambh/ScopeFlow
 scopeflow-kitti-a20c434d.ckpt,kitti_comb.ckpt,
 scopeflow-sintel-21a91683.ckpt,sintel_comb.ckpt,
 scopeflow-things-70e22d63.ckpt,t3.ckpt,
+scv-eighth-chairs-8ba57294.ckpt,eighth/scv-chairs.pth,https://github.com/zacjiang/SCV
+scv-eighth-things-9c893323.ckpt,eighth/scv-things.pth,
+scv-quarter-chairs-4726627e.ckpt,quarter/scv-chairs.pth,
+scv-quarter-kitti-e86c7953.ckpt,quarter/scv-kitti.pth,
+scv-quarter-sintel-2d9b4a05.ckpt,quarter/scv-sintel.pth,
+scv-quarter-things-0dac9b66.ckpt,quarter/scv-things.pth,
 starflow-kitti-34b9a3ed.ckpt,StarFlow_kitti,https://github.com/pgodet/star_flow
 starflow-sintel-3c06b844.ckpt,StarFlow_sintel,
 starflow-things-d3966a93.ckpt,StarFlow_things,
