@@ -9,7 +9,7 @@ Inference speed vs. Trainable parameters
 Environment
 -----------
 
-- GPU: Tesla T4
+- GPU: RTX 3060Ti
 
 - CUDA: 11.2
 
