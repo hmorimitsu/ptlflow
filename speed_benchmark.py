@@ -158,7 +158,7 @@ def save_plot(
     df_tmp[log10_col] = np.log10(df[TABLE_COLS[1]])
 
     fig = px.scatter(
-        df, x=TABLE_COLS[1], y=TABLE_COLS[2], color=TABLE_COLS[0], symbol=TABLE_COLS[0], log_x=True,
+        df, x=TABLE_COLS[1], y=TABLE_COLS[2], color=TABLE_COLS[0], symbol=TABLE_COLS[0], log_x=True, log_y=True,
         title='Parameters x Forward time')
     fig.update_traces(
         marker={
