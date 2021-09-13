@@ -305,12 +305,19 @@ reference_accuracy = {
     'vcn_small_things_sintel': 0.575,
 }
 
+EXCLUDE_MODELS = [
+    'scv4', 'scv8'  # Has additional requirements
+]
+
 
 @pytest.mark.skip(reason='Requires to download all checkpoints. Just run occasionally.')
 def test_accuracy() -> None:
     data = _load_data()
     model_names = ptlflow.models_dict.keys()
     for mname in model_names:
+        if mname in EXCLUDE_MODELS:
+            continue
+
         model_ref = ptlflow.get_model_reference(mname)
 
         if hasattr(model_ref, 'pretrained_checkpoints'):
