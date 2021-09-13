@@ -16,7 +16,7 @@
 # limitations under the License.
 # =============================================================================
 
-__version__ = '0.2.3'
+__version__ = '0.2.4'
 
 import logging
 from argparse import Namespace
@@ -35,6 +35,7 @@ from ptlflow.models.flownet.flownetcs import FlowNetCS
 from ptlflow.models.flownet.flownetcss import FlowNetCSS
 from ptlflow.models.flownet.flownets import FlowNetS
 from ptlflow.models.flownet.flownetsd import FlowNetSD
+from ptlflow.models.gma.gma import GMA
 from ptlflow.models.hd3.hd3 import HD3, HD3Context
 from ptlflow.models.irr.pwcnet import IRRPWCNet
 from ptlflow.models.irr.pwcnet_irr import IRRPWCNetIRR
@@ -52,6 +53,13 @@ from ptlflow.models.starflow.starflow import StarFlow
 from ptlflow.models.vcn.vcn import VCN, VCNSmall
 from ptlflow.utils.utils import config_logging
 
+try:
+    from ptlflow.models.scv.scv import SCVEighth, SCVQuarter
+except ImportError as e:
+    print(e)
+    SCVEighth = None
+    SCVQuarter = None
+
 config_logging()
 
 
@@ -63,6 +71,7 @@ models_dict = {
     'flownetcss': FlowNetCSS,
     'flownets': FlowNetS,
     'flownetsd': FlowNetSD,
+    'gma': GMA,
     'hd3': HD3,
     'hd3_ctxt': HD3Context,
     'irr_pwc': IRRPWC,
@@ -84,6 +93,8 @@ models_dict = {
     'raft': RAFT,
     'raft_small': RAFTSmall,
     'scopeflow': ScopeFlow,
+    'scv4': SCVQuarter,
+    'scv8': SCVEighth,
     'starflow': StarFlow,
     'vcn': VCN,
     'vcn_small': VCNSmall,

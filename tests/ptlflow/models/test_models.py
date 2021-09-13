@@ -34,10 +34,17 @@ from ptlflow.utils.utils import make_divisible
 TRAIN_EPOCHS = 1
 DATASET = 'overfit'
 
+EXCLUDE_MODELS = [
+    'scv4', 'scv8'  # Has additional requirements
+]
+
 
 def test_forward() -> None:
     model_names = ptlflow.models_dict.keys()
     for mname in model_names:
+        if mname in EXCLUDE_MODELS:
+            continue
+
         model = ptlflow.get_model(mname)
         model = model.eval()
 
@@ -56,6 +63,9 @@ def test_train(tmp_path: Path):
 
     model_names = ptlflow.models_dict.keys()
     for mname in model_names:
+        if mname in EXCLUDE_MODELS:
+            continue
+
         print(mname)
         _train_one_pass(tmp_path, mname)
 
@@ -94,6 +104,9 @@ def test_overfit(tmp_path: Path) -> None:
 
     model_names = ptlflow.models_dict.keys()
     for mname in model_names:
+        if mname in EXCLUDE_MODELS:
+            continue
+
         print(mname)
         try:
             epe = _overfit_model(tmp_path, mname)

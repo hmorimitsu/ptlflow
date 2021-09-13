@@ -26,6 +26,7 @@ This is still under development, so some things may not work as intended. I plan
 - DICL-Flow [https://arxiv.org/abs/2010.14851](https://arxiv.org/abs/2010.14851)
 - FlowNet - [https://arxiv.org/abs/1504.06852](https://arxiv.org/abs/1504.06852)
 - FlowNet2 - [https://arxiv.org/abs/1612.01925](https://arxiv.org/abs/1612.01925)
+- GMA - [https://arxiv.org/abs/2104.02409](https://arxiv.org/abs/2104.02409)
 - HD3 - [https://arxiv.org/abs/1812.06264](https://arxiv.org/abs/1812.06264)
 - IRR - [https://arxiv.org/abs/1904.05290](https://arxiv.org/abs/1904.05290)
 - LCV - [https://arxiv.org/abs/2007.11431](https://arxiv.org/abs/2007.11431)
@@ -35,7 +36,8 @@ This is still under development, so some things may not work as intended. I plan
 - MaskFlownet [https://arxiv.org/abs/2003.10955](https://arxiv.org/abs/2003.10955)
 - PWCNet - [https://arxiv.org/abs/1709.02371](https://arxiv.org/abs/1709.02371)
 - RAFT - [https://arxiv.org/abs/2003.12039](https://arxiv.org/abs/2003.12039)
-- ScopeFlow -  [https://arxiv.org/abs/2002.10770](https://arxiv.org/abs/2002.10770)
+- ScopeFlow - [https://arxiv.org/abs/2002.10770](https://arxiv.org/abs/2002.10770)
+- SCV - [https://arxiv.org/abs/2104.02166](https://arxiv.org/abs/2104.02166)
 - STaRFlow -  [https://arxiv.org/abs/2007.05481](https://arxiv.org/abs/2007.05481)
 - VCN - [https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf](https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf)
 

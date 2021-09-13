@@ -103,6 +103,22 @@ reference_accuracy = {
     'hd3_ctxt_kitti_flyingthings3d': 66.693,
     'hd3_ctxt_kitti_kitti': 1.491,
     'hd3_ctxt_kitti_sintel': 0.305,
+    'gma_chairs_flyingchairs': 0.533,
+    'gma_chairs_flyingthings3d': 8.372,
+    'gma_chairs_kitti': 12.524,
+    'gma_chairs_sintel': 0.334,
+    'gma_things_flyingchairs': 0.796,
+    'gma_things_flyingthings3d': 3.652,
+    'gma_things_kitti': 7.176,
+    'gma_things_sintel': 0.188,
+    'gma_sintel_flyingchairs': 0.887,
+    'gma_sintel_flyingthings3d': 4.145,
+    'gma_sintel_kitti': 1.863,
+    'gma_sintel_sintel': 0.153,
+    'gma_kitti_flyingchairs': 1.626,
+    'gma_kitti_flyingthings3d': 18.008,
+    'gma_kitti_kitti': 0.987,
+    'gma_kitti_sintel': 0.286,
     'irr_pwc_chairs_occ_flyingchairs': 0.909,
     'irr_pwc_chairs_occ_flyingthings3d': 10.531,
     'irr_pwc_chairs_occ_kitti': 9.929,
@@ -239,6 +255,30 @@ reference_accuracy = {
     'scopeflow_sintel_flyingthings3d': 11.772,
     'scopeflow_sintel_kitti': 9.662,
     'scopeflow_sintel_sintel': 0.218,
+    'scv4_chairs_flyingchairs': 0.644,
+    'scv4_chairs_flyingthings3d': 8.586,
+    'scv4_chairs_kitti': 20.236,
+    'scv4_chairs_sintel': 0.361,
+    'scv4_kitti_flyingchairs': 2.260,
+    'scv4_kitti_flyingthings3d': 57.771,
+    'scv4_kitti_kitti': 1.401,
+    'scv4_kitti_sintel': 0.290,
+    'scv4_sintel_flyingchairs': 0.813,
+    'scv4_sintel_flyingthings3d': 5.976,
+    'scv4_sintel_kitti': 2.180,
+    'scv4_sintel_sintel': 0.224,
+    'scv4_things_flyingchairs': 1.930,
+    'scv4_things_flyingthings3d': 6.140,
+    'scv4_things_kitti': 15.921,
+    'scv4_things_sintel': 0.300,
+    'scv8_chairs_flyingchairs': 2.339,
+    'scv8_chairs_flyingthings3d': 290.216,
+    'scv8_chairs_kitti': 34.867,
+    'scv8_chairs_sintel': 1.866,
+    'scv8_things_flyingchairs': 2.195,
+    'scv8_things_flyingthings3d': 32.719,
+    'scv8_things_kitti': 30.921,
+    'scv8_things_sintel': 1.257,
     'vcn_chairs_flyingchairs': 1.155,
     'vcn_chairs_flyingthings3d': 11.569,
     'vcn_chairs_kitti': 9.270,
@@ -265,12 +305,19 @@ reference_accuracy = {
     'vcn_small_things_sintel': 0.575,
 }
 
+EXCLUDE_MODELS = [
+    'scv4', 'scv8'  # Has additional requirements
+]
+
 
 @pytest.mark.skip(reason='Requires to download all checkpoints. Just run occasionally.')
 def test_accuracy() -> None:
     data = _load_data()
     model_names = ptlflow.models_dict.keys()
     for mname in model_names:
+        if mname in EXCLUDE_MODELS:
+            continue
+
         model_ref = ptlflow.get_model_reference(mname)
 
         if hasattr(model_ref, 'pretrained_checkpoints'):
