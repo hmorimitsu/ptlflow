@@ -49,10 +49,16 @@ from ptlflow.models.maskflownet.maskflownet import MaskFlownet, MaskFlownet_S
 from ptlflow.models.pwcnet.pwcnet import PWCNet, PWCDCNet
 from ptlflow.models.raft.raft import RAFT, RAFTSmall
 from ptlflow.models.scopeflow.irr_pwc_v2 import ScopeFlow
-from ptlflow.models.scv.scv import SCVEighth, SCVQuarter
 from ptlflow.models.starflow.starflow import StarFlow
 from ptlflow.models.vcn.vcn import VCN, VCNSmall
 from ptlflow.utils.utils import config_logging
+
+try:
+    from ptlflow.models.scv.scv import SCVEighth, SCVQuarter
+except ImportError as e:
+    print(e)
+    SCVEighth = None
+    SCVQuarter = None
 
 config_logging()
 
