@@ -71,7 +71,7 @@ The code below shows a way to do this:
     predictions = model(inputs)
 
     # Remove extra padding that may have been added to the inputs
-    predictions = io_adapter.unpad(predictions)
+    predictions = io_adapter.unpad_and_unscale(predictions)
 
     # The output is a dict with possibly several keys,
     # but it should always store the optical flow prediction in a key called 'flows'.
