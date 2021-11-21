@@ -17,8 +17,8 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [3.6, 3.9]
-        torch: [1.7.1, 1.9.0]
-        pytorch-lightning: [1.1.8, 1.4.0]
+        torch: [1.7.1, 1.10.0]
+        pytorch-lightning: [1.1.8, 1.5.2]
 
     steps:
       - uses: actions/checkout@v2

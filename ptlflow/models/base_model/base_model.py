@@ -338,7 +338,7 @@ class BaseModel(pl.LightningModule):
 
         self.train_dataloader()  # Just to initialize dataloader variables
 
-        if self.args.max_steps is None:
+        if self.args.max_steps is None or self.args.max_steps <= 0:
             if self.args.max_epochs is None:
                 self.args.max_epochs = 10
                 logging.warning('--max_epochs is not set. It will be set to %d.', self.args.max_epochs)

@@ -71,7 +71,7 @@ The code below shows a way to do this:
     predictions = model(inputs)
 
     # Remove extra padding that may have been added to the inputs
-    predictions = io_adapter.unpad(predictions)
+    predictions = io_adapter.unpad_and_unscale(predictions)
 
     # The output is a dict with possibly several keys,
     # but it should always store the optical flow prediction in a key called 'flows'.
@@ -94,3 +94,11 @@ The code below shows a way to do this:
     cv.imshow('image2', images[1])
     cv.imshow('flow', flow_bgr_npy)
     cv.waitKey()
+
+Inference on batches of images
+==============================
+
+For simplicity, the base PTLFlow scripts do not provide a direct way to do inference on batches.
+However, it should be easy to extend the base scripts to your use case.
+One example of a workaround to work with batches can be found in
+`[this GitHub issue] <https://github.com/hmorimitsu/ptlflow/issues/28>`__.
