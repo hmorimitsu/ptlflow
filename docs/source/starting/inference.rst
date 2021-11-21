@@ -94,3 +94,11 @@ The code below shows a way to do this:
     cv.imshow('image2', images[1])
     cv.imshow('flow', flow_bgr_npy)
     cv.waitKey()
+
+Inference on batches of images
+==============================
+
+For simplicity, the base PTLFlow scripts do not provide a direct way to do inference on batches.
+However, it should be easy to extend the base scripts to your use case.
+One example of a workaround to work with batches can be found in
+`[this GitHub issue] <https://github.com/hmorimitsu/ptlflow/issues/28>`__.
