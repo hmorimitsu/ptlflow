@@ -18,6 +18,17 @@ DICL-Flow
 
 - Model names: ``dicl``
 
+FastFlownet
+-----------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/fastflownet>`__
+
+- Paper: **FastFlowNet: A Lightweight Network for Fast Optical Flow Estimation** - `https://arxiv.org/abs/2103.04524 <https://arxiv.org/abs/2103.04524>`_
+
+- Reference code: `https://github.com/ltkong218/FastFlowNet <https://github.com/ltkong218/FastFlowNet>`_
+
+- Model names: ``fastflownet``
+
 Flownet
 -------
 

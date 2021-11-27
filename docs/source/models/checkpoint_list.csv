@@ -3,6 +3,11 @@ dicl-chairs-fdc24e2f.ckpt,ckpt_chairs.pth.tar,https://github.com/jytime/DICL-Flo
 dicl-kitti-4813ccab.ckpt,ckpt_kitti.pth.tar,
 dicl-sintel-fa9fc259.ckpt,ckpt_sintel.pth.tar,
 dicl-things-20bc573d.ckpt,ckpt_things.pth.tar,
+fastflownet-chairs-89e7a48e.ckpt,fastflownet_chairs.pth,https://github.com/ltkong218/FastFlowNet
+fastflownet-kitti-6d3526a8.ckpt,fastflownet_ft_kitti.pth,
+fastflownet-mix-fd9b8c0d.ckpt,fastflownet_ft_mix.pth,
+fastflownet-sintel-6475ea96.ckpt,fastflownet_ft_sintel.pth,
+fastflownet-things3d-fc093d29.ckpt,fastflownet_things.pth,
 flownet2-things-d63b53a7.ckpt,FlowNet2_checkpoint.pth.tar,https://github.com/NVIDIA/flownet2-pytorch
 flownetc-things-cc8ac7fd.ckpt,FlowNet2-C_checkpoint,
 flownetcs-things-4bdecffa.ckpt,FlowNet2-CS_checkpoint,
