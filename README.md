@@ -24,6 +24,7 @@ This is still under development, so some things may not work as intended. I plan
 ## Available models
 
 - DICL-Flow [https://arxiv.org/abs/2010.14851](https://arxiv.org/abs/2010.14851)
+- FastFlowNet [https://arxiv.org/abs/2103.04524](https://arxiv.org/abs/2103.04524)
 - FlowNet - [https://arxiv.org/abs/1504.06852](https://arxiv.org/abs/1504.06852)
 - FlowNet2 - [https://arxiv.org/abs/1612.01925](https://arxiv.org/abs/1612.01925)
 - GMA - [https://arxiv.org/abs/2104.02409](https://arxiv.org/abs/2104.02409)
