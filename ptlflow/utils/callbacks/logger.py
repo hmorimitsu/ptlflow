@@ -173,8 +173,9 @@ class LoggerCallback(Callback):
             An instance of the optical flow model.
         """
         self.train_images = {}
+        limit_batches = pl_module.args.limit_train_batches if pl_module.args.limit_train_batches is not None else 1.0
         collect_idx = np.unique(np.linspace(
-            0, self._compute_max_range(pl_module.train_dataloader_length, pl_module.args.limit_train_batches),
+            0, self._compute_max_range(pl_module.train_dataloader_length, limit_batches),
             self.num_images, dtype=np.int32))
         self.train_collect_img_idx = collect_idx
 
@@ -246,9 +247,10 @@ class LoggerCallback(Callback):
         for dl_name in self.val_dataloader_names:
             self.val_images[dl_name] = {}
 
+        limit_batches = pl_module.args.limit_val_batches if pl_module.args.limit_val_batches is not None else 1.0
         for dname, dlen in zip(pl_module.val_dataloader_names, pl_module.val_dataloader_lengths):
             collect_idx = np.unique(np.linspace(
-                0, self._compute_max_range(dlen, pl_module.args.limit_val_batches), self.num_images, dtype=np.int32))
+                0, self._compute_max_range(dlen, limit_batches), self.num_images, dtype=np.int32))
             self.val_collect_image_idx[dname] = collect_idx
 
     def on_validation_epoch_end(
