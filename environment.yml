@@ -1,0 +1,26 @@
+name: ptlflow
+channels:
+  - pytorch
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pip
+  - cudatoolkit~=11.3
+  - pytorch>=1.7.1,<=1.12
+  - torchvision
+  - pip:
+    - einops>=0.3.0,<=0.4.*
+    - numpy>=1.17.0,<=1.22.*
+    - opencv-python>=4.0.0.21,<=4.6.*
+    - packaging>=20.0,<=21.*
+    - pandas>=1.1.0,<=1.4.*
+    - pillow>=5.0,<=9.2.*
+    - plotly>=5.0.0,<=5.9.*
+    - pypng~=0.0.16
+    - pytorch-lightning>=1.1.0,<=1.6.*
+    - requests>=2.0.0,<=2.28.*
+    - scipy>=1.0.0,<=1.8.*
+    - tabulate~=0.8.3
+    - torchmetrics>=0.2,<=0.9.*
+    - tqdm>=4.41.0,<=4.64.*
