@@ -212,6 +212,80 @@ class BaseFlowDataset(Dataset):
             logging.info('Loading %d samples from %s dataset.', self.__len__(), self.dataset_name)
 
 
+class AutoFlowDataset(BaseFlowDataset):
+    """Handle the AutoFlow dataset."""
+
+    def __init__(
+        self,
+        root_dir: str,
+        split: str = 'train',
+        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        max_flow: float = 10000.0,
+        get_valid_mask: bool = True,
+        get_meta: bool = True
+    ) -> None:
+        """Initialize AutoFlowDataset.
+
+        Parameters
+        ----------
+        root_dir : str
+            path to the root directory of the AutoFlow dataset.
+        split : str, default 'train'
+            Which split of the dataset should be loaded. It can be one of {'train', 'val', 'trainval'}.
+        transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
+            Transform to be applied on the inputs.
+        max_flow : float, default 10000.0
+            Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
+            as zero in the valid mask.
+        get_valid_mask : bool, default True
+            Whether to get or generate valid masks.
+        get_meta : bool, default True
+            Whether to get metadata.
+        """
+        super().__init__(
+            dataset_name='AutoFlow',
+            split_name=split,
+            transform=transform,
+            max_flow=max_flow,
+            get_valid_mask=get_valid_mask,
+            get_occlusion_mask=False,
+            get_motion_boundary_mask=False,
+            get_backward=False,
+            get_meta=get_meta)
+        self.root_dir = root_dir
+        self.split_file = THIS_DIR / 'AutoFlow_val.txt'
+
+        # Read data from disk
+        parts_dirs = [f'static_40k_png_{i+1}_of_4' for i in range(4)]
+        sample_paths = []
+        for pdir in parts_dirs:
+            sample_paths.extend([p for p in (Path(root_dir) / pdir).glob('*') if p.is_dir()])
+
+        with open(self.split_file, 'r') as f:
+            val_names = f.read().strip().splitlines()
+
+        if split == 'trainval':
+            remove_names = []
+        elif split == 'train':
+            remove_names = val_names
+        elif split == 'val':
+            remove_names = [p.stem for p in sample_paths if p.stem not in val_names]
+
+        # Keep only data from the correct split
+        self.img_paths = [
+            [p / 'im0.png', p / 'im1.png']
+            for p in sample_paths if p.stem not in remove_names]
+        self.flow_paths = [
+            [p / 'forward.flo'] for p in sample_paths if p.stem not in remove_names]
+        assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
+
+        self.metadata = [
+            {'image_paths': [str(p) for p in paths], 'is_val': paths[0].stem in val_names, 'misc': ''}
+            for paths in self.img_paths]
+
+        self._log_status()
+
+
 class FlyingChairsDataset(BaseFlowDataset):
     """Handle the FlyingChairs dataset."""
 

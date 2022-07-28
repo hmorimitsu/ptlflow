@@ -37,7 +37,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from ptlflow.data import flow_transforms as ft
 from ptlflow.data.datasets import (
-    FlyingChairsDataset, FlyingChairs2Dataset, Hd1kDataset, KittiDataset, SintelDataset, FlyingThings3DDataset,
+    AutoFlowDataset, FlyingChairsDataset, FlyingChairs2Dataset, Hd1kDataset, KittiDataset, SintelDataset, FlyingThings3DDataset,
     FlyingThings3DSubsetDataset)
 from ptlflow.utils.external.raft import InputPadder
 from ptlflow.utils.utils import config_logging, make_divisible
@@ -601,6 +601,41 @@ class BaseModel(pl.LightningModule):
     ###########################################################################
     # _get_datasets
     ###########################################################################
+
+    def _get_autoflow_dataset(
+        self,
+        is_train: bool,
+        *args: str
+    ) -> Dataset:
+        device = 'cuda' if self.args.train_transform_cuda else 'cpu'
+        md = make_divisible
+
+        if is_train:
+            if self.args.train_crop_size is None:
+                cy, cx = (md(368, self.output_stride), md(496, self.output_stride))
+                self.args.train_crop_size = (cy, cx)
+                logging.warning('--train_crop_size is not set. It will be set as (%d, %d).', cy, cx)
+            else:
+                cy, cx = (
+                    md(self.args.train_crop_size[0], self.output_stride), md(self.args.train_crop_size[1], self.output_stride))
+
+            # These transforms are based on RAFT: https://github.com/princeton-vl/RAFT
+            transform = ft.Compose([
+                ft.ToTensor(device=device, fp16=self.args.train_transform_fp16),
+                ft.RandomScaleAndCrop((cy, cx), (-0.1, 1.0), (-0.2, 0.2), min_pool_binary=True),
+                ft.ColorJitter(0.4, 0.4, 0.4, 0.5/3.14, 0.2),
+                ft.GaussianNoise(0.02),
+                ft.RandomPatchEraser(0.5, (int(1), int(3)), (int(50), int(100)), 'mean'),
+                ft.RandomFlip(min(0.5, 0.5), min(0.1, 0.5)),
+            ])
+        else:
+            transform = ft.ToTensor()
+
+        split = 'trainval'
+        if len(args) > 0 and args[0] in ['train', 'val', 'trainval']:
+            split = args[0]
+        dataset = AutoFlowDataset(self.args.autoflow_root_dir, split=split, transform=transform)
+        return dataset
 
     def _get_chairs_dataset(
         self,
