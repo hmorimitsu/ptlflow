@@ -87,7 +87,7 @@ class BaseModel(pl.LightningModule):
         self.last_inputs = None
         self.last_predictions = None
 
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=['loss_fn'])
 
     @staticmethod
     def add_model_specific_args(
