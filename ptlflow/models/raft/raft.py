@@ -55,8 +55,6 @@ class RAFT(BaseModel):
 
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
-        args.corr_levels = 4
-        args.corr_radius = 4
 
         if 'dropout' not in self.args:
             self.args.dropout = 0
