@@ -99,7 +99,7 @@ def benchmark(
             df = df.round(3)
             df.to_csv(output_path / f'speed_benchmark-{args.model}.csv', index=False)
             save_plot(output_path, args.model, df)
-        except Exception as e:
+        except Exception as e:  # noqa: B902
             logging.warning('Skipping model %s due to exception %s', mname, e)
     return df
 

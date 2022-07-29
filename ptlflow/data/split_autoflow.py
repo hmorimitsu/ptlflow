@@ -42,6 +42,13 @@ def _init_parser() -> ArgumentParser:
 
 
 def main(args: Namespace) -> None:
+    """Run the split process.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Arguments for configuring the splitting.
+    """
     parts_dirs = [f'static_40k_png_{i+1}_of_4' for i in range(4)]
     sample_dirs = []
     for pdir in parts_dirs:
@@ -54,7 +61,8 @@ def main(args: Namespace) -> None:
         if table_idx not in samples_per_table:
             samples_per_table[table_idx] = []
         samples_per_table[table_idx].append(sdir)
-    assert len(samples_per_table) == 300, f'ERROR: AutoFlow dataset should have 300 tables, but found {len(samples_per_table)}.'
+    assert len(samples_per_table) == 300, (
+        f'ERROR: AutoFlow dataset should have 300 tables, but found {len(samples_per_table)}.')
 
     val_samples = []
     carryover_samples = 0.0
