@@ -16,10 +16,26 @@ from ..base_model.base_model import BaseModel
 class SequenceLoss(nn.Module):
     def __init__(self, args):
         super().__init__()
+        self.gamma = args.gamma
+        self.max_flow = args.max_flow
 
     def forward(self, outputs, inputs):
         """ Loss function defined over sequence of flow predictions """  
+        flow_preds = outputs['flow_preds']
+        flow_gt = inputs['flows'][:, 0]
+        valid = inputs['valids'][:, 0]
+
+        n_predictions = len(flow_preds)    
         flow_loss = 0.0
+
+        # exlude invalid pixels and extremely large diplacements
+        mag = torch.sum(flow_gt**2, dim=1).sqrt()
+        valid = (valid >= 0.5) & (mag < self.max_flow)
+
+        for i in range(n_predictions):
+            i_weight = self.gamma**(n_predictions - i - 1)
+            i_loss = (flow_preds[i] - flow_gt).abs()
+            flow_loss += i_weight * (valid[:, None] * i_loss).mean()
 
         return flow_loss
 
@@ -67,6 +83,8 @@ class FlowFormer(BaseModel):
         parser.add_argument('--encoder_latent_dim', type=int, default=256)
         parser.add_argument('--feat_cross_attn', action='store_true')
         parser.add_argument('--fnet', type=str, choices=('basicencoder', 'twins'), default='twins')
+        parser.add_argument('--gamma', type=float, default=0.8)
+        parser.add_argument('--max_flow', type=float, default=400.0)
         parser.add_argument('--no_gma', action='store_false', dest='gma')
         parser.add_argument('--only_global', action='store_true')
         parser.add_argument('--patch_size', type=int, default=8)
