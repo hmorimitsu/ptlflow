@@ -1,7 +1,5 @@
 from argparse import ArgumentParser, Namespace
-from pathlib import Path
 
-import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -115,7 +113,6 @@ class RAFT(BaseModel):
         up_flow = torch.sum(mask * up_flow, dim=2)
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
         return up_flow.reshape(N, 2, 8*H, 8*W)
-
 
     def forward(self, inputs, flow_init=None):
         """ Estimate optical flow between pair of frames """
