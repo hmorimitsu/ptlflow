@@ -44,10 +44,10 @@ class SequenceLoss(nn.Module):
 
 class GMFlow(BaseModel):
     pretrained_checkpoints = {
-        'chairs': '',
-        'things': '',
-        'sintel': '',
-        'kitti': ''
+        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-chairs-4922131e.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-things-5a18a9e8.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-sintel-d6f83ccd.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-kitti-af50eb2e.ckpt'
     }
 
     def __init__(self,
@@ -224,6 +224,13 @@ class GMFlow(BaseModel):
 
 
 class GMFlowWithRefinement(GMFlow):
+    pretrained_checkpoints = {
+        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow_refine-chairs-88cdc009.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow_refine-things-e40899f5.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow_refine-sintel-ee46a2c4.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow_refine-kitti-b7bf2fda.ckpt'
+    }
+
     def __init__(self, args: Namespace) -> None:
         args.attn_splits_list = (2, 2)
         args.corr_radius_list = (-1, 4)

@@ -39,10 +39,10 @@ class SequenceLoss(nn.Module):
 
 class FlowFormer(BaseModel):
     pretrained_checkpoints = {
-        'chairs': '',
-        'things': '',
-        'sintel': '',
-        'kitti': ''
+        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformer-chairs-2b34ea4b.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformer-things-ab5f3255.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformer-sintel-27cc959a.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformer-kitti-1e45a6c8.ckpt'
     }
 
     def __init__(self,
