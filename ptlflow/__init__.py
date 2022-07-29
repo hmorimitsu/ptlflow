@@ -28,6 +28,7 @@ import torch
 from torch import hub
 
 from ptlflow.models.base_model.base_model import BaseModel
+from ptlflow.models.csflow.csflow import CSFlow
 from ptlflow.models.dicl.dicl import DICL
 from ptlflow.models.fastflownet.fastflownet import FastFlowNet
 from ptlflow.models.flowformer.flowformer import FlowFormer
@@ -68,6 +69,7 @@ config_logging()
 
 
 models_dict = {
+    'csflow': CSFlow,
     'dicl': DICL,
     'fastflownet': FastFlowNet,
     'flowformer': FlowFormer,
