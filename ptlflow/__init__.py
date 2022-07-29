@@ -28,6 +28,7 @@ import torch
 from torch import hub
 
 from ptlflow.models.base_model.base_model import BaseModel
+from ptlflow.models.craft.craft import CRAFT
 from ptlflow.models.csflow.csflow import CSFlow
 from ptlflow.models.dicl.dicl import DICL
 from ptlflow.models.fastflownet.fastflownet import FastFlowNet
@@ -69,6 +70,7 @@ config_logging()
 
 
 models_dict = {
+    'craft': CRAFT,
     'csflow': CSFlow,
     'dicl': DICL,
     'fastflownet': FastFlowNet,
