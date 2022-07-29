@@ -38,6 +38,7 @@ from ptlflow.models.flownet.flownetcss import FlowNetCSS
 from ptlflow.models.flownet.flownets import FlowNetS
 from ptlflow.models.flownet.flownetsd import FlowNetSD
 from ptlflow.models.gma.gma import GMA
+from ptlflow.models.gmflow.gmflow import GMFlow, GMFlowWithRefinement
 from ptlflow.models.hd3.hd3 import HD3, HD3Context
 from ptlflow.models.irr.pwcnet import IRRPWCNet
 from ptlflow.models.irr.pwcnet_irr import IRRPWCNetIRR
@@ -76,6 +77,8 @@ models_dict = {
     'flownets': FlowNetS,
     'flownetsd': FlowNetSD,
     'gma': GMA,
+    'gmflow': GMFlow,
+    'gmflow_refine': GMFlowWithRefinement,
     'hd3': HD3,
     'hd3_ctxt': HD3Context,
     'irr_pwc': IRRPWC,
