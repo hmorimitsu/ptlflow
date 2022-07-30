@@ -16,8 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.6, 3.9]
-        torch: [1.7.1, 1.12.0]
+        python-version: [3.6, 3.10]
+        pytorch: [1.7.1, 1.12.0]
         pytorch-lightning: [1.1.8, 1.6.5]
 
     steps:
@@ -30,13 +30,32 @@ jobs:
         run: |
           # $CONDA is an environment variable pointing to the root of the miniconda directory
           echo $CONDA/bin >> $GITHUB_PATH
+      - name: Replace python
+        uses: jacobtomlinson/gha-find-replace@v2
+        with:
+          find: "python>=3.6,<=3.10"
+          replace: "python==${{ matrix.python-version }}"
+          regex: false
+          include: "environment.yml"
+      - name: Replace pytorch
+        uses: jacobtomlinson/gha-find-replace@v2
+        with:
+          find: "pytorch>=1.7.1,<=1.12"
+          replace: "pytorch==${{ matrix.pytorch }}"
+          regex: false
+          include: "environment.yml"
+      - name: Replace pytorch-lightning
+        uses: jacobtomlinson/gha-find-replace@v2
+        with:
+          find: "pytorch-lightning>=1.1.0,<=1.6"
+          replace: "pytorch-lightning==${{ matrix.pytorch-lightning }}"
+          regex: false
+          include: "environment.yml"
       - name: Install dependencies
         run: |
           conda env update --file environment.yml --name base
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install --upgrade pytest
-          python -m pip install torch==${{ matrix.torch }}
-          python -m pip install pytorch-lightning==${{ matrix.pytorch-lightning }}
       - name: Test with pytest
         run: |
           python -m pytest
