@@ -62,7 +62,7 @@ def test_train(tmp_path: Path) -> None:
 
     train.train(args)
 
-    log_dirs = Path('default/version_0')
+    log_dirs = Path('lightning_logs/version_0')
 
     assert (tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'hparams.yaml').exists()
 
