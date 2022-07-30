@@ -229,7 +229,8 @@ class GMFlowNet(BaseModel):
         if self.training:
             outputs = {
                 'flows': flow_up[:, None],
-                'flow_preds': flow_predictions
+                'flow_preds': flow_predictions,
+                'soft_corr_map': softCorrMap
             }
         else:
             outputs = {
