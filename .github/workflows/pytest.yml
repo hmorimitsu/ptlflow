@@ -17,22 +17,26 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [3.6, 3.9]
-        torch: [1.7.1, 1.10.0]
-        pytorch-lightning: [1.1.8, 1.5.2]
+        torch: [1.7.1, 1.12.0]
+        pytorch-lightning: [1.1.8, 1.6.5]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Add conda to system path
+        run: |
+          # $CONDA is an environment variable pointing to the root of the miniconda directory
+          echo $CONDA/bin >> $GITHUB_PATH
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install --upgrade pytest
           python -m pip install torch==${{ matrix.torch }}
           python -m pip install pytorch-lightning==${{ matrix.pytorch-lightning }}
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          conda env update --file environment.yml --name base
       - name: Test with pytest
         run: |
           python -m pytest
