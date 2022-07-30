@@ -162,6 +162,55 @@ def validate(
     return metrics_df
 
 
+def validate_list_of_models(
+    args: Namespace
+) -> None:
+    """Perform the validation.
+
+    Parameters
+    ----------
+    args : Namespace
+        Arguments to configure the list of models and the validation.
+    """
+    metrics_df = pd.DataFrame()
+
+    model_names = _get_model_names(args)
+    if args.reversed:
+        model_names = reversed(model_names)
+
+    for mname in model_names:
+        logging.info(mname)
+        model_ref = ptlflow.get_model_reference(mname)
+
+        if hasattr(model_ref, 'pretrained_checkpoints'):
+            ckpt_names = model_ref.pretrained_checkpoints.keys()
+            for cname in ckpt_names:
+                try:
+                    logging.info(cname)
+                    parser_tmp = model_ref.add_model_specific_args(parser)
+                    args = parser_tmp.parse_args()
+
+                    args.model = mname
+                    args.pretrained_ckpt = cname
+
+                    model_id = args.model
+                    if args.pretrained_ckpt is not None:
+                        model_id += f'_{args.pretrained_ckpt}'
+                    args.output_path = Path(args.output_path) / model_id
+
+                    model = get_model(mname, cname, args)
+                    instance_metrics_df = validate(args, model)
+                    metrics_df = pd.concat([metrics_df, instance_metrics_df])
+                    args.output_path.parent.mkdir(parents=True, exist_ok=True)
+                    if args.reversed:
+                        metrics_df.to_csv(args.output_path.parent / 'metrics_all_rev.csv', index=False)
+                    else:
+                        metrics_df.to_csv(args.output_path.parent / 'metrics_all.csv', index=False)
+                except Exception as e:  # noqa: B902
+                    logging.warning('Skipping model %s due to exception %s', mname, e)
+                    break
+
+
 @torch.no_grad()
 def validate_one_dataloader(
     args: Namespace,
@@ -314,43 +363,6 @@ if __name__ == '__main__':
         model = get_model(sys.argv[1], args.pretrained_ckpt, args)
         args.output_path.mkdir(parents=True, exist_ok=True)
 
-        metrics_df = validate(args, model)
+        validate(args, model)
     else:
-        # Run validation on all models and checkpoints
-        metrics_df = pd.DataFrame()
-
-        model_names = _get_model_names(args)
-        if args.reversed:
-            model_names = reversed(model_names)
-
-        for mname in model_names:
-            logging.info(mname)
-            model_ref = ptlflow.get_model_reference(mname)
-
-            if hasattr(model_ref, 'pretrained_checkpoints'):
-                ckpt_names = model_ref.pretrained_checkpoints.keys()
-                for cname in ckpt_names:
-                    try:
-                        logging.info(cname)
-                        parser_tmp = model_ref.add_model_specific_args(parser)
-                        args = parser_tmp.parse_args()
-
-                        args.model = mname
-                        args.pretrained_ckpt = cname
-
-                        model_id = args.model
-                        if args.pretrained_ckpt is not None:
-                            model_id += f'_{args.pretrained_ckpt}'
-                        args.output_path = Path(args.output_path) / model_id
-
-                        model = get_model(mname, cname, args)
-                        instance_metrics_df = validate(args, model)
-                        metrics_df = pd.concat([metrics_df, instance_metrics_df])
-                        args.output_path.parent.mkdir(parents=True, exist_ok=True)
-                        if args.reversed:
-                            metrics_df.to_csv(args.output_path.parent / 'metrics_all_rev.csv', index=False)
-                        else:
-                            metrics_df.to_csv(args.output_path.parent / 'metrics_all.csv', index=False)
-                    except Exception as e:  # noqa: B902
-                        logging.warning('Skipping model %s due to exception %s', mname, e)
-                        break
+        validate_list_of_models(args)
