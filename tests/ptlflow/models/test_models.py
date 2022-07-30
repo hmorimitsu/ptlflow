@@ -49,7 +49,7 @@ def test_forward() -> None:
             model = ptlflow.get_model(mname)
             model = model.eval()
 
-            s = make_divisible(400, model.output_stride)
+            s = make_divisible(128, model.output_stride)
             inputs = {'images': torch.rand(1, 2, 3, s, s)}
 
             if torch.cuda.is_available():
@@ -61,6 +61,7 @@ def test_forward() -> None:
             continue
 
 
+@pytest.mark.skip(reason='Requires too many resources. Use only on machines with large GPUs.')
 def test_train(tmp_path: Path):
     write_flying_chairs2(tmp_path)
 
