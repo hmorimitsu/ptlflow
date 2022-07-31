@@ -4,6 +4,5 @@ flake8-blind-except
 flake8-bugbear
 flake8-comprehensions
 flake8-docstrings
-flake8-eradicate
 flake8-rst-docstrings
 pep8-naming
