@@ -1,4 +1,10 @@
 PTLFlow name,Original name,Source
+craft-kitti-4d99b0c1.ckpt,craft-kitti.pth,https://github.com/askerlee/craft
+craft-sintel-ff8e6563.ckpt,craft-sintel.pth,
+craft-things-5a41930c.ckpt,craft-things.pth,
+csflow-chairs-458a9436.ckpt,CSFlow-chairs.pth,https://github.com/MasterHow/CSFlow
+csflow-kitti-dc66357a.ckpt,CSFlow-kitti.pth,
+csflow-things-ebdd403b.ckpt,CSFlow-things.pth,
 dicl-chairs-fdc24e2f.ckpt,ckpt_chairs.pth.tar,https://github.com/jytime/DICL-Flow
 dicl-kitti-4813ccab.ckpt,ckpt_kitti.pth.tar,
 dicl-sintel-fa9fc259.ckpt,ckpt_sintel.pth.tar,
@@ -8,6 +14,10 @@ fastflownet-kitti-6d3526a8.ckpt,fastflownet_ft_kitti.pth,
 fastflownet-mix-fd9b8c0d.ckpt,fastflownet_ft_mix.pth,
 fastflownet-sintel-6475ea96.ckpt,fastflownet_ft_sintel.pth,
 fastflownet-things3d-fc093d29.ckpt,fastflownet_things.pth,
+flowformer-chairs-2b34ea4b.ckpt,chairs.pth,https://github.com/drinkingcoder/FlowFormer-Official
+flowformer-kitti-1e45a6c8.ckpt,kitti.pth,
+flowformer-sintel-27cc959a.ckpt,sintel.pth,
+flowformer-things-ab5f3255.ckpt,things.pth,
 flownet2-things-d63b53a7.ckpt,FlowNet2_checkpoint.pth.tar,https://github.com/NVIDIA/flownet2-pytorch
 flownetc-things-cc8ac7fd.ckpt,FlowNet2-C_checkpoint,
 flownetcs-things-4bdecffa.ckpt,FlowNet2-CS_checkpoint,
@@ -18,6 +28,18 @@ gma-chairs-d4ec321d.ckpt,gma-chairs.pth,https://github.com/zacjiang/GMA
 gma-things-90aafb63.ckpt,gma-things.pth,
 gma-sintel-98d6f3d0.ckpt,gma-sintel.pth,
 gma-kitti-8ca3ec80.ckpt,gma-kitti.pth,
+gmflow-chairs-4922131e.ckpt,gmflow_chairs-1d776046.pth,https://github.com/haofeixu/gmflow
+gmflow-kitti-af50eb2e.ckpt,gmflow_kitti-285701a8.pth,
+gmflow-sintel-d6f83ccd.ckpt,gmflow_sintel-0c07dcb3.pth,
+gmflow-things-5a18a9e8.ckpt,gmflow_things-e9887eda.pth,
+gmflow_refine-chairs-88cdc009.ckpt,gmflow_with_refine_chairs-020cc9be.pth,
+gmflow_refine-kitti-b7bf2fda.ckpt,gmflow_with_refine_kitti-8d3b9786.pth,
+gmflow_refine-sintel-ee46a2c4.ckpt,gmflow_with_refine_sintel-3ed1cf48.pth,
+gmflow_refine-things-e40899f5.ckpt,gmflow_with_refine_things-36579974.pth,
+gmflownet-kitti-712b4660.ckpt,gmflownet-kitti.pth,https://github.com/xiaofeng94/GMFlowNet
+gmflownet-things-9f061ac7.ckpt,gmflownet-things.pth,
+gmflownet_mix-sintel-33492618.ckpt,gmflownet_mix-sintel.pth,
+gmflownet_mix-things-8396f0a1.ckpt,gmflownet_mix-things.pth,
 hd3-chairs-0d46c9fd.ckpt,hd3f_chairs-04bf114d.pth,https://github.com/ucbdrive/hd3
 hd3-kitti-6eb77dd3.ckpt,hd3f_chairs_things-462a3896.pth,
 hd3-sintel-10689995.ckpt,hd3f_chairs_things_kitti-41b15827.pth,
