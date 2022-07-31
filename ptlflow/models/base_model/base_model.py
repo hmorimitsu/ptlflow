@@ -26,6 +26,7 @@ import logging
 import warnings
 from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
+from packaging import version
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 with warnings.catch_warnings():
@@ -87,7 +88,10 @@ class BaseModel(pl.LightningModule):
         self.last_inputs = None
         self.last_predictions = None
 
-        self.save_hyperparameters()
+        if version.parse(pl.__version__) >= version.parse('1.6.0'):
+            self.save_hyperparameters(ignore=['loss_fn'])
+        else:
+            self.save_hyperparameters()
 
     @staticmethod
     def add_model_specific_args(
