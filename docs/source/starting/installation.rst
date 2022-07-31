@@ -60,19 +60,6 @@ checkpoint name to ``--pretrained_ckpt`` as follows:
 
 This will show an error message with a list of the available checkpoint names.
 
-Conda environment
-=================
-
-It is recommended to use a virtual environment, such as ``conda`` or ``virtualenv``. 
-Most of the PTLFlow tests are done in ``conda``. To install PTLFlow in
-a new conda environment, run:
-
-.. code-block:: bash
-
-    conda create --name ptlflow-env
-    conda activate ptlflow-env
-    pip install ptlflow
-
 Optional dependencies
 =====================
 
@@ -116,11 +103,9 @@ The instructions below show how to create a conda environment and install the re
 
 .. code-block:: bash
 
-    conda create --name ptlflow-env
-    conda activate ptlflow-env
-    pip install -r requirements.txt
+    conda env create -f environment.yml
 
-Then you should be able to use PTLFlow from inside this directory.
+This will create a conda environment called ``ptlflow`` with all the required dependencies already installed.
 
 Another option is to install PTLFlow to your environment. The benefit is that ptlflow will be
 accessible from anywhere while using the environment. The drawback is that you will have to reinstall
