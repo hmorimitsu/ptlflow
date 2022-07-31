@@ -62,13 +62,19 @@ def test_train(tmp_path: Path) -> None:
 
     train.train(args)
 
-    log_dirs = Path('default/version_0')
+    dir_names = ['default', 'lightning_logs']  # Name changes depending on PL version
+    hparams_res = []
+    last_res = []
+    train_res = []
+    for dname in dir_names:
+        log_dirs = Path(f'{dname}/version_0')
 
-    assert (tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'hparams.yaml').exists()
+        hparams_res.append((tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'hparams.yaml').exists())
+        last_res.append(len(list((tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'checkpoints').glob('*_last_*.ckpt'))))
+        train_res.append(len(list((tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'checkpoints').glob('*_train_*.ckpt'))))
 
-    ckpt_last = list((tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'checkpoints').glob('*_last_*.ckpt'))
-    assert len(ckpt_last) > 0
-    ckpt_train = list((tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'checkpoints').glob('*_train_*.ckpt'))
-    assert len(ckpt_train) > 0
+    assert max(hparams_res) is True
+    assert max(last_res) > 0
+    assert max(train_res) > 0
 
     shutil.rmtree(tmp_path)
