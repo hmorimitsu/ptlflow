@@ -7,8 +7,9 @@ dependencies:
   - python>=3.8,<=3.10
   - pip
   - cudatoolkit>=11.0,<=11.6
-  - pytorch>=1.7.1,<=1.12
-  - pytorch-lightning>=1.1.0,<=1.6
+  - distutils
+  - pytorch>=1.8.1,<=1.12
+  - pytorch-lightning>=1.1.0,<=1.6,!=1.3,!=1.4
   - torchmetrics>=0.2,<=0.9
   - torchvision>=0.8.2,<=0.13
   - pip:
