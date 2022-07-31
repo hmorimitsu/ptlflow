@@ -17,6 +17,7 @@
 # =============================================================================
 
 import argparse
+import logging
 from pathlib import Path
 from typing import Union
 
@@ -29,9 +30,11 @@ from tqdm import tqdm
 import ptlflow
 from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils.timer import Timer
-from ptlflow.utils.utils import count_parameters, get_list_of_available_models_list, make_divisible
+from ptlflow.utils.utils import config_logging, count_parameters, get_list_of_available_models_list, make_divisible
 
 TABLE_COLS = ['Model', 'Params', 'Time(ms)']
+
+config_logging()
 
 
 def _init_parser() -> argparse.ArgumentParser:
@@ -83,17 +86,21 @@ def benchmark(
     else:
         model_names = [args.model]
     for mname in tqdm(model_names):
-        model = ptlflow.get_model(mname)
-        model = model.eval()
-        if torch.cuda.is_available():
-            model = model.cuda()
-        model_params = count_parameters(model)
-        infer_timer = estimate_inference_time(args, model)
-        values = [mname, model_params, infer_timer*1000]
-        df = df.append({c: v for c, v in zip(df.columns, values)}, ignore_index=True)
-        df = df.round(3)
-        df.to_csv(output_path / f'speed_benchmark-{args.model}.csv', index=False)
-        save_plot(output_path, args.model, df)
+        try:
+            model = ptlflow.get_model(mname)
+            model = model.eval()
+            if torch.cuda.is_available():
+                model = model.cuda()
+            model_params = count_parameters(model)
+            infer_timer = estimate_inference_time(args, model)
+            values = [mname, model_params, infer_timer*1000]
+            new_df = pd.DataFrame({c: [v] for c, v in zip(df.columns, values)})
+            df = pd.concat([df, new_df], ignore_index=True)
+            df = df.round(3)
+            df.to_csv(output_path / f'speed_benchmark-{args.model}.csv', index=False)
+            save_plot(output_path, args.model, df)
+        except Exception as e:  # noqa: B902
+            logging.warning('Skipping model %s due to exception %s', mname, e)
     return df
 
 
