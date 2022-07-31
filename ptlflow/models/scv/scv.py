@@ -95,7 +95,32 @@ class FlowHead(nn.Module):
         return self.flowpredictor(x)
 
 
-class SCVQuarter(BaseModel):
+class SCVBase(BaseModel):
+    def __init__(self,
+                 args: Namespace) -> None:
+        super().__init__(
+            args=args,
+            loss_fn=SequenceLoss(args),
+            output_stride=8)
+
+        try:
+            import torch_scatter
+        except ImportError:
+            raise ImportError(
+                'ERROR: torch_scatter not found.'
+                ' SCV requires torch_scatter library to run.'
+                ' Check instructions at: https://github.com/rusty1s/pytorch_scatter'
+            )
+        try:
+            import faiss
+        except ImportError:
+            raise ImportError(
+                'ERROR: faiss not found.'
+                ' CSV requires faiss library to run.'
+                ' Install with pip install faiss-gpu'
+            )
+
+class SCVQuarter(SCVBase):
     pretrained_checkpoints = {
         'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/scv-quarter-chairs-4726627e.ckpt',
         'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/scv-quarter-kitti-e86c7953.ckpt',
@@ -105,10 +130,7 @@ class SCVQuarter(BaseModel):
 
     def __init__(self,
                  args: Namespace) -> None:
-        super().__init__(
-            args=args,
-            loss_fn=SequenceLoss(args),
-            output_stride=8)
+        super().__init__(args=args)
 
         # feature network, context network, and update block
         self.fnet = BasicEncoderQuarter(output_dim=256, norm_fn='instance', dropout=False)
@@ -257,7 +279,7 @@ class SCVQuarter(BaseModel):
         return outputs
 
 
-class SCVEighth(BaseModel):
+class SCVEighth(SCVBase):
     pretrained_checkpoints = {
         'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/scv-eighth-chairs-8ba57294.ckpt',
         'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/scv-eighth-things-9c893323.ckpt'
@@ -265,10 +287,7 @@ class SCVEighth(BaseModel):
 
     def __init__(self,
                  args: Namespace) -> None:
-        super().__init__(
-            args=args,
-            loss_fn=SequenceLoss(args),
-            output_stride=8)
+        super().__init__(args=args)
 
         # feature network, context network, and update block
         self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', dropout=False)

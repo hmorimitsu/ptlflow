@@ -5,11 +5,7 @@ from scipy import interpolate
 try:
     from torch_scatter import scatter_softmax, scatter_add
 except ImportError:
-    raise ImportError(
-        'ERROR: torch_scatter not found.'
-        ' CSV requires torch_scatter library to run.'
-        ' Check instructions at: https://github.com/rusty1s/pytorch_scatter'
-    )
+    pass
 
 
 class InputPadder:
