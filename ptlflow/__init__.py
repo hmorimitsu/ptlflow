@@ -16,7 +16,7 @@
 # limitations under the License.
 # =============================================================================
 
-__version__ = '0.2.5'
+__version__ = '0.2.6'
 
 import logging
 from argparse import Namespace
@@ -28,8 +28,11 @@ import torch
 from torch import hub
 
 from ptlflow.models.base_model.base_model import BaseModel
+from ptlflow.models.craft.craft import CRAFT
+from ptlflow.models.csflow.csflow import CSFlow
 from ptlflow.models.dicl.dicl import DICL
 from ptlflow.models.fastflownet.fastflownet import FastFlowNet
+from ptlflow.models.flowformer.flowformer import FlowFormer
 from ptlflow.models.flownet.flownet2 import FlowNet2
 from ptlflow.models.flownet.flownetc import FlowNetC
 from ptlflow.models.flownet.flownetcs import FlowNetCS
@@ -37,6 +40,8 @@ from ptlflow.models.flownet.flownetcss import FlowNetCSS
 from ptlflow.models.flownet.flownets import FlowNetS
 from ptlflow.models.flownet.flownetsd import FlowNetSD
 from ptlflow.models.gma.gma import GMA
+from ptlflow.models.gmflow.gmflow import GMFlow, GMFlowWithRefinement
+from ptlflow.models.gmflownet.gmflownet import GMFlowNet, GMFlowNetMix
 from ptlflow.models.hd3.hd3 import HD3, HD3Context
 from ptlflow.models.irr.pwcnet import IRRPWCNet
 from ptlflow.models.irr.pwcnet_irr import IRRPWCNetIRR
@@ -65,8 +70,11 @@ config_logging()
 
 
 models_dict = {
+    'craft': CRAFT,
+    'csflow': CSFlow,
     'dicl': DICL,
     'fastflownet': FastFlowNet,
+    'flowformer': FlowFormer,
     'flownet2': FlowNet2,
     'flownetc': FlowNetC,
     'flownetcs': FlowNetCS,
@@ -74,6 +82,10 @@ models_dict = {
     'flownets': FlowNetS,
     'flownetsd': FlowNetSD,
     'gma': GMA,
+    'gmflow': GMFlow,
+    'gmflow_refine': GMFlowWithRefinement,
+    'gmflownet': GMFlowNet,
+    'gmflownet_mix': GMFlowNetMix,
     'hd3': HD3,
     'hd3_ctxt': HD3Context,
     'irr_pwc': IRRPWC,
