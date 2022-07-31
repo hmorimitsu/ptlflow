@@ -1,7 +1,9 @@
 # PyTorch Lightning Optical Flow
 
 ![GitHub CI flake8 status](https://github.com/hmorimitsu/ptlflow/actions/workflows/flake8.yml/badge.svg)
-![GitHub CI pytest status](https://github.com/hmorimitsu/ptlflow/actions/workflows/pytest.yml/badge.svg)
+![GitHub CI python status](https://github.com/hmorimitsu/ptlflow/actions/workflows/python.yml/badge.svg)
+![GitHub CI pytorch status](https://github.com/hmorimitsu/ptlflow/actions/workflows/pytorch.yml/badge.svg)
+![GitHub CI pytorch-lightning status](https://github.com/hmorimitsu/ptlflow/actions/workflows/pytorch-lightning.yml/badge.svg)
 ![GitHub CI pytest pip status](https://github.com/hmorimitsu/ptlflow/actions/workflows/pytest_pip.yml/badge.svg)
 [![DOI](https://zenodo.org/badge/375416785.svg)](https://zenodo.org/badge/latestdoi/375416785)
 
@@ -13,6 +15,7 @@ The work and code from many others are present here. I tried to make sure everyt
 
 This is still under development, so some things may not work as intended. I plan to add more models in the future, as well keep improving the platform.
 
+- [What's new](#whats-new)
 - [Available models](#available-models)
 - [Results](#results)
 - [Getting started](#getting-started)
@@ -21,13 +24,31 @@ This is still under development, so some things may not work as intended. I plan
 - [Citing](#citing)
 - [Acknowledgements](#acknowledgements)
 
+## What's new
+
+### July 30, 2022
+
+- Added new models:
+  - CRAFT [https://arxiv.org/abs/2203.16896](https://arxiv.org/abs/2203.16896)
+  - CSFlow [https://arxiv.org/abs/2202.00909](https://arxiv.org/abs/2202.00909)
+  - FlowFormer [https://arxiv.org/abs/2203.16194](https://arxiv.org/abs/2203.16194)
+  - GMFlow [https://arxiv.org/abs/2111.13680](https://arxiv.org/abs/2111.13680)
+  - GMFlowNet [https://arxiv.org/abs/2203.11335](https://arxiv.org/abs/2203.11335)
+- Added support for AutoFlow dataset [https://arxiv.org/abs/2104.14544](https://arxiv.org/abs/2104.14544)
+- Fix Compatibility with Pytorch Lightning 1.6
+
 ## Available models
 
+- CRAFT [https://arxiv.org/abs/2203.16896](https://arxiv.org/abs/2203.16896)
+- CSFlow [https://arxiv.org/abs/2202.00909](https://arxiv.org/abs/2202.00909)
 - DICL-Flow [https://arxiv.org/abs/2010.14851](https://arxiv.org/abs/2010.14851)
 - FastFlowNet [https://arxiv.org/abs/2103.04524](https://arxiv.org/abs/2103.04524)
+- FlowFormer [https://arxiv.org/abs/2203.16194](https://arxiv.org/abs/2203.16194)
 - FlowNet - [https://arxiv.org/abs/1504.06852](https://arxiv.org/abs/1504.06852)
 - FlowNet2 - [https://arxiv.org/abs/1612.01925](https://arxiv.org/abs/1612.01925)
 - GMA - [https://arxiv.org/abs/2104.02409](https://arxiv.org/abs/2104.02409)
+- GMFlow [https://arxiv.org/abs/2111.13680](https://arxiv.org/abs/2111.13680)
+- GMFlowNet [https://arxiv.org/abs/2203.11335](https://arxiv.org/abs/2203.11335)
 - HD3 - [https://arxiv.org/abs/1812.06264](https://arxiv.org/abs/1812.06264)
 - IRR - [https://arxiv.org/abs/1904.05290](https://arxiv.org/abs/1904.05290)
 - LCV - [https://arxiv.org/abs/2007.11431](https://arxiv.org/abs/2007.11431)
