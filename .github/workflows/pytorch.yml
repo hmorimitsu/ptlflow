@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests with a variety of Python versions
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: pytest
+name: pytorch
 
 on:
   push:
@@ -16,39 +16,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.6', '3.10']
-        pytorch: [1.7.1, 1.12.0]
-        pytorch-lightning: [1.1.8, 1.6.5]
+        pytorch: [1.7.1, 1.8.1, 1.9.1, 1.10.1, 1.11.0, 1.12.0]
 
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
       - name: Add conda to system path
         run: |
           # $CONDA is an environment variable pointing to the root of the miniconda directory
           echo $CONDA/bin >> $GITHUB_PATH
-      - name: Replace python
-        uses: jacobtomlinson/gha-find-replace@v2
-        with:
-          find: "python>=3.6,<=3.10"
-          replace: "python==${{ matrix.python-version }}"
-          regex: false
-          include: "environment.yml"
       - name: Replace pytorch
         uses: jacobtomlinson/gha-find-replace@v2
         with:
           find: "pytorch>=1.7.1,<=1.12"
           replace: "pytorch==${{ matrix.pytorch }}"
-          regex: false
-          include: "environment.yml"
-      - name: Replace pytorch-lightning
-        uses: jacobtomlinson/gha-find-replace@v2
-        with:
-          find: "pytorch-lightning>=1.1.0,<=1.6"
-          replace: "pytorch-lightning==${{ matrix.pytorch-lightning }}"
           regex: false
           include: "environment.yml"
       - name: Install dependencies
