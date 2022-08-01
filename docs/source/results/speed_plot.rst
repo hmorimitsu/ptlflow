@@ -9,8 +9,8 @@ Inference speed vs. Trainable parameters
 Environment
 -----------
 
-- GPU: RTX 3060Ti
+- GPU: Tesla T4
 
 - CUDA: 11.2
 
-- PyTorch: 1.9.0
+- PyTorch: 1.12.0

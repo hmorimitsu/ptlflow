@@ -1,0 +1,41 @@
+# This workflow will install Python dependencies, run tests with a variety of Python versions
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: pytorch
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pytorch: [1.8.1, 1.9.1, 1.10.1, 1.11.0, 1.12.0]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Add conda to system path
+        run: |
+          # $CONDA is an environment variable pointing to the root of the miniconda directory
+          echo $CONDA/bin >> $GITHUB_PATH
+      - name: Replace pytorch
+        uses: jacobtomlinson/gha-find-replace@v2
+        with:
+          find: "pytorch>=1.8.1,<=1.12"
+          replace: "pytorch==${{ matrix.pytorch }}"
+          regex: false
+          include: "environment.yml"
+      - name: Install dependencies
+        run: |
+          conda env update --file environment.yml --name base
+          python -m pip install --upgrade pip setuptools==59.5.0 wheel
+          python -m pip install --upgrade pytest
+      - name: Test with pytest
+        run: |
+          python -m pytest

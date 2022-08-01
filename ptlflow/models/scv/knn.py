@@ -1,15 +1,10 @@
 try:
     import faiss
+    res = faiss.StandardGpuResources()
+    res.setDefaultNullStreamAllDevices()
 except ImportError:
-    raise ImportError(
-        'ERROR: faiss not found.'
-        ' CSV requires faiss library to run.'
-        ' Install with pip install faiss-gpu'
-    )
+    faiss = None
 import torch
-
-res = faiss.StandardGpuResources()
-res.setDefaultNullStreamAllDevices()
 
 
 def swig_ptr_from_Tensor(x):
@@ -26,7 +21,7 @@ def swig_ptr_from_Tensor(x):
 
 
 def search_raw_array_pytorch(res, xb, xq, k, D=None, I=None,
-                             metric=faiss.METRIC_L2):
+                             metric=faiss.METRIC_L2 if faiss is not None else 0):
     """search xq in xb, without building an index"""
     assert xb.device == xq.device
 

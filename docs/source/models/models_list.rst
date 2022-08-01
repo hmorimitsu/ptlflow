@@ -7,6 +7,28 @@ Below is a list and a brief explanation about the models currently available on 
 List of models
 ==============
 
+CRAFT
+-----
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/craft>`__
+
+- Paper: **CRAFT: Cross-Attentional Flow Transformers for Robust Optical Flow** - `https://arxiv.org/abs/2203.16896 <https://arxiv.org/abs/2203.16896>`_
+
+- Reference code: `https://github.com/askerlee/craft <https://github.com/askerlee/craft>`_
+
+- Model names: ``craft``
+
+CSFlow
+------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/csflow>`__
+
+- Paper: **CSFlow: Learning optical flow via cross strip correlation for autonomous driving* - `https://arxiv.org/abs/2202.00909 <https://arxiv.org/abs/2202.00909>`_
+
+- Reference code: `https://github.com/MasterHow/CSFlow <https://github.com/MasterHow/CSFlow>`_
+
+- Model names: ``csflow``
+
 DICL-Flow
 ---------
 
@@ -28,6 +50,17 @@ FastFlownet
 - Reference code: `https://github.com/ltkong218/FastFlowNet <https://github.com/ltkong218/FastFlowNet>`_
 
 - Model names: ``fastflownet``
+
+FlowFormer
+----------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/flowformer>`__
+
+- Paper: **FlowFormer: A Transformer Architecture for Optical Flow* - `https://arxiv.org/abs/2203.16194 <https://arxiv.org/abs/2203.16194>`_
+
+- Reference code: `https://github.com/drinkingcoder/FlowFormer-Official <https://github.com/drinkingcoder/FlowFormer-Official>`_
+
+- Model names: ``flowformer``
 
 Flownet
 -------
@@ -54,6 +87,28 @@ GMA
 - Reference code: `https://github.com/zacjiang/GMA <https://github.com/zacjiang/GMA>`_
 
 - Model names: ``gma``
+
+GMFlow
+------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/gmflow>`__
+
+- Paper: **GMFlow: Learning Optical Flow via Global Matching** - `https://arxiv.org/abs/2111.13680 <https://arxiv.org/abs/2111.13680>`_
+
+- Reference code: `https://github.com/haofeixu/gmflow <https://github.com/haofeixu/gmflow>`_
+
+- Model names: ``gmflow``, ``gmflow_refine``
+
+GMFlowNet
+---------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/gmflownet>`__
+
+- Paper: **Global Matching with Overlapping Attention for Optical Flow Estimation** - `https://arxiv.org/abs/2203.11335 <https://arxiv.org/abs/2203.11335>`_
+
+- Reference code: `https://github.com/xiaofeng94/GMFlowNet <https://github.com/xiaofeng94/GMFlowNet>`_
+
+- Model names: ``gmflownet``, ``gmflownet_mix``
 
 HD3
 ---
