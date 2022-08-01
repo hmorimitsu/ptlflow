@@ -5,6 +5,13 @@ List of supported datasets
 The datasets below are currently natively supported by PTLFlow. You should be able to
 use datasets for training or testing just by calling them.
 
+AutoFlow
+--------
+
+Paper: **AutoFlow: Learning a Better Training Set for Optical Flow** - `https://arxiv.org/pdf/2104.14544.pdf <https://arxiv.org/pdf/2104.14544.pdf>`_
+
+Dataset link: `https://autoflow-google.github.io/ <https://autoflow-google.github.io/>`_
+
 Flying Chairs
 -------------
 
