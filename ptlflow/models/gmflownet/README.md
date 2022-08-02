@@ -1,4 +1,4 @@
-# RAFT
+# GMFlowNet
 
 ## Original code
 
