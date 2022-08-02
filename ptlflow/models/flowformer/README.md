@@ -1,4 +1,4 @@
-# RAFT
+# FlowFormer
 
 ## Original code
 

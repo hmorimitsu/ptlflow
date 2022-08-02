@@ -1,4 +1,4 @@
-# RAFT
+# CRAFT
 
 ## Original code
 
