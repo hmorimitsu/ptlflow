@@ -1,4 +1,4 @@
-# ScopeFlow
+# StarFlow
 
 ## Original code
 
