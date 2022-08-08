@@ -1,4 +1,4 @@
-# PWCNet
+# FastFlowNet
 
 ## Original code
 
