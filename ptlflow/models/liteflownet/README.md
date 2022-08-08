@@ -1,4 +1,4 @@
-# PWCNet
+# LiteFlowNet
 
 ## Original code
 
