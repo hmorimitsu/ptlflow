@@ -39,7 +39,7 @@ class FlowMetrics(Metric):
         A prefix string that will be attached to the metric names.
     """
 
-    full_state_update = False
+    full_state_update = True
 
     def __init__(
         self,
