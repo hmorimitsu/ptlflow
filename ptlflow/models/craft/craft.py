@@ -32,7 +32,8 @@ class SequenceLoss(nn.Module):
 
         # exclude invalid pixels and extremely large displacements. 
         # MAX_FLOW = 400.
-        valid = (valid >= 0.5) & ((flow_gt**2).sum(dim=1).sqrt() < self.max_flow)
+        mag = torch.sum(flow_gt ** 2, dim=1, keepdim=True).sqrt()
+        valid = (valid >= 0.5) & (mag < self.max_flow)
 
         for i in range(n_predictions):
             # Exponentially increasing weights. (Eq.7 in RAFT paper)
