@@ -57,6 +57,8 @@ def train(args: Namespace) -> None:
     args : Namespace
         Arguments to configure the training.
     """
+    _print_untested_warning()
+
     pl.utilities.seed.seed_everything(args.random_seed)
 
     if args.train_transform_cuda:
@@ -131,6 +133,19 @@ def _gen_dataset_id(
 
     dataset_id = '_'.join(names_list)
     return dataset_id
+
+
+def _print_untested_warning():
+    print('###############################################################################')
+    print('# WARNING, please read!                                                       #')
+    print('#                                                                             #')
+    print('# This training script has not been tested!                                   #')
+    print('# Therefore, there is no guarantee that a model trained with this script      #')
+    print('# will produce good results after the training!                               #')
+    print('#                                                                             #')
+    print('# You can find more information at                                            #')
+    print('# https://ptlflow.readthedocs.io/en/latest/starting/training.html             #')
+    print('###############################################################################')
 
 
 if __name__ == '__main__':

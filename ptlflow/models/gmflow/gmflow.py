@@ -29,7 +29,7 @@ class SequenceLoss(nn.Module):
         flow_loss = 0.0
 
         # exlude invalid pixels and extremely large diplacements
-        mag = torch.sum(flow_gt ** 2, dim=1).sqrt()  # [B, H, W]
+        mag = torch.sum(flow_gt ** 2, dim=1, keepdim=True).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
 
         for i in range(n_predictions):

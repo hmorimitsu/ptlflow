@@ -114,8 +114,12 @@ class LoggerCallback(Callback):
 
         logger_collection = pl_module.logger
         if logger_collection is not None:
-            if not isinstance(logger_collection, LoggerCollection):
-                logger_collection = LoggerCollection([logger_collection])
+            try:
+                if not isinstance(logger_collection, LoggerCollection):
+                    logger_collection = LoggerCollection([logger_collection])
+            except NotImplementedError:
+                if not isinstance(logger_collection, (list, tuple)):
+                    logger_collection = [logger_collection]
 
             for logger in logger_collection:
                 if isinstance(logger, CometLogger):
@@ -136,7 +140,7 @@ class LoggerCallback(Callback):
         outputs: Dict[str, torch.Tensor],
         batch: Dict[str, torch.Tensor],
         batch_idx: int,
-        dataloader_idx: int
+        **kwargs
     ) -> None:
         """Store one image to be logged, if the current batch_idx is in the log selection group.
 
