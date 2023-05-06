@@ -200,8 +200,9 @@ class LoggerCallback(Callback):
         outputs : Any
             Outputs of the training epoch.
         """
-        img_grid = self._make_image_grid(self.train_images)
-        self.log_image('train', img_grid, pl_module)
+        if len(self.train_images) > 0:
+            img_grid = self._make_image_grid(self.train_images)
+            self.log_image('train', img_grid, pl_module)
 
     def on_validation_batch_end(
         self,
@@ -272,8 +273,9 @@ class LoggerCallback(Callback):
             An instance of the optical flow model.
         """
         for dl_name, dl_images in self.val_images.items():
-            img_grid = self._make_image_grid(dl_images)
-            self.log_image(f'val/{dl_name}', img_grid, pl_module)
+            if len(dl_images) > 0:
+                img_grid = self._make_image_grid(dl_images)
+                self.log_image(f'val/{dl_name}', img_grid, pl_module)
 
     def _add_title(
         self,
