@@ -305,26 +305,27 @@ class BaseModel(pl.LightningModule):
         --------
         validation_step
         """
-        if not isinstance(outputs[0], list):
-            outputs = [outputs]
+        if len(outputs) > 0:
+            if not isinstance(outputs[0], list):
+                outputs = [outputs]
 
-        for i, loader_outputs in enumerate(outputs):
-            # Log mean metrics for one val dataloader
-            metrics_cum = {}
-            for output_dict in loader_outputs:
-                for k, v in output_dict['metrics'].items():
-                    if metrics_cum.get(k) is None:
-                        metrics_cum[k] = [0.0, 0]
-                    metrics_cum[k][0] += v
-                    metrics_cum[k][1] += 1
-            metrics_mean = {}
-            for k, v in metrics_cum.items():
-                metrics_mean[k] = v[0] / v[1]
-            self.log_dict(metrics_mean)
+            for i, loader_outputs in enumerate(outputs):
+                # Log mean metrics for one val dataloader
+                metrics_cum = {}
+                for output_dict in loader_outputs:
+                    for k, v in output_dict['metrics'].items():
+                        if metrics_cum.get(k) is None:
+                            metrics_cum[k] = [0.0, 0]
+                        metrics_cum[k][0] += v
+                        metrics_cum[k][1] += 1
+                metrics_mean = {}
+                for k, v in metrics_cum.items():
+                    metrics_mean[k] = v[0] / v[1]
+                self.log_dict(metrics_mean)
 
-            # Find the EPE metric on the full split
-            epe_key = [k for k in metrics_mean if 'full' in k and 'epe' in k][0]
-            self.log(self.val_dataloader_names[i], metrics_mean[epe_key], prog_bar=True)
+                # Find the EPE metric on the full split
+                epe_key = [k for k in metrics_mean if 'full' in k and 'epe' in k][0]
+                self.log(self.val_dataloader_names[i], metrics_mean[epe_key], prog_bar=True)
 
     def configure_optimizers(self) -> Dict[str, Any]:
         """Initialize the optimizers and LR schedulers.
