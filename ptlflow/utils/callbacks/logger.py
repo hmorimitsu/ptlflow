@@ -26,7 +26,6 @@ except ImportError:
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from pytorch_lightning.callbacks import Callback
-from pytorch_lightning.loggers.base import LoggerCollection
 from pytorch_lightning.loggers.comet import CometLogger
 from pytorch_lightning.loggers.neptune import NeptuneLogger
 from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
@@ -112,26 +111,17 @@ class LoggerCallback(Callback):
         """
         image_npy = image.permute(1, 2, 0).numpy()
 
-        logger_collection = pl_module.logger
-        if logger_collection is not None:
-            try:
-                if not isinstance(logger_collection, LoggerCollection):
-                    logger_collection = LoggerCollection([logger_collection])
-            except NotImplementedError:
-                if not isinstance(logger_collection, (list, tuple)):
-                    logger_collection = [logger_collection]
-
-            for logger in logger_collection:
-                if isinstance(logger, CometLogger):
-                    logger.experiment.log_image(image_npy, name=title)
-                elif isinstance(logger, NeptuneLogger):
-                    logger.experiment[title].log(NeptuneFile.as_image(image))
-                elif isinstance(logger, TensorBoardLogger):
-                    logger.experiment.add_image(title, image, pl_module.global_step)
-                elif isinstance(logger, WandbLogger) and wandb is not None:
-                    title_wb = title.replace('/', '-')
-                    image_wb = wandb.Image(image_npy)
-                    logger.experiment.log({title_wb: image_wb})
+        for logger in pl_module.loggers:
+            if isinstance(logger, CometLogger):
+                logger.experiment.log_image(image_npy, name=title)
+            elif isinstance(logger, NeptuneLogger):
+                logger.experiment[title].log(NeptuneFile.as_image(image))
+            elif isinstance(logger, TensorBoardLogger):
+                logger.experiment.add_image(title, image, pl_module.global_step)
+            elif isinstance(logger, WandbLogger) and wandb is not None:
+                title_wb = title.replace('/', '-')
+                image_wb = wandb.Image(image_npy)
+                logger.experiment.log({title_wb: image_wb})
 
     def on_train_batch_end(
         self,
@@ -156,8 +146,6 @@ class LoggerCallback(Callback):
             The inputs of the current training batch.
         batch_idx : int
             The counter value of the current batch.
-        dataloader_idx : int
-            The index number of the current dataloader.
         """
         if batch_idx in self.train_collect_img_idx:
             self._append_images(self.train_images, pl_module.last_inputs, pl_module.last_predictions)
@@ -187,7 +175,7 @@ class LoggerCallback(Callback):
         self,
         trainer: Trainer,
         pl_module: BaseModel,
-        outputs: Any = None  # This arg does not exist anymore, but it is kept here for compatibility
+        **kwargs
     ) -> None:
         """Log the images accumulated during the training.
 
@@ -200,9 +188,8 @@ class LoggerCallback(Callback):
         outputs : Any
             Outputs of the training epoch.
         """
-        if len(self.train_images) > 0:
-            img_grid = self._make_image_grid(self.train_images)
-            self.log_image('train', img_grid, pl_module)
+        img_grid = self._make_image_grid(self.train_images)
+        self.log_image('train', img_grid, pl_module)
 
     def on_validation_batch_end(
         self,
@@ -273,9 +260,8 @@ class LoggerCallback(Callback):
             An instance of the optical flow model.
         """
         for dl_name, dl_images in self.val_images.items():
-            if len(dl_images) > 0:
-                img_grid = self._make_image_grid(dl_images)
-                self.log_image(f'val/{dl_name}', img_grid, pl_module)
+            img_grid = self._make_image_grid(dl_images)
+            self.log_image(f'val/{dl_name}', img_grid, pl_module)
 
     def _add_title(
         self,
@@ -449,5 +435,7 @@ class LoggerCallback(Callback):
 
                 imgs.append(im)
 
-        grid = make_grid(imgs, len(imgs)//len(dl_images))
+        grid = None
+        if len(dl_images) > 0:
+            grid = make_grid(imgs, len(imgs)//len(dl_images))
         return grid
