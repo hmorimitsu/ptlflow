@@ -29,6 +29,7 @@ from collections.abc import KeysView
 import random
 from typing import Dict, Optional, Sequence, Tuple, Union
 
+from einops import rearrange
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -464,11 +465,11 @@ class RandomFlip(object):
         for k in valid_keys:
             if ibatch is None:
                 inputs[k] = torch.flip(inputs[k], [iinp])
-                if k == 'flows':
+                if 'flows' in k:
                     inputs[k][:, iflow] *= -1
             else:
                 inputs[k][ibatch] = torch.flip(inputs[k][ibatch], [iinp-1])
-                if k == 'flows':
+                if 'flows' in k:
                     inputs[k][ibatch, iflow] *= -1
         return inputs
 
@@ -508,8 +509,6 @@ class RandomScaleAndCrop(object):
     """Applies first random scale and then random crop to the inputs.
 
     The scale is adjusted so that it is not smaller than the crop size.
-    If min_pool_binary is True, then inputs[binary_keys]
-    are interpolated with min pooling, otherwise with bilinear interpolation.
 
     The scale calculation is composed of 2 main stages:
 
@@ -551,10 +550,11 @@ class RandomScaleAndCrop(object):
         major_scale: Tuple[float, float] = (0.0, 0.0),
         space_scale: Union[Tuple[float, float], Tuple[float, float, float, float]] = (0.0, 0.0),
         time_scale: Union[Tuple[float, float], Tuple[float, float, float, float]] = (0.0, 0.0),
-        min_pool_binary: bool = True,
         binary_keys: Union[KeysView, Sequence[str]] = ('mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b'),
         flow_keys: Union[KeysView, Sequence[str]] = ('flows', 'flows_b'),
-        occlusion_keys: Union[KeysView, Sequence[str]] = ('occs', 'occs_b')
+        occlusion_keys: Union[KeysView, Sequence[str]] = ('occs', 'occs_b'),
+        sparse: bool = False,
+        valid_key: str = 'valids'
     ) -> None:
         """Initialize RandomScaleAndCrop.
 
@@ -568,18 +568,20 @@ class RandomScaleAndCrop(object):
             The range of the minor scale. See the class description for more details.
         time_scale : Union[Tuple[float, float], Tuple[float, float, float, float]], default (0.0, 0.0)
             NOTE: Currently not implemented. The range of the time scale. See the class description for more details.
-        min_pool_binary : bool, default True
-            If True, min pooling is applied on binary inputs after the resizing. This ensures: 1. that they remain binary, and
-            2. only pixels which were resized from patches containing only ones remain one.
         binary_keys : Union[KeysView, Sequence[str]], default ['mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b']
             Indicate which of the input keys correspond to binary tensors.
         flow_keys : Union[KeysView, Sequence[str]], default ['flows', 'flows_b']
             Indicate which of the input keys correspond to optical flow tensors.
         occlusion_keys : Union[KeysView, Sequence[str]], default ['occs', 'occs_b']
             Indicate which of the input keys correspond to occlusion mask tensors.
+        sparse : bool, default False
+            If True, only values at valid positions (indicated by the mask in inputs[valid_key]) will be kept when
+            resizing binary and flow inputs. Requires valid_key to exist as a key in inputs.
+        valid_keys : str, default 'valids'
+            The name of the key in inputs that contains the binary mask indicating which pixels are valid.
+            Only used when sparse=True.
         """
         self.crop_size = crop_size
-        self.min_pool_binary = min_pool_binary
         self.major_scale = major_scale
         if len(major_scale) == 2:
             self.major_scale = (major_scale[0], major_scale[1], major_scale[0], major_scale[1])
@@ -595,6 +597,8 @@ class RandomScaleAndCrop(object):
         self.binary_keys = list(binary_keys)
         self.flow_keys = list(flow_keys)
         self.occlusion_keys = list(occlusion_keys)
+        self.sparse = sparse
+        self.valid_key = valid_key
 
     def __call__(  # noqa: C901
         self,
@@ -622,7 +626,7 @@ class RandomScaleAndCrop(object):
         space_scales = (2 ** random.uniform(self.space_scale[0], self.space_scale[1]),
                         2 ** random.uniform(self.space_scale[2], self.space_scale[3]))
         if self.use_time_scale:
-            raise NotImplementedError()
+            raise NotImplementedError('time_scale is currently not supported')
         else:
             min_size = self.crop_size
             if min_size is None:
@@ -632,19 +636,12 @@ class RandomScaleAndCrop(object):
             if self.crop_size is not None:
                 y_crop = random.randint(0, scaled_size[0]-self.crop_size[0])
                 x_crop = random.randint(0, scaled_size[1]-self.crop_size[1])
-            for k, v in inputs.items():
-                v = F.interpolate(v, size=scaled_size, mode='bilinear', align_corners=True)
-                if self.min_pool_binary and k in self.binary_keys:
-                    # Pseudo min pooling
-                    v[v < 0.999] = 0
-                if self.crop_size is not None:
-                    v = v[:, :, y_crop:y_crop+self.crop_size[0], x_crop:x_crop+self.crop_size[1]]
 
-                if k in self.flow_keys:
-                    scale_mult = [float(scaled_size[1]) / w, float(scaled_size[0]) / h]
-                    scale_mult = torch.from_numpy(np.array(scale_mult)).to(dtype=v.dtype, device=v.device)[None, :, None, None]
-                    v = v * scale_mult
-                inputs[k] = v
+            inputs = _resize(inputs, scaled_size, self.binary_keys, self.flow_keys, self.sparse, self.valid_key)
+            if self.crop_size is not None:
+                for k, v in inputs.items():
+                    v = v[:, :, y_crop:y_crop+self.crop_size[0], x_crop:x_crop+self.crop_size[1]]
+                    inputs[k] = v
 
             # Update occlusion masks for out-of-bounds flows
             for k, v in inputs.items():
@@ -751,11 +748,11 @@ class RandomRotate(object):
         self,
         angle: float = 0.0,
         diff_angle: float = 0.0,
-        min_pool_binary: bool = True,
         flow_keys: Union[KeysView, Sequence[str]] = ('flows', 'flows_b'),
         occlusion_keys: Union[KeysView, Sequence[str]] = ('occs', 'occs_b'),
         valid_keys: Union[KeysView, Sequence[str]] = ('valids', 'valids_b'),
-        binary_keys: Union[KeysView, Sequence[str]] = ('mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b')
+        binary_keys: Union[KeysView, Sequence[str]] = ('mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b'),
+        sparse: bool = False
     ) -> None:
         """Initialize RandomRotate.
 
@@ -765,9 +762,6 @@ class RandomRotate(object):
             The maximum absolute value to sample the major angle from.
         diff_angle : float, default 0.0
             The maximum absolute value to sample the angle difference between consecutive images.
-        min_pool_binary : bool, default True
-            If True, min pooling is applied on binary inputs after the resizing. This ensures: 1. that they remain binary, and
-            2. only pixels which were resized from patches containing only ones remain one.
         flow_keys : Union[KeysView, Sequence[str]], default ['flows', 'flows_b']
             Indicate which of the input keys correspond to optical flow tensors.
         occlusion_keys : Union[KeysView, Sequence[str]], default ['occs', 'occs_b']
@@ -776,14 +770,16 @@ class RandomRotate(object):
             Indicate which of the input keys correspond to valid mask tensors.
         binary_keys : Union[KeysView, Sequence[str]], default ['mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b']
             Indicate which of the input keys correspond to binary tensors.
+        sparse : bool, default False
+            If True, all binary inputs and flows are rotated with nearest grid_sample, instead of bilinear.
         """
         self.angle = angle
         self.diff_angle = diff_angle
-        self.min_pool_binary = min_pool_binary
         self.flow_keys = flow_keys
         self.occlusion_keys = occlusion_keys
         self.valid_keys = valid_keys
         self.binary_keys = binary_keys
+        self.sparse = sparse
 
     def __call__(  # noqa: C901
         self,
@@ -874,13 +870,21 @@ class RandomRotate(object):
                 if k in self.flow_keys:
                     v[t::2] += rmat[:num_flows]
 
-                v[t::2] = F.grid_sample(v[t::2], rot_grid[:v[t::2].shape[0]], mode='bilinear', align_corners=True)
+                if k in self.binary_keys:
+                    v[t::2] = F.grid_sample(v[t::2], rot_grid[:v[t::2].shape[0]], mode='nearest')
+                else:
+                    if k in self.flow_keys:
+                        if self.sparse:
+                            v[t::2] = F.grid_sample(v[t::2], rot_grid[:v[t::2].shape[0]], mode='nearest')
+                        else:
+                            v[t::2] = F.grid_sample(v[t::2], rot_grid[:v[t::2].shape[0]], mode='bilinear', align_corners=True)
+                        v[t::2] = rotate_flow(v[t::2], angle)
+                    else:
+                        v[t::2] = F.grid_sample(v[t::2], rot_grid[:v[t::2].shape[0]], mode='bilinear', align_corners=True)
 
                 if k in self.flow_keys:
                     v[t::2] = rotate_flow(v[t::2], angle)
-                elif self.min_pool_binary and k in self.binary_keys:
-                    # Pseudo min pooling
-                    v[v < 0.999] = 0
+
                 inputs[k] = v
 
         # Update occlusion masks for out-of-bounds flows
@@ -905,9 +909,10 @@ class Resize(object):
         self,
         size: Tuple[int, int] = (0, 0),
         scale: float = 1.0,
-        min_pool_binary: bool = True,
         binary_keys: Union[KeysView, Sequence[str]] = ('mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b'),
-        flow_keys: Union[KeysView, Sequence[str]] = ('flows', 'flows_b')
+        flow_keys: Union[KeysView, Sequence[str]] = ('flows', 'flows_b'),
+        sparse: bool = False,
+        valid_key: str = 'valids'
     ) -> None:
         """Initialize Resize.
 
@@ -917,20 +922,24 @@ class Resize(object):
             The target size to resize the inputs. If it is zeros, then the scale will be used instead.
         scale : float, default 1.0
             The scale factor to resize the images. Only used if size is zeros.
-        min_pool_binary : bool, default True
-            If True, min pooling is applied on binary inputs after the resizing. This ensures: 1. that they remain binary, and
-            2. only pixels which were resized from patches containing only ones remain one.
         binary_keys : Union[KeysView, Sequence[str]], default ['mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b']
             Indicate which of the input keys correspond to binary tensors.
             [description], by default ['mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b']
         flow_keys : Union[KeysView, Sequence[str]], default ['flows', 'flows_b']
             Indicate which of the input keys correspond to optical flow tensors.
+        sparse : bool, default False
+            If True, only values at valid positions (indicated by the mask in inputs[valid_key]) will be kept when
+            resizing binary and flow inputs. Requires valid_key to exist as a key in inputs.
+        valid_keys : str, default 'valids'
+            The name of the key in inputs that contains the binary mask indicating which pixels are valid.
+            Only used when sparse=True.
         """
         self.size = size
         self.scale = scale
-        self.min_pool_binary = min_pool_binary
         self.binary_keys = list(binary_keys)
         self.flow_keys = list(flow_keys)
+        self.sparse = sparse
+        self.valid_key = valid_key
 
     def __call__(
         self,
@@ -952,17 +961,7 @@ class Resize(object):
         if self.size is None or self.size[0] < 1 or self.size[1] < 1:
             self.size = (int(self.scale*h), int(self.scale*w))
         if self.size[0] != h or self.size[1] != w:
-            for k, v in inputs.items():
-                v = F.interpolate(v, size=self.size, mode='bilinear', align_corners=True)
-                if self.min_pool_binary and k in self.binary_keys:
-                    # Pseudo min pooling
-                    v[v < 0.999] = 0
-
-                if k in self.flow_keys:
-                    scale_mult = [float(self.size[1]) / w, float(self.size[0]) / h]
-                    scale_mult = torch.from_numpy(np.array(scale_mult)).to(dtype=v.dtype, device=v.device)[None, :, None, None]
-                    v = v * scale_mult
-                inputs[k] = v
+            inputs = _resize(inputs, self.size, self.binary_keys, self.flow_keys, self.sparse, self.valid_key)
         return inputs
 
 
@@ -994,6 +993,105 @@ def _get_valid_keys(
     if ignore_keys is None:
         return inputs_keys
     return [k for k in inputs_keys if k not in ignore_keys]
+
+
+def _resize(
+    inputs: Dict[str, torch.Tensor],
+    target_size: Tuple[int, int],
+    binary_keys: Union[KeysView, Sequence[str]],
+    flow_keys: Union[KeysView, Sequence[str]],
+    sparse: bool,
+    valid_key: str
+):
+    """Resize inputs to a target size. Set sparse=True when the valid mask has holes.
+    This ensures that the resized valid mask does not interpolate the valid positions.
+
+    Parameters
+    ----------
+    inputs : Dict[str, torch.Tensor]
+        Elements to be transformed. Each element is a 4D tensor NCHW.
+    target_size : Tuple[int, int]
+        Target (height, width) sizes.
+    binary_keys : Union[KeysView, Sequence[str]]
+        Indicate which of the input keys correspond to binary tensors.
+        [description], by default ['mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b']
+    flow_keys : Union[KeysView, Sequence[str]]
+        Indicate which of the input keys correspond to optical flow tensors.
+    sparse : bool
+        If True, only values at valid positions (indicated by the mask in inputs[valid_key]) will be kept when
+        resizing binary and flow inputs. Requires valid_key to exist as a key in inputs.
+    valid_keys : str
+        The name of the key in inputs that contains the binary mask indicating which pixels are valid.
+        Only used when sparse=True.
+
+    Returns
+    -------
+    torch.Tensor
+        The updated occlusion masks. Flows which went out-of-bounds are marked as occluded.
+    """
+    if sparse:
+        assert valid_key in inputs, f'sparse is True, but valid_key({valid_key}) is not in inputs'
+        valids = inputs[valid_key]
+        n, k, h, w = valids.shape
+        hs, ws = target_size
+        scale_factor = torch.Tensor([float(ws) / w, float(hs) / h], device=valids.device)
+        valids_flat = rearrange(valids, 'n k h w -> n (k h w)')
+        xy_scaled_list = []
+        inbounds_list = []
+        valids_out = torch.zeros(n, k, hs, ws, dtype=torch.float, device=valids.device)
+        for i, vflat in enumerate(valids_flat):
+            coords = torch.meshgrid(
+                torch.arange(w, device=valids.device), torch.arange(h, device=valids.device))
+            coords = torch.stack(coords, dim=-1)
+            coords = rearrange(coords, 'h w k -> (w h) k')
+
+            coords_valid = coords[vflat >= 1]
+
+            coords_scaled = coords_valid * scale_factor
+
+            x_scaled = torch.round(coords_scaled[:,0]).long()
+            y_scaled = torch.round(coords_scaled[:,1]).long()
+            inbounds = (x_scaled > 0) & (x_scaled < ws) & (y_scaled > 0) & (y_scaled < hs)
+            inbounds_list.append(inbounds)
+            x_scaled = x_scaled[inbounds]
+            y_scaled = y_scaled[inbounds]
+            xy_scaled_list.append((x_scaled, y_scaled))
+
+            valids_out[i, 0, y_scaled, x_scaled] = 1
+
+        inputs[valid_key] = valids_out
+
+        for k, v in inputs.items():
+            if k != valid_key:
+                if k in binary_keys or k in flow_keys:
+                    v_out = torch.zeros(v.shape[0], v.shape[1], hs, ws, dtype=v.dtype, device=v.device)
+                    for i, v_one in enumerate(v):
+                        v_flat = rearrange(v_one, 'k h w -> (h w) k')
+                        v_valid = v_flat[valids_flat[i] >= 1]
+                        if k in flow_keys:
+                            v_valid = v_valid * scale_factor
+                        v_valid = v_valid[inbounds_list[i]]
+                        v_valid = rearrange(v_valid, 'n k -> k n')
+                        v_out[i, :, xy_scaled_list[i][1], xy_scaled_list[i][0]] = v_valid
+                    v = v_out
+                else:
+                    v = F.interpolate(v, size=target_size, mode='bilinear', align_corners=True)
+            inputs[k] = v
+    else:
+        for k, v in inputs.items():
+            h, w = v.shape[-2:]
+            if k in binary_keys:
+                v = F.interpolate(v, size=target_size, mode='nearest')
+            else:
+                v = F.interpolate(v, size=target_size, mode='bilinear', align_corners=True)
+
+            if k in flow_keys:
+                scale_mult = torch.Tensor([float(target_size[1]) / w, float(target_size[0]) / h], device=v.device)[None, :, None, None]
+                v = v * scale_mult
+            
+            inputs[k] = v
+
+    return inputs
 
 
 def _update_oob_flows(
