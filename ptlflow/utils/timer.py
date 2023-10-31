@@ -76,6 +76,7 @@ class Timer(object):
         self.reset()
 
         self.num_tocs = 0
+        self.num_global_tocs = 0
 
     def reset(self) -> None:
         """Zero the total time counter."""
@@ -94,7 +95,8 @@ class Timer(object):
             torch.cuda.synchronize()
         self.end = time.perf_counter()
         assert self.has_tic, 'toc called without tic'
-        self.total_time += self.end - self.start
+        if self.num_tocs > 0:
+            self.total_time += self.end - self.start
         self.has_tic = False
         self.num_tocs += 1
 
@@ -106,7 +108,8 @@ class Timer(object):
         float
             The average time in milliseconds.
         """
-        return self.total() / max(1, self.num_tocs)
+        num_tocs = self.num_global_tocs if self.num_global_tocs > 0 else self.num_tocs
+        return self.total() / max(1, num_tocs-1)
 
     def total(self) -> float:
         """Return the total time since the last reset().
@@ -182,13 +185,21 @@ class TimerManager(object):
         self.log_id = log_id
         self.log_path = log_path
         self.logger = None
+        self.num_global_tocs = 0
+
+    def global_toc(self):
+        self.num_global_tocs += 1
+        for t in self.timers.values():
+            t.num_global_tocs = self.num_global_tocs
 
     def clear(self) -> None:
         """Remove all timers."""
+        self.num_global_tocs = 0
         self.timers = {}
 
     def reset(self) -> None:
         """Restart the total time counter of all timers."""
+        self.num_global_tocs = 0
         for _, t in self.timers.items():
             t.reset()
 
