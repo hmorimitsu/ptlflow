@@ -40,17 +40,21 @@ import torch.nn.functional as F
 
 class InputPadder:
     """Pads images such that dimensions are divisible by stride."""
-    def __init__(self, dims, stride=8):
+    def __init__(self, dims, stride=8, two_side_pad=True, pad_mode='replicate'):
+        self.pad_mode = pad_mode
         self.ht, self.wd = dims[-2:]
         pad_ht = (((self.ht // stride) + 1) * stride - self.ht) % stride
         pad_wd = (((self.wd // stride) + 1) * stride - self.wd) % stride
-        self._pad = [pad_wd//2, pad_wd - pad_wd//2, 0, pad_ht]
+        if two_side_pad:
+            self._pad = [pad_wd//2, pad_wd - pad_wd//2, pad_ht//2, pad_ht - pad_ht//2]
+        else:
+            self._pad = [pad_wd//2, pad_wd - pad_wd//2, 0, pad_ht]
 
     def pad(self, x):
         in_shape = x.shape
         if len(in_shape) > 4:
             x = x.view(-1, *in_shape[-3:])
-        x = F.pad(x, self._pad, mode='replicate')
+        x = F.pad(x, self._pad, mode=self.pad_mode)
         if len(in_shape) > 4:
             x = x.view(*in_shape[:-2], *x.shape[-2:])
         return x

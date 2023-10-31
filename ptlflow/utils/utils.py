@@ -17,6 +17,7 @@
 # =============================================================================
 
 import logging
+import math
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -39,7 +40,9 @@ class InputPadder(_InputPadder):
     def __init__(
         self,
         dims: Sequence[int],
-        stride: int
+        stride: int,
+        two_side_pad=True,
+        pad_mode='replicate'
     ) -> None:
         """Initialize InputPadder.
 
@@ -52,7 +55,59 @@ class InputPadder(_InputPadder):
             The number to compute the amount of padding. The padding will be applied so that the input size is divisible
             by stride.
         """
-        super().__init__(dims, stride=stride)
+        super().__init__(dims, stride=stride, two_side_pad=two_side_pad, pad_mode=pad_mode)
+
+    def fill(self, x):
+        return self.pad(x)
+
+    def unfill(self, x):
+        return self.unpad(x)
+
+
+class InputInterpolator(object):
+    """Bilinearly interpolate images such that dimensions are divisible by stride.
+    """
+
+    def __init__(
+        self,
+        dims: Sequence[int],
+        stride: int,
+    ) -> None:
+        """Initialize InputPadder.
+
+        Parameters
+        ----------
+        dims : Sequence[int]
+            The shape of the original input. It must have at least two elements. It is assumed that the last two dimensions
+            are (height, width).
+        stride : int
+            The number to compute the amount of padding. The padding will be applied so that the input size is divisible
+            by stride.
+        """
+        self.dims = dims
+        self.stride = stride
+
+    def fill(self, x):
+        in_shape = x.shape
+        if len(in_shape) > 4:
+            x = x.view(-1, *in_shape[-3:])
+        new_size = (
+            int(math.ceil(float(x.shape[-2]) / self.stride)) * self.stride,
+            int(math.ceil(float(x.shape[-1]) / self.stride)) * self.stride
+        )
+        x = F.interpolate(x, size=new_size, mode='bilinear', align_corners=True)
+        if len(in_shape) > 4:
+            x = x.view(*in_shape[:-2], *x.shape[-2:])
+        return x
+
+    def unfill(self, x):
+        in_shape = x.shape
+        if len(in_shape) > 4:
+            x = x.view(-1, *in_shape[-3:])
+        x = F.interpolate(x, size=self.dims[-2:], mode='bilinear', align_corners=True)
+        if len(in_shape) > 4:
+            x = x.view(*in_shape[:-2], *x.shape[-2:])
+        return x
 
 
 class InputScaler(object):

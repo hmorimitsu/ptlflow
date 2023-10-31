@@ -24,7 +24,7 @@ import torch
 
 from ptlflow.data.flow_transforms import ToTensor
 from ptlflow.models.base_model.base_model import BaseModel
-from ptlflow.utils.utils import InputPadder, InputScaler
+from ptlflow.utils.utils import InputPadder, InputScaler, InputInterpolator
 
 
 class IOAdapter(object):
@@ -38,7 +38,9 @@ class IOAdapter(object):
         target_scale_factor: Optional[float] = None,
         interpolation_mode: str = 'bilinear',
         interpolation_align_corners: bool = False,
-        cuda: bool = False
+        cuda: bool = False,
+        fp16: bool = False,
+        fill_mode: str = 'pad'
     ) -> None:
         """Initialize IOAdapter.
 
@@ -61,6 +63,10 @@ class IOAdapter(object):
             Whether the interpolation keep the corners aligned. As defined in torch.nn.functional.interpolate.
         cuda : bool
             If True, the input tensors are transferred to GPU (if a GPU is available).
+        fill_mode : str, default 'pad'
+            How to change the input size to adapt to the model stride.
+            If pad, the input is padded with zeros.
+            If interpolate, the input is resized with bilinear interpolation.
         """
         self.output_stride = model.output_stride
         self.target_size = target_size
@@ -68,6 +74,7 @@ class IOAdapter(object):
         self.interpolation_mode = interpolation_mode
         self.interpolation_align_corners = interpolation_align_corners
         self.cuda = cuda
+        self.fp16 = fp16
 
         self.transform = ToTensor()
         padder_input_size = input_size
@@ -82,13 +89,19 @@ class IOAdapter(object):
             else:
                 padder_input_size = (int(target_scale_factor*input_size[0]), int(target_scale_factor*input_size[1]))
 
-        self.padder = InputPadder(padder_input_size, model.output_stride)
+        if fill_mode == 'pad':
+            self.filler = InputPadder(padder_input_size, model.output_stride)
+        elif fill_mode == 'interpolate':
+            self.filler = InputInterpolator(padder_input_size, model.output_stride)
+        else:
+            raise ValueError()
 
     def prepare_inputs(
         self,
         images: Optional[Union[np.ndarray, List[np.ndarray]]] = None,
         flows: Optional[Union[np.ndarray, List[np.ndarray]]] = None,
         inputs: Optional[Dict[str, Any]] = None,
+        image_only: bool = False,
         **kwargs: Union[np.ndarray, List[np.ndarray]]
     ) -> Dict[str, torch.Tensor]:
         """Transform numpy inputs into the input format of theoptical flow models.
@@ -104,6 +117,8 @@ class IOAdapter(object):
             One or more groundtruth optical flow, which can be used for validation. Typically it will be an array HWC.
         inputs : Optional[Dict[str, Any]]
             Dict containing input tensors or other metadata. Only the tensors will be transformed.
+        image_only : Optional[bool]
+            If True, only applies scaling and padding to the images.
         kwargs : Union[np.ndarray, List[np.ndarray]]
             Any other array inputs can be provided as keyworded arguments. This function will create an entry in the input dict
             for each keyworded array given.
@@ -125,12 +140,15 @@ class IOAdapter(object):
             inputs = self.transform(inputs)
 
         for k, v in inputs.items():
+            if image_only and k != 'images':
+                continue
+
             if isinstance(v, torch.Tensor):
                 while len(v.shape) < 5:
                     v = v.unsqueeze(0)
                 if self.scaler is not None:
                     v = self.scaler.scale(v, is_flow=k.startswith('flow'))
-                v = self.padder.pad(v)
+                v = self.filler.fill(v)
                 inputs[k] = v
 
         inputs = self._to_cuda(inputs)
@@ -139,7 +157,8 @@ class IOAdapter(object):
 
     def unpad_and_unscale(
         self,
-        outputs: Dict[str, Any]
+        outputs: Dict[str, Any],
+        image_only: bool = False
     ) -> Dict[str, torch.Tensor]:
         """Remove padding and scaling to restore the original shapes.
 
@@ -154,6 +173,8 @@ class IOAdapter(object):
         outputs : Dict[str, Any]
             It can be either the inputs or the outputs of optical flow models. All tensors will have the extra padding and
             rescaling removed.
+        image_only : Optional[bool]
+            If True, only removes scaling and padding from the images.
 
         Returns
         -------
@@ -165,8 +186,11 @@ class IOAdapter(object):
         prepare_inputs
         """
         for k, v in outputs.items():
+            if image_only and k != 'images':
+                continue
+
             if isinstance(v, torch.Tensor):
-                v = self.padder.unpad(v)
+                v = self.filler.unfill(v)
                 if self.scaler is not None:
                     v = self.scaler.unscale(v, is_flow=k.startswith('flow'))
                 outputs[k] = v
@@ -180,6 +204,8 @@ class IOAdapter(object):
         if self.cuda:
             if torch.cuda.is_available():
                 inputs = {k: v.cuda() if isinstance(v, torch.Tensor) else v for k, v in inputs.items()}
+                if self.fp16:
+                    inputs = {k: v.half() if (isinstance(v, torch.Tensor) and ('flow' in k or 'image' in k)) else v for k, v in inputs.items()}
             else:
                 logging.warning(
                     'IOAdapter was asked to use cuda, but torch.cuda.is_available() == False. Tensors will remain on CPU.')
