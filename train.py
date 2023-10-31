@@ -19,12 +19,10 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 import sys
-import warnings
 
-with warnings.catch_warnings():
-    warnings.simplefilter('ignore')  # Workaround until pl stop raising the metrics deprecation warning
-    import pytorch_lightning as pl
+import pytorch_lightning as pl
 import torch
+from pytorch_lightning.strategies import DDPStrategy
 
 from ptlflow import get_model, get_model_reference
 from ptlflow.utils.callbacks.logger import LoggerCallback
@@ -46,6 +44,8 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         '--log_dir', type=str, default='ptlflow_logs',
         help='The path to the directory where the logs will be saved.')
+    parser.add_argument(
+        '--find_unused_parameters', action='store_true')
     return parser
 
 
@@ -92,7 +92,7 @@ def train(args: Namespace) -> None:
     model.val_dataloader()  # Called just to populate model.val_dataloader_names
 
     model_ckpt_last = pl.callbacks.model_checkpoint.ModelCheckpoint(
-        filename=args.model+'_last_{epoch}_{step}', save_weights_only=True)
+        filename=args.model+'_last_{epoch}_{step}', save_weights_only=True, mode='max')
     callbacks.append(model_ckpt_last)
     model_ckpt_train = pl.callbacks.model_checkpoint.ModelCheckpoint(filename=args.model+'_train_{epoch}_{step}')
     callbacks.append(model_ckpt_train)
@@ -106,11 +106,10 @@ def train(args: Namespace) -> None:
     callbacks.append(LoggerCallback())
 
     trainer = pl.Trainer.from_argparse_args(
-        args, logger=tb_logger, callbacks=callbacks)
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')  # Workaround until pl stop the LightningModule.datamodule` property warning
-        trainer.tune(model)
-        trainer.fit(model)
+        args, logger=tb_logger, callbacks=callbacks,
+        strategy=DDPStrategy(find_unused_parameters=args.find_unused_parameters))
+    trainer.tune(model)
+    trainer.fit(model)
 
 
 def _gen_dataset_id(
