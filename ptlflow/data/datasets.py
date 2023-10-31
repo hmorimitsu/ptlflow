@@ -147,18 +147,23 @@ class BaseFlowDataset(Dataset):
         inputs['images'] = [cv2.imread(str(path)) for path in self.img_paths[index]]
 
         if index < len(self.flow_paths):
-            inputs['flows'], valids = self._get_flows_and_valids(self.flow_paths, index)
+            inputs['flows'], valids = self._get_flows_and_valids(self.flow_paths[index])
             if self.get_valid_mask:
                 inputs['valids'] = valids
 
-        if self.get_occlusion_mask and index < len(self.occ_paths):
-            inputs['occs'] = [cv2.imread(str(path), 0)[:, :, None] for path in self.occ_paths[index]]
+        if self.get_occlusion_mask:
+            if index < len(self.occ_paths):
+                inputs['occs'] = [cv2.imread(str(path), 0)[:, :, None] for path in self.occ_paths[index]]
+            elif self.dataset_name.startswith('KITTI'):
+                noc_paths = [str(p).replace('flow_occ', 'flow_noc') for p in self.flow_paths[index]]
+                _, valids_noc = self._get_flows_and_valids(noc_paths)
+                inputs['occs'] = [valids[i] - valids_noc[i] for i in range(len(valids))]
         if self.get_motion_boundary_mask and index < len(self.mb_paths):
             inputs['mbs'] = [cv2.imread(str(path), 0)[:, :, None] for path in self.mb_paths[index]]
 
         if self.get_backward:
             if index < len(self.flow_b_paths):
-                inputs['flows_b'], valids_b = self._get_flows_and_valids(self.flow_b_paths, index)
+                inputs['flows_b'], valids_b = self._get_flows_and_valids(self.flow_b_paths[index])
                 if self.get_valid_mask:
                     inputs['valids_b'] = valids_b
             if self.get_occlusion_mask and index < len(self.occ_b_paths):
@@ -181,12 +186,11 @@ class BaseFlowDataset(Dataset):
 
     def _get_flows_and_valids(
         self,
-        flow_paths: Sequence[str],
-        index: int
+        flow_paths: Sequence[str]
     ) -> Tuple[List[np.ndarray], List[Optional[np.ndarray]]]:
         flows = []
         valids = []
-        for path in flow_paths[index]:
+        for path in flow_paths:
             flow = flow_utils.flow_read(path)
 
             nan_mask = np.isnan(flow)
@@ -922,6 +926,7 @@ class KittiDataset(BaseFlowDataset):
         transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
         max_flow: float = 512.0,
         get_valid_mask: bool = True,
+        get_occlusion_mask: bool = False,
         get_meta: bool = True
     ) -> None:
         """Initialize KittiDataset.
@@ -943,6 +948,8 @@ class KittiDataset(BaseFlowDataset):
             as zero in the valid mask.
         get_valid_mask : bool, default True
             Whether to get or generate valid masks.
+        get_occlusion_mask : bool, default True
+            Whether to get occlusion masks.
         get_meta : bool, default True
             Whether to get metadata.
         """
@@ -954,7 +961,7 @@ class KittiDataset(BaseFlowDataset):
             transform=transform,
             max_flow=max_flow,
             get_valid_mask=get_valid_mask,
-            get_occlusion_mask=False,
+            get_occlusion_mask=get_occlusion_mask,
             get_motion_boundary_mask=False,
             get_backward=False,
             get_meta=get_meta)
@@ -995,17 +1002,17 @@ class KittiDataset(BaseFlowDataset):
             elif split == 'val':
                 remove_names = [p.stem for p in img1_paths if p.stem not in val_names]
 
-            self.img_paths = [
-                [img1_paths[i], img2_paths[i]] for i in range(len(img1_paths)) if img1_paths[i].stem not in remove_names]
+            self.img_paths.extend([
+                [img1_paths[i], img2_paths[i]] for i in range(len(img1_paths)) if img1_paths[i].stem not in remove_names])
             if split != 'test':
-                self.flow_paths = [
-                    [flow_paths[i]] for i in range(len(flow_paths)) if flow_paths[i].stem not in remove_names]
-            self.metadata = [
+                self.flow_paths.extend([
+                    [flow_paths[i]] for i in range(len(flow_paths)) if flow_paths[i].stem not in remove_names])
+            self.metadata.extend([
                 {
                     'image_paths': [str(img1_paths[i]), str(img2_paths[i])],
                     'is_val': img1_paths[i].stem in val_names,
                     'misc': ver
-                } for i in range(len(img1_paths)) if img1_paths[i].stem not in remove_names]
+                } for i in range(len(img1_paths)) if img1_paths[i].stem not in remove_names])
 
         if split != 'test':
             assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
@@ -1117,5 +1124,207 @@ class SintelDataset(BaseFlowDataset):
             assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
         if len(self.occ_paths) > 0:
             assert len(self.img_paths) == len(self.occ_paths), f'{len(self.img_paths)} vs {len(self.occ_paths)}'
+
+        self._log_status()
+
+
+class MiddleburyDataset(BaseFlowDataset):
+    """Handle the Middlebury dataset."""
+
+    def __init__(  # noqa: C901
+        self,
+        root_dir: str,
+        split: str = 'train',
+        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        max_flow: float = 10000.0,
+        get_valid_mask: bool = True,
+        get_meta: bool = True
+    ) -> None:
+        """Initialize MiddleburyDataset.
+
+        Parameters
+        ----------
+        root_dir : str
+            path to the root directory of the Middlebury dataset.
+        split : str, default 'train'
+            Which split of the dataset should be loaded. It can be one of {'train', 'val', 'trainval', 'test'}.
+        pass_names : Union[str, List[str]], default 'clean'
+            Which passes should be loaded. It can be one of {'clean', 'final', ['clean', 'final']}.
+        transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
+            Transform to be applied on the inputs.
+        max_flow : float, default 10000.0
+            Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
+            as zero in the valid mask.
+        get_valid_mask : bool, default True
+            Whether to get or generate valid masks.
+        get_occlusion_mask : bool, default True
+            Whether to get occlusion masks.
+        get_meta : bool, default True
+            Whether to get metadata.
+        sequence_length : int, default 2
+            How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
+            temporal information.
+        """
+        super().__init__(
+            dataset_name='Middlebury',
+            split_name=split,
+            transform=transform,
+            max_flow=max_flow,
+            get_valid_mask=get_valid_mask,
+            get_occlusion_mask=False,
+            get_motion_boundary_mask=False,
+            get_backward=False,
+            get_meta=get_meta)
+        self.root_dir = root_dir
+        self.split = split
+        self.sequence_length = 2
+
+        # Get sequence names for the given split
+        if split == 'test':
+            split_dir = 'eval'
+        else:
+            split_dir = 'other'
+
+        sequence_names = sorted([p.stem for p in (Path(root_dir) / f'{split_dir}-gt-flow').glob('*')])
+
+        # Read paths from disk
+        for seq_name in sequence_names:
+            image_paths = sorted((Path(self.root_dir) / f'{split_dir}-data' / seq_name).glob('*.png'))
+            flow_paths = []
+            if split != 'test':
+                flow_paths = sorted((Path(self.root_dir) / f'{split_dir}-gt-flow' / seq_name).glob('*.flo'))
+                assert len(image_paths)-1 == len(flow_paths), (
+                    f'{seq_name}: {len(image_paths)-1} vs {len(flow_paths)}')
+            for i in range(len(image_paths)-self.sequence_length+1):
+                self.img_paths.append(image_paths[i:i+self.sequence_length])
+                if len(flow_paths) > 0:
+                    self.flow_paths.append(flow_paths[i:i+self.sequence_length-1])
+                self.metadata.append({
+                    'image_paths': [str(p) for p in image_paths[i:i+self.sequence_length]],
+                    'is_val': False,
+                    'misc': seq_name
+                })
+
+        # Sanity check
+        if split != 'test':
+            assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
+
+        self._log_status()
+
+
+class MonkaaDataset(BaseFlowDataset):
+    """Handle the Monkaa dataset.
+    """
+
+    def __init__(  # noqa: C901
+        self,
+        root_dir: str,
+        pass_names: Union[str, List[str]] = 'clean',
+        side_names: Union[str, List[str]] = 'left',
+        add_reverse: bool = True,
+        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        max_flow: float = 1000.0,
+        get_valid_mask: bool = True,
+        get_backward: bool = True,
+        get_meta: bool = True,
+        sequence_length: int = 2
+    ) -> None:
+        """Initialize MonkaaDataset.
+
+        Parameters
+        ----------
+        root_dir : str
+            path to the root directory of the Monkaa dataset.
+        pass_names : Union[str, List[str]], default 'clean'
+            Which passes should be loaded. It can be one of {'clean', 'final', ['clean', 'final']}.
+        side_names : Union[str, List[str]], default 'left'
+             Samples from which side view should be loaded. It can be one of {'left', 'right', ['left', 'right']}.
+        add_reverse : bool, default True
+            If True, double the number of samples by appending the backward samples as additional samples.
+        transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
+            Transform to be applied on the inputs.
+        max_flow : float, default 10000.0
+            Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
+            as zero in the valid mask.
+        get_valid_mask : bool, default True
+            Whether to get or generate valid masks.
+        get_backward : bool, default True
+            Whether to get the occluded version of the inputs.
+        get_meta : bool, default True
+            Whether to get metadata.
+        sequence_length : int, default 2
+            How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
+            temporal information.
+        """
+        super().__init__(
+            dataset_name='Monkaa',
+            split_name='trainval',
+            transform=transform,
+            max_flow=max_flow,
+            get_valid_mask=get_valid_mask,
+            get_occlusion_mask=False,
+            get_motion_boundary_mask=False,
+            get_backward=get_backward,
+            get_semantic_segmentation_labels=False,
+            get_meta=get_meta)
+        self.root_dir = root_dir
+        self.add_reverse = add_reverse
+        self.pass_names = pass_names
+        self.sequence_length = sequence_length
+        if isinstance(self.pass_names, str):
+            self.pass_names = [self.pass_names]
+        self.side_names = side_names
+        if isinstance(self.side_names, str):
+            self.side_names = [self.side_names]
+
+        pass_dirs = [f'frames_{p}pass' for p in self.pass_names]
+
+        directions = [('into_future', 'into_past')]
+        reverts = [False]
+        if self.add_reverse:
+            directions.append(('into_past', 'into_future'))
+            reverts.append(True)
+
+        # Read paths from disk
+        for passd in pass_dirs:
+            pass_path = Path(self.root_dir) / passd
+            for seq_path in pass_path.glob('*'):
+                for direcs, rev in zip(directions, reverts):
+                    for side in self.side_names:
+                        image_paths = sorted((seq_path / side).glob('*.png'), reverse=rev)
+                        flow_paths = sorted(
+                            (Path(str(seq_path).replace(passd, 'optical_flow')) / direcs[0] / side).glob('*.pfm'),
+                            reverse=rev)
+
+                        flow_b_paths = []
+                        if self.get_backward:
+                            flow_b_paths = sorted(
+                                (Path(str(seq_path).replace(passd, 'optical_flow')) / direcs[1] / side).glob('*.pfm'),
+                                reverse=rev)
+
+                        for i in range(len(image_paths)-self.sequence_length+1):
+                            self.img_paths.append(image_paths[i:i+self.sequence_length])
+                            if len(flow_paths) > 0:
+                                self.flow_paths.append(flow_paths[i:i+self.sequence_length-1])
+                            self.metadata.append({
+                                'image_paths': [str(p) for p in image_paths[i:i+self.sequence_length]],
+                                'is_val': False,
+                                'misc': ''
+                            })
+                            if self.get_backward:
+                                if len(flow_b_paths) > 0:
+                                    self.flow_b_paths.append(flow_b_paths[i+1:i+self.sequence_length])
+
+        assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
+        assert len(self.occ_paths) == 0 or len(self.img_paths) == len(self.occ_paths), (
+            f'{len(self.img_paths)} vs {len(self.occ_paths)}')
+        assert len(self.mb_paths) == 0 or len(self.img_paths) == len(self.mb_paths), (
+            f'{len(self.img_paths)} vs {len(self.mb_paths)}')
+        if self.get_backward:
+            assert len(self.img_paths) == len(self.flow_b_paths), f'{len(self.img_paths)} vs {len(self.flow_b_paths)}'
+            assert len(self.occ_b_paths) == 0 or len(self.img_paths) == len(self.occ_b_paths), (
+                f'{len(self.img_paths)} vs {len(self.occ_b_paths)}')
+            assert len(self.mb_b_paths) == 0 or len(self.img_paths) == len(self.mb_b_paths), (
+                f'{len(self.img_paths)} vs {len(self.mb_b_paths)}')
 
         self._log_status()
