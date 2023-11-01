@@ -53,6 +53,7 @@ from ptlflow.models.liteflownet.liteflownet3 import (
     LiteFlowNet3, LiteFlowNet3PseudoReg, LiteFlowNet3S, LiteFlowNet3SPseudoReg)
 from ptlflow.models.liteflownet.liteflownet2 import LiteFlowNet2, LiteFlowNet2PseudoReg
 from ptlflow.models.maskflownet.maskflownet import MaskFlownet, MaskFlownet_S
+from ptlflow.models.matchflow.matchflow import MatchFlow, MatchFlowRAFT
 from ptlflow.models.pwcnet.pwcnet import PWCNet, PWCDCNet
 from ptlflow.models.raft.raft import RAFT, RAFTSmall
 from ptlflow.models.scopeflow.irr_pwc_v2 import ScopeFlow
@@ -104,6 +105,8 @@ models_dict = {
     'liteflownet3s_pseudoreg': LiteFlowNet3SPseudoReg,
     'maskflownet': MaskFlownet,
     'maskflownet_s': MaskFlownet_S,
+    'matchflow': MatchFlow,
+    'matchflow_raft': MatchFlowRAFT,
     'pwcnet': PWCNet,
     'pwcdcnet': PWCDCNet,
     'raft': RAFT,

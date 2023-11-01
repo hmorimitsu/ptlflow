@@ -14,7 +14,7 @@ fastflownet-kitti-6d3526a8.ckpt,fastflownet_ft_kitti.pth,
 fastflownet-mix-fd9b8c0d.ckpt,fastflownet_ft_mix.pth,
 fastflownet-sintel-6475ea96.ckpt,fastflownet_ft_sintel.pth,
 fastflownet-things3d-fc093d29.ckpt,fastflownet_things.pth,
-flow1d-chairs-75cd85a1.ckpt,flow1d_chairs-12f67500..pth,
+flow1d-chairs-75cd85a1.ckpt,flow1d_chairs-12f67500..pth,https://github.com/haofeixu/flow1d
 flow1d-things-bcd92815.ckpt,flow1d_things-fd4bee1f.pth,
 flow1d-sintel-28a093d3.ckpt,flow1d_sintel-276ce58e.pth,
 flow1d-kitti-803a0181.ckpt,flow1d_kitti-04b1caa2.pth,
@@ -74,6 +74,11 @@ maskflownet-kitti-d2ccb09b.ckpt,8caNov12-1532_300000.pth,https://github.com/catt
 maskflownet-sintel-c52423aa.ckpt,5adNov03-0005_1000000.pth,
 maskflownet_s-sintel-79196ff3.ckpt,771Sep25-0735_500000.pth,
 maskflownet_s-things-a8a8ed9e.ckpt,dbbSep30-1206_1000000.pth,
+matchflow_gma-chairs-e6519f99.ckpt,matchflow-g-chairs.pth,https://github.com/DQiaole/MatchFlow
+matchflow_gma-kitti-91f4a33c.ckpt,matchflow-g-kitti.pth,
+matchflow_gma-sintel-59650b06.ckpt,matchflow-g-sintel.pth,
+matchflow_gma-things-cde8bbac.ckpt,matchflow-g-things.pth,
+matchflow_raft-things-f4729f27.ckpt,matchflow-r-things.pth,
 pwcdcnet-sintel-c7d08a46.ckpt,pwc_net.pth.tar,https://github.com/NVlabs/PWC-Net/tree/master/PyTorch
 pwcdcnet-things-cc223701.ckpt,pwc_net_chairs.pth.tar,
 pwcnet-sintel-533815e5.ckpt,pwc_net.pth.tar,

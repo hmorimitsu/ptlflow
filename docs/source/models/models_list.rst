@@ -52,7 +52,7 @@ FastFlownet
 - Model names: ``fastflownet``
 
 Flow1D
------
+------
 
 `[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/flow1d>`__
 
@@ -199,6 +199,17 @@ MaskFlownet
 - Reference code: `https://github.com/cattaneod/MaskFlownet-Pytorch <https://github.com/cattaneod/MaskFlownet-Pytorch>`__
 
 - Model names: ``maskflownet``, ``maskflownet_s``
+
+MatchFlow
+---------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/matchflow>`__
+
+- Paper: **Rethinking Optical Flow from Geometric Matching Consistent Perspective** - `https://arxiv.org/abs/2303.08384 <https://arxiv.org/abs/2303.08384>`_
+
+- Reference code: `https://github.com/DQiaole/MatchFlow <https://github.com/DQiaole/MatchFlow>`_
+
+- Model names: ``matchflow``, ``matchflow_raft``
 
 PWCNet
 ------
