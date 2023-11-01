@@ -57,6 +57,7 @@ from ptlflow.models.matchflow.matchflow import MatchFlow, MatchFlowRAFT
 from ptlflow.models.pwcnet.pwcnet import PWCNet, PWCDCNet
 from ptlflow.models.raft.raft import RAFT, RAFTSmall
 from ptlflow.models.scopeflow.irr_pwc_v2 import ScopeFlow
+from ptlflow.models.skflow.skflow import SKFlow
 from ptlflow.models.starflow.starflow import StarFlow
 from ptlflow.models.vcn.vcn import VCN, VCNSmall
 from ptlflow.utils.utils import config_logging
@@ -114,6 +115,7 @@ models_dict = {
     'scopeflow': ScopeFlow,
     'scv4': SCVQuarter,
     'scv8': SCVEighth,
+    'skflow': SKFlow,
     'starflow': StarFlow,
     'vcn': VCN,
     'vcn_small': VCNSmall,

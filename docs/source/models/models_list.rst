@@ -255,6 +255,17 @@ SCV
 
 - Model names: ``scv4``, ``scv8``
 
+SKFlow
+------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/skflow>`__
+
+- Paper: **SKFlow: Learning Optical Flow with Super Kernels** - `https://arxiv.org/abs/2205.14623 <https://arxiv.org/abs/2205.14623>`_
+
+- Reference code: `https://github.com/littlespray/SKFlow <https://github.com/littlespray/SKFlow>`_
+
+- Model names: ``skflow``
+
 STaRFlow
 --------
 

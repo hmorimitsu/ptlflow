@@ -98,6 +98,9 @@ scv-quarter-chairs-4726627e.ckpt,quarter/scv-chairs.pth,
 scv-quarter-kitti-e86c7953.ckpt,quarter/scv-kitti.pth,
 scv-quarter-sintel-2d9b4a05.ckpt,quarter/scv-sintel.pth,
 scv-quarter-things-0dac9b66.ckpt,quarter/scv-things.pth,
+skflow-kitti-4e1f8b63.ckpt,skflow-kitti.pth,https://github.com/littlespray/SKFlow
+skflow-sintel-98fb67cf.ckpt,skflow-sintel.pth,
+skflow-things-f84e6538.ckpt,skflow-things.pth,
 starflow-kitti-34b9a3ed.ckpt,StarFlow_kitti,https://github.com/pgodet/star_flow
 starflow-sintel-3c06b844.ckpt,StarFlow_sintel,
 starflow-things-d3966a93.ckpt,StarFlow_things,
