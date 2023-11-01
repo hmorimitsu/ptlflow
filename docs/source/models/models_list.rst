@@ -222,6 +222,17 @@ MatchFlow
 
 - Model names: ``matchflow``, ``matchflow_raft``
 
+MS-RAFT+
+--------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/ms_raft_plus>`__
+
+- Paper: **High-Resolution Multi-Scale RAFT** - `https://arxiv.org/abs/2210.16900 <https://arxiv.org/abs/2210.16900>`_
+
+- Reference code: `https://github.com/cv-stuttgart/MS_RAFT_plus <https://github.com/cv-stuttgart/MS_RAFT_plus>`_
+
+- Model names: ``ms_raft+``
+
 PWCNet
 ------
 
