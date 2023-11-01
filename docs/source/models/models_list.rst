@@ -51,6 +51,17 @@ FastFlownet
 
 - Model names: ``fastflownet``
 
+Flow1D
+-----
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/flow1d>`__
+
+- Paper: **High-Resolution Optical Flow from 1D Attention and Correlation** - `https://arxiv.org/abs/2104.13918 <https://arxiv.org/abs/2104.13918>`_
+
+- Reference code: `https://github.com/haofeixu/flow1d <https://github.com/haofeixu/flow1d>`_
+
+- Model names: ``flow1d``
+
 FlowFormer
 ----------
 

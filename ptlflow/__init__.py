@@ -16,7 +16,7 @@
 # limitations under the License.
 # =============================================================================
 
-__version__ = '0.2.7'
+__version__ = '0.2.8'
 
 import logging
 from argparse import Namespace
@@ -32,6 +32,7 @@ from ptlflow.models.craft.craft import CRAFT
 from ptlflow.models.csflow.csflow import CSFlow
 from ptlflow.models.dicl.dicl import DICL
 from ptlflow.models.fastflownet.fastflownet import FastFlowNet
+from ptlflow.models.flow1d.flow1d import Flow1D
 from ptlflow.models.flowformer.flowformer import FlowFormer
 from ptlflow.models.flownet.flownet2 import FlowNet2
 from ptlflow.models.flownet.flownetc import FlowNetC
@@ -74,6 +75,7 @@ models_dict = {
     'csflow': CSFlow,
     'dicl': DICL,
     'fastflownet': FastFlowNet,
+    'flow1d': Flow1D,
     'flowformer': FlowFormer,
     'flownet2': FlowNet2,
     'flownetc': FlowNetC,
