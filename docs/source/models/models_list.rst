@@ -110,6 +110,17 @@ GMFlow
 
 - Model names: ``gmflow``, ``gmflow_refine``
 
+GMFlow+, UniMatch
+-----------------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/unimatch>`__
+
+- Paper: **Unifying Flow, Stereo and Depth Estimation** - `https://arxiv.org/abs/2211.05783 <https://arxiv.org/abs/2211.05783>`_
+
+- Reference code: `https://github.com/autonomousvision/unimatch <https://github.com/autonomousvision/unimatch>`_
+
+- Model names: ``gmflow+``, ``gmflow+_sc2``, ``gmflow+_sc2_refine6``, ``unimatch``, ``unimatch_sc2``, ``unimatch_sc2_refine6``
+
 GMFlowNet
 ---------
 

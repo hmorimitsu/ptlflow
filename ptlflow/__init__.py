@@ -59,6 +59,7 @@ from ptlflow.models.raft.raft import RAFT, RAFTSmall
 from ptlflow.models.scopeflow.irr_pwc_v2 import ScopeFlow
 from ptlflow.models.skflow.skflow import SKFlow
 from ptlflow.models.starflow.starflow import StarFlow
+from ptlflow.models.unimatch.unimatch import UniMatch, UniMatchScale2, UniMatchScale2With6Refinements
 from ptlflow.models.vcn.vcn import VCN, VCNSmall
 from ptlflow.utils.utils import config_logging
 
@@ -88,6 +89,9 @@ models_dict = {
     'gma': GMA,
     'gmflow': GMFlow,
     'gmflow_refine': GMFlowWithRefinement,
+    'gmflow+': UniMatch,
+    'gmflow+_sc2': UniMatchScale2,
+    'gmflow+_sc2_refine6': UniMatchScale2With6Refinements,
     'gmflownet': GMFlowNet,
     'gmflownet_mix': GMFlowNetMix,
     'hd3': HD3,
@@ -117,6 +121,9 @@ models_dict = {
     'scv8': SCVEighth,
     'skflow': SKFlow,
     'starflow': StarFlow,
+    'unimatch': UniMatch,
+    'unimatch_sc2': UniMatchScale2,
+    'unimatch_sc2_refine6': UniMatchScale2With6Refinements,
     'vcn': VCN,
     'vcn_small': VCNSmall,
 }
