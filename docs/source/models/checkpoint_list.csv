@@ -108,6 +108,10 @@ scv-quarter-chairs-4726627e.ckpt,quarter/scv-chairs.pth,
 scv-quarter-kitti-e86c7953.ckpt,quarter/scv-kitti.pth,
 scv-quarter-sintel-2d9b4a05.ckpt,quarter/scv-sintel.pth,
 scv-quarter-things-0dac9b66.ckpt,quarter/scv-things.pth,
+separableflow-kitti-c9395318.ckpt,sepflow_kitti.pth,https://github.com/feihuzhang/SeparableFlow
+separableflow-sintel-4c9a8c03.ckpt,sepflow_sintel.pth,
+separableflow-things-31fe3b2d.ckpt,sepflow_things.pth,
+separableflow-universal-87350d91.ckpt,sepflow_universal.pth,
 skflow-kitti-4e1f8b63.ckpt,skflow-kitti.pth,https://github.com/littlespray/SKFlow
 skflow-sintel-98fb67cf.ckpt,skflow-sintel.pth,
 skflow-things-f84e6538.ckpt,skflow-things.pth,

@@ -58,6 +58,7 @@ from ptlflow.models.ms_raft_plus.ms_raft_plus import MSRAFTPlus
 from ptlflow.models.pwcnet.pwcnet import PWCNet, PWCDCNet
 from ptlflow.models.raft.raft import RAFT, RAFTSmall
 from ptlflow.models.scopeflow.irr_pwc_v2 import ScopeFlow
+from ptlflow.models.separableflow.separableflow import SeparableFlow
 from ptlflow.models.skflow.skflow import SKFlow
 from ptlflow.models.starflow.starflow import StarFlow
 from ptlflow.models.unimatch.unimatch import UniMatch, UniMatchScale2, UniMatchScale2With6Refinements
@@ -121,6 +122,7 @@ models_dict = {
     'scopeflow': ScopeFlow,
     'scv4': SCVQuarter,
     'scv8': SCVEighth,
+    'separableflow': SeparableFlow,
     'skflow': SKFlow,
     'starflow': StarFlow,
     'unimatch': UniMatch,

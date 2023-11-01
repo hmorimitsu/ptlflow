@@ -277,6 +277,17 @@ SCV
 
 - Model names: ``scv4``, ``scv8``
 
+SeparableFlow
+-------------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/separableflow>`__
+
+- Paper: **Separable Flow: Learning Motion Cost Volumes for Optical Flow Estimation** - `https://openaccess.thecvf.com/content/ICCV2021/papers/Zhang_Separable_Flow_Learning_Motion_Cost_Volumes_for_Optical_Flow_Estimation_ICCV_2021_paper.pdf <https://openaccess.thecvf.com/content/ICCV2021/papers/Zhang_Separable_Flow_Learning_Motion_Cost_Volumes_for_Optical_Flow_Estimation_ICCV_2021_paper.pdf>`_
+
+- Reference code: `https://github.com/feihuzhang/SeparableFlow <https://github.com/feihuzhang/SeparableFlow>`_
+
+- Model names: ``separableflow``
+
 SKFlow
 ------
 
