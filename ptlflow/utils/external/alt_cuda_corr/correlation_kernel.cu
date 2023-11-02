@@ -35,15 +35,12 @@ __global__ void corr_forward_kernel(
   const int N = coords.size(1);
   const int C = fmap1.size(3);
 
-  __shared__ scalar_t f1[CHANNEL_STRIDE][BLOCK_HW];
-  __shared__ scalar_t f2[CHANNEL_STRIDE][BLOCK_HW];
+  __shared__ scalar_t f1[CHANNEL_STRIDE][BLOCK_HW+1];
+  __shared__ scalar_t f2[CHANNEL_STRIDE][BLOCK_HW+1];
   __shared__ scalar_t x2s[BLOCK_HW];
   __shared__ scalar_t y2s[BLOCK_HW];
 
   for (int c=0; c<C; c+=CHANNEL_STRIDE) {
-
-     __syncthreads();
-
     for (int k=0; k<BLOCK_HW; k+=BLOCK_HW/CHANNEL_STRIDE) {
       int k1 = k + tid / CHANNEL_STRIDE;
       int h1 = h0 + k1 / BLOCK_W;
@@ -51,7 +48,7 @@ __global__ void corr_forward_kernel(
       int c1 = tid % CHANNEL_STRIDE;
 
       auto fptr = fmap1[b][h1][w1];
-      if (within_bounds(h1, w1, H1, W1) && c + c1 < C)
+      if (within_bounds(h1, w1, H1, W1))
         f1[c1][k1] = fptr[c+c1];
       else
         f1[c1][k1] = 0.0;
@@ -73,9 +70,6 @@ __global__ void corr_forward_kernel(
       int rd = 2*r + 1;
       for (int iy=0; iy<rd+1; iy++) {
         for (int ix=0; ix<rd+1; ix++) {
-
-          __syncthreads();
-
           for (int k=0; k<BLOCK_HW; k+=BLOCK_HW/CHANNEL_STRIDE) {
             int k1 = k + tid / CHANNEL_STRIDE;
             int h2 = static_cast<int>(floor(y2s[k1]))-r+iy;
@@ -83,14 +77,14 @@ __global__ void corr_forward_kernel(
             int c2 = tid % CHANNEL_STRIDE;
 
             auto fptr = fmap2[b][h2][w2];
-            if (within_bounds(h2, w2, H2, W2) && c + c2 < C)
+            if (within_bounds(h2, w2, H2, W2))
               f2[c2][k1] = fptr[c+c2];
             else
               f2[c2][k1] = 0.0;
           }
 
           __syncthreads();
-
+      
           scalar_t s = 0.0;
           for (int k=0; k<CHANNEL_STRIDE; k++)
             s += f1[k][tid] * f2[k][tid];
@@ -119,7 +113,7 @@ __global__ void corr_forward_kernel(
           if (iy < rd && ix < rd && within_bounds(h1, w1, H1, W1))
             *(corr_ptr + ix_se) += se;
         }
-      }
+      } 
     }
   }
 }
@@ -206,7 +200,7 @@ __global__ void corr_backward_kernel(
           }
 
           __syncthreads();
-
+      
           const scalar_t* grad_ptr = &corr_grad[b][n][0][h1][w1];
           scalar_t g = 0.0;
 
@@ -226,7 +220,7 @@ __global__ void corr_backward_kernel(
 
           if (iy < rd && ix < rd && within_bounds(h1, w1, H1, W1))
             g += *(grad_ptr + ix_se) * (1-dy) * (1-dx);
-
+            
           for (int k=0; k<CHANNEL_STRIDE; k++) {
             f1_grad[k][tid] += g * f2[k][tid];
             f2_grad[k][tid] += g * f1[k][tid];
@@ -277,7 +271,7 @@ std::vector<torch::Tensor> corr_cuda_forward(
   const auto rd = 2 * radius + 1;
   auto opts = fmap1.options();
   auto corr = torch::zeros({B, N, rd*rd, H, W}, opts);
-
+  
   const dim3 blocks(B, (H+BLOCK_H-1)/BLOCK_H, (W+BLOCK_W-1)/BLOCK_W);
   const dim3 threads(BLOCK_H, BLOCK_W);
 
@@ -311,7 +305,7 @@ std::vector<torch::Tensor> corr_cuda_backward(
   auto fmap1_grad = torch::zeros({B, H1, W1, C}, opts);
   auto fmap2_grad = torch::zeros({B, H2, W2, C}, opts);
   auto coords_grad = torch::zeros({B, N, H1, W1, 2}, opts);
-
+    
   const dim3 blocks(B, (H1+BLOCK_H-1)/BLOCK_H, (W1+BLOCK_W-1)/BLOCK_W);
   const dim3 threads(BLOCK_H, BLOCK_W);
 
