@@ -6,7 +6,8 @@ import torch.nn.functional as F
 
 from .update import BasicUpdateBlock, SmallUpdateBlock
 from .extractor import BasicEncoder, SmallEncoder
-from .corr import CorrBlock
+from .corr import CorrBlock, AlternateCorrBlock
+from .utils import coords_grid, upflow8
 from ..base_model.base_model import BaseModel
 
 
@@ -59,10 +60,13 @@ class RAFT(BaseModel):
         if 'dropout' not in self.args:
             self.args.dropout = 0
 
+        if 'alternate_corr' not in self.args:
+            self.args.alternate_corr = False
+
         # feature network, context network, and update block
         self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', dropout=args.dropout)        
         self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_fn='batch', dropout=args.dropout)
-        self.update_block = BasicUpdateBlock(args, hidden_dim=hdim)
+        self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)
 
     @staticmethod
     def add_model_specific_args(parent_parser=None):
@@ -74,6 +78,7 @@ class RAFT(BaseModel):
         parser.add_argument('--gamma', type=float, default=0.8)
         parser.add_argument('--max_flow', type=float, default=1000.0)
         parser.add_argument('--iters', type=int, default=12)
+        parser.add_argument('--alternate_corr', action='store_true')
         return parser
 
     def freeze_bn(self):
@@ -81,23 +86,14 @@ class RAFT(BaseModel):
             if isinstance(m, nn.BatchNorm2d):
                 m.eval()
 
-    def coords_grid(self, batch, ht, wd):
-        coords = torch.meshgrid(torch.arange(ht, dtype=self.dtype, device=self.device), torch.arange(wd, dtype=self.dtype, device=self.device))
-        coords = torch.stack(coords[::-1], dim=0).float()
-        return coords[None].repeat(batch, 1, 1, 1)
-
     def initialize_flow(self, img):
         """ Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         N, C, H, W = img.shape
-        coords0 = self.coords_grid(N, H//8, W//8)
-        coords1 = self.coords_grid(N, H//8, W//8)
+        coords0 = coords_grid(N, H//8, W//8, device=img.device)
+        coords1 = coords_grid(N, H//8, W//8, device=img.device)
 
         # optical flow computed as difference: flow = coords1 - coords0
         return coords0, coords1
-
-    def upflow8(self, flow, mode='bilinear'):
-        new_size = (8 * flow.shape[2], 8 * flow.shape[3])
-        return  8 * F.interpolate(flow, size=new_size, mode=mode, align_corners=True)
 
     def upsample_flow(self, flow, mask):
         """ Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination """
@@ -131,7 +127,10 @@ class RAFT(BaseModel):
         
         fmap1 = fmap1.float()
         fmap2 = fmap2.float()
-        corr_fn = CorrBlock(fmap1, fmap2, num_levels=self.args.corr_levels, radius=self.args.corr_radius)
+        if self.args.alternate_corr:
+            corr_fn = AlternateCorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
+        else:
+            corr_fn = CorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
 
         # run the context network
         cnet = self.cnet(image1)
@@ -157,7 +156,7 @@ class RAFT(BaseModel):
 
             # upsample predictions
             if up_mask is None:
-                flow_up = self.upflow8(coords1 - coords0)
+                flow_up = upflow8(coords1 - coords0)
             else:
                 flow_up = self.upsample_flow(coords1 - coords0, up_mask)
             
