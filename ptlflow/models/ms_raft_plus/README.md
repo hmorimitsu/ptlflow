@@ -6,15 +6,8 @@
 
 ## Additional requirements
 
-In order to use MS-RAFT+ you need to have CUDA installed and compile the alt_cuda_corr package:
-
-- Download and install CUDA from [https://developer.nvidia.com/cuda-downloads](https://developer.nvidia.com/cuda-downloads)
-  - IMPORTANT! Be sure to choose the same CUDA version as your PyTorch
-- Enter the alt_cuda_corr folder and run the setup:
-```bash
-cd alt_cuda_corr
-python setup.py install
-```
+In order to use MS-RAFT+ you need to install the alt_cuda_corr package.
+Follow the instructions at [ptlflow/utils/external/alt_cuda_corr/README.md](../../../ptlflow/utils/external/alt_cuda_corr/README.md).
 
 ## Code license
 
@@ -22,7 +15,7 @@ See [LICENSE](LICENSE).
 
 ## Pretrained weights license
 
-Not specified.
+[CC BY-NC-SA 3.0 license.](https://creativecommons.org/licenses/by-nc-sa/3.0/)
 
 ## Citation
 
