@@ -64,6 +64,8 @@ from ptlflow.models.skflow.skflow import SKFlow
 from ptlflow.models.starflow.starflow import StarFlow
 from ptlflow.models.unimatch.unimatch import UniMatch, UniMatchScale2, UniMatchScale2With6Refinements
 from ptlflow.models.vcn.vcn import VCN, VCNSmall
+from ptlflow.models.videoflow.videoflow_bof import VideoFlowBOF
+from ptlflow.models.videoflow.videoflow_mof import VideoFlowMOF
 from ptlflow.utils.utils import config_logging
 
 try:
@@ -132,6 +134,8 @@ models_dict = {
     'unimatch_sc2_refine6': UniMatchScale2With6Refinements,
     'vcn': VCN,
     'vcn_small': VCNSmall,
+    'videoflow_bof': VideoFlowBOF,
+    'videoflow_mof': VideoFlowMOF,
 }
 
 

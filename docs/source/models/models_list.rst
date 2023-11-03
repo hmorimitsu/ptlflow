@@ -331,3 +331,14 @@ VCN
 - Reference code: `https://github.com/gengshan-y/VCN <https://github.com/gengshan-y/VCN>`_
 
 - Model names: ``vcn``, ``vcn_small``
+
+VideoFlow
+---------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/videoflow>`__
+
+- Paper: **Videoflow: Exploiting temporal cues for multi-frame optical flow estimation** - `https://arxiv.org/abs/2303.08340 <https://arxiv.org/abs/2303.08340>`_
+
+- Reference code: `https://github.com/XiaoyuShi97/VideoFlow <hhttps://github.com/XiaoyuShi97/VideoFlow>`_
+
+- Model names: ``videoflow_bof``, ``videoflow_mof``
