@@ -78,7 +78,7 @@ FlowFormer++
 
 `[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/flowformerplusplus>`__
 
-- Paper: **Flowformer++: Masked cost volume autoencoding for pretraining optical flow estimation** - `https://arxiv.org/abs/2203.16194 <https://arxiv.org/abs/2203.16194>`_
+- Paper: **Flowformer++: Masked cost volume autoencoding for pretraining optical flow estimation** - `https://arxiv.org/abs/2303.01237 <https://arxiv.org/abs/2303.01237>`_
 
 - Reference code: `https://github.com/XiaoyuShi97/FlowFormerPlusPlus <https://github.com/XiaoyuShi97/FlowFormerPlusPlus>`_
 
