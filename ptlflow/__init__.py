@@ -34,6 +34,7 @@ from ptlflow.models.dicl.dicl import DICL
 from ptlflow.models.fastflownet.fastflownet import FastFlowNet
 from ptlflow.models.flow1d.flow1d import Flow1D
 from ptlflow.models.flowformer.flowformer import FlowFormer
+from ptlflow.models.flowformerplusplus.flowformerplusplus import FlowFormerPlusPlus
 from ptlflow.models.flownet.flownet2 import FlowNet2
 from ptlflow.models.flownet.flownetc import FlowNetC
 from ptlflow.models.flownet.flownetcs import FlowNetCS
@@ -82,6 +83,7 @@ models_dict = {
     'fastflownet': FastFlowNet,
     'flow1d': Flow1D,
     'flowformer': FlowFormer,
+    'flowformer++': FlowFormerPlusPlus,
     'flownet2': FlowNet2,
     'flownetc': FlowNetC,
     'flownetcs': FlowNetCS,
