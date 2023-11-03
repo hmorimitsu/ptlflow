@@ -20,11 +20,9 @@ from functools import partial
 
 from ...timm0412.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from ...timm0412.models.layers import Mlp, DropPath, to_2tuple, trunc_normal_
-from ...timm0412.models.registry import register_model
 from ...timm0412.models.vision_transformer import Attention
-from ...timm0412.models.helpers import build_model_with_cfg, overlay_external_default_cfg
-from .attention import MultiHeadAttention, LinearPositionEmbeddingSine
-from ...utils.utils import coords_grid, bilinear_sampler, upflow8
+from .attention import LinearPositionEmbeddingSine
+from ...utils import coords_grid
 
 
 def _cfg(url='', **kwargs):

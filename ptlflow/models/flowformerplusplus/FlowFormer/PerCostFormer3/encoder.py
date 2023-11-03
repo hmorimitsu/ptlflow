@@ -5,7 +5,7 @@ from torch import einsum
 
 from einops import rearrange
 
-from ...utils.utils import coords_grid
+from ...utils import coords_grid
 from .attention import MultiHeadAttention, LinearPositionEmbeddingSine, ExpPositionEmbeddingSine
 from ..encoders import twins_svt_large, convnext_large
 from .cnn import BasicEncoder

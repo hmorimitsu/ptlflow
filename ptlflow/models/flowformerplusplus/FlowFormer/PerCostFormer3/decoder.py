@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ...utils.utils import coords_grid, bilinear_sampler
+from ...utils import coords_grid, bilinear_sampler
 from .attention import MultiHeadAttention, LinearPositionEmbeddingSine, ExpPositionEmbeddingSine
 
 from timm.models.layers import DropPath
