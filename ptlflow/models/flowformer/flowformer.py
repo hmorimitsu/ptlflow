@@ -50,7 +50,7 @@ class FlowFormer(BaseModel):
         super().__init__(
             args=args,
             loss_fn=SequenceLoss(args),
-            output_stride=8)
+            output_stride=32)
 
         if self.args.gma is None:
             self.args.gma = True  # Use GMA by default, unless
