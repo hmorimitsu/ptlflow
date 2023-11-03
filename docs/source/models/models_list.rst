@@ -23,7 +23,7 @@ CSFlow
 
 `[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/csflow>`__
 
-- Paper: **CSFlow: Learning optical flow via cross strip correlation for autonomous driving* - `https://arxiv.org/abs/2202.00909 <https://arxiv.org/abs/2202.00909>`_
+- Paper: **CSFlow: Learning optical flow via cross strip correlation for autonomous driving** - `https://arxiv.org/abs/2202.00909 <https://arxiv.org/abs/2202.00909>`_
 
 - Reference code: `https://github.com/MasterHow/CSFlow <https://github.com/MasterHow/CSFlow>`_
 
@@ -67,11 +67,22 @@ FlowFormer
 
 `[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/flowformer>`__
 
-- Paper: **FlowFormer: A Transformer Architecture for Optical Flow* - `https://arxiv.org/abs/2203.16194 <https://arxiv.org/abs/2203.16194>`_
+- Paper: **FlowFormer: A Transformer Architecture for Optical Flow** - `https://arxiv.org/abs/2203.16194 <https://arxiv.org/abs/2203.16194>`_
 
 - Reference code: `https://github.com/drinkingcoder/FlowFormer-Official <https://github.com/drinkingcoder/FlowFormer-Official>`_
 
 - Model names: ``flowformer``
+
+FlowFormer++
+------------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/flowformerplusplus>`__
+
+- Paper: **Flowformer++: Masked cost volume autoencoding for pretraining optical flow estimation** - `https://arxiv.org/abs/2203.16194 <https://arxiv.org/abs/2203.16194>`_
+
+- Reference code: `https://github.com/XiaoyuShi97/FlowFormerPlusPlus <https://github.com/XiaoyuShi97/FlowFormerPlusPlus>`_
+
+- Model names: ``flowformer++``
 
 Flownet
 -------

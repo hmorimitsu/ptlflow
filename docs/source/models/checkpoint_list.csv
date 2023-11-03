@@ -23,6 +23,11 @@ flowformer-chairs-2b34ea4b.ckpt,chairs.pth,https://github.com/drinkingcoder/Flow
 flowformer-kitti-1e45a6c8.ckpt,kitti.pth,
 flowformer-sintel-27cc959a.ckpt,sintel.pth,
 flowformer-things-ab5f3255.ckpt,things.pth,
+flowformerplusplus-chairs-228c2fec.ckpt,chairs.pth,https://github.com/XiaoyuShi97/FlowFormerPlusPlus
+flowformerplusplus-kitti-453e8476.ckpt,kitti.pth,
+flowformerplusplus-sintel-90b72ab7.ckpt,sintel.pth,
+flowformerplusplus-things-71639183.ckpt,things.pth,
+flowformerplusplus-things_288960-1a21a884.ckpt,things_288960.pth,
 flownet2-things-d63b53a7.ckpt,FlowNet2_checkpoint.pth.tar,https://github.com/NVIDIA/flownet2-pytorch
 flownetc-things-cc8ac7fd.ckpt,FlowNet2-C_checkpoint,
 flownetcs-things-4bdecffa.ckpt,FlowNet2-CS_checkpoint,

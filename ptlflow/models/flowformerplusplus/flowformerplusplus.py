@@ -9,11 +9,11 @@ from ..base_model.base_model import BaseModel
 
 class FlowFormerPlusPlus(BaseModel):
     pretrained_checkpoints = {
-        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/.ckpt',
-        'things288960': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/.ckpt'
+        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-chairs-228c2fec.ckpt',
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-things-71639183.ckpt',
+        'things288960': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-things_288960-1a21a884.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-sintel-90b72ab7.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-kitti-453e8476.ckpt'
     }
 
     def __init__(self,
