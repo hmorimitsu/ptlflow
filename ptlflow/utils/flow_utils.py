@@ -22,7 +22,7 @@ from typing import IO, Optional, Union
 import numpy as np
 import torch
 
-from .external import flowpy, raft, selflow
+from .external import flowpy, raft, selflow, flow_IO
 from . import flowpy_torch
 
 
@@ -82,7 +82,7 @@ def flow_read(
     input_file: str, pathlib.Path or IO
         Path of the file to read or file object.
     format: str, optional
-        Specify in what format the flow is read, accepted formats: "png", "flo", or "pfm".
+        Specify in what format the flow is read, accepted formats: "png", "flo", "pfm", or "flo5".
         If None, it is guessed on the file extension.
 
     Returns
@@ -96,10 +96,13 @@ def flow_read(
     --------
     ptlflow.utils.external.flowpy.flow_read
     ptlflow.utils.external.raft.read_pfm
+    ptlflow.utils.external.flow_IO.readFlo5Flow
     write_pfm
     """
     if (format is not None and format == 'pfm') or str(input_file).endswith('pfm'):
         return raft.read_pfm(input_file)
+    elif (format is not None and format == 'flo5') or str(input_file).endswith('flo5'):
+        return flow_IO.readFlo5Flow(input_file)
     else:
         return flowpy.flow_read(input_file, format)
 

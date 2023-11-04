@@ -514,7 +514,7 @@ class FlyingThings3DDataset(BaseFlowDataset):
         get_motion_boundary_mask : bool, default True
             Whether to get motion boundary masks.
         get_backward : bool, default True
-            Whether to get the occluded version of the inputs.
+            Whether to get the backward version of the inputs.
         get_meta : bool, default True
             Whether to get metadata.
         sequence_length : int, default 2
@@ -1124,6 +1124,114 @@ class SintelDataset(BaseFlowDataset):
             assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
         if len(self.occ_paths) > 0:
             assert len(self.img_paths) == len(self.occ_paths), f'{len(self.img_paths)} vs {len(self.occ_paths)}'
+
+        self._log_status()
+
+
+class SpringDataset(BaseFlowDataset):
+    """Handle the Spring dataset."""
+
+    def __init__(  # noqa: C901
+        self,
+        root_dir: str,
+        split: str = 'train',
+        side_names: Union[str, List[str]] = 'left',
+        add_reverse: bool = True,
+        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        max_flow: float = 10000.0,
+        get_valid_mask: bool = True,
+        get_backward: bool = False,
+        get_meta: bool = True,
+        sequence_length: int = 2
+    ) -> None:
+        """Initialize SintelDataset.
+
+        Parameters
+        ----------
+        root_dir : str
+            path to the root directory of the MPI Sintel dataset.
+        split : str, default 'train'
+            Which split of the dataset should be loaded. It can be one of {'train', 'val', 'trainval', 'test'}.
+        side_names : Union[str, List[str]], default 'left'
+             Samples from which side view should be loaded. It can be one of {'left', 'right', ['left', 'right']}.
+        add_reverse : bool, default True
+            If True, double the number of samples by appending the backward samples as additional samples.
+        transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
+            Transform to be applied on the inputs.
+        max_flow : float, default 10000.0
+            Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
+            as zero in the valid mask.
+        get_valid_mask : bool, default True
+            Whether to get or generate valid masks.
+        get_backward : bool, default True
+            Whether to get the backward version of the inputs.
+        get_meta : bool, default True
+            Whether to get metadata.
+        sequence_length : int, default 2
+            How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
+            temporal information.
+        """
+        if isinstance(side_names, str):
+            side_names = [side_names]
+        super().__init__(
+            dataset_name='Spring',
+            split_name=split,
+            transform=transform,
+            max_flow=max_flow,
+            get_valid_mask=get_valid_mask,
+            get_occlusion_mask=False,
+            get_motion_boundary_mask=False,
+            get_backward=get_backward,
+            get_meta=get_meta)
+        self.root_dir = root_dir
+        self.split = split
+        self.side_names = side_names
+        self.sequence_length = sequence_length
+
+        # Get sequence names for the given split
+        if split == 'test':
+            split_dir = 'test'
+        else:
+            split_dir = 'train'
+
+        sequence_names = sorted([p.stem for p in (Path(root_dir) / split_dir).glob('*')])
+
+        directions = [('FW', 'BW')]
+        if add_reverse:
+            directions.append(('BW', 'FW'))
+
+        # Read paths from disk
+        for seq_name in sequence_names:
+            for side in side_names:
+                for direcs in directions:
+                    rev = (direcs[0] == 'BW')
+                    image_paths = sorted((Path(self.root_dir) / split_dir / seq_name / f'frame_{side}').glob('*.png'), reverse=rev)
+                    flow_paths = []
+                    flow_b_paths = []
+                    if split != 'test':
+                        flow_paths = sorted((Path(self.root_dir) / split_dir / seq_name / f'flow_{direcs[0]}_{side}').glob('*.flo5'), reverse=rev)
+                        assert len(image_paths)-1 == len(flow_paths), (
+                            f'{seq_name}, {side}: {len(image_paths)-1} vs {len(flow_paths)}')
+                        if self.get_backward:
+                            flow_b_paths = sorted((Path(self.root_dir) / split_dir / seq_name / f'flow_{direcs[1]}_{side}').glob('*.flo5'), reverse=rev)
+                            assert len(image_paths)-1 == len(flow_paths), (
+                                f'{seq_name}, {side}: {len(image_paths)-1} vs {len(flow_paths)}')
+                        
+                    for i in range(len(image_paths)-self.sequence_length+1):
+                        self.img_paths.append(image_paths[i:i+self.sequence_length])
+                        if len(flow_paths) > 0:
+                            self.flow_paths.append(flow_paths[i:i+self.sequence_length-1])
+                        if self.get_backward and len(flow_b_paths) > 0:
+                            self.flow_b_paths.append(flow_b_paths[i:i+self.sequence_length-1])
+                        self.metadata.append({
+                            'image_paths': [str(p) for p in image_paths[i:i+self.sequence_length]],
+                            'is_val': False,
+                            'misc': seq_name
+                        })
+
+        # Sanity check
+        if split != 'test':
+            assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
 
         self._log_status()
 
