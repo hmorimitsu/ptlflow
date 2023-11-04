@@ -253,7 +253,7 @@ PWCNet
 
 - Reference code: `https://github.com/NVlabs/PWC-Net <https://github.com/NVlabs/PWC-Net>`_
 
-- Model names: ``pwcnet``, ``pwcdcnet``
+- Model names: ``pwcnet``, ``pwcnet_nodc``
 
 RAFT
 ----

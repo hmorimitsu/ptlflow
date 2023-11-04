@@ -16,7 +16,7 @@
 # limitations under the License.
 # =============================================================================
 
-__version__ = "0.2.8"
+__version__ = "0.3.0"
 
 import logging
 from argparse import Namespace
@@ -127,8 +127,8 @@ models_dict = {
     "matchflow": MatchFlow,
     "matchflow_raft": MatchFlowRAFT,
     "ms_raft+": MSRAFTPlus,
-    "pwcnet": PWCNet,
-    "pwcdcnet": PWCDCNet,
+    "pwcnet": PWCDCNet,
+    "pwcnet_nodc": PWCNet,
     "raft": RAFT,
     "raft_small": RAFTSmall,
     "scopeflow": ScopeFlow,
