@@ -1,6 +1,6 @@
 ==================
-speed_benchmark.py
+model_benchmark.py
 ==================
 
-.. automodule:: speed_benchmark
+.. automodule:: model_benchmark
    :members:

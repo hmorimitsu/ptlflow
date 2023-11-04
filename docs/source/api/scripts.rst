@@ -14,5 +14,5 @@ scripts
     :maxdepth: 1
     :caption: Utils
 
-    scripts/speed_benchmark
+    scripts/model_benchmark
     scripts/summary_metrics
