@@ -46,11 +46,12 @@ def test_test(tmp_path: Path) -> None:
 
     dataset_name_path = [
         ("kitti2012", "000000_10.png"),
-        ("kitti2015", "000000_10.png"),
+        ("kitti2015", "flow/000000_10.png"),
         ("sintel/clean", "sequence_1/frame_0001.flo"),
         ("sintel/final", "sequence_1/frame_0001.flo"),
     ]
     for dname, dpath in dataset_name_path:
+        print(tmp_path / dname / dpath)
         assert (tmp_path / dname / dpath).exists()
 
     shutil.rmtree(tmp_path)
