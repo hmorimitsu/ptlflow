@@ -44,7 +44,7 @@ def create_meshgrid(
     # Note: normalize_pixel_coordinates still gots TracerWarning since new width and height
     #       tensors will be generated.
     # Below is the code using normalize_pixel_coordinates:
-    # base_grid: torch.Tensor = torch.stack(torch.meshgrid([xs, ys]), dim=2)
+    # base_grid: torch.Tensor = torch.stack(torch.meshgrid([xs, ys], indexing='ij'), dim=2)
     # if normalized_coordinates:
     #     base_grid = K.geometry.normalize_pixel_coordinates(base_grid, height, width)
     # return torch.unsqueeze(base_grid.transpose(0, 1), dim=0)
@@ -52,7 +52,7 @@ def create_meshgrid(
         xs = (xs / (width - 1) - 0.5) * 2
         ys = (ys / (height - 1) - 0.5) * 2
     # generate grid by stacking coordinates
-    base_grid: torch.Tensor = torch.stack(torch.meshgrid([xs, ys])).transpose(1, 2)  # 2xHxW
+    base_grid: torch.Tensor = torch.stack(torch.meshgrid([xs, ys], indexing='ij')).transpose(1, 2)  # 2xHxW
     return torch.unsqueeze(base_grid, dim=0).permute(0, 2, 3, 1)  # 1xHxWx2
 
 

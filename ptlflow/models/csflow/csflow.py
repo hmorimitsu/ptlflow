@@ -574,7 +574,7 @@ class CorrBlock_v2:
             corr = self.corr_pyramid[i]
             dx = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
             dy = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
-            delta = torch.stack(torch.meshgrid(dy, dx), axis=-1)
+            delta = torch.stack(torch.meshgrid(dy, dx, indexing='ij'), axis=-1)
 
             centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2) / 2**i
             delta_lvl = delta.view(1, 2 * r + 1, 2 * r + 1, 2)
@@ -617,7 +617,7 @@ def bilinear_sampler(img, coords, mode='bilinear', mask=False):
 
 def coords_grid(batch, ht, wd, device):
     coords = torch.meshgrid(
-        torch.arange(ht, device=device), torch.arange(wd, device=device))
+        torch.arange(ht, device=device), torch.arange(wd, device=device), indexing='ij')
     coords = torch.stack(coords[::-1], dim=0).float()
     return coords[None].repeat(batch, 1, 1, 1)
 

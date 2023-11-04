@@ -84,7 +84,7 @@ class LCV_RAFT(BaseModel):
                 m.eval()
 
     def coords_grid(self, batch, ht, wd):
-        coords = torch.meshgrid(torch.arange(ht, dtype=self.dtype, device=self.device), torch.arange(wd, dtype=self.dtype, device=self.device))
+        coords = torch.meshgrid(torch.arange(ht, dtype=self.dtype, device=self.device), torch.arange(wd, dtype=self.dtype, device=self.device), indexing='ij')
         coords = torch.stack(coords[::-1], dim=0).float()
         return coords[None].repeat(batch, 1, 1, 1)
 

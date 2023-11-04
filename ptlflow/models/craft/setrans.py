@@ -652,7 +652,7 @@ class SlidingPosBiases2D(nn.Module):
                 i_h1s, i_w1s, i_h2s, i_w2s = [], [], [], []
                 for j in range(max_pos_size[1]):
                     h1s, w1s, h2s, w2s = torch.meshgrid(torch.tensor(i), torch.tensor(j), 
-                                                        torch.arange(i, i+2*R+1), torch.arange(j, j+2*R+1))
+                                                        torch.arange(i, i+2*R+1), torch.arange(j, j+2*R+1), indexing='ij')
                     i_h1s.append(h1s)
                     i_w1s.append(w1s)
                     i_h2s.append(h2s)

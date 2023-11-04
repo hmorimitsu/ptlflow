@@ -135,7 +135,7 @@ class ReverseCostExtractor(nn.Module):
         r = 4
         dx = torch.linspace(-r, r, 2*r+1)
         dy = torch.linspace(-r, r, 2*r+1)
-        delta = torch.stack(torch.meshgrid(dy, dx), axis=-1).to(coords0.device)
+        delta = torch.stack(torch.meshgrid(dy, dx, indexing='ij'), axis=-1).to(coords0.device)
         centroid = coords0.permute(0, 2, 3, 1).reshape(BH1W1, 1, 1, 2)
         delta = delta.view(1, 2*r+1, 2*r+1, 2)
         coords = centroid + delta
@@ -188,7 +188,7 @@ class MemoryDecoder(nn.Module):
         r = 4
         dx = torch.linspace(-r, r, 2*r+1)
         dy = torch.linspace(-r, r, 2*r+1)
-        delta = torch.stack(torch.meshgrid(dy, dx), axis=-1).to(coords.device)
+        delta = torch.stack(torch.meshgrid(dy, dx, indexing='ij'), axis=-1).to(coords.device)
 
         centroid = coords.reshape(batch*h1*w1, 1, 1, 2)
         delta = delta.view(1, 2*r+1, 2*r+1, 2)

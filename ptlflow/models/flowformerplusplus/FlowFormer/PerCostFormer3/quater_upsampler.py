@@ -18,7 +18,7 @@ def generate_window_grid(h_min, h_max, w_min, w_max, len_h, len_w, device=None):
 
     x, y = torch.meshgrid([torch.linspace(w_min, w_max, len_w, device=device),
                            torch.linspace(h_min, h_max, len_h, device=device)],
-                          )
+                           indexing='ij')
     grid = torch.stack((x, y), -1).transpose(0, 1).float()  # [H, W, 2]
 
     return grid

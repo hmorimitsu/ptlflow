@@ -91,9 +91,10 @@ def bilinear_sampler(img, coords, mode='bilinear', mask=False):
 def coords_grid(batch, ht, wd, dtype, normalize=False):
     if normalize:  # [-1, 1]
         coords = torch.meshgrid(2 * torch.arange(ht) / (ht - 1) - 1,
-                                2 * torch.arange(wd) / (wd - 1) - 1)
+                                2 * torch.arange(wd) / (wd - 1) - 1,
+                                indexing='ij')
     else:
-        coords = torch.meshgrid(torch.arange(ht), torch.arange(wd))
+        coords = torch.meshgrid(torch.arange(ht), torch.arange(wd), indexing='ij')
     coords = torch.stack(coords[::-1], dim=0).to(dtype=dtype)
     return coords[None].repeat(batch, 1, 1, 1)  # [B, 2, H, W]
 

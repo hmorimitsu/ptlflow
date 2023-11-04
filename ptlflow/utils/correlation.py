@@ -196,7 +196,7 @@ def _init_coords_grid(flow: torch.Tensor) -> torch.Tensor:
         The grid with the 2D coordinates of the pixels.
     """
     b, _, h, w = flow.shape
-    coords_grid = torch.meshgrid(torch.arange(h), torch.arange(w))
+    coords_grid = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
     coords_grid = torch.stack(coords_grid[::-1], dim=0).to(dtype=flow.dtype, device=flow.device)
     coords_grid = coords_grid[None].repeat(b, 1, 1, 1)
     return coords_grid

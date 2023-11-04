@@ -98,7 +98,7 @@ def bilinear_sample(img, sample_coords, mode='bilinear', padding_mode='zeros', r
 
 
 def coords_grid(batch, ht, wd):
-    coords = torch.meshgrid(torch.arange(ht), torch.arange(wd))
+    coords = torch.meshgrid(torch.arange(ht), torch.arange(wd), indexing='ij')
     coords = torch.stack(coords[::-1], dim=0).float()
     return coords[None].expand(batch, -1, -1, -1)
 
@@ -114,7 +114,7 @@ def flow_warp(image, flow, mask=False, padding_mode='zeros'):
 
 def coords_grid_y_first(batch, ht, wd):
     """Place y grid before x grid"""
-    coords = torch.meshgrid(torch.arange(ht), torch.arange(wd))
+    coords = torch.meshgrid(torch.arange(ht), torch.arange(wd), indexing='ij')
     coords = torch.stack(coords, dim=0).int()
     return coords[None].expand(batch, -1, -1, -1)
 

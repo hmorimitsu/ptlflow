@@ -3,7 +3,7 @@ import torch.nn.functional as F
 
 
 def coords_grid(b, h, w, homogeneous=False, device=None):
-    y, x = torch.meshgrid(torch.arange(h), torch.arange(w))  # [H, W]
+    y, x = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')  # [H, W]
 
     stacks = [x, y]
 
@@ -26,6 +26,7 @@ def generate_window_grid(h_min, h_max, w_min, w_max, len_h, len_w, device=None):
 
     x, y = torch.meshgrid([torch.linspace(w_min, w_max, len_w, device=device),
                            torch.linspace(h_min, h_max, len_h, device=device)],
+                           indexing='ij'
                           )
     grid = torch.stack((x, y), -1).transpose(0, 1).float()  # [H, W, 2]
 

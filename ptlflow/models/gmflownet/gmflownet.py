@@ -1,8 +1,6 @@
 from argparse import ArgumentParser, Namespace
 import configparser
-import math
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,7 +8,7 @@ import torch.nn.functional as F
 from .update import BasicUpdateBlock
 from .extractor import BasicEncoder, BasicConvEncoder
 from .corr import CorrBlock, AlternateCorrBlock
-from .utils.utils import bilinear_sampler, coords_grid, upflow8
+from .utils.utils import coords_grid, upflow8
 from .swin_transformer import POLAUpdate, MixAxialPOLAUpdate
 from .loss import compute_supervision_coarse, compute_coarse_loss, backwarp
 from ..base_model.base_model import BaseModel

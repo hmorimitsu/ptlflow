@@ -494,7 +494,7 @@ class RandomFlip(object):
         torch.Tensor
             The mirrored flow.
         """
-        grid = torch.meshgrid(torch.arange(flow.shape[1]), torch.arange(flow.shape[2]))
+        grid = torch.meshgrid(torch.arange(flow.shape[1]), torch.arange(flow.shape[2]), indexing='ij')
         grid = torch.stack(grid[::-1]).float()
         if is_hflip:
             mean_coord = (flow.shape[2]-1) / 2.0
@@ -809,7 +809,7 @@ class RandomRotate(object):
             dtype: torch.dtype,
             device: torch.device
         ) -> torch.Tensor:
-            vy, vx = torch.meshgrid(torch.arange(h), torch.arange(w))
+            vy, vx = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
             vx = vx.type(dtype)
             vy = vy.type(dtype)
             vx = vx.to(device)
@@ -831,7 +831,7 @@ class RandomRotate(object):
             dtype: torch.dtype,
             device: torch.device
         ) -> torch.Tensor:
-            vx, vy = torch.meshgrid(torch.arange(h), torch.arange(w))
+            vx, vy = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
             vx = vx.type(dtype)
             vy = vy.type(dtype)
             vx = vx.to(device)
@@ -1041,7 +1041,7 @@ def _resize(
         valids_out = torch.zeros(n, k, hs, ws, dtype=torch.float, device=valids.device)
         for i, vflat in enumerate(valids_flat):
             coords = torch.meshgrid(
-                torch.arange(w, device=valids.device), torch.arange(h, device=valids.device))
+                torch.arange(w, device=valids.device), torch.arange(h, device=valids.device), indexing='ij')
             coords = torch.stack(coords, dim=-1)
             coords = rearrange(coords, 'h w k -> (w h) k')
 
@@ -1114,7 +1114,8 @@ def _update_oob_flows(
     """
     grid = torch.meshgrid(
         torch.arange(flows.shape[2], dtype=flows.dtype, device=flows.device),
-        torch.arange(flows.shape[3], dtype=flows.dtype, device=flows.device))
+        torch.arange(flows.shape[3], dtype=flows.dtype, device=flows.device),
+        indexing='ij')
     grid = torch.stack(grid[::-1]).float()[None].repeat(flows.shape[0], 1, 1, 1)
     coords = flows + grid
     oob_occs = coords < 0

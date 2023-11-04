@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from ...utils import bilinear_sampler
 # from compute_sparse_correlation import compute_sparse_corr, compute_sparse_corr_torch, compute_sparse_corr_mink
-import alt_cuda_corr
 
 try:
     import alt_cuda_corr
@@ -52,7 +51,7 @@ class OLCorrBlock:
             fmap2 = self.fmap2_pyramid[i]
             dx = torch.linspace(-r, r, 2 * r + 1)
             dy = torch.linspace(-r, r, 2 * r + 1)
-            delta = torch.stack(torch.meshgrid(dy, dx), axis=-1).to(coords.device)
+            delta = torch.stack(torch.meshgrid(dy, dx, indexing='ij'), axis=-1).to(coords.device)
 
             centroid_lvl = coords.reshape(batch, h1 * w1, 1, 2) / 2 ** i
             delta_lvl = delta.view(1, 1, (2 * r + 1) ** 2, 2)
@@ -97,7 +96,7 @@ class CorrBlock:
             corr = self.corr_pyramid[i]
             dx = torch.linspace(-r, r, 2 * r + 1)
             dy = torch.linspace(-r, r, 2 * r + 1)
-            delta = torch.stack(torch.meshgrid(dy, dx), axis=-1).to(coords.device)
+            delta = torch.stack(torch.meshgrid(dy, dx, indexing='ij'), axis=-1).to(coords.device)
 
             centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2) / 2 ** i
             delta_lvl = delta.view(1, 2 * r + 1, 2 * r + 1, 2)
@@ -139,7 +138,7 @@ class CorrBlockSingleScale(nn.Module):
         corr = self.corr
         dx = torch.linspace(-r, r, 2 * r + 1)
         dy = torch.linspace(-r, r, 2 * r + 1)
-        delta = torch.stack(torch.meshgrid(dy, dx), axis=-1).to(coords.device)
+        delta = torch.stack(torch.meshgrid(dy, dx, indexing='ij'), axis=-1).to(coords.device)
 
         centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2)
         delta_lvl = delta.view(1, 2 * r + 1, 2 * r + 1, 2)
