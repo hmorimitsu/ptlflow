@@ -43,14 +43,14 @@ def test_infer(tmp_path: Path) -> None:
     args.flow_format = "flo"
     model = ptlflow.get_model(TEST_MODEL, None, args)
     infer.infer(args, model)
-    assert (tmp_path / "flows/img1.flo").exists()
-    assert (tmp_path / "flows_viz/img1.png").exists()
+    assert (tmp_path / "flows/test_infer0/img1.flo").exists()
+    assert (tmp_path / "flows_viz/test_infer0/img1.png").exists()
 
     args.flow_format = "png"
     model = ptlflow.get_model(TEST_MODEL, None, args)
     infer.infer(args, model)
-    assert (tmp_path / "flows/img1.png").exists()
-    assert (tmp_path / "flows_viz/img1.png").exists()
+    assert (tmp_path / "flows/test_infer0/img1.png").exists()
+    assert (tmp_path / "flows_viz/test_infer0/img1.png").exists()
 
     shutil.rmtree(tmp_path)
 

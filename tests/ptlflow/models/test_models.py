@@ -37,7 +37,14 @@ from ptlflow.utils.utils import make_divisible
 TRAIN_EPOCHS = 1
 DATASET = "overfit"
 
-EXCLUDE_MODELS = ["scv4", "scv8"]  # Has additional requirements
+EXCLUDE_MODELS = [
+    "matchflow",
+    "matchflow_raft",
+    "ms_raft+",
+    "scv4",
+    "scv8",
+    "separableflow",
+]  # Has additional requirements
 
 
 def test_forward() -> None:
@@ -47,6 +54,7 @@ def test_forward() -> None:
             continue
 
         try:
+            print(mname)
             model = ptlflow.get_model(mname)
             model = model.eval()
 
