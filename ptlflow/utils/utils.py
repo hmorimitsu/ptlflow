@@ -54,12 +54,18 @@ class InputPadder(_InputPadder):
         super().__init__(
             dims, stride=stride, two_side_pad=two_side_pad, pad_mode=pad_mode
         )
+        self.tgt_size = (
+            int(math.ceil(float(dims[-2]) / stride)) * stride,
+            int(math.ceil(float(dims[-1]) / stride)) * stride
+        )
 
     def fill(self, x):
         return self.pad(x)
 
     def unfill(self, x):
-        return self.unpad(x)
+        if x.shape[-2] == self.tgt_size[0] and x.shape[-1] == self.tgt_size[1]:
+            x = self.unpad(x)
+        return x
 
 
 class InputInterpolator(object):
@@ -83,6 +89,10 @@ class InputInterpolator(object):
         """
         self.dims = dims
         self.stride = stride
+        self.tgt_size = (
+            int(math.ceil(float(dims[-2]) / stride)) * stride,
+            int(math.ceil(float(dims[-1]) / stride)) * stride
+        )
 
     def fill(self, x):
         in_shape = x.shape
@@ -99,11 +109,12 @@ class InputInterpolator(object):
 
     def unfill(self, x):
         in_shape = x.shape
-        if len(in_shape) > 4:
-            x = x.view(-1, *in_shape[-3:])
-        x = F.interpolate(x, size=self.dims[-2:], mode="bilinear", align_corners=True)
-        if len(in_shape) > 4:
-            x = x.view(*in_shape[:-2], *x.shape[-2:])
+        if in_shape[-2] == self.tgt_size[0] and in_shape[-1] == self.tgt_size[1]:
+            if len(in_shape) > 4:
+                x = x.view(-1, *in_shape[-3:])
+            x = F.interpolate(x, size=self.dims[-2:], mode="bilinear", align_corners=True)
+            if len(in_shape) > 4:
+                x = x.view(*in_shape[:-2], *x.shape[-2:])
         return x
 
 
