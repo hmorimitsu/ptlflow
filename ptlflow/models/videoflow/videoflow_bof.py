@@ -115,6 +115,8 @@ class VideoFlowBOF(BaseModel):
         """Estimate optical flow between pair of frames"""
 
         images = inputs["images"]
+        if images.shape[1] == 2:
+            images = torch.cat([images[:, :1], images], 1)
 
         B, N, _, H, W = images.shape
 
