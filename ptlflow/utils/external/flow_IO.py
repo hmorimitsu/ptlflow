@@ -12,10 +12,12 @@ import h5py
 import cv2 as cv
 
 
-FLO_TAG_FLOAT = 202021.25  # first 4 bytes in flo file; check for this when READING the file
-FLO_TAG_STRING = "PIEH"    # first 4 bytes in flo file; use this when WRITING the file
-FLO_UNKNOWN_FLOW_THRESH = 1e9 # flo format threshold for unknown values
-FLO_UNKNOWN_FLOW = 1e10 # value to use to represent unknown flow in flo file format
+FLO_TAG_FLOAT = (
+    202021.25  # first 4 bytes in flo file; check for this when READING the file
+)
+FLO_TAG_STRING = "PIEH"  # first 4 bytes in flo file; use this when WRITING the file
+FLO_UNKNOWN_FLOW_THRESH = 1e9  # flo format threshold for unknown values
+FLO_UNKNOWN_FLOW = 1e10  # value to use to represent unknown flow in flo file format
 
 
 def readFlowFile(filepath):
@@ -48,10 +50,14 @@ def writeFlowFile(flow, filepath):
         raise ValueError("writeFlowFile: empty filepath")
 
     if len(flow.shape) != 3 or flow.shape[2] != 2:
-        raise IOError(f"writeFlowFile {filepath}: expected shape height x width x 2 but received {flow.shape}")
+        raise IOError(
+            f"writeFlowFile {filepath}: expected shape height x width x 2 but received {flow.shape}"
+        )
 
     if flow.shape[0] > flow.shape[1]:
-        print(f"write flo file {filepath}: Warning: Are you writing an upright image? Expected shape height x width x 2, got {flow.shape}")
+        print(
+            f"write flo file {filepath}: Warning: Are you writing an upright image? Expected shape height x width x 2, got {flow.shape}"
+        )
 
     if filepath.endswith(".flo"):
         return writeFloFlow(flow, filepath)
@@ -83,7 +89,7 @@ def readFloFlow(filepath):
             the float values for u and v, interleaved, in row order, i.e.,
             u[row0,col0], v[row0,col0], u[row0,col1], v[row0,col1], ...
     """
-    if (filepath is None):
+    if filepath is None:
         raise IOError("read flo file: empty filename")
 
     if not filepath.endswith(".flo"):
@@ -95,7 +101,9 @@ def readFloFlow(filepath):
         height = struct.unpack("i", stream.read(4))[0]
 
         if tag != FLO_TAG_FLOAT:  # simple test for correct endian-ness
-            raise IOError(f"read flo file({filepath}): wrong tag (possibly due to big-endian machine?)")
+            raise IOError(
+                f"read flo file({filepath}): wrong tag (possibly due to big-endian machine?)"
+            )
 
         # another sanity check to see that integers were read correctly (99999 should do the trick...)
         if width < 1 or width > 99999:
@@ -116,7 +124,7 @@ def readFloFlow(filepath):
             data = data.reshape((width, nBands))
             flow.append(data)
 
-        if stream.read(1) != b'':
+        if stream.read(1) != b"":
             raise IOError(f"read flo file({filepath}): file is too long")
 
         flow = np.asarray(flow)
@@ -154,8 +162,8 @@ def writeFloFlow(flow, filepath):
 
         # write header
         result = f.write(FLO_TAG_STRING.encode("ascii"))
-        result += f.write(struct.pack('i', width))
-        result += f.write(struct.pack('i', height))
+        result += f.write(struct.pack("i", width))
+        result += f.write(struct.pack("i", height))
         if result != 12:
             raise IOError(f"write flo file {filepath}: problem writing header")
 
@@ -178,15 +186,15 @@ def readPngFlow(filepath):
     flow_object = png.Reader(filename=filepath)
     flow_direct = flow_object.asDirect()
     flow_data = list(flow_direct[2])
-    (w, h) = flow_direct[3]['size']
+    (w, h) = flow_direct[3]["size"]
     flow = np.zeros((h, w, 3), dtype=np.float64)
     for i in range(len(flow_data)):
         flow[i, :, 0] = flow_data[i][0::3]
         flow[i, :, 1] = flow_data[i][1::3]
         flow[i, :, 2] = flow_data[i][2::3]
 
-    invalid_idx = (flow[:, :, 2] == 0)
-    flow[:, :, 0:2] = (flow[:, :, 0:2] - 2 ** 15) / 64.0
+    invalid_idx = flow[:, :, 2] == 0
+    flow[:, :, 0:2] = (flow[:, :, 0:2] - 2**15) / 64.0
     flow[invalid_idx, 0] = np.nan
     flow[invalid_idx, 1] = np.nan
     return flow[:, :, :2]
@@ -201,12 +209,12 @@ def writePngFlow(flow, filename):
     width = flow.shape[1]
     height = flow.shape[0]
     valid_map = np.ones([flow.shape[0], flow.shape[1], 1])
-    valid_map[np.isnan(flow[:,:,0]) | np.isnan(flow[:,:,1])] = 0
+    valid_map[np.isnan(flow[:, :, 0]) | np.isnan(flow[:, :, 1])] = 0
     flow = np.nan_to_num(flow)
     flow = np.concatenate([flow, valid_map], axis=-1)
-    flow = np.clip(flow, 0, 2**16-1)
+    flow = np.clip(flow, 0, 2**16 - 1)
     flow = flow.astype(np.uint16)
-    flow = np.reshape(flow, (-1, width*3))
+    flow = np.reshape(flow, (-1, width * 3))
     with open(filename, "wb") as f:
         writer = png.Writer(width=width, height=height, bitdepth=16, greyscale=False)
         writer.write(f, flow)
@@ -236,7 +244,9 @@ def writeFlo5File(flow, filename):
 def readFlo5Flow(filename):
     with h5py.File(filename, "r") as f:
         if "flow" not in f.keys():
-            raise IOError(f"File {filename} does not have a 'flow' key. Is this a valid flo5 file?")
+            raise IOError(
+                f"File {filename} does not have a 'flow' key. Is this a valid flo5 file?"
+            )
         return f["flow"][()]
 
 
@@ -247,18 +257,22 @@ def readPfmFlow(filepath):
     """
     flow = readPfmFile(filepath)
     if len(flow.shape) != 3:
-        raise IOError(f"read pfm flow: PFM file has wrong shape (assumed to be w x h x 3): {flow.shape}")
+        raise IOError(
+            f"read pfm flow: PFM file has wrong shape (assumed to be w x h x 3): {flow.shape}"
+        )
     if flow.shape[2] != 3:
-        raise IOError(f"read pfm flow: PFM file has wrong shape (assumed to be w x h x 3): {flow.shape}")
+        raise IOError(
+            f"read pfm flow: PFM file has wrong shape (assumed to be w x h x 3): {flow.shape}"
+        )
     # remove third channel -> is all zeros
-    return flow[:,:,:2]
+    return flow[:, :, :2]
 
 
 def readPfmFile(filepath):
     """
     adapted from https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html
     """
-    file = open(filepath, 'rb')
+    file = open(filepath, "rb")
 
     color = None
     width = None
@@ -267,64 +281,66 @@ def readPfmFile(filepath):
     endian = None
 
     header = file.readline().rstrip()
-    if header.decode("ascii") == 'PF':
+    if header.decode("ascii") == "PF":
         color = True
-    elif header.decode("ascii") == 'Pf':
+    elif header.decode("ascii") == "Pf":
         color = False
     else:
-        raise Exception('Not a PFM file.')
+        raise Exception("Not a PFM file.")
 
-    dim_match = re.match(r'^(\d+)\s(\d+)\s$', file.readline().decode("ascii"))
+    dim_match = re.match(r"^(\d+)\s(\d+)\s$", file.readline().decode("ascii"))
     if dim_match:
         width, height = list(map(int, dim_match.groups()))
     else:
-        raise Exception('Malformed PFM header.')
+        raise Exception("Malformed PFM header.")
 
     scale = float(file.readline().decode("ascii").rstrip())
-    if scale < 0: # little-endian
-        endian = '<'
+    if scale < 0:  # little-endian
+        endian = "<"
         scale = -scale
     else:
-        endian = '>' # big-endian
+        endian = ">"  # big-endian
 
-    data = np.fromfile(file, endian + 'f')
+    data = np.fromfile(file, endian + "f")
     shape = (height, width, 3) if color else (height, width)
 
     data = np.reshape(data, shape)
     data = np.flipud(data)
-    return data #, scale
+    return data  # , scale
 
 
 def writePfmFile(image, filepath):
     """
     adapted from https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html
     """
-    scale=1
-    file = open(filepath, 'wb')
+    scale = 1
+    file = open(filepath, "wb")
 
     color = None
 
-    if image.dtype.name != 'float32':
-        raise Exception('Image dtype must be float32.')
+    if image.dtype.name != "float32":
+        raise Exception("Image dtype must be float32.")
 
     image = np.flipud(image)
 
-    if len(image.shape) == 3 and image.shape[2] == 3: # color image
+    if len(image.shape) == 3 and image.shape[2] == 3:  # color image
         color = True
-    elif len(image.shape) == 2 or len(image.shape) == 3 and image.shape[2] == 1: # greyscale
+    elif (
+        len(image.shape) == 2 or len(image.shape) == 3 and image.shape[2] == 1
+    ):  # greyscale
         color = False
     else:
-        raise Exception('Image must have H x W x 3, H x W x 1 or H x W dimensions.')
+        raise Exception("Image must have H x W x 3, H x W x 1 or H x W dimensions.")
 
-    file.write('PF\n' if color else 'Pf\n'.encode())
-    file.write('%d %d\n'.encode() % (image.shape[1], image.shape[0]))
+    file.write("PF\n" if color else "Pf\n".encode())
+    file.write("%d %d\n".encode() % (image.shape[1], image.shape[0]))
 
     endian = image.dtype.byteorder
 
-    if endian == '<' or endian == '=' and sys.byteorder == 'little':
+    if endian == "<" or endian == "=" and sys.byteorder == "little":
         scale = -scale
 
-    file.write('%f\n'.encode() % scale)
+    file.write("%f\n".encode() % scale)
 
     image.tofile(file)
 
@@ -357,7 +373,7 @@ def readPngDisp(filepath):
     image_object = png.Reader(filename=filepath)
     image_direct = image_object.asDirect()
     image_data = list(image_direct[2])
-    (w, h) = image_direct[3]['size']
+    (w, h) = image_direct[3]["size"]
     channel = len(image_data[0]) // w
     if channel != 1:
         raise IOError("read png disp: assumed channels to be 1!")
@@ -375,7 +391,9 @@ def readPfmDisp(filepath):
     """
     disp = readPfmFile(filepath)
     if len(disp.shape) != 2:
-        raise IOError(f"read pfm disp: PFM file has wrong shape (assumed to be w x h): {disp.shape}")
+        raise IOError(
+            f"read pfm disp: PFM file has wrong shape (assumed to be w x h): {disp.shape}"
+        )
     return disp
 
 
@@ -387,7 +405,7 @@ def writePngDisp(disp, filepath):
     disp = 256 * disp
     width = disp.shape[1]
     height = disp.shape[0]
-    disp = np.clip(disp, 0, 2**16-1)
+    disp = np.clip(disp, 0, 2**16 - 1)
     disp = np.nan_to_num(disp).astype(np.uint16)
     disp = np.reshape(disp, (-1, width))
     with open(filepath, "wb") as f:
@@ -403,7 +421,9 @@ def writeDsp5File(disp, filename):
 def readDsp5Disp(filename):
     with h5py.File(filename, "r") as f:
         if "disparity" not in f.keys():
-            raise IOError(f"File {filename} does not have a 'disparity' key. Is this a valid dsp5 file?")
+            raise IOError(
+                f"File {filename} does not have a 'disparity' key. Is this a valid dsp5 file?"
+            )
         return f["disparity"][()]
 
 
@@ -416,11 +436,15 @@ def writeDispFile(disp, filepath):
         raise ValueError("writeDispFile: empty filepath")
 
     if len(disp.shape) != 2:
-        raise IOError(f"writeDispFile {filepath}: expected shape height x width but received {disp.shape}")
+        raise IOError(
+            f"writeDispFile {filepath}: expected shape height x width but received {disp.shape}"
+        )
 
     if disp.shape[0] > disp.shape[1]:
-        print(f"writeDispFile {filepath}: Warning: Are you writing an upright image? Expected shape height x width, got {disp.shape}")
-    
+        print(
+            f"writeDispFile {filepath}: Warning: Are you writing an upright image? Expected shape height x width, got {disp.shape}"
+        )
+
     if filepath.endswith(".png"):
         writePngDisp(disp, filepath)
     elif filepath.endswith(".npy"):
@@ -440,11 +464,11 @@ def readKITTIIntrinsics(filepath, image=2):
     assert filepath.endswith(".txt")
 
     with open(filepath) as f:
-        reader = csv.reader(f, delimiter=' ')
+        reader = csv.reader(f, delimiter=" ")
         for row in reader:
-            if row[0] == f'K_{image:02d}:':
-                K = np.array(row[1:], dtype=np.float32).reshape(3,3)
-                kvec = np.array([K[0,0], K[1,1], K[0,2], K[1,2]])
+            if row[0] == f"K_{image:02d}:":
+                K = np.array(row[1:], dtype=np.float32).reshape(3, 3)
+                kvec = np.array([K[0, 0], K[1, 1], K[0, 2], K[1, 2]])
                 return kvec
 
 

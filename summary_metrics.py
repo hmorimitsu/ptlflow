@@ -33,34 +33,60 @@ import plotly.express as px
 def _init_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--metrics_path', type=str, default=str(Path('docs/source/results/metrics_all.csv')),
-        help=('Path to the csv file containing the validation metrics.'))
+        "--metrics_path",
+        type=str,
+        default=str(Path("docs/source/results/metrics_all.csv")),
+        help=("Path to the csv file containing the validation metrics."),
+    )
     parser.add_argument(
-        '--chosen_metrics', type=str, nargs='+', default=('epe', 'outlier'),
-        help=('Names of which metrics to keep in the summarized results. The chosen names must be at the end of the column '
-              'name of the csv file. If exactly two metrics are chosen, a plot between the two will also be generated.'))
+        "--chosen_metrics",
+        type=str,
+        nargs="+",
+        default=("epe", "outlier"),
+        help=(
+            "Names of which metrics to keep in the summarized results. The chosen names must be at the end of the column "
+            "name of the csv file. If exactly two metrics are chosen, a plot between the two will also be generated."
+        ),
+    )
     parser.add_argument(
-        '--output_dir', type=str, default=str(Path('outputs/metrics')),
-        help=('Path to the directory where the outputs will be saved.'))
+        "--output_dir",
+        type=str,
+        default=str(Path("outputs/metrics")),
+        help=("Path to the directory where the outputs will be saved."),
+    )
     parser.add_argument(
-        '--sort_by', type=str, default='model',
-        help=('Name of the column to use to sort the outputs table. The name must match exactly a column name from the'
-              'metrics csv file.'))
+        "--sort_by",
+        type=str,
+        default="model",
+        help=(
+            "Name of the column to use to sort the outputs table. The name must match exactly a column name from the"
+            "metrics csv file."
+        ),
+    )
     parser.add_argument(
-        '--ignore', type=str, default='model',
-        help=('Name of the column to use to sort the outputs table. The name must match exactly a column name from the'
-              'metrics csv file.'))
+        "--ignore",
+        type=str,
+        default="model",
+        help=(
+            "Name of the column to use to sort the outputs table. The name must match exactly a column name from the"
+            "metrics csv file."
+        ),
+    )
     parser.add_argument(
-        '--drop_checkpoints', type=str, nargs='*', default=None,
-        help=('Name of checkpoints to not be included in the final outputs. The names must be substrings of the values in '
-              'the file from --metrics_path.'))
+        "--drop_checkpoints",
+        type=str,
+        nargs="*",
+        default=None,
+        help=(
+            "Name of checkpoints to not be included in the final outputs. The names must be substrings of the values in "
+            "the file from --metrics_path."
+        ),
+    )
 
     return parser
 
 
-def load_summarized_table(
-    args: argparse.Namespace
-) -> pd.DataFrame:
+def load_summarized_table(args: argparse.Namespace) -> pd.DataFrame:
     """Load the DataFrame and keep only columns according to the selected metrics.
 
     Parameters
@@ -85,10 +111,7 @@ def load_summarized_table(
     return summ_df
 
 
-def save_plots(
-    args: argparse.Namespace,
-    df: pd.DataFrame
-) -> None:
+def save_plots(args: argparse.Namespace, df: pd.DataFrame) -> None:
     """Generate and save the plot to disk.
 
     Parameters
@@ -102,7 +125,7 @@ def save_plots(
     for col in df.columns[2:]:
         for cmet in args.chosen_metrics:
             if col.endswith(cmet):
-                dataset_name = '_'.join(col.split('-')[:2])
+                dataset_name = "_".join(col.split("-")[:2])
                 if metric_pairs.get(dataset_name) is None:
                     metric_pairs[dataset_name] = {}
                 metric_pairs[dataset_name][cmet] = col
@@ -110,25 +133,25 @@ def save_plots(
     for dataset_name, col_pair_dict in metric_pairs.items():
         col1, col2 = col_pair_dict.values()
         fig = px.scatter(
-            df, x=col1, y=col2, color=df.columns[0], symbol=df.columns[1],
-            title=f'{dataset_name} - {args.chosen_metrics[0]} x {args.chosen_metrics[1]}')
-        fig.update_traces(
-            marker={
-                'size': 20,
-                'line': {'width': 2, 'color': 'DarkSlateGrey'}},
-            selector={'mode': 'markers'})
-        fig.update_layout(
-            title_font_size=30
+            df,
+            x=col1,
+            y=col2,
+            color=df.columns[0],
+            symbol=df.columns[1],
+            title=f"{dataset_name} - {args.chosen_metrics[0]} x {args.chosen_metrics[1]}",
         )
-        file_name = f'{dataset_name}_{args.chosen_metrics[0]}_{args.chosen_metrics[1]}'
+        fig.update_traces(
+            marker={"size": 20, "line": {"width": 2, "color": "DarkSlateGrey"}},
+            selector={"mode": "markers"},
+        )
+        fig.update_layout(title_font_size=30)
+        file_name = f"{dataset_name}_{args.chosen_metrics[0]}_{args.chosen_metrics[1]}"
         if args.drop_checkpoints is not None and len(args.drop_checkpoints) > 0:
             file_name += f'-drop_{"_".join(args.drop_checkpoints)}'
-        fig.write_html(args.output_dir / (file_name+'.html'))
+        fig.write_html(args.output_dir / (file_name + ".html"))
 
 
-def summarize(
-    args: argparse.Namespace
-) -> None:
+def summarize(args: argparse.Namespace) -> None:
     """Summarize the results and save them to the disk.
 
     Parameters
@@ -142,7 +165,11 @@ def summarize(
     df = _shorten_columns_names(df, len(args.chosen_metrics) > 1)
 
     if args.drop_checkpoints is not None and len(args.drop_checkpoints) > 0:
-        ignore_idx = [i for i in df.index if any(c in df.loc[i, 'checkpoint'] for c in args.drop_checkpoints)]
+        ignore_idx = [
+            i
+            for i in df.index
+            if any(c in df.loc[i, "checkpoint"] for c in args.drop_checkpoints)
+        ]
         df = df.drop(ignore_idx)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -150,34 +177,31 @@ def summarize(
     if args.drop_checkpoints is not None and len(args.drop_checkpoints) > 0:
         file_name += f'-drop_{"_".join(args.drop_checkpoints)}'
 
-    df.to_csv(args.output_dir / (file_name+'.csv'), index=False)
-    with open(args.output_dir / (file_name+'.md'), 'w') as f:
+    df.to_csv(args.output_dir / (file_name + ".csv"), index=False)
+    with open(args.output_dir / (file_name + ".md"), "w") as f:
         df.to_markdown(f)
 
     if len(args.chosen_metrics) == 2:
         save_plots(args, df)
 
 
-def _shorten_columns_names(
-    df: pd.DataFrame,
-    keep_metric_name: bool
-) -> pd.DataFrame:
+def _shorten_columns_names(df: pd.DataFrame, keep_metric_name: bool) -> pd.DataFrame:
     change_dict = {}
     for col in df.columns:
-        tokens = col.split('-')
+        tokens = col.split("-")
         if len(tokens) > 1:
-            metric_name = tokens[-1].split('/')[1]
-            new_col_name = f'{tokens[0]}-{tokens[1]}'
+            metric_name = tokens[-1].split("/")[1]
+            new_col_name = f"{tokens[0]}-{tokens[1]}"
             if keep_metric_name:
-                new_col_name += f'-{metric_name}'
+                new_col_name += f"-{metric_name}"
             change_dict[col] = new_col_name
 
     df = df.rename(columns=change_dict)
     return df
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = _init_parser()
     args = parser.parse_args()
     summarize(args)
-    print(f'Results saved to {str(args.output_dir)}.')
+    print(f"Results saved to {str(args.output_dir)}.")

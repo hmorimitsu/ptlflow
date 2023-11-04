@@ -5,7 +5,8 @@ BatchNorm = nn.BatchNorm2d
 
 
 class PreActBlock(nn.Module):
-    '''Pre-activation version of the BasicBlock.'''
+    """Pre-activation version of the BasicBlock."""
+
     expansion = 1
 
     def __init__(self, in_planes, planes, stride=1, normalize=True):
@@ -13,15 +14,12 @@ class PreActBlock(nn.Module):
         if normalize:
             self.bn1 = BatchNorm(in_planes)
         self.conv1 = nn.Conv2d(
-            in_planes,
-            planes,
-            kernel_size=3,
-            stride=stride,
-            padding=1,
-            bias=False)
+            in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False
+        )
         self.bn2 = BatchNorm(planes)
         self.conv2 = nn.Conv2d(
-            planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
+            planes, planes, kernel_size=3, stride=1, padding=1, bias=False
+        )
         self.relu = nn.ReLU(inplace=True)
 
         if stride != 1 or in_planes != self.expansion * planes:
@@ -31,11 +29,13 @@ class PreActBlock(nn.Module):
                     self.expansion * planes,
                     kernel_size=1,
                     stride=stride,
-                    bias=False))
+                    bias=False,
+                )
+            )
 
     def forward(self, x):
-        out = self.relu(self.bn1(x)) if hasattr(self, 'bn1') else x
-        shortcut = self.shortcut(out) if hasattr(self, 'shortcut') else x
+        out = self.relu(self.bn1(x)) if hasattr(self, "bn1") else x
+        shortcut = self.shortcut(out) if hasattr(self, "shortcut") else x
         out = self.conv1(out)
         out = self.conv2(self.relu(self.bn2(out)))
         out += shortcut
@@ -48,15 +48,12 @@ class ResBlock(nn.Module):
     def __init__(self, in_planes, planes, stride=1):
         super(ResBlock, self).__init__()
         self.conv1 = nn.Conv2d(
-            in_planes,
-            planes,
-            kernel_size=3,
-            stride=stride,
-            padding=1,
-            bias=False)
+            in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False
+        )
         self.bn1 = BatchNorm(planes)
         self.conv2 = nn.Conv2d(
-            planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
+            planes, planes, kernel_size=3, stride=1, padding=1, bias=False
+        )
         self.bn2 = BatchNorm(planes)
         self.relu = nn.ReLU(inplace=True)
 
@@ -68,7 +65,10 @@ class ResBlock(nn.Module):
                     self.expansion * planes,
                     kernel_size=1,
                     stride=stride,
-                    bias=False), BatchNorm(self.expansion * planes))
+                    bias=False,
+                ),
+                BatchNorm(self.expansion * planes),
+            )
 
     def forward(self, x):
         out = self.relu(self.bn1(self.conv1(x)))
@@ -79,7 +79,6 @@ class ResBlock(nn.Module):
 
 
 class ResnetDecoder(nn.Module):
-
     def __init__(self, inplane, outplane):
         super(ResnetDecoder, self).__init__()
         self.block1 = PreActBlock(inplane, outplane, normalize=False)
@@ -92,15 +91,15 @@ class ResnetDecoder(nn.Module):
 
 
 class HDADecoder(nn.Module):
-
     def __init__(self, inplane, outplane):
         super(HDADecoder, self).__init__()
         self.block1 = PreActBlock(inplane, outplane, normalize=False)
         self.block2 = PreActBlock(outplane, outplane, normalize=True)
         self.root = nn.Sequential(
-            BatchNorm(outplane * 2), nn.ReLU(inplace=True),
-            nn.Conv2d(
-                outplane * 2, outplane, kernel_size=1, stride=1, bias=False))
+            BatchNorm(outplane * 2),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(outplane * 2, outplane, kernel_size=1, stride=1, bias=False),
+        )
 
     def forward(self, x):
         y1 = self.block1(x)

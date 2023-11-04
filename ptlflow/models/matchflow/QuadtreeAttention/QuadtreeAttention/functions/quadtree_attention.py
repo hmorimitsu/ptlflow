@@ -1,6 +1,7 @@
 from einops.einops import rearrange
 import torch
 from torch.autograd import Function
+
 try:
     import score_computation_cuda
     import value_aggregation_cuda
@@ -32,8 +33,12 @@ class value_aggregation(Function):
     def forward(ctx, score, value, index):
         ctx.save_for_backward(score, value, index)
         f = score.shape[2]
-        score = rearrange(score, "b n f K h -> b (n f) K h")  # [b, N, 4, 4K, H] -> [b, 4N, 4K, H]
-        index = rearrange(index, "b n f K h -> b (n f) K h")  # [b, N, 4, 4K, H] -> [b, 4N, 4K, H]
+        score = rearrange(
+            score, "b n f K h -> b (n f) K h"
+        )  # [b, N, 4, 4K, H] -> [b, 4N, 4K, H]
+        index = rearrange(
+            index, "b n f K h -> b (n f) K h"
+        )  # [b, N, 4, 4K, H] -> [b, 4N, 4K, H]
         b, N, _, H = score.shape
         D = value.shape[-1]
         # value [b, M, H, D]
@@ -54,7 +59,9 @@ class value_aggregation(Function):
         grad_score = score.new_zeros(score.shape).contiguous()
         grad_value = value.new_zeros(value.shape).contiguous()
 
-        value_aggregation_cuda.value_aggregation_backward(grad_output, score, value, index, grad_score, grad_value)
+        value_aggregation_cuda.value_aggregation_backward(
+            grad_output, score, value, index, grad_score, grad_value
+        )
         grad_score = rearrange(grad_score, "b (n f) K h -> b n f K h", f=f)
         return grad_score, grad_value, None
 

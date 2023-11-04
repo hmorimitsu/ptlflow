@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 from .utils import bilinear_sampler, coords_grid
+
 # from compute_sparse_correlation import compute_sparse_corr, compute_sparse_corr_torch, compute_sparse_corr_mink
 
 try:
@@ -39,9 +40,11 @@ class CorrBlock:
             corr = self.corr_pyramid[i]
             dx = torch.linspace(-r, r, 2 * r + 1)
             dy = torch.linspace(-r, r, 2 * r + 1)
-            delta = torch.stack(torch.meshgrid(dy, dx, indexing='ij'), axis=-1).to(coords.device)
+            delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1).to(
+                coords.device
+            )
 
-            centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2) / 2 ** i
+            centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2) / 2**i
             delta_lvl = delta.view(1, 2 * r + 1, 2 * r + 1, 2)
             coords_lvl = centroid_lvl + delta_lvl
 
@@ -81,7 +84,9 @@ class CorrBlockSingleScale(nn.Module):
         corr = self.corr
         dx = torch.linspace(-r, r, 2 * r + 1)
         dy = torch.linspace(-r, r, 2 * r + 1)
-        delta = torch.stack(torch.meshgrid(dy, dx, indexing='ij'), axis=-1).to(coords.device)
+        delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1).to(
+            coords.device
+        )
 
         centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2)
         delta_lvl = delta.view(1, 2 * r + 1, 2 * r + 1, 2)

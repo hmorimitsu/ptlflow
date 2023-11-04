@@ -36,11 +36,11 @@ class IOAdapter(object):
         input_size: Tuple[int, int],
         target_size: Optional[Tuple[int, int]] = None,
         target_scale_factor: Optional[float] = None,
-        interpolation_mode: str = 'bilinear',
+        interpolation_mode: str = "bilinear",
         interpolation_align_corners: bool = False,
         cuda: bool = False,
         fp16: bool = False,
-        fill_mode: str = 'pad'
+        fill_mode: str = "pad",
     ) -> None:
         """Initialize IOAdapter.
 
@@ -79,19 +79,28 @@ class IOAdapter(object):
         self.transform = ToTensor()
         padder_input_size = input_size
         self.scaler = None
-        if (target_size is not None and min(target_size) > 0) or (target_scale_factor is not None and target_scale_factor > 0):
+        if (target_size is not None and min(target_size) > 0) or (
+            target_scale_factor is not None and target_scale_factor > 0
+        ):
             self.scaler = InputScaler(
-                orig_shape=input_size, size=target_size, scale_factor=target_scale_factor,
-                interpolation_mode=interpolation_mode, interpolation_align_corners=interpolation_align_corners)
+                orig_shape=input_size,
+                size=target_size,
+                scale_factor=target_scale_factor,
+                interpolation_mode=interpolation_mode,
+                interpolation_align_corners=interpolation_align_corners,
+            )
 
-            if (target_size is not None and min(target_size) > 0):
+            if target_size is not None and min(target_size) > 0:
                 padder_input_size = target_size
             else:
-                padder_input_size = (int(target_scale_factor*input_size[0]), int(target_scale_factor*input_size[1]))
+                padder_input_size = (
+                    int(target_scale_factor * input_size[0]),
+                    int(target_scale_factor * input_size[1]),
+                )
 
-        if fill_mode == 'pad':
+        if fill_mode == "pad":
             self.filler = InputPadder(padder_input_size, model.output_stride)
-        elif fill_mode == 'interpolate':
+        elif fill_mode == "interpolate":
             self.filler = InputInterpolator(padder_input_size, model.output_stride)
         else:
             raise ValueError()
@@ -129,7 +138,7 @@ class IOAdapter(object):
             The inputs converted and transformed to the input format of the optical flow models.
         """
         if inputs is None:
-            inputs = {'images': images, 'flows': flows}
+            inputs = {"images": images, "flows": flows}
             inputs.update(kwargs)
             keys_to_remove = []
             for k, v in inputs.items():
@@ -140,14 +149,14 @@ class IOAdapter(object):
             inputs = self.transform(inputs)
 
         for k, v in inputs.items():
-            if image_only and k != 'images':
+            if image_only and k != "images":
                 continue
 
             if isinstance(v, torch.Tensor):
                 while len(v.shape) < 5:
                     v = v.unsqueeze(0)
                 if self.scaler is not None:
-                    v = self.scaler.scale(v, is_flow=k.startswith('flow'))
+                    v = self.scaler.scale(v, is_flow=k.startswith("flow"))
                 v = self.filler.fill(v)
                 inputs[k] = v
 
@@ -156,9 +165,7 @@ class IOAdapter(object):
         return inputs
 
     def unpad_and_unscale(
-        self,
-        outputs: Dict[str, Any],
-        image_only: bool = False
+        self, outputs: Dict[str, Any], image_only: bool = False
     ) -> Dict[str, torch.Tensor]:
         """Remove padding and scaling to restore the original shapes.
 
@@ -186,27 +193,36 @@ class IOAdapter(object):
         prepare_inputs
         """
         for k, v in outputs.items():
-            if image_only and k != 'images':
+            if image_only and k != "images":
                 continue
 
             if isinstance(v, torch.Tensor):
                 v = self.filler.unfill(v)
                 if self.scaler is not None:
-                    v = self.scaler.unscale(v, is_flow=k.startswith('flow'))
+                    v = self.scaler.unscale(v, is_flow=k.startswith("flow"))
                 outputs[k] = v
 
         return outputs
 
-    def _to_cuda(
-        self,
-        inputs: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _to_cuda(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         if self.cuda:
             if torch.cuda.is_available():
-                inputs = {k: v.cuda() if isinstance(v, torch.Tensor) else v for k, v in inputs.items()}
+                inputs = {
+                    k: v.cuda() if isinstance(v, torch.Tensor) else v
+                    for k, v in inputs.items()
+                }
                 if self.fp16:
-                    inputs = {k: v.half() if (isinstance(v, torch.Tensor) and ('flow' in k or 'image' in k)) else v for k, v in inputs.items()}
+                    inputs = {
+                        k: v.half()
+                        if (
+                            isinstance(v, torch.Tensor)
+                            and ("flow" in k or "image" in k)
+                        )
+                        else v
+                        for k, v in inputs.items()
+                    }
             else:
                 logging.warning(
-                    'IOAdapter was asked to use cuda, but torch.cuda.is_available() == False. Tensors will remain on CPU.')
+                    "IOAdapter was asked to use cuda, but torch.cuda.is_available() == False. Tensors will remain on CPU."
+                )
         return inputs

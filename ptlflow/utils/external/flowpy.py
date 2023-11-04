@@ -41,7 +41,9 @@ from itertools import accumulate
 DEFAULT_TRANSITIONS = (15, 6, 4, 11, 13, 6)
 
 
-def flow_to_rgb(flow, flow_max_radius=None, background="bright", custom_colorwheel=None):
+def flow_to_rgb(
+    flow, flow_max_radius=None, background="bright", custom_colorwheel=None
+):
     """
     Creates a RGB representation of an optical flow.
 
@@ -81,7 +83,9 @@ def flow_to_rgb(flow, flow_max_radius=None, background="bright", custom_colorwhe
     """
     valid_backgrounds = ("bright", "dark")
     if background not in valid_backgrounds:
-        raise ValueError(f"background should be one the following: {valid_backgrounds}, not {background}")
+        raise ValueError(
+            f"background should be one the following: {valid_backgrounds}, not {background}"
+        )
 
     wheel = make_colorwheel() if custom_colorwheel is None else custom_colorwheel
 
@@ -108,33 +112,40 @@ def flow_to_rgb(flow, flow_max_radius=None, background="bright", custom_colorwhe
     # Interpolate the hues
     (angle_fractional, angle_floor), angle_ceil = np.modf(angle), np.ceil(angle)
     angle_fractional = angle_fractional.reshape((angle_fractional.shape) + (1,))
-    float_hue = (wheel[angle_floor.astype(np.int32)] * (1 - angle_fractional)
-                 + wheel[angle_ceil.astype(np.int32)] * angle_fractional)
+    float_hue = (
+        wheel[angle_floor.astype(np.int32)] * (1 - angle_fractional)
+        + wheel[angle_ceil.astype(np.int32)] * angle_fractional
+    )
 
-    ColorizationArgs = namedtuple("ColorizationArgs", [
-        'move_hue_valid_radius',
-        'move_hue_oversized_radius',
-        'invalid_color'])
+    ColorizationArgs = namedtuple(
+        "ColorizationArgs",
+        ["move_hue_valid_radius", "move_hue_oversized_radius", "invalid_color"],
+    )
 
     def move_hue_on_V_axis(hues, factors):
         return hues * np.expand_dims(factors, -1)
 
     def move_hue_on_S_axis(hues, factors):
-        return 255. - np.expand_dims(factors, -1) * (255. - hues)
+        return 255.0 - np.expand_dims(factors, -1) * (255.0 - hues)
 
     if background == "dark":
-        parameters = ColorizationArgs(move_hue_on_V_axis, move_hue_on_S_axis,
-                                      np.array([255, 255, 255], dtype=np.float32))
+        parameters = ColorizationArgs(
+            move_hue_on_V_axis,
+            move_hue_on_S_axis,
+            np.array([255, 255, 255], dtype=np.float32),
+        )
     else:
-        parameters = ColorizationArgs(move_hue_on_S_axis, move_hue_on_V_axis,
-                                      np.array([0, 0, 0], dtype=np.float32))
+        parameters = ColorizationArgs(
+            move_hue_on_S_axis,
+            move_hue_on_V_axis,
+            np.array([0, 0, 0], dtype=np.float32),
+        )
 
     colors = parameters.move_hue_valid_radius(float_hue, radius)
 
     oversized_radius_mask = radius > 1
     colors[oversized_radius_mask] = parameters.move_hue_oversized_radius(
-        float_hue[oversized_radius_mask],
-        1 / radius[oversized_radius_mask]
+        float_hue[oversized_radius_mask], 1 / radius[oversized_radius_mask]
     )
     colors[nan_mask] = parameters.invalid_color
 
@@ -169,10 +180,18 @@ def make_colorwheel(transitions=DEFAULT_TRANSITIONS):
     colorwheel_length = sum(transitions)
 
     # The red hue is repeated to make the color wheel cyclic
-    base_hues = map(np.array,
-                    ([255, 0, 0], [255, 255, 0], [0, 255, 0],
-                     [0, 255, 255], [0, 0, 255], [255, 0, 255],
-                     [255, 0, 0]))
+    base_hues = map(
+        np.array,
+        (
+            [255, 0, 0],
+            [255, 255, 0],
+            [0, 255, 0],
+            [0, 255, 255],
+            [0, 0, 255],
+            [255, 0, 255],
+            [255, 0, 0],
+        ),
+    )
 
     colorwheel = np.zeros((colorwheel_length, 3), dtype="uint8")
     hue_from = next(base_hues)
@@ -181,7 +200,8 @@ def make_colorwheel(transitions=DEFAULT_TRANSITIONS):
         transition_length = end_index - start_index
 
         colorwheel[start_index:end_index] = np.linspace(
-            hue_from, hue_to, transition_length, endpoint=False)
+            hue_from, hue_to, transition_length, endpoint=False
+        )
         hue_from = hue_to
         start_index = end_index
 
@@ -276,7 +296,7 @@ def flow_read(input_file, format=None):
 
 
 def flow_read_flo(f):
-    if (f.read(4) != b'PIEH'):
+    if f.read(4) != b"PIEH":
         warn(f"{f.name} does not have a .flo file signature")
 
     width, height = struct.unpack("II", f.read(8))
@@ -298,7 +318,7 @@ def flow_write_flo(f, flow):
     image = flow.copy()
     image[np.isnan(image)] = SENTINEL
 
-    f.write(b'PIEH')
+    f.write(b"PIEH")
     f.write(struct.pack("II", width, height))
     image.astype(np.float32).tofile(f)
 
@@ -309,7 +329,7 @@ def flow_read_png(f):
     file_content = np.concatenate(list(stream)).reshape((height, width, 3))
     flow, valid = file_content[..., 0:2], file_content[..., 2]
 
-    flow = (flow.astype(np.float32) - 2 ** 15) / 64.
+    flow = (flow.astype(np.float32) - 2**15) / 64.0
 
     flow[~valid.astype(bool)] = np.NaN
 
@@ -317,14 +337,14 @@ def flow_read_png(f):
 
 
 def flow_write_png(f, flow):
-    SENTINEL = 0.  # Only here to look like original KITTI files
+    SENTINEL = 0.0  # Only here to look like original KITTI files
     height, width, _ = flow.shape
     flow_copy = flow.copy()
 
     valid = ~(np.isnan(flow[..., 0]) | np.isnan(flow[..., 1]))
     flow_copy[~valid] = SENTINEL
 
-    flow_copy = (flow_copy * 64. + 2 ** 15).astype(np.uint16)
+    flow_copy = (flow_copy * 64.0 + 2**15).astype(np.uint16)
     image = np.dstack((flow_copy, valid))
 
     writer = png.Writer(width, height, bitdepth=16, greyscale=False)

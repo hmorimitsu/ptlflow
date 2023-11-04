@@ -52,8 +52,8 @@ class SequenceLoss(nn.Module):
 
 class UniMatch(BaseModel):
     pretrained_checkpoints = {
-        'mix': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale1_mixdata-eaf948e3.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale1_things-5e5a4b7a.ckpt'
+        "mix": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale1_mixdata-eaf948e3.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale1_things-5e5a4b7a.ckpt",
     }
 
     def __init__(self, args: Namespace) -> None:
@@ -345,9 +345,9 @@ class UniMatch(BaseModel):
 
 class UniMatchScale2(UniMatch):
     pretrained_checkpoints = {
-        'mix': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_mixdata-d9a42210.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_things-9353862b.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_sintel-f94ab7db.ckpt'
+        "mix": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_mixdata-d9a42210.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_things-9353862b.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_sintel-f94ab7db.ckpt",
     }
 
     def __init__(self, args: Namespace) -> None:
@@ -361,10 +361,10 @@ class UniMatchScale2(UniMatch):
 
 class UniMatchScale2With6Refinements(UniMatch):
     pretrained_checkpoints = {
-        'mix': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_ref6_mixdata-36413e25.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_ref6_things-41920bbd.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_ref6_sintel-30e624a6.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_ref6_kitti-77dd88e3.ckpt'
+        "mix": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_ref6_mixdata-36413e25.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_ref6_things-41920bbd.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_ref6_sintel-30e624a6.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_ref6_kitti-77dd88e3.ckpt",
     }
 
     def __init__(self, args: Namespace) -> None:

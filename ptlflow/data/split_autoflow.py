@@ -35,9 +35,11 @@ THIS_DIR = Path(os.path.abspath(os.path.dirname(__file__)))
 
 def _init_parser() -> ArgumentParser:
     parser: ArgumentParser = ArgumentParser()
-    parser.add_argument('--autoflow_root', type=str, required=True)
-    parser.add_argument('--output_file', type=str, default=str(THIS_DIR / 'AutoFlow_val.txt'))
-    parser.add_argument('--val_percentage', type=float, default=0.05)
+    parser.add_argument("--autoflow_root", type=str, required=True)
+    parser.add_argument(
+        "--output_file", type=str, default=str(THIS_DIR / "AutoFlow_val.txt")
+    )
+    parser.add_argument("--val_percentage", type=float, default=0.05)
     return parser
 
 
@@ -49,20 +51,31 @@ def main(args: Namespace) -> None:
     args : argparse.Namespace
         Arguments for configuring the splitting.
     """
-    parts_dirs = [f'static_40k_png_{i+1}_of_4' for i in range(4)]
+    parts_dirs = [f"static_40k_png_{i+1}_of_4" for i in range(4)]
     sample_dirs = []
     for pdir in parts_dirs:
-        sample_dirs.extend(sorted([f.stem for f in (Path(args.autoflow_root) / pdir).glob('*') if f.is_dir()]))
+        sample_dirs.extend(
+            sorted(
+                [
+                    f.stem
+                    for f in (Path(args.autoflow_root) / pdir).glob("*")
+                    if f.is_dir()
+                ]
+            )
+        )
     sample_dirs.sort()
-    assert len(sample_dirs) == 40000, f'ERROR: AutoFlow dataset should have 40k samples, but found {len(sample_dirs)}.'
+    assert (
+        len(sample_dirs) == 40000
+    ), f"ERROR: AutoFlow dataset should have 40k samples, but found {len(sample_dirs)}."
     samples_per_table = {}
     for sdir in sample_dirs:
-        table_idx = sdir.split('_')[1]
+        table_idx = sdir.split("_")[1]
         if table_idx not in samples_per_table:
             samples_per_table[table_idx] = []
         samples_per_table[table_idx].append(sdir)
-    assert len(samples_per_table) == 300, (
-        f'ERROR: AutoFlow dataset should have 300 tables, but found {len(samples_per_table)}.')
+    assert (
+        len(samples_per_table) == 300
+    ), f"ERROR: AutoFlow dataset should have 300 tables, but found {len(samples_per_table)}."
 
     val_samples = []
     carryover_samples = 0.0
@@ -76,14 +89,14 @@ def main(args: Namespace) -> None:
 
         carryover_samples = num_val_samples_float - num_val_samples
 
-    val_samples.sort(key=lambda x: 1000*int(x.split('_')[1]) + int(x.split('_')[-1]))
-    with open(args.output_file, 'w') as f:
-        f.write('\n'.join(val_samples))
+    val_samples.sort(key=lambda x: 1000 * int(x.split("_")[1]) + int(x.split("_")[-1]))
+    with open(args.output_file, "w") as f:
+        f.write("\n".join(val_samples))
 
-    print(f'Saved {len(val_samples)} sample names to {args.output_file}')
+    print(f"Saved {len(val_samples)} sample names to {args.output_file}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser: ArgumentParser = _init_parser()
     args: Namespace = parser.parse_args()
     main(args)

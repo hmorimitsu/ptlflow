@@ -5,40 +5,39 @@ from .hd3_ops import *
 
 
 class LossCalculator(object):
-
     def __init__(self, task):
-        assert task in ['flow', 'stereo']
+        assert task in ["flow", "stereo"]
         self.task = task
-        self.dim = 1 if task == 'stereo' else 2
+        self.dim = 1 if task == "stereo" else 2
 
     def __call__(self, outputs, inputs):
-        ms_prob = outputs['ms_prob']
-        ms_pred = outputs['ms_pred']
-        corr_range = outputs['corr_range']
-        ds = outputs['downsample']
-        gt = inputs['flows'][:, 0]
+        ms_prob = outputs["ms_prob"]
+        ms_pred = outputs["ms_pred"]
+        corr_range = outputs["corr_range"]
+        ds = outputs["downsample"]
+        gt = inputs["flows"][:, 0]
         B, C, H, W = gt.size()
         lv = len(ms_prob)
-        criterion = nn.KLDivLoss(reduction='batchmean').to(device=gt.device)
+        criterion = nn.KLDivLoss(reduction="batchmean").to(device=gt.device)
         losses = {}
         kld_loss = 0
         for l in range(lv):
-            scaled_gt, valid_mask = downsample_flow(gt, 1 / 2**(ds - l))
-            if self.task == 'stereo':
+            scaled_gt, valid_mask = downsample_flow(gt, 1 / 2 ** (ds - l))
+            if self.task == "stereo":
                 scaled_gt = scaled_gt[:, 0, :, :].unsqueeze(1)
             if l > 0:
                 scaled_gt = scaled_gt - F.interpolate(
-                    ms_pred[l - 1],
-                    scale_factor=2,
-                    mode='bilinear',
-                    align_corners=True)
-            scaled_gt = scaled_gt / 2**(ds - l)
-            gt_dist = vector2density(scaled_gt, corr_range[l],
-                                     self.dim) * valid_mask
-            kld_loss += 4**(ds - l) / (H * W) * criterion(
-                F.log_softmax(ms_prob[l], dim=1), gt_dist.detach())
+                    ms_pred[l - 1], scale_factor=2, mode="bilinear", align_corners=True
+                )
+            scaled_gt = scaled_gt / 2 ** (ds - l)
+            gt_dist = vector2density(scaled_gt, corr_range[l], self.dim) * valid_mask
+            kld_loss += (
+                4 ** (ds - l)
+                / (H * W)
+                * criterion(F.log_softmax(ms_prob[l], dim=1), gt_dist.detach())
+            )
 
-        losses['loss'] = kld_loss
+        losses["loss"] = kld_loss
         for loss_type, loss_value in losses.items():
             losses[loss_type] = loss_value.reshape(1)
         return losses

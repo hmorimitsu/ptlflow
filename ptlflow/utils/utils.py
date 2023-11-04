@@ -38,11 +38,7 @@ class InputPadder(_InputPadder):
     """
 
     def __init__(
-        self,
-        dims: Sequence[int],
-        stride: int,
-        two_side_pad=True,
-        pad_mode='replicate'
+        self, dims: Sequence[int], stride: int, two_side_pad=True, pad_mode="replicate"
     ) -> None:
         """Initialize InputPadder.
 
@@ -55,7 +51,9 @@ class InputPadder(_InputPadder):
             The number to compute the amount of padding. The padding will be applied so that the input size is divisible
             by stride.
         """
-        super().__init__(dims, stride=stride, two_side_pad=two_side_pad, pad_mode=pad_mode)
+        super().__init__(
+            dims, stride=stride, two_side_pad=two_side_pad, pad_mode=pad_mode
+        )
 
     def fill(self, x):
         return self.pad(x)
@@ -65,8 +63,7 @@ class InputPadder(_InputPadder):
 
 
 class InputInterpolator(object):
-    """Bilinearly interpolate images such that dimensions are divisible by stride.
-    """
+    """Bilinearly interpolate images such that dimensions are divisible by stride."""
 
     def __init__(
         self,
@@ -93,9 +90,9 @@ class InputInterpolator(object):
             x = x.view(-1, *in_shape[-3:])
         new_size = (
             int(math.ceil(float(x.shape[-2]) / self.stride)) * self.stride,
-            int(math.ceil(float(x.shape[-1]) / self.stride)) * self.stride
+            int(math.ceil(float(x.shape[-1]) / self.stride)) * self.stride,
         )
-        x = F.interpolate(x, size=new_size, mode='bilinear', align_corners=True)
+        x = F.interpolate(x, size=new_size, mode="bilinear", align_corners=True)
         if len(in_shape) > 4:
             x = x.view(*in_shape[:-2], *x.shape[-2:])
         return x
@@ -104,7 +101,7 @@ class InputInterpolator(object):
         in_shape = x.shape
         if len(in_shape) > 4:
             x = x.view(-1, *in_shape[-3:])
-        x = F.interpolate(x, size=self.dims[-2:], mode='bilinear', align_corners=True)
+        x = F.interpolate(x, size=self.dims[-2:], mode="bilinear", align_corners=True)
         if len(in_shape) > 4:
             x = x.view(*in_shape[:-2], *x.shape[-2:])
         return x
@@ -118,8 +115,8 @@ class InputScaler(object):
         orig_shape: Tuple[int, int],
         size: Optional[Tuple[int, int]] = None,
         scale_factor: Optional[float] = 1.0,
-        interpolation_mode: str = 'bilinear',
-        interpolation_align_corners: bool = False
+        interpolation_mode: str = "bilinear",
+        interpolation_align_corners: bool = False,
     ) -> None:
         """Initialize InputScaler.
 
@@ -153,11 +150,7 @@ class InputScaler(object):
         self.interpolation_mode = interpolation_mode
         self.interpolation_align_corners = interpolation_align_corners
 
-    def scale(
-        self,
-        x: torch.Tensor,
-        is_flow: bool = False
-    ) -> torch.Tensor:
+    def scale(self, x: torch.Tensor, is_flow: bool = False) -> torch.Tensor:
         """Scale the input to the target size specified during initialization.
 
         Parameters
@@ -174,11 +167,7 @@ class InputScaler(object):
         """
         return self._scale_keep_dims(x, (self.tgt_height, self.tgt_width), is_flow)
 
-    def unscale(
-        self,
-        x: torch.Tensor,
-        is_flow: bool = False
-    ) -> torch.Tensor:
+    def unscale(self, x: torch.Tensor, is_flow: bool = False) -> torch.Tensor:
         """Scale the input to back to the original size defined during initialization.
 
         Parameters
@@ -196,10 +185,7 @@ class InputScaler(object):
         return self._scale_keep_dims(x, (self.orig_height, self.orig_width), is_flow)
 
     def _scale_keep_dims(
-        self,
-        x: torch.Tensor,
-        size: Tuple[int, int],
-        is_flow: bool
+        self, x: torch.Tensor, size: Tuple[int, int], is_flow: bool
     ) -> torch.Tensor:
         """Scale the input to a given size while keeping the other dimensions intact.
 
@@ -220,8 +206,11 @@ class InputScaler(object):
         x_shape = x.shape
         x = x.view(-1, x.shape[-3], x.shape[-2], x.shape[-1])
         x = F.interpolate(
-            x, size=size, mode=self.interpolation_mode,
-            align_corners=self.interpolation_align_corners)
+            x,
+            size=size,
+            mode=self.interpolation_mode,
+            align_corners=self.interpolation_align_corners,
+        )
 
         if is_flow:
             x[:, 0] = x[:, 0] * (float(x.shape[-1]) / x_shape[-1])
@@ -234,8 +223,7 @@ class InputScaler(object):
 
 
 def add_datasets_to_parser(
-    parser: ArgumentParser,
-    dataset_config_path: str
+    parser: ArgumentParser, dataset_config_path: str
 ) -> ArgumentParser:
     """Add dataset paths as parser arguments.
 
@@ -253,27 +241,30 @@ def add_datasets_to_parser(
     ArgumentParser
         The updated parser.
     """
-    with open(dataset_config_path, 'r') as f:
+    with open(dataset_config_path, "r") as f:
         dataset_paths = yaml.safe_load(f)
     for name, path in dataset_paths.items():
         parser.add_argument(
-            f'--{name}_root_dir', type=str, default=path,
-            help=f'Path to the root of the {name} dataset')
+            f"--{name}_root_dir",
+            type=str,
+            default=path,
+            help=f"Path to the root of the {name} dataset",
+        )
     return parser
 
 
 def config_logging() -> None:
     """Initialize logging parameters."""
-    log_dir = Path('ptlflow_logs')
+    log_dir = Path("ptlflow_logs")
     log_dir.mkdir(exist_ok=True)
     logging.basicConfig(
-        format='%(asctime)s - %(levelname)s: %(message)s',
-        datefmt='%m/%d/%Y %H:%M:%S',
+        format="%(asctime)s - %(levelname)s: %(message)s",
+        datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO,
         handlers=[
-            logging.FileHandler(log_dir / 'log_run.txt'),
-            logging.StreamHandler()
-        ]
+            logging.FileHandler(log_dir / "log_run.txt"),
+            logging.StreamHandler(),
+        ],
     )
 
 
@@ -306,10 +297,7 @@ def get_list_of_available_models_list() -> List[str]:
     return sorted(ptlflow.models_dict.keys())
 
 
-def make_divisible(
-    v: int,
-    div: int
-) -> int:
+def make_divisible(v: int, div: int) -> int:
     """Decrease a number v until it is divisible by div.
 
     Parameters
@@ -327,9 +315,7 @@ def make_divisible(
     return max(div, v - (v % div))
 
 
-def release_gpu(
-    tensors_dict: Dict[str, Any]
-) -> Dict[str, Any]:
+def release_gpu(tensors_dict: Dict[str, Any]) -> Dict[str, Any]:
     """Detach and move to cpu the tensors from the input dict.
 
     The non-tensor elements are kept intact.
@@ -352,8 +338,7 @@ def release_gpu(
 
 
 def tensor_dict_to_numpy(
-    tensor_dict: Dict[str, torch.Tensor],
-    padder: Optional[InputPadder] = None
+    tensor_dict: Dict[str, torch.Tensor], padder: Optional[InputPadder] = None
 ) -> Dict[str, np.ndarray]:
     """Convert all tensors into numpy format, changing the shape from CHW to HWC.
 

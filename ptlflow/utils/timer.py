@@ -56,11 +56,7 @@ class Timer(object):
       inner_op: 1000.0 (1000.0) ms
     """
 
-    def __init__(
-        self,
-        name: str,
-        indent_level: int = 0
-    ) -> None:
+    def __init__(self, name: str, indent_level: int = 0) -> None:
         """Initialize the Timer.
 
         Parameters
@@ -94,7 +90,7 @@ class Timer(object):
         if torch is not None and torch.cuda.is_available():
             torch.cuda.synchronize()
         self.end = time.perf_counter()
-        assert self.has_tic, 'toc called without tic'
+        assert self.has_tic, "toc called without tic"
         if self.num_tocs > 0:
             self.total_time += self.end - self.start
         self.has_tic = False
@@ -109,7 +105,7 @@ class Timer(object):
             The average time in milliseconds.
         """
         num_tocs = self.num_global_tocs if self.num_global_tocs > 0 else self.num_tocs
-        return self.total() / max(1, num_tocs-1)
+        return self.total() / max(1, num_tocs - 1)
 
     def total(self) -> float:
         """Return the total time since the last reset().
@@ -167,11 +163,7 @@ class TimerManager(object):
     Timer : The timers that are managed.
     """
 
-    def __init__(
-        self,
-        log_id: str = 'timer',
-        log_path: str = 'timer_log.txt'
-    ) -> None:
+    def __init__(self, log_id: str = "timer", log_path: str = "timer_log.txt") -> None:
         """Initialize the TimerManager.
 
         Parameters
@@ -203,10 +195,7 @@ class TimerManager(object):
         for _, t in self.timers.items():
             t.reset()
 
-    def write_to_log(
-        self,
-        header: str = ''
-    ) -> None:
+    def write_to_log(self, header: str = "") -> None:
         """Write the timers to the log file.
 
         Parameters
@@ -223,14 +212,11 @@ class TimerManager(object):
     def _init_logger(self) -> None:
         self.logger = logging.getLogger(self.log_id)
         self.logger.setLevel(logging.INFO)
-        fh = logging.FileHandler(self.log_path, mode='w')
+        fh = logging.FileHandler(self.log_path, mode="w")
         fh.setLevel(logging.INFO)
         self.logger.addHandler(fh)
 
-    def __getitem__(
-        self,
-        key: Union[str, Tuple[str, int]]
-    ) -> None:
+    def __getitem__(self, key: Union[str, Tuple[str, int]]) -> None:
         indent_level = 0
         if isinstance(key, tuple) or isinstance(key, list):
             indent_level = key[1]
@@ -240,9 +226,9 @@ class TimerManager(object):
         return self.timers[key]
 
     def __repr__(self) -> str:
-        ret = ''
+        ret = ""
         for _, t in self.timers.items():
-            ret += t.__repr__() + '\n'
+            ret += t.__repr__() + "\n"
         return ret
 
     def __str__(self) -> str:

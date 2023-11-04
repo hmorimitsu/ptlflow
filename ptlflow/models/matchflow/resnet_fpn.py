@@ -3,12 +3,16 @@ import torch.nn as nn
 
 def conv1x1(in_planes, out_planes, stride=1):
     """1x1 convolution without padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, padding=0, bias=False)
+    return nn.Conv2d(
+        in_planes, out_planes, kernel_size=1, stride=stride, padding=0, bias=False
+    )
 
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False)
+    return nn.Conv2d(
+        in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False
+    )
 
 
 class BasicBlock(nn.Module):
@@ -25,8 +29,7 @@ class BasicBlock(nn.Module):
             self.downsample = None
         else:
             self.downsample = nn.Sequential(
-                conv1x1(in_planes, planes, stride=stride),
-                nn.BatchNorm2d(planes)
+                conv1x1(in_planes, planes, stride=stride), nn.BatchNorm2d(planes)
             )
 
     def forward(self, x):
@@ -37,7 +40,7 @@ class BasicBlock(nn.Module):
         if self.downsample is not None:
             x = self.downsample(x)
 
-        return self.relu(x+y)
+        return self.relu(x + y)
 
 
 class ResNetFPN_8_2(nn.Module):
@@ -60,7 +63,9 @@ class ResNetFPN_8_2(nn.Module):
         self.initial_dim = initial_dim
 
         # Networks
-        self.conv1 = nn.Conv2d(3, initial_dim, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv2d(
+            3, initial_dim, kernel_size=7, stride=2, padding=3, bias=False
+        )
         self.bn1 = nn.BatchNorm2d(initial_dim)
 
         self.relu = nn.ReLU(inplace=True)
@@ -74,7 +79,7 @@ class ResNetFPN_8_2(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)

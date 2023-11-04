@@ -4,34 +4,36 @@ import torchvision.transforms.functional as TF
 
 
 class ResidualBlock(nn.Module):
-    def __init__(self, in_planes, planes, norm_fn='group', stride=1):
+    def __init__(self, in_planes, planes, norm_fn="group", stride=1):
         super(ResidualBlock, self).__init__()
 
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, padding=1, stride=stride)
+        self.conv1 = nn.Conv2d(
+            in_planes, planes, kernel_size=3, padding=1, stride=stride
+        )
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding=1)
         self.relu = nn.ReLU(inplace=True)
 
         num_groups = planes // 8
 
-        if norm_fn == 'group':
+        if norm_fn == "group":
             self.norm1 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
             self.norm2 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
             if not stride == 1:
                 self.norm3 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
 
-        elif norm_fn == 'batch':
+        elif norm_fn == "batch":
             self.norm1 = nn.BatchNorm2d(planes)
             self.norm2 = nn.BatchNorm2d(planes)
             if not stride == 1:
                 self.norm3 = nn.BatchNorm2d(planes)
 
-        elif norm_fn == 'instance':
+        elif norm_fn == "instance":
             self.norm1 = nn.InstanceNorm2d(planes)
             self.norm2 = nn.InstanceNorm2d(planes)
             if not stride == 1:
                 self.norm3 = nn.InstanceNorm2d(planes)
 
-        elif norm_fn == 'none':
+        elif norm_fn == "none":
             self.norm1 = nn.Sequential()
             self.norm2 = nn.Sequential()
             if not stride == 1:
@@ -42,7 +44,8 @@ class ResidualBlock(nn.Module):
 
         else:
             self.downsample = nn.Sequential(
-                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm3)
+                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm3
+            )
 
     def forward(self, x):
         y = x
@@ -53,42 +56,44 @@ class ResidualBlock(nn.Module):
         if x.shape[1] != y.shape[1]:  # for the uplayers.
             return y
 
-        return self.relu(x+y)
+        return self.relu(x + y)
 
 
 class BottleneckBlock(nn.Module):
-    def __init__(self, in_planes, planes, norm_fn='group', stride=1):
+    def __init__(self, in_planes, planes, norm_fn="group", stride=1):
         super(BottleneckBlock, self).__init__()
 
-        self.conv1 = nn.Conv2d(in_planes, planes//4, kernel_size=1, padding=0)
-        self.conv2 = nn.Conv2d(planes//4, planes//4, kernel_size=3, padding=1, stride=stride)
-        self.conv3 = nn.Conv2d(planes//4, planes, kernel_size=1, padding=0)
+        self.conv1 = nn.Conv2d(in_planes, planes // 4, kernel_size=1, padding=0)
+        self.conv2 = nn.Conv2d(
+            planes // 4, planes // 4, kernel_size=3, padding=1, stride=stride
+        )
+        self.conv3 = nn.Conv2d(planes // 4, planes, kernel_size=1, padding=0)
         self.relu = nn.ReLU(inplace=True)
 
         num_groups = planes // 8
 
-        if norm_fn == 'group':
-            self.norm1 = nn.GroupNorm(num_groups=num_groups, num_channels=planes//4)
-            self.norm2 = nn.GroupNorm(num_groups=num_groups, num_channels=planes//4)
+        if norm_fn == "group":
+            self.norm1 = nn.GroupNorm(num_groups=num_groups, num_channels=planes // 4)
+            self.norm2 = nn.GroupNorm(num_groups=num_groups, num_channels=planes // 4)
             self.norm3 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
             if not stride == 1:
                 self.norm4 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
 
-        elif norm_fn == 'batch':
-            self.norm1 = nn.BatchNorm2d(planes//4)
-            self.norm2 = nn.BatchNorm2d(planes//4)
+        elif norm_fn == "batch":
+            self.norm1 = nn.BatchNorm2d(planes // 4)
+            self.norm2 = nn.BatchNorm2d(planes // 4)
             self.norm3 = nn.BatchNorm2d(planes)
             if not stride == 1:
                 self.norm4 = nn.BatchNorm2d(planes)
 
-        elif norm_fn == 'instance':
-            self.norm1 = nn.InstanceNorm2d(planes//4)
-            self.norm2 = nn.InstanceNorm2d(planes//4)
+        elif norm_fn == "instance":
+            self.norm1 = nn.InstanceNorm2d(planes // 4)
+            self.norm2 = nn.InstanceNorm2d(planes // 4)
             self.norm3 = nn.InstanceNorm2d(planes)
             if not stride == 1:
                 self.norm4 = nn.InstanceNorm2d(planes)
 
-        elif norm_fn == 'none':
+        elif norm_fn == "none":
             self.norm1 = nn.Sequential()
             self.norm2 = nn.Sequential()
             self.norm3 = nn.Sequential()
@@ -100,7 +105,8 @@ class BottleneckBlock(nn.Module):
 
         else:
             self.downsample = nn.Sequential(
-                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm4)
+                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm4
+            )
 
     def forward(self, x):
         y = x
@@ -111,24 +117,24 @@ class BottleneckBlock(nn.Module):
         if self.downsample is not None:
             x = self.downsample(x)
 
-        return self.relu(x+y)
+        return self.relu(x + y)
 
 
 class BasicEncoder(nn.Module):
-    def __init__(self, output_dim=128, norm_fn='group'):
+    def __init__(self, output_dim=128, norm_fn="group"):
         super(BasicEncoder, self).__init__()
         self.norm_fn = norm_fn
 
-        if self.norm_fn == 'group':
+        if self.norm_fn == "group":
             self.norm1 = nn.GroupNorm(num_groups=8, num_channels=64)
 
-        elif self.norm_fn == 'batch':
+        elif self.norm_fn == "batch":
             self.norm1 = nn.BatchNorm2d(64)
 
-        elif self.norm_fn == 'instance':
+        elif self.norm_fn == "instance":
             self.norm1 = nn.InstanceNorm2d(64)
 
-        elif self.norm_fn == 'none':
+        elif self.norm_fn == "none":
             self.norm1 = nn.Sequential()
 
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
@@ -151,7 +157,7 @@ class BasicEncoder(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
             elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
                 if m.weight is not None:
                     nn.init.constant_(m.weight, 1)
@@ -215,16 +221,16 @@ class BasicEncoder(nn.Module):
 
 
 class Basic_Context_Encoder(nn.Module):
-    def __init__(self, output_dim=256, norm_fn='group'):
+    def __init__(self, output_dim=256, norm_fn="group"):
         super(Basic_Context_Encoder, self).__init__()
         self.norm_fn = norm_fn
-        if self.norm_fn == 'group':
+        if self.norm_fn == "group":
             self.norm1 = nn.GroupNorm(num_groups=8, num_channels=64)
-        elif self.norm_fn == 'batch':
+        elif self.norm_fn == "batch":
             self.norm1 = nn.BatchNorm2d(64)
-        elif self.norm_fn == 'instance':
+        elif self.norm_fn == "instance":
             self.norm1 = nn.InstanceNorm2d(64)
-        elif self.norm_fn == 'none':
+        elif self.norm_fn == "none":
             self.norm1 = nn.Sequential()
 
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
@@ -235,8 +241,12 @@ class Basic_Context_Encoder(nn.Module):
         self.layer2 = self._make_layer(96, stride=2)
         self.layer3 = self._make_layer(128, stride=2)
 
-        self.layer4 = self._make_layer(160, stride=2)           # 160 for group norm instead of 164
-        self.conv2 = nn.Conv2d(160, output_dim, kernel_size=1)  # 160 for group norm instead of 164
+        self.layer4 = self._make_layer(
+            160, stride=2
+        )  # 160 for group norm instead of 164
+        self.conv2 = nn.Conv2d(
+            160, output_dim, kernel_size=1
+        )  # 160 for group norm instead of 164
         self.in_planes = 256 + 128
         self.up_layer2 = self._make_layer(output_dim, stride=1)
         self.in_planes = 256 + 96
@@ -246,7 +256,7 @@ class Basic_Context_Encoder(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
             elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
                 if m.weight is not None:
                     nn.init.constant_(m.weight, 1)
@@ -262,7 +272,9 @@ class Basic_Context_Encoder(nn.Module):
         return nn.Sequential(*layers)
 
     def _make_modest_layer(self, dim, intermediate_channels, stride=1):
-        layer1 = ResidualBlock(self.in_planes, intermediate_channels, self.norm_fn, stride=stride)
+        layer1 = ResidualBlock(
+            self.in_planes, intermediate_channels, self.norm_fn, stride=stride
+        )
         layer2 = ResidualBlock(intermediate_channels, dim, self.norm_fn, stride=1)
         layers = (layer1, layer2)
 

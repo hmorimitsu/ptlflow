@@ -20,17 +20,17 @@ class SequenceLoss(nn.Module):
         self.max_flow = args.max_flow
 
     def forward(self, outputs, inputs):
-        """ Loss function defined over sequence of flow predictions """
+        """Loss function defined over sequence of flow predictions"""
 
-        flow_preds = outputs['flow_preds']
-        flow_gt = inputs['flows'][:, 0]
-        valid = inputs['valids'][:, 0]
+        flow_preds = outputs["flow_preds"]
+        flow_gt = inputs["flows"][:, 0]
+        valid = inputs["valids"][:, 0]
 
         n_predictions = len(flow_preds)
         flow_loss = 0.0
 
         # exlude invalid pixels and extremely large diplacements
-        mag = torch.sum(flow_gt ** 2, dim=1, keepdim=True).sqrt()
+        mag = torch.sum(flow_gt**2, dim=1, keepdim=True).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
 
         for i in range(n_predictions):
@@ -44,58 +44,61 @@ class SequenceLoss(nn.Module):
 
 class Flow1D(BaseModel):
     pretrained_checkpoints = {
-        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow1d-chairs-75cd85a1.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow1d-things-bcd92815.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow1d-sintel-28a093d3.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow1d-kitti-803a0181.ckpt',
-        'highres': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow1d-highres-7ab476dc.ckpt',
+        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow1d-chairs-75cd85a1.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow1d-things-bcd92815.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow1d-sintel-28a093d3.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow1d-kitti-803a0181.ckpt",
+        "highres": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow1d-highres-7ab476dc.ckpt",
     }
 
-    def __init__(self,
-                 args: Namespace) -> None:
-        super().__init__(
-            args=args,
-            loss_fn=SequenceLoss(args),
-            output_stride=8)
+    def __init__(self, args: Namespace) -> None:
+        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=8)
         # feature network, context network, and update block
-        self.fnet = BasicEncoder(output_dim=self.args.feature_channels, norm_fn='instance',
-                                 )
+        self.fnet = BasicEncoder(
+            output_dim=self.args.feature_channels,
+            norm_fn="instance",
+        )
 
-        self.cnet = BasicEncoder(output_dim=self.args.hidden_dim + self.args.context_dim, norm_fn='batch',
-                                 )
+        self.cnet = BasicEncoder(
+            output_dim=self.args.hidden_dim + self.args.context_dim,
+            norm_fn="batch",
+        )
 
         # 1D attention
         corr_channels = (2 * self.args.corr_radius + 1) * 2
 
-        self.attn_x = Attention1D(self.args.feature_channels,
-                                  y_attention=False,
-                                  double_cross_attn=True,
-                                  )
-        self.attn_y = Attention1D(self.args.feature_channels,
-                                  y_attention=True,
-                                  double_cross_attn=True,
-                                  )
+        self.attn_x = Attention1D(
+            self.args.feature_channels,
+            y_attention=False,
+            double_cross_attn=True,
+        )
+        self.attn_y = Attention1D(
+            self.args.feature_channels,
+            y_attention=True,
+            double_cross_attn=True,
+        )
 
         # Update block
-        self.update_block = BasicUpdateBlock(corr_channels=corr_channels,
-                                             hidden_dim=self.args.hidden_dim,
-                                             context_dim=self.args.context_dim,
-                                             downsample_factor=self.args.downsample_factor,
-                                             )
+        self.update_block = BasicUpdateBlock(
+            corr_channels=corr_channels,
+            hidden_dim=self.args.hidden_dim,
+            context_dim=self.args.context_dim,
+            downsample_factor=self.args.downsample_factor,
+        )
 
     @staticmethod
     def add_model_specific_args(parent_parser=None):
         parent_parser = BaseModel.add_model_specific_args(parent_parser)
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument('--downsample_factor', type=int, default=8)
-        parser.add_argument('--feature_channels', type=int, default=256)
-        parser.add_argument('--hidden_dim', type=int, default=128)
-        parser.add_argument('--context_dim', type=int, default=128)
-        parser.add_argument('--corr_radius', type=int, default=32)
-        parser.add_argument('--iters', type=int, default=12)
-        parser.add_argument('--mixed_precision', action='store_true')
-        parser.add_argument('--gamma', type=float, default=0.8)
-        parser.add_argument('--max_flow', type=float, default=400)
+        parser.add_argument("--downsample_factor", type=int, default=8)
+        parser.add_argument("--feature_channels", type=int, default=256)
+        parser.add_argument("--hidden_dim", type=int, default=128)
+        parser.add_argument("--context_dim", type=int, default=128)
+        parser.add_argument("--corr_radius", type=int, default=32)
+        parser.add_argument("--iters", type=int, default=12)
+        parser.add_argument("--mixed_precision", action="store_true")
+        parser.add_argument("--gamma", type=float, default=0.8)
+        parser.add_argument("--max_flow", type=float, default=400)
         return parser
 
     def freeze_bn(self):
@@ -104,19 +107,27 @@ class Flow1D(BaseModel):
                 m.eval()
 
     def initialize_flow(self, img, downsample=None):
-        """ Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
+        """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         n, c, h, w = img.shape
-        downsample_factor = self.args.downsample_factor if downsample is None else downsample
-        coords0 = coords_grid(n, h // downsample_factor, w // downsample_factor, dtype=img.dtype).to(img.device)
-        coords1 = coords_grid(n, h // downsample_factor, w // downsample_factor, dtype=img.dtype).to(img.device)
+        downsample_factor = (
+            self.args.downsample_factor if downsample is None else downsample
+        )
+        coords0 = coords_grid(
+            n, h // downsample_factor, w // downsample_factor, dtype=img.dtype
+        ).to(img.device)
+        coords1 = coords_grid(
+            n, h // downsample_factor, w // downsample_factor, dtype=img.dtype
+        ).to(img.device)
 
         # optical flow computed as difference: flow = coords1 - coords0
         return coords0, coords1
 
     def learned_upflow(self, flow, mask):
-        """ Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination """
+        """Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination"""
         n, _, h, w = flow.shape
-        mask = mask.view(n, 1, 9, self.args.downsample_factor, self.args.downsample_factor, h, w)
+        mask = mask.view(
+            n, 1, 9, self.args.downsample_factor, self.args.downsample_factor, h, w
+        )
         mask = torch.softmax(mask, dim=2)
 
         up_flow = F.unfold(self.args.downsample_factor * flow, [3, 3], padding=1)
@@ -124,12 +135,14 @@ class Flow1D(BaseModel):
 
         up_flow = torch.sum(mask * up_flow, dim=2)
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
-        return up_flow.reshape(n, 2, self.args.downsample_factor * h, self.args.downsample_factor * w)
+        return up_flow.reshape(
+            n, 2, self.args.downsample_factor * h, self.args.downsample_factor * w
+        )
 
     def forward(self, inputs, flow_init=None):
-        """ Estimate optical flow between pair of frames """
-        image1 = inputs['images'][:, 0]
-        image2 = inputs['images'][:, 1]
+        """Estimate optical flow between pair of frames"""
+        image1 = inputs["images"][:, 0]
+        image2 = inputs["images"][:, 1]
 
         image1 = 2 * image1 - 1.0
         image2 = 2 * image2 - 1.0
@@ -148,16 +161,20 @@ class Flow1D(BaseModel):
 
         # 1D correlation
         feature2_x, attn_x = self.attn_x(feature1, feature2, position)
-        corr_fn_y = Correlation1D(feature1, feature2_x,
-                                  radius=self.args.corr_radius,
-                                  x_correlation=False,
-                                  )
+        corr_fn_y = Correlation1D(
+            feature1,
+            feature2_x,
+            radius=self.args.corr_radius,
+            x_correlation=False,
+        )
 
         feature2_y, attn_y = self.attn_y(feature1, feature2, position)
-        corr_fn_x = Correlation1D(feature1, feature2_y,
-                                  radius=self.args.corr_radius,
-                                  x_correlation=True,
-                                  )
+        corr_fn_x = Correlation1D(
+            feature1,
+            feature2_y,
+            radius=self.args.corr_radius,
+            x_correlation=True,
+        )
 
         # run the context network
         cnet = self.cnet(image1)  # list of feature pyramid, low scale to high scale
@@ -181,9 +198,13 @@ class Flow1D(BaseModel):
 
             flow = coords1 - coords0
 
-            net, up_mask, delta_flow = self.update_block(net, inp, corr, flow,
-                                                         upsample=(self.training or itr == self.args.iters - 1),
-                                                         )
+            net, up_mask, delta_flow = self.update_block(
+                net,
+                inp,
+                corr,
+                flow,
+                upsample=(self.training or itr == self.args.iters - 1),
+            )
 
             coords1 = coords1 + delta_flow
 
@@ -195,14 +216,8 @@ class Flow1D(BaseModel):
                 flow_up = self.learned_upflow(coords1 - coords0, up_mask)
 
         if self.training:
-            outputs = {
-                'flows': flow_up[:, None],
-                'flow_preds': flow_predictions
-            }
+            outputs = {"flows": flow_up[:, None], "flow_preds": flow_predictions}
         else:
-            outputs = {
-                'flows': flow_up[:, None],
-                'flow_small': coords1 - coords0
-            }
-            
+            outputs = {"flows": flow_up[:, None], "flow_small": coords1 - coords0}
+
         return outputs

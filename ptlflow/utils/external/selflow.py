@@ -30,20 +30,20 @@ import numpy as np
 
 
 def write_pfm(output_path, flow, scale=1):
-    with open(output_path, 'wb') as file:
-        if flow.dtype.name != 'float32':
-            raise TypeError('flow dtype must be float32.')
+    with open(output_path, "wb") as file:
+        if flow.dtype.name != "float32":
+            raise TypeError("flow dtype must be float32.")
         if not (len(flow.shape) == 3 and flow.shape[2] == 2):
-            raise ValueError('flow must have H x W x 2 shape.')
+            raise ValueError("flow must have H x W x 2 shape.")
 
-        file.write(b'PF\n')
-        file.write(b'%d %d\n' % (flow.shape[1], flow.shape[0]))
+        file.write(b"PF\n")
+        file.write(b"%d %d\n" % (flow.shape[1], flow.shape[0]))
 
         endian = flow.dtype.byteorder
-        if endian == '<' or endian == '=' and sys.byteorder == 'little':
+        if endian == "<" or endian == "=" and sys.byteorder == "little":
             scale = -scale
 
-        file.write(b'%f\n' % scale)
+        file.write(b"%f\n" % scale)
 
         invalid = np.isnan(flow[..., 0]) | np.isnan(flow[..., 1])
         flow = np.dstack([flow, invalid.astype(np.float32)])

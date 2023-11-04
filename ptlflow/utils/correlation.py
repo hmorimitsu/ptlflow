@@ -38,7 +38,7 @@ def iter_spatial_correlation_sample(
     stride: Union[int, Tuple[int, int]] = 1,
     padding: Union[int, Tuple[int, int]] = 0,
     dilation: Union[int, Tuple[int, int]] = 1,
-    dilation_patch: Union[int, Tuple[int, int]] = 1
+    dilation_patch: Union[int, Tuple[int, int]] = 1,
 ) -> torch.Tensor:
     """Apply spatial correlation sampling from input1 to input2 using iteration in PyTorch.
 
@@ -79,17 +79,23 @@ def iter_spatial_correlation_sample(
         If dilation != 1.
     """
     # Make inputs be tuples
-    kernel_size = (kernel_size, kernel_size) if isinstance(kernel_size, int) else kernel_size
+    kernel_size = (
+        (kernel_size, kernel_size) if isinstance(kernel_size, int) else kernel_size
+    )
     patch_size = (patch_size, patch_size) if isinstance(patch_size, int) else patch_size
     stride = (stride, stride) if isinstance(stride, int) else stride
     padding = (padding, padding) if isinstance(padding, int) else padding
     dilation = (dilation, dilation) if isinstance(dilation, int) else dilation
-    dilation_patch = (dilation_patch, dilation_patch) if isinstance(dilation_patch, int) else dilation_patch
+    dilation_patch = (
+        (dilation_patch, dilation_patch)
+        if isinstance(dilation_patch, int)
+        else dilation_patch
+    )
 
     if kernel_size[0] != 1 or kernel_size[1] != 1:
-        raise NotImplementedError('Only kernel_size=1 is supported.')
+        raise NotImplementedError("Only kernel_size=1 is supported.")
     if dilation[0] != 1 or dilation[1] != 1:
-        raise NotImplementedError('Only dilation=1 is supported.')
+        raise NotImplementedError("Only dilation=1 is supported.")
 
     if max(padding) > 0:
         input1 = F.pad(input1, (padding[1], padding[1], padding[0], padding[0]))
@@ -102,19 +108,23 @@ def iter_spatial_correlation_sample(
             dilation_patch[1] * (patch_size[1] // 2),
             dilation_patch[0] * ((patch_size[0] - 1) // 2),
             dilation_patch[0] * (patch_size[0] // 2),
-        )
+        ),
     )
 
     b, _, h, w = input1.shape
-    input1 = input1[:, :, ::stride[0], ::stride[1]]
+    input1 = input1[:, :, :: stride[0], :: stride[1]]
     sh, sw = input1.shape[2:4]
-    corr = torch.zeros(b, patch_size[0], patch_size[1], sh, sw).to(dtype=input1.dtype, device=input1.device)
+    corr = torch.zeros(b, patch_size[0], patch_size[1], sh, sw).to(
+        dtype=input1.dtype, device=input1.device
+    )
 
-    for i in range(0, patch_size[0]*dilation_patch[0], dilation_patch[0]):
-        for j in range(0, patch_size[1]*dilation_patch[1], dilation_patch[1]):
-            p2 = input2[:, :, i:i+h, j:j+w]
-            p2 = p2[:, :, ::stride[0], ::stride[1]]
-            corr[:, i//dilation_patch[0], j//dilation_patch[1]] = (input1 * p2).sum(dim=1)
+    for i in range(0, patch_size[0] * dilation_patch[0], dilation_patch[0]):
+        for j in range(0, patch_size[1] * dilation_patch[1], dilation_patch[1]):
+            p2 = input2[:, :, i : i + h, j : j + w]
+            p2 = p2[:, :, :: stride[0], :: stride[1]]
+            corr[:, i // dilation_patch[0], j // dilation_patch[1]] = (input1 * p2).sum(
+                dim=1
+            )
 
     return corr
 
@@ -129,7 +139,7 @@ class IterSpatialCorrelationSampler(nn.Module):
         stride: Union[int, Tuple[int, int]] = 1,
         padding: Union[int, Tuple[int, int]] = 0,
         dilation: Union[int, Tuple[int, int]] = 1,
-        dilation_patch: Union[int, Tuple[int, int]] = 1
+        dilation_patch: Union[int, Tuple[int, int]] = 1,
     ) -> None:
         """Initialize IterSpatialCorrelationSampler.
 
@@ -156,11 +166,7 @@ class IterSpatialCorrelationSampler(nn.Module):
         self.dilation = dilation
         self.dilation_patch = dilation_patch
 
-    def forward(
-        self,
-        input1: torch.Tensor,
-        input2: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, input1: torch.Tensor, input2: torch.Tensor) -> torch.Tensor:
         """Compute the correlation sampling from input1 to input2.
 
         Parameters
@@ -176,8 +182,15 @@ class IterSpatialCorrelationSampler(nn.Module):
             Result of correlation sampling.
         """
         return iter_spatial_correlation_sample(
-            input1=input1, input2=input2, kernel_size=self.kernel_size, patch_size=self.patch_size, stride=self.stride,
-            padding=self.padding, dilation=self.dilation, dilation_patch=self.dilation_patch)
+            input1=input1,
+            input2=input2,
+            kernel_size=self.kernel_size,
+            patch_size=self.patch_size,
+            stride=self.stride,
+            padding=self.padding,
+            dilation=self.dilation,
+            dilation_patch=self.dilation_patch,
+        )
 
 
 def _init_coords_grid(flow: torch.Tensor) -> torch.Tensor:
@@ -196,8 +209,10 @@ def _init_coords_grid(flow: torch.Tensor) -> torch.Tensor:
         The grid with the 2D coordinates of the pixels.
     """
     b, _, h, w = flow.shape
-    coords_grid = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
-    coords_grid = torch.stack(coords_grid[::-1], dim=0).to(dtype=flow.dtype, device=flow.device)
+    coords_grid = torch.meshgrid(torch.arange(h), torch.arange(w), indexing="ij")
+    coords_grid = torch.stack(coords_grid[::-1], dim=0).to(
+        dtype=flow.dtype, device=flow.device
+    )
     coords_grid = coords_grid[None].repeat(b, 1, 1, 1)
     return coords_grid
 
@@ -212,7 +227,7 @@ def iter_translated_spatial_correlation_sample(
     padding: Union[int, Tuple[int, int]] = 0,
     dilation: Union[int, Tuple[int, int]] = 1,
     dilation_patch: Union[int, Tuple[int, int]] = 1,
-    coords_grid: Optional[torch.Tensor] = None
+    coords_grid: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     """Apply spatial correlation sampling with translation from input1 to input2 using iteration in PyTorch.
 
@@ -264,26 +279,34 @@ def iter_translated_spatial_correlation_sample(
         If dilation != 1.
     """
     # Make inputs be tuples
-    kernel_size = (kernel_size, kernel_size) if isinstance(kernel_size, int) else kernel_size
+    kernel_size = (
+        (kernel_size, kernel_size) if isinstance(kernel_size, int) else kernel_size
+    )
     patch_size = (patch_size, patch_size) if isinstance(patch_size, int) else patch_size
     stride = (stride, stride) if isinstance(stride, int) else stride
     padding = (padding, padding) if isinstance(padding, int) else padding
     dilation = (dilation, dilation) if isinstance(dilation, int) else dilation
-    dilation_patch = (dilation_patch, dilation_patch) if isinstance(dilation_patch, int) else dilation_patch
+    dilation_patch = (
+        (dilation_patch, dilation_patch)
+        if isinstance(dilation_patch, int)
+        else dilation_patch
+    )
 
     if kernel_size[0] != 1 or kernel_size[1] != 1:
-        raise NotImplementedError('Only kernel_size=1 is supported.')
+        raise NotImplementedError("Only kernel_size=1 is supported.")
     if dilation[0] != 1 or dilation[1] != 1:
-        raise NotImplementedError('Only dilation=1 is supported.')
+        raise NotImplementedError("Only dilation=1 is supported.")
 
     if max(padding) > 0:
         input1 = F.pad(input1, (padding[1], padding[1], padding[0], padding[0]))
         input2 = F.pad(input2, (padding[1], padding[1], padding[0], padding[0]))
 
     b, _, h, w = input1.shape
-    input1 = input1[:, :, ::stride[0], ::stride[1]]
+    input1 = input1[:, :, :: stride[0], :: stride[1]]
     sh, sw = input1.shape[2:4]
-    corr = torch.zeros(b, patch_size[0], patch_size[1], sh, sw).to(dtype=input1.dtype, device=input1.device)
+    corr = torch.zeros(b, patch_size[0], patch_size[1], sh, sw).to(
+        dtype=input1.dtype, device=input1.device
+    )
 
     if coords_grid is None:
         coords_grid = _init_coords_grid(flow)
@@ -294,17 +317,25 @@ def iter_translated_spatial_correlation_sample(
 
     offset = (
         dilation_patch[0] * ((patch_size[0] - 1) // 2),
-        dilation_patch[1] * ((patch_size[1] - 1) // 2)
+        dilation_patch[1] * ((patch_size[1] - 1) // 2),
     )
 
     # for i in range(-interval[0], interval[1], dilation_patch[0]):
     #     for j in range(-interval[2], interval[3], dilation_patch[1]):
-    for i in range(0, patch_size[0]*dilation_patch[0], dilation_patch[0]):
-        for j in range(0, patch_size[1]*dilation_patch[1], dilation_patch[1]):
-            grid = torch.stack([cx + 2 * (j - offset[1]) / float(w - 1), cy + 2 * (i - offset[0]) / float(h - 1)], dim=-1)
-            p2 = F.grid_sample(input2, grid, mode='bilinear', align_corners=True)
-            p2 = p2[:, :, ::stride[0], ::stride[1]]
-            corr[:, i//dilation_patch[0], j//dilation_patch[1]] = (input1 * p2).sum(dim=1)
+    for i in range(0, patch_size[0] * dilation_patch[0], dilation_patch[0]):
+        for j in range(0, patch_size[1] * dilation_patch[1], dilation_patch[1]):
+            grid = torch.stack(
+                [
+                    cx + 2 * (j - offset[1]) / float(w - 1),
+                    cy + 2 * (i - offset[0]) / float(h - 1),
+                ],
+                dim=-1,
+            )
+            p2 = F.grid_sample(input2, grid, mode="bilinear", align_corners=True)
+            p2 = p2[:, :, :: stride[0], :: stride[1]]
+            corr[:, i // dilation_patch[0], j // dilation_patch[1]] = (input1 * p2).sum(
+                dim=1
+            )
 
     return corr
 
@@ -325,7 +356,7 @@ class IterTranslatedSpatialCorrelationSampler(nn.Module):
         stride: Union[int, Tuple[int, int]] = 1,
         padding: Union[int, Tuple[int, int]] = 0,
         dilation: Union[int, Tuple[int, int]] = 1,
-        dilation_patch: Union[int, Tuple[int, int]] = 1
+        dilation_patch: Union[int, Tuple[int, int]] = 1,
     ) -> None:
         """Initialize IterTranslatedSpatialCorrelationSampler.
 
@@ -355,10 +386,7 @@ class IterTranslatedSpatialCorrelationSampler(nn.Module):
         self.coords_grid = None
 
     def forward(
-        self,
-        input1: torch.Tensor,
-        input2: torch.Tensor,
-        flow: torch.Tensor
+        self, input1: torch.Tensor, input2: torch.Tensor, flow: torch.Tensor
     ) -> torch.Tensor:
         """Compute the correlation sampling from input1 to input2.
 
@@ -379,11 +407,24 @@ class IterTranslatedSpatialCorrelationSampler(nn.Module):
             Result of correlation sampling.
         """
         b, _, h, w = flow.shape
-        if self.coords_grid is None or self.coords_grid.shape[2] != h or self.coords_grid.shape[3] != w:
+        if (
+            self.coords_grid is None
+            or self.coords_grid.shape[2] != h
+            or self.coords_grid.shape[3] != w
+        ):
             self.coords_grid = _init_coords_grid(flow)
         if self.coords_grid.shape[0] != b:
             self.coords_grid = self.coords_grid[:1].repeat(b, 1, 1, 1)
 
         return iter_translated_spatial_correlation_sample(
-            input1=input1, input2=input2, flow=flow, kernel_size=self.kernel_size, patch_size=self.patch_size, stride=self.stride,
-            padding=self.padding, dilation=self.dilation, dilation_patch=self.dilation_patch, coords_grid=self.coords_grid)
+            input1=input1,
+            input2=input2,
+            flow=flow,
+            kernel_size=self.kernel_size,
+            patch_size=self.patch_size,
+            stride=self.stride,
+            padding=self.padding,
+            dilation=self.dilation,
+            dilation_patch=self.dilation_patch,
+            coords_grid=self.coords_grid,
+        )

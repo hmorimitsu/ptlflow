@@ -15,12 +15,12 @@ class SequenceLoss(nn.Module):
         self.max_flow = args.max_flow
 
     def forward(self, outputs, inputs):
-        """ Loss function defined over sequence of flow predictions """
+        """Loss function defined over sequence of flow predictions"""
 
-        flow_preds = outputs['flow_preds']
-        flow_gt = inputs['flows'][:, 0]
-        valid = inputs['valids'][:, 0]
-        
+        flow_preds = outputs["flow_preds"]
+        flow_gt = inputs["flows"][:, 0]
+        valid = inputs["valids"][:, 0]
+
         n_predictions = len(flow_preds)
         flow_loss = 0.0
 
@@ -29,7 +29,7 @@ class SequenceLoss(nn.Module):
         valid = (valid >= 0.5) & (mag < self.max_flow)
 
         for i in range(n_predictions):
-            i_weight = self.gamma**(n_predictions - i - 1)
+            i_weight = self.gamma ** (n_predictions - i - 1)
             i_loss = (flow_preds[i] - flow_gt).abs()
             flow_loss += i_weight * (valid[:, None] * i_loss).mean()
 
@@ -38,50 +38,44 @@ class SequenceLoss(nn.Module):
 
 class CSFlow(BaseModel):
     pretrained_checkpoints = {
-        'chairs': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/csflow-chairs-458a9436.ckpt',
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/csflow-things-ebdd403b.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/csflow-kitti-dc66357a.ckpt'
+        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/csflow-chairs-458a9436.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/csflow-things-ebdd403b.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/csflow-kitti-dc66357a.ckpt",
     }
 
-    def __init__(self,
-                 args: Namespace) -> None:
-        super().__init__(
-            args=args,
-            loss_fn=SequenceLoss(args),
-            output_stride=8)
+    def __init__(self, args: Namespace) -> None:
+        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=8)
 
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
 
-        if 'dropout' not in self.args:
+        if "dropout" not in self.args:
             self.args.dropout = 0
 
         # feature network, context network, and update block
         self.fnet = BasicEncoder(
-            output_dim=256, norm_fn='instance', dropout=args.dropout)
+            output_dim=256, norm_fn="instance", dropout=args.dropout
+        )
 
         self.cnet = BasicEncoder(
-            output_dim=hdim + cdim,
-            norm_fn='batch',
-            dropout=args.dropout)
+            output_dim=hdim + cdim, norm_fn="batch", dropout=args.dropout
+        )
 
-        self.strip_corr_block_v2 = StripCrossCorrMap_v2(
-            in_chan=256, out_chan=256)
-        self.update_block = BasicUpdateBlock(
-            self.args, hidden_dim=hdim)
+        self.strip_corr_block_v2 = StripCrossCorrMap_v2(in_chan=256, out_chan=256)
+        self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)
 
     @staticmethod
     def add_model_specific_args(parent_parser=None):
         parent_parser = BaseModel.add_model_specific_args(parent_parser)
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument('--corr_levels', type=int, default=4)
-        parser.add_argument('--corr_radius', type=int, default=4)
-        parser.add_argument('--dropout', type=float, default=0.0)
-        parser.add_argument('--gamma', type=float, default=0.8)
-        parser.add_argument('--max_flow', type=float, default=400.0)
-        parser.add_argument('--iters', type=int, default=12)
-        parser.add_argument('--gen_fmap', action='store_true')
-        parser.add_argument('--skip_encode', action='store_true')
+        parser.add_argument("--corr_levels", type=int, default=4)
+        parser.add_argument("--corr_radius", type=int, default=4)
+        parser.add_argument("--dropout", type=float, default=0.0)
+        parser.add_argument("--gamma", type=float, default=0.8)
+        parser.add_argument("--max_flow", type=float, default=400.0)
+        parser.add_argument("--iters", type=int, default=12)
+        parser.add_argument("--gen_fmap", action="store_true")
+        parser.add_argument("--skip_encode", action="store_true")
         return parser
 
     def freeze_bn(self):
@@ -116,9 +110,9 @@ class CSFlow(BaseModel):
         return up_flow.reshape(N, 2, 8 * H, 8 * W)
 
     def forward(self, inputs, flow_init=None):
-        """ Estimate optical flow between pair of frames """
-        image1 = inputs['images'][:, 0]
-        image2 = inputs['images'][:, 1]
+        """Estimate optical flow between pair of frames"""
+        image1 = inputs["images"][:, 0]
+        image2 = inputs["images"][:, 1]
         """Estimate optical flow between pair of frames."""
 
         if not self.args.skip_encode:
@@ -149,16 +143,18 @@ class CSFlow(BaseModel):
                 if self.args.gen_fmap:
                     return fmap1, fmap2, cnet
         else:
-            cnet = inputs['images'][:, 2] * 255.0
+            cnet = inputs["images"][:, 2] * 255.0
 
         net, inp = torch.split(cnet, [hdim, cdim], dim=1)
         net = torch.tanh(net)
         inp = torch.relu(inp)
 
         strip_coor_map, strip_corr_map_w, strip_corr_map_h = self.strip_corr_block_v2(
-            [fmap1, fmap2])
+            [fmap1, fmap2]
+        )
         corr_fn = CorrBlock_v2(
-            fmap1, fmap2, strip_coor_map, radius=self.args.corr_radius)
+            fmap1, fmap2, strip_coor_map, radius=self.args.corr_radius
+        )
 
         if not self.args.skip_encode:
             coords0, coords1 = self.initialize_flow(image1)
@@ -174,9 +170,11 @@ class CSFlow(BaseModel):
 
         # init flow with regression before GRU iters
         corr_w_act = torch.nn.functional.softmax(
-            strip_corr_map_w, dim=3)  # B H1 W1 1 W2
+            strip_corr_map_w, dim=3
+        )  # B H1 W1 1 W2
         corr_h_act = torch.nn.functional.softmax(
-            strip_corr_map_h, dim=4)  # B H1 W1 H2 1
+            strip_corr_map_h, dim=4
+        )  # B H1 W1 H2 1
 
         flo_v = corr_w_act.mul(strip_corr_map_w)  # B H1 W1 1 W2
         flo_u = corr_h_act.mul(strip_corr_map_h)  # B H1 W1 H2 1
@@ -198,8 +196,7 @@ class CSFlow(BaseModel):
             corr = corr_fn(coords1)  # index correlation volume
 
             flow = coords1 - coords0
-            net, up_mask, delta_flow = self.update_block(
-                net, inp, corr, flow)
+            net, up_mask, delta_flow = self.update_block(net, inp, corr, flow)
 
             # F(t+1) = F(t) + \Delta(t)
             coords1 = coords1 + delta_flow
@@ -213,16 +210,10 @@ class CSFlow(BaseModel):
             flow_predictions.append(flow_up)
 
         if self.training:
-            outputs = {
-                'flows': flow_up[:, None],
-                'flow_preds': flow_predictions
-            }
+            outputs = {"flows": flow_up[:, None], "flow_preds": flow_predictions}
         else:
-            outputs = {
-                'flows': flow_up[:, None],
-                'flow_small': coords1 - coords0
-            }
-            
+            outputs = {"flows": flow_up[:, None], "flow_small": coords1 - coords0}
+
         return outputs
 
 
@@ -262,19 +253,29 @@ class StripCrossCorrMap_v2(nn.Module):
         fmap2_h = fmap2_h.view(batchsize, c_middle, -1).permute(0, 2, 1)
 
         # cross strip corr map
-        strip_corr_map_w = torch.bmm(fmap2_w, fmap1_w).\
-            view(batchsize, w, h, w, 1).permute(0, 2, 3, 4, 1)      # B H1 W1 1 W2
-        strip_corr_map_h = torch.bmm(fmap2_h, fmap1_h).\
-            view(batchsize, h, h, w, 1).permute(0, 2, 3, 1, 4)      # B H1 W1 H2 1
+        strip_corr_map_w = (
+            torch.bmm(fmap2_w, fmap1_w)
+            .view(batchsize, w, h, w, 1)
+            .permute(0, 2, 3, 4, 1)
+        )  # B H1 W1 1 W2
+        strip_corr_map_h = (
+            torch.bmm(fmap2_h, fmap1_h)
+            .view(batchsize, h, h, w, 1)
+            .permute(0, 2, 3, 1, 4)
+        )  # B H1 W1 H2 1
 
-        return (strip_corr_map_w + strip_corr_map_h).view(
-            batchsize, h, w, 1, h, w), strip_corr_map_w, strip_corr_map_h
+        return (
+            (strip_corr_map_w + strip_corr_map_h).view(batchsize, h, w, 1, h, w),
+            strip_corr_map_w,
+            strip_corr_map_h,
+        )
 
     def init_weight(self):
         for ly in self.children():
             if isinstance(ly, nn.Conv2d):
                 nn.init.kaiming_normal_(ly.weight, a=1)
-                if not ly.bias is None: nn.init.constant_(ly.bias, 0)
+                if not ly.bias is None:
+                    nn.init.constant_(ly.bias, 0)
 
     def get_params(self):
         wd_params, nowd_params = [], []
@@ -291,14 +292,7 @@ class StripCrossCorrMap_v2(nn.Module):
 class ConvBNReLU(nn.Module):
     """Conv with BN and ReLU, used for Strip Corr Module"""
 
-    def __init__(self,
-                 in_chan,
-                 out_chan,
-                 ks=3,
-                 stride=1,
-                 padding=1,
-                 *args,
-                 **kwargs):
+    def __init__(self, in_chan, out_chan, ks=3, stride=1, padding=1, *args, **kwargs):
         super(ConvBNReLU, self).__init__()
         self.conv = nn.Conv2d(
             in_chan,
@@ -306,7 +300,8 @@ class ConvBNReLU(nn.Module):
             kernel_size=ks,
             stride=stride,
             padding=padding,
-            bias=False)
+            bias=False,
+        )
         self.bn = torch.nn.BatchNorm2d(out_chan)
         self.relu = nn.ReLU(inplace=True)
 
@@ -320,11 +315,11 @@ class ConvBNReLU(nn.Module):
         for ly in self.children():
             if isinstance(ly, nn.Conv2d):
                 nn.init.kaiming_normal_(ly.weight, a=1)
-                if not ly.bias is None: nn.init.constant_(ly.bias, 0)
+                if not ly.bias is None:
+                    nn.init.constant_(ly.bias, 0)
 
 
 class SmallUpdateBlock(nn.Module):
-
     def __init__(self, args, hidden_dim=96):
         super(SmallUpdateBlock, self).__init__()
         self.encoder = SmallMotionEncoder(args)
@@ -347,13 +342,14 @@ class BasicUpdateBlock(nn.Module):
         super(BasicUpdateBlock, self).__init__()
         self.args = args
         self.encoder = BasicMotionEncoder_v2(args)
-        self.gru = SepConvGRU(
-            hidden_dim=hidden_dim, input_dim=128 + hidden_dim)
+        self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=128 + hidden_dim)
         self.flow_head = FlowHead(hidden_dim, hidden_dim=256)
 
         self.mask = nn.Sequential(
-            nn.Conv2d(128, 256, 3, padding=1), nn.ReLU(inplace=True),
-            nn.Conv2d(256, 64 * 9, 1, padding=0))
+            nn.Conv2d(128, 256, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 64 * 9, 1, padding=0),
+        )
 
     def forward(self, net, inp, corr, flow, upsample=True):
         motion_features = self.encoder(flow, corr)
@@ -363,7 +359,7 @@ class BasicUpdateBlock(nn.Module):
         delta_flow = self.flow_head(net)
 
         # scale mask to balence gradients
-        mask = .25 * self.mask(net)
+        mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
 
@@ -372,27 +368,27 @@ def pool2x(x):
 
 
 def interp(x, dest):
-    interp_args = {'mode': 'bilinear', 'align_corners': True}
+    interp_args = {"mode": "bilinear", "align_corners": True}
     return F.interpolate(x, dest.shape[2:], **interp_args)
 
 
 class BasicEncoder(nn.Module):
-
-    def __init__(self, output_dim=128, norm_fn='batch', dropout=0.0):
+    def __init__(self, output_dim=128, norm_fn="batch", dropout=0.0):
         from torch.nn.modules.utils import _pair
+
         super(BasicEncoder, self).__init__()
         self.norm_fn = norm_fn
 
-        if self.norm_fn == 'group':
+        if self.norm_fn == "group":
             self.norm1 = nn.GroupNorm(num_groups=8, num_channels=64)
 
-        elif self.norm_fn == 'batch':
+        elif self.norm_fn == "batch":
             self.norm1 = nn.BatchNorm2d(64)
 
-        elif self.norm_fn == 'instance':
+        elif self.norm_fn == "instance":
             self.norm1 = nn.InstanceNorm2d(64)
 
-        elif self.norm_fn == 'none':
+        elif self.norm_fn == "none":
             self.norm1 = nn.Sequential()
 
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
@@ -412,18 +408,15 @@ class BasicEncoder(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(
-                    m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m,
-                            (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
                 if m.weight is not None:
                     nn.init.constant_(m.weight, 1)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
     def _make_layer(self, dim, stride=1):
-        layer1 = ResidualBlock(
-            self.in_planes, dim, self.norm_fn, stride=stride)
+        layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride)
         layer2 = ResidualBlock(dim, dim, self.norm_fn, stride=1)
         layers = (layer1, layer2)
 
@@ -431,7 +424,6 @@ class BasicEncoder(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-
         # if input is list, combine batch dimension
         is_list = isinstance(x, tuple) or isinstance(x, list)
         if is_list:
@@ -459,21 +451,20 @@ class BasicEncoder(nn.Module):
 
 
 class SmallEncoder(nn.Module):
-
-    def __init__(self, output_dim=128, norm_fn='batch', dropout=0.0):
+    def __init__(self, output_dim=128, norm_fn="batch", dropout=0.0):
         super(SmallEncoder, self).__init__()
         self.norm_fn = norm_fn
 
-        if self.norm_fn == 'group':
+        if self.norm_fn == "group":
             self.norm1 = nn.GroupNorm(num_groups=8, num_channels=32)
 
-        elif self.norm_fn == 'batch':
+        elif self.norm_fn == "batch":
             self.norm1 = nn.BatchNorm2d(32)
 
-        elif self.norm_fn == 'instance':
+        elif self.norm_fn == "instance":
             self.norm1 = nn.InstanceNorm2d(32)
 
-        elif self.norm_fn == 'none':
+        elif self.norm_fn == "none":
             self.norm1 = nn.Sequential()
 
         self.conv1 = nn.Conv2d(3, 32, kernel_size=7, stride=2, padding=3)
@@ -492,18 +483,15 @@ class SmallEncoder(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(
-                    m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m,
-                            (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
                 if m.weight is not None:
                     nn.init.constant_(m.weight, 1)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
     def _make_layer(self, dim, stride=1):
-        layer1 = BottleneckBlock(
-            self.in_planes, dim, self.norm_fn, stride=stride)
+        layer1 = BottleneckBlock(self.in_planes, dim, self.norm_fn, stride=stride)
         layer2 = BottleneckBlock(dim, dim, self.norm_fn, stride=1)
         layers = (layer1, layer2)
 
@@ -511,7 +499,6 @@ class SmallEncoder(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-
         # if input is list, combine batch dimension
         is_list = isinstance(x, tuple) or isinstance(x, list)
         if is_list:
@@ -539,12 +526,7 @@ class SmallEncoder(nn.Module):
 class CorrBlock_v2:
     """Corr Block, modified by Hao, concat SC with 4D corr"""
 
-    def __init__(self,
-                 fmap1,
-                 fmap2,
-                 strip_coor_map=None,
-                 num_levels=4,
-                 radius=4):
+    def __init__(self, fmap1, fmap2, strip_coor_map=None, num_levels=4, radius=4):
         self.num_levels = num_levels
         self.radius = radius
         self.corr_pyramid = []
@@ -574,7 +556,7 @@ class CorrBlock_v2:
             corr = self.corr_pyramid[i]
             dx = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
             dy = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
-            delta = torch.stack(torch.meshgrid(dy, dx, indexing='ij'), axis=-1)
+            delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1)
 
             centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2) / 2**i
             delta_lvl = delta.view(1, 2 * r + 1, 2 * r + 1, 2)
@@ -598,7 +580,7 @@ class CorrBlock_v2:
         return corr / torch.sqrt(torch.tensor(dim).float())
 
 
-def bilinear_sampler(img, coords, mode='bilinear', mask=False):
+def bilinear_sampler(img, coords, mode="bilinear", mask=False):
     """Wrapper for grid_sample, uses pixel coordinates."""
     H, W = img.shape[-2:]
     xgrid, ygrid = coords.split([1, 1], dim=-1)
@@ -617,51 +599,48 @@ def bilinear_sampler(img, coords, mode='bilinear', mask=False):
 
 def coords_grid(batch, ht, wd, device):
     coords = torch.meshgrid(
-        torch.arange(ht, device=device), torch.arange(wd, device=device), indexing='ij')
+        torch.arange(ht, device=device), torch.arange(wd, device=device), indexing="ij"
+    )
     coords = torch.stack(coords[::-1], dim=0).float()
     return coords[None].repeat(batch, 1, 1, 1)
 
 
-def upflow8(flow, mode='bilinear'):
+def upflow8(flow, mode="bilinear"):
     new_size = (8 * flow.shape[2], 8 * flow.shape[3])
-    return 8 * F.interpolate(
-        flow, size=new_size, mode=mode, align_corners=True)
+    return 8 * F.interpolate(flow, size=new_size, mode=mode, align_corners=True)
 
 
 class ResidualBlock(nn.Module):
-
-    def __init__(self, in_planes, planes, norm_fn='group', stride=1):
+    def __init__(self, in_planes, planes, norm_fn="group", stride=1):
         super(ResidualBlock, self).__init__()
 
         self.conv1 = nn.Conv2d(
-            in_planes, planes, kernel_size=3, padding=1, stride=stride)
+            in_planes, planes, kernel_size=3, padding=1, stride=stride
+        )
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding=1)
         self.relu = nn.ReLU(inplace=True)
 
         num_groups = planes // 8
 
-        if norm_fn == 'group':
-            self.norm1 = nn.GroupNorm(
-                num_groups=num_groups, num_channels=planes)
-            self.norm2 = nn.GroupNorm(
-                num_groups=num_groups, num_channels=planes)
+        if norm_fn == "group":
+            self.norm1 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
+            self.norm2 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
             if not stride == 1:
-                self.norm3 = nn.GroupNorm(
-                    num_groups=num_groups, num_channels=planes)
+                self.norm3 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
 
-        elif norm_fn == 'batch':
+        elif norm_fn == "batch":
             self.norm1 = nn.BatchNorm2d(planes)
             self.norm2 = nn.BatchNorm2d(planes)
             if not stride == 1:
                 self.norm3 = nn.BatchNorm2d(planes)
 
-        elif norm_fn == 'instance':
+        elif norm_fn == "instance":
             self.norm1 = nn.InstanceNorm2d(planes)
             self.norm2 = nn.InstanceNorm2d(planes)
             if not stride == 1:
                 self.norm3 = nn.InstanceNorm2d(planes)
 
-        elif norm_fn == 'none':
+        elif norm_fn == "none":
             self.norm1 = nn.Sequential()
             self.norm2 = nn.Sequential()
             if not stride == 1:
@@ -672,8 +651,8 @@ class ResidualBlock(nn.Module):
 
         else:
             self.downsample = nn.Sequential(
-                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride),
-                self.norm3)
+                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm3
+            )
 
     def forward(self, x):
         y = x
@@ -687,45 +666,40 @@ class ResidualBlock(nn.Module):
 
 
 class BottleneckBlock(nn.Module):
-
-    def __init__(self, in_planes, planes, norm_fn='group', stride=1):
+    def __init__(self, in_planes, planes, norm_fn="group", stride=1):
         super(BottleneckBlock, self).__init__()
 
-        self.conv1 = nn.Conv2d(
-            in_planes, planes // 4, kernel_size=1, padding=0)
+        self.conv1 = nn.Conv2d(in_planes, planes // 4, kernel_size=1, padding=0)
         self.conv2 = nn.Conv2d(
-            planes // 4, planes // 4, kernel_size=3, padding=1, stride=stride)
+            planes // 4, planes // 4, kernel_size=3, padding=1, stride=stride
+        )
         self.conv3 = nn.Conv2d(planes // 4, planes, kernel_size=1, padding=0)
         self.relu = nn.ReLU(inplace=True)
 
         num_groups = planes // 8
 
-        if norm_fn == 'group':
-            self.norm1 = nn.GroupNorm(
-                num_groups=num_groups, num_channels=planes // 4)
-            self.norm2 = nn.GroupNorm(
-                num_groups=num_groups, num_channels=planes // 4)
-            self.norm3 = nn.GroupNorm(
-                num_groups=num_groups, num_channels=planes)
+        if norm_fn == "group":
+            self.norm1 = nn.GroupNorm(num_groups=num_groups, num_channels=planes // 4)
+            self.norm2 = nn.GroupNorm(num_groups=num_groups, num_channels=planes // 4)
+            self.norm3 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
             if not stride == 1:
-                self.norm4 = nn.GroupNorm(
-                    num_groups=num_groups, num_channels=planes)
+                self.norm4 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
 
-        elif norm_fn == 'batch':
+        elif norm_fn == "batch":
             self.norm1 = nn.BatchNorm2d(planes // 4)
             self.norm2 = nn.BatchNorm2d(planes // 4)
             self.norm3 = nn.BatchNorm2d(planes)
             if not stride == 1:
                 self.norm4 = nn.BatchNorm2d(planes)
 
-        elif norm_fn == 'instance':
+        elif norm_fn == "instance":
             self.norm1 = nn.InstanceNorm2d(planes // 4)
             self.norm2 = nn.InstanceNorm2d(planes // 4)
             self.norm3 = nn.InstanceNorm2d(planes)
             if not stride == 1:
                 self.norm4 = nn.InstanceNorm2d(planes)
 
-        elif norm_fn == 'none':
+        elif norm_fn == "none":
             self.norm1 = nn.Sequential()
             self.norm2 = nn.Sequential()
             self.norm3 = nn.Sequential()
@@ -737,8 +711,8 @@ class BottleneckBlock(nn.Module):
 
         else:
             self.downsample = nn.Sequential(
-                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride),
-                self.norm4)
+                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm4
+            )
 
     def forward(self, x):
         y = x
@@ -758,7 +732,7 @@ class BasicMotionEncoder_v2(nn.Module):
     def __init__(self, args):
         super(BasicMotionEncoder_v2, self).__init__()
         # double cor_plances due to concat aug
-        cor_planes = 2 * (args.corr_levels * (2 * args.corr_radius + 1)**2)
+        cor_planes = 2 * (args.corr_levels * (2 * args.corr_radius + 1) ** 2)
         self.convc1 = nn.Conv2d(cor_planes, 256, 1, padding=0)
         self.convc2 = nn.Conv2d(256, 192, 3, padding=1)
         self.convf1 = nn.Conv2d(2, 128, 7, padding=3)
@@ -777,10 +751,9 @@ class BasicMotionEncoder_v2(nn.Module):
 
 
 class SmallMotionEncoder(nn.Module):
-
     def __init__(self, args):
         super(SmallMotionEncoder, self).__init__()
-        cor_planes = args.corr_levels * (2 * args.corr_radius + 1)**2
+        cor_planes = args.corr_levels * (2 * args.corr_radius + 1) ** 2
         self.convc1 = nn.Conv2d(cor_planes, 96, 1, padding=0)
         self.convf1 = nn.Conv2d(2, 64, 7, padding=3)
         self.convf2 = nn.Conv2d(64, 32, 3, padding=1)
@@ -796,22 +769,27 @@ class SmallMotionEncoder(nn.Module):
 
 
 class SepConvGRU(nn.Module):
-
     def __init__(self, hidden_dim=128, input_dim=192 + 128):
         super(SepConvGRU, self).__init__()
         self.convz1 = nn.Conv2d(
-            hidden_dim + input_dim, hidden_dim, (1, 5), padding=(0, 2))
+            hidden_dim + input_dim, hidden_dim, (1, 5), padding=(0, 2)
+        )
         self.convr1 = nn.Conv2d(
-            hidden_dim + input_dim, hidden_dim, (1, 5), padding=(0, 2))
+            hidden_dim + input_dim, hidden_dim, (1, 5), padding=(0, 2)
+        )
         self.convq1 = nn.Conv2d(
-            hidden_dim + input_dim, hidden_dim, (1, 5), padding=(0, 2))
+            hidden_dim + input_dim, hidden_dim, (1, 5), padding=(0, 2)
+        )
 
         self.convz2 = nn.Conv2d(
-            hidden_dim + input_dim, hidden_dim, (5, 1), padding=(2, 0))
+            hidden_dim + input_dim, hidden_dim, (5, 1), padding=(2, 0)
+        )
         self.convr2 = nn.Conv2d(
-            hidden_dim + input_dim, hidden_dim, (5, 1), padding=(2, 0))
+            hidden_dim + input_dim, hidden_dim, (5, 1), padding=(2, 0)
+        )
         self.convq2 = nn.Conv2d(
-            hidden_dim + input_dim, hidden_dim, (5, 1), padding=(2, 0))
+            hidden_dim + input_dim, hidden_dim, (5, 1), padding=(2, 0)
+        )
 
     def forward(self, h, x):
         # horizontal
@@ -832,7 +810,6 @@ class SepConvGRU(nn.Module):
 
 
 class FlowHead(nn.Module):
-
     def __init__(self, input_dim=128, hidden_dim=256):
         super(FlowHead, self).__init__()
         self.conv1 = nn.Conv2d(input_dim, hidden_dim, 3, padding=1)
@@ -844,15 +821,11 @@ class FlowHead(nn.Module):
 
 
 class ConvGRU(nn.Module):
-
     def __init__(self, hidden_dim=128, input_dim=192 + 128):
         super(ConvGRU, self).__init__()
-        self.convz = nn.Conv2d(
-            hidden_dim + input_dim, hidden_dim, 3, padding=1)
-        self.convr = nn.Conv2d(
-            hidden_dim + input_dim, hidden_dim, 3, padding=1)
-        self.convq = nn.Conv2d(
-            hidden_dim + input_dim, hidden_dim, 3, padding=1)
+        self.convz = nn.Conv2d(hidden_dim + input_dim, hidden_dim, 3, padding=1)
+        self.convr = nn.Conv2d(hidden_dim + input_dim, hidden_dim, 3, padding=1)
+        self.convq = nn.Conv2d(hidden_dim + input_dim, hidden_dim, 3, padding=1)
 
     def forward(self, h, x):
         hx = torch.cat([h, x], dim=1)

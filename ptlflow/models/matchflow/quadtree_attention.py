@@ -2,7 +2,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from timm.models.layers import trunc_normal_
 
-from .QuadtreeAttention.QuadtreeAttention.modules.quadtree_attention import QTAttA, QTAttB
+from .QuadtreeAttention.QuadtreeAttention.modules.quadtree_attention import (
+    QTAttA,
+    QTAttB,
+)
 
 
 class QuadtreeAttention(nn.Module):
@@ -21,12 +24,14 @@ class QuadtreeAttention(nn.Module):
         attn_type="B",
     ):
         super().__init__()
-        assert dim % num_heads == 0, f"dim {dim} should be divided by num_heads {num_heads}."
+        assert (
+            dim % num_heads == 0
+        ), f"dim {dim} should be divided by num_heads {num_heads}."
 
         self.dim = dim
         self.num_heads = num_heads
         head_dim = dim // num_heads
-        self.scale = qk_scale or head_dim ** -0.5
+        self.scale = qk_scale or head_dim**-0.5
 
         self.q_proj = nn.Conv2d(dim, dim, kernel_size=1, stride=1, bias=qkv_bias)
         self.k_proj = nn.Conv2d(dim, dim, kernel_size=1, stride=1, bias=qkv_bias)
@@ -62,7 +67,6 @@ class QuadtreeAttention(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x, target, H, W, msg=None):
-
         B, N, C = x.shape
         x = x.permute(0, 2, 1).reshape(B, C, H, W)
         target = target.permute(0, 2, 1).reshape(B, C, H, W)

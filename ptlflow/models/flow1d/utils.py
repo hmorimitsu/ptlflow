@@ -5,24 +5,33 @@ from scipy import interpolate
 
 
 class InputPadder:
-    """ Pads images such that dimensions are divisible by 8 """
+    """Pads images such that dimensions are divisible by 8"""
 
-    def __init__(self, dims, mode='sintel', padding_factor=8):
+    def __init__(self, dims, mode="sintel", padding_factor=8):
         self.ht, self.wd = dims[-2:]
-        pad_ht = (((self.ht // padding_factor) + 1) * padding_factor - self.ht) % padding_factor
-        pad_wd = (((self.wd // padding_factor) + 1) * padding_factor - self.wd) % padding_factor
-        if mode == 'sintel':
-            self._pad = [pad_wd // 2, pad_wd - pad_wd // 2, pad_ht // 2, pad_ht - pad_ht // 2]
+        pad_ht = (
+            ((self.ht // padding_factor) + 1) * padding_factor - self.ht
+        ) % padding_factor
+        pad_wd = (
+            ((self.wd // padding_factor) + 1) * padding_factor - self.wd
+        ) % padding_factor
+        if mode == "sintel":
+            self._pad = [
+                pad_wd // 2,
+                pad_wd - pad_wd // 2,
+                pad_ht // 2,
+                pad_ht - pad_ht // 2,
+            ]
         else:
             self._pad = [pad_wd // 2, pad_wd - pad_wd // 2, 0, pad_ht]
 
     def pad(self, *inputs):
-        return [F.pad(x, self._pad, mode='replicate') for x in inputs]
+        return [F.pad(x, self._pad, mode="replicate") for x in inputs]
 
     def unpad(self, x):
         ht, wd = x.shape[-2:]
         c = [self._pad[2], ht - self._pad[3], self._pad[0], wd - self._pad[1]]
-        return x[..., c[0]:c[1], c[2]:c[3]]
+        return x[..., c[0] : c[1], c[2] : c[3]]
 
 
 def forward_interpolate(flow):
@@ -47,17 +56,19 @@ def forward_interpolate(flow):
     dy = dy[valid]
 
     flow_x = interpolate.griddata(
-        (x1, y1), dx, (x0, y0), method='nearest', fill_value=0)
+        (x1, y1), dx, (x0, y0), method="nearest", fill_value=0
+    )
 
     flow_y = interpolate.griddata(
-        (x1, y1), dy, (x0, y0), method='nearest', fill_value=0)
+        (x1, y1), dy, (x0, y0), method="nearest", fill_value=0
+    )
 
     flow = np.stack([flow_x, flow_y], axis=0)
     return torch.from_numpy(flow).to(dtype=flow.dtype)
 
 
-def bilinear_sampler(img, coords, mode='bilinear', mask=False):
-    """ Wrapper for grid_sample, uses pixel coordinates """
+def bilinear_sampler(img, coords, mode="bilinear", mask=False):
+    """Wrapper for grid_sample, uses pixel coordinates"""
     if coords.size(-1) != 2:  # [B, 2, H, W] -> [B, H, W, 2]
         coords = coords.permute(0, 2, 3, 1)
 
@@ -90,18 +101,21 @@ def bilinear_sampler(img, coords, mode='bilinear', mask=False):
 
 def coords_grid(batch, ht, wd, dtype, normalize=False):
     if normalize:  # [-1, 1]
-        coords = torch.meshgrid(2 * torch.arange(ht) / (ht - 1) - 1,
-                                2 * torch.arange(wd) / (wd - 1) - 1,
-                                indexing='ij')
+        coords = torch.meshgrid(
+            2 * torch.arange(ht) / (ht - 1) - 1,
+            2 * torch.arange(wd) / (wd - 1) - 1,
+            indexing="ij",
+        )
     else:
-        coords = torch.meshgrid(torch.arange(ht), torch.arange(wd), indexing='ij')
+        coords = torch.meshgrid(torch.arange(ht), torch.arange(wd), indexing="ij")
     coords = torch.stack(coords[::-1], dim=0).to(dtype=dtype)
     return coords[None].repeat(batch, 1, 1, 1)  # [B, 2, H, W]
 
 
 def coords_grid_np(h, w):  # used for accumulating high speed sintel flow data
-    coords = np.meshgrid(np.arange(h, dtype=np.float32),
-                         np.arange(w, dtype=np.float32), indexing='ij')
+    coords = np.meshgrid(
+        np.arange(h, dtype=np.float32), np.arange(w, dtype=np.float32), indexing="ij"
+    )
     coords = np.stack(coords[::-1], axis=-1)  # [H, W, 2]
 
     return coords
@@ -129,15 +143,19 @@ def flow_warp(feature, flow, mask=False):
     return bilinear_sampler(feature, grid, mask=mask)
 
 
-def upflow8(flow, mode='bilinear'):
+def upflow8(flow, mode="bilinear"):
     new_size = (8 * flow.shape[2], 8 * flow.shape[3])
     return 8 * F.interpolate(flow, size=new_size, mode=mode, align_corners=True)
 
 
 def bilinear_upflow(flow, scale_factor=8):
     assert flow.size(1) == 2
-    flow = F.interpolate(flow, scale_factor=scale_factor,
-                         mode='bilinear', align_corners=True) * scale_factor
+    flow = (
+        F.interpolate(
+            flow, scale_factor=scale_factor, mode="bilinear", align_corners=True
+        )
+        * scale_factor
+    )
 
     return flow
 
@@ -145,8 +163,12 @@ def bilinear_upflow(flow, scale_factor=8):
 def upsample_flow(flow, img):
     if flow.size(-1) != img.size(-1):
         scale_factor = img.size(-1) / flow.size(-1)
-        flow = F.interpolate(flow, size=img.size()[-2:],
-                             mode='bilinear', align_corners=True) * scale_factor
+        flow = (
+            F.interpolate(
+                flow, size=img.size()[-2:], mode="bilinear", align_corners=True
+            )
+            * scale_factor
+        )
     return flow
 
 
@@ -157,5 +179,5 @@ def count_parameters(model):
 
 def set_bn_eval(m):
     classname = m.__class__.__name__
-    if classname.find('BatchNorm') != -1:
+    if classname.find("BatchNorm") != -1:
         m.eval()

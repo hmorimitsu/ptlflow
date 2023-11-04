@@ -20,8 +20,14 @@ import shutil
 import torch
 
 from ptlflow.data.datasets import (
-    FlyingChairsDataset, FlyingChairs2Dataset, FlyingThings3DDataset, FlyingThings3DSubsetDataset, Hd1kDataset, KittiDataset,
-    SintelDataset)
+    FlyingChairsDataset,
+    FlyingChairs2Dataset,
+    FlyingThings3DDataset,
+    FlyingThings3DSubsetDataset,
+    Hd1kDataset,
+    KittiDataset,
+    SintelDataset,
+)
 from ptlflow.data.flow_transforms import ToTensor
 from ptlflow.utils import dummy_datasets
 
@@ -29,20 +35,20 @@ from ptlflow.utils import dummy_datasets
 def test_chairs(tmp_path: Path) -> None:
     dummy_datasets.write_flying_chairs(tmp_path)
 
-    for split in ['trainval']:
+    for split in ["trainval"]:
         dataset = FlyingChairsDataset(
-            root_dir=tmp_path / 'FlyingChairs_release',
+            root_dir=tmp_path / "FlyingChairs_release",
             split=split,
             transform=ToTensor(),
             get_valid_mask=True,
-            get_meta=True
+            get_meta=True,
         )
 
         inputs = dataset[0]
 
-        assert inputs.get('meta') is not None
+        assert inputs.get("meta") is not None
 
-        keys = ['images', 'flows', 'valids']
+        keys = ["images", "flows", "valids"]
         for k in keys:
             assert inputs.get(k) is not None
             assert isinstance(inputs[k], torch.Tensor)
@@ -55,9 +61,9 @@ def test_chairs(tmp_path: Path) -> None:
 def test_chairs2(tmp_path: Path) -> None:
     dummy_datasets.write_flying_chairs2(tmp_path)
 
-    for split in ['trainval']:
+    for split in ["trainval"]:
         dataset = FlyingChairs2Dataset(
-            root_dir=tmp_path / 'FlyingChairs2',
+            root_dir=tmp_path / "FlyingChairs2",
             split=split,
             transform=ToTensor(),
             add_reverse=True,
@@ -70,9 +76,19 @@ def test_chairs2(tmp_path: Path) -> None:
 
         inputs = dataset[0]
 
-        assert inputs.get('meta') is not None
+        assert inputs.get("meta") is not None
 
-        keys = ['images', 'flows', 'valids', 'occs', 'mbs', 'flows_b', 'valids_b', 'occs_b', 'mbs_b']
+        keys = [
+            "images",
+            "flows",
+            "valids",
+            "occs",
+            "mbs",
+            "flows_b",
+            "valids_b",
+            "occs_b",
+            "mbs_b",
+        ]
         for k in keys:
             assert inputs.get(k) is not None
             assert isinstance(inputs[k], torch.Tensor)
@@ -85,11 +101,11 @@ def test_chairs2(tmp_path: Path) -> None:
 def test_things(tmp_path: Path) -> None:
     dummy_datasets.write_things(tmp_path)
 
-    for side_name in ['left', 'right']:
-        for pass_name in ['clean', 'final']:
-            for split in ['trainval']:
+    for side_name in ["left", "right"]:
+        for pass_name in ["clean", "final"]:
+            for split in ["trainval"]:
                 dataset = FlyingThings3DDataset(
-                    root_dir=tmp_path / 'FlyingThings3D',
+                    root_dir=tmp_path / "FlyingThings3D",
                     split=split,
                     pass_names=[pass_name],
                     side_names=[side_name],
@@ -104,10 +120,10 @@ def test_things(tmp_path: Path) -> None:
 
                 inputs = dataset[0]
 
-                assert inputs.get('meta') is not None
+                assert inputs.get("meta") is not None
 
                 # keys = ['images', 'flows', 'valids', 'occs', 'mbs', 'flows_b', 'valids_b', 'occs_b', 'mbs_b']
-                keys = ['images', 'flows', 'valids', 'flows_b', 'valids_b']
+                keys = ["images", "flows", "valids", "flows_b", "valids_b"]
                 for k in keys:
                     assert inputs.get(k) is not None
                     assert isinstance(inputs[k], torch.Tensor)
@@ -120,11 +136,11 @@ def test_things(tmp_path: Path) -> None:
 def test_things_subset(tmp_path: Path) -> None:
     dummy_datasets.write_things_subset(tmp_path)
 
-    for side_name in ['left', 'right']:
-        for pass_name in ['clean', 'final']:
-            for split in ['trainval']:
+    for side_name in ["left", "right"]:
+        for pass_name in ["clean", "final"]:
+            for split in ["trainval"]:
                 dataset = FlyingThings3DSubsetDataset(
-                    root_dir=tmp_path / 'FlyingThings3D_subset',
+                    root_dir=tmp_path / "FlyingThings3D_subset",
                     split=split,
                     pass_names=[pass_name],
                     side_names=[side_name],
@@ -139,10 +155,10 @@ def test_things_subset(tmp_path: Path) -> None:
 
                 inputs = dataset[0]
 
-                assert inputs.get('meta') is not None
+                assert inputs.get("meta") is not None
 
                 # keys = ['images', 'flows', 'valids', 'occs', 'mbs', 'flows_b', 'valids_b', 'occs_b', 'mbs_b']
-                keys = ['images', 'flows', 'valids', 'flows_b', 'valids_b']
+                keys = ["images", "flows", "valids", "flows_b", "valids_b"]
                 for k in keys:
                     assert inputs.get(k) is not None
                     assert isinstance(inputs[k], torch.Tensor)
@@ -155,23 +171,23 @@ def test_things_subset(tmp_path: Path) -> None:
 def test_hd1k(tmp_path: Path) -> None:
     dummy_datasets.write_hd1k(tmp_path)
 
-    for split in ['trainval', 'test']:
+    for split in ["trainval", "test"]:
         dataset = Hd1kDataset(
-            root_dir=tmp_path / 'HD1K',
+            root_dir=tmp_path / "HD1K",
             split=split,
             transform=ToTensor(),
             get_valid_mask=True,
-            get_meta=True
+            get_meta=True,
         )
 
         inputs = dataset[0]
 
-        assert inputs.get('meta') is not None
+        assert inputs.get("meta") is not None
 
-        if split == 'test':
-            keys = ['images']
+        if split == "test":
+            keys = ["images"]
         else:
-            keys = ['images', 'flows', 'valids']
+            keys = ["images", "flows", "valids"]
         for k in keys:
             assert inputs.get(k) is not None
             assert isinstance(inputs[k], torch.Tensor)
@@ -184,26 +200,26 @@ def test_hd1k(tmp_path: Path) -> None:
 def test_kitti(tmp_path: Path) -> None:
     dummy_datasets.write_kitti(tmp_path)
 
-    for version in ['2012', '2015']:
-        for split in ['trainval', 'test']:
+    for version in ["2012", "2015"]:
+        for split in ["trainval", "test"]:
             dataset = KittiDataset(
-                root_dir_2012=tmp_path / 'KITTI/2012',
-                root_dir_2015=tmp_path / 'KITTI/2015',
+                root_dir_2012=tmp_path / "KITTI/2012",
+                root_dir_2015=tmp_path / "KITTI/2015",
                 versions=[version],
                 split=split,
                 transform=ToTensor(),
                 get_valid_mask=True,
-                get_meta=True
+                get_meta=True,
             )
 
             inputs = dataset[0]
 
-            assert inputs.get('meta') is not None
+            assert inputs.get("meta") is not None
 
-            if split == 'test':
-                keys = ['images']
+            if split == "test":
+                keys = ["images"]
             else:
-                keys = ['images', 'flows', 'valids']
+                keys = ["images", "flows", "valids"]
             for k in keys:
                 assert inputs.get(k) is not None
                 assert isinstance(inputs[k], torch.Tensor)
@@ -216,27 +232,27 @@ def test_kitti(tmp_path: Path) -> None:
 def test_sintel(tmp_path: Path) -> None:
     dummy_datasets.write_sintel(tmp_path)
 
-    for pass_name in ['clean', 'final']:
-        for split in ['trainval', 'test']:
+    for pass_name in ["clean", "final"]:
+        for split in ["trainval", "test"]:
             dataset = SintelDataset(
-                root_dir=tmp_path / 'MPI-Sintel',
+                root_dir=tmp_path / "MPI-Sintel",
                 split=split,
                 pass_names=[pass_name],
                 transform=ToTensor(),
                 get_valid_mask=True,
                 get_meta=True,
-                get_occlusion_mask=True
+                get_occlusion_mask=True,
             )
 
             assert len(dataset)
             inputs = dataset[0]
 
-            assert inputs.get('meta') is not None
+            assert inputs.get("meta") is not None
 
-            if split == 'test':
-                keys = ['images']
+            if split == "test":
+                keys = ["images"]
             else:
-                keys = ['images', 'flows', 'valids', 'occs']
+                keys = ["images", "flows", "valids", "occs"]
             for k in keys:
                 assert inputs.get(k) is not None
                 assert isinstance(inputs[k], torch.Tensor)

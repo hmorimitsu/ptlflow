@@ -36,8 +36,8 @@ DEFAULT_TRANSITIONS = (15, 6, 4, 11, 13, 6)
 def flow_to_rgb(
     flow: torch.Tensor,
     flow_max_radius: Optional[Union[float, torch.Tensor]] = None,
-    background: str = 'bright',
-    custom_colorwheel: Optional[torch.Tensor] = None
+    background: str = "bright",
+    custom_colorwheel: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     """Create a RGB representation of an optical flow.
 
@@ -70,9 +70,11 @@ def flow_to_rgb(
     --------
     ptlflow.utils.external.flowpy.make_colorwheel : How the colorwheel can be generated.
     """
-    valid_backgrounds = ('bright', 'dark')
+    valid_backgrounds = ("bright", "dark")
     if background not in valid_backgrounds:
-        raise ValueError(f'background should be one the following: {valid_backgrounds}, not {background}')
+        raise ValueError(
+            f"background should be one the following: {valid_backgrounds}, not {background}"
+        )
 
     wheel = make_colorwheel() if custom_colorwheel is None else custom_colorwheel
     wheel = torch.from_numpy(wheel).to(dtype=flow.dtype, device=flow.device) / 255
@@ -91,7 +93,10 @@ def flow_to_rgb(
     if flow_max_radius is None:
         flow_max_radius = radius.view(radius.shape[0], -1).max(dim=1)[0]
     else:
-        flow_max_radius = torch.zeros(radius.shape[0]).to(dtype=flow.dtype, device=flow.device) + flow_max_radius
+        flow_max_radius = (
+            torch.zeros(radius.shape[0]).to(dtype=flow.dtype, device=flow.device)
+            + flow_max_radius
+        )
 
     flow_max_radius = torch.clamp(flow_max_radius[:, None, None], 1)
     radius /= flow_max_radius
@@ -109,38 +114,47 @@ def flow_to_rgb(
     angle_fractional = torch.frac(angle)
     angle_floor = torch.floor(angle)
     angle_ceil = torch.ceil(angle)
-    angle_fractional = angle_fractional.view((angle_fractional.shape)+(1,))
-    float_hue = (wheel[angle_floor.long()] * (1 - angle_fractional)
-                 + wheel[angle_ceil.long()] * angle_fractional)
+    angle_fractional = angle_fractional.view((angle_fractional.shape) + (1,))
+    float_hue = (
+        wheel[angle_floor.long()] * (1 - angle_fractional)
+        + wheel[angle_ceil.long()] * angle_fractional
+    )
 
-    ColorizationArgs = namedtuple('ColorizationArgs', [
-        'move_hue_valid_radius',
-        'move_hue_oversized_radius',
-        'invalid_color'])
+    ColorizationArgs = namedtuple(
+        "ColorizationArgs",
+        ["move_hue_valid_radius", "move_hue_oversized_radius", "invalid_color"],
+    )
 
     def _move_hue_on_v_axis(hues: torch.Tensor, factors: torch.Tensor) -> torch.Tensor:
         return hues * torch.unsqueeze(factors, -1)
 
     def _move_hue_on_s_axis(hues: torch.Tensor, factors: torch.Tensor) -> torch.Tensor:
-        return 1. - torch.unsqueeze(factors, -1) * (1. - hues)
+        return 1.0 - torch.unsqueeze(factors, -1) * (1.0 - hues)
 
-    if background == 'dark':
-        parameters = ColorizationArgs(_move_hue_on_v_axis, _move_hue_on_s_axis,
-                                      torch.zeros(3).to(dtype=flow.dtype, device=flow.device)+1)
+    if background == "dark":
+        parameters = ColorizationArgs(
+            _move_hue_on_v_axis,
+            _move_hue_on_s_axis,
+            torch.zeros(3).to(dtype=flow.dtype, device=flow.device) + 1,
+        )
     else:
-        parameters = ColorizationArgs(_move_hue_on_s_axis, _move_hue_on_v_axis,
-                                      torch.zeros(3).to(dtype=flow.dtype, device=flow.device))
+        parameters = ColorizationArgs(
+            _move_hue_on_s_axis,
+            _move_hue_on_v_axis,
+            torch.zeros(3).to(dtype=flow.dtype, device=flow.device),
+        )
 
     colors = parameters.move_hue_valid_radius(float_hue, radius)
 
     oversized_radius_mask = radius > 1
     colors[oversized_radius_mask] = parameters.move_hue_oversized_radius(
-        float_hue[oversized_radius_mask],
-        1 / radius[oversized_radius_mask]
+        float_hue[oversized_radius_mask], 1 / radius[oversized_radius_mask]
     )
     colors[nan_mask] = parameters.invalid_color
 
-    output_shape = tuple(3 if i == len(orig_shape)-3 else orig_shape[i] for i in range(len(orig_shape)))
+    output_shape = tuple(
+        3 if i == len(orig_shape) - 3 else orig_shape[i] for i in range(len(orig_shape))
+    )
     colors = colors.permute(0, 3, 1, 2).contiguous()
     colors = colors.view(output_shape)
 
@@ -148,8 +162,7 @@ def flow_to_rgb(
 
 
 def _replace_nans(
-    array: torch.Tensor,
-    value: int = 0
+    array: torch.Tensor, value: int = 0
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     nan_mask = torch.isnan(array)
     array[nan_mask] = value

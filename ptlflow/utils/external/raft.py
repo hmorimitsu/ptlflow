@@ -40,15 +40,21 @@ import torch.nn.functional as F
 
 class InputPadder:
     """Pads images such that dimensions are divisible by stride."""
-    def __init__(self, dims, stride=8, two_side_pad=True, pad_mode='replicate'):
+
+    def __init__(self, dims, stride=8, two_side_pad=True, pad_mode="replicate"):
         self.pad_mode = pad_mode
         self.ht, self.wd = dims[-2:]
         pad_ht = (((self.ht // stride) + 1) * stride - self.ht) % stride
         pad_wd = (((self.wd // stride) + 1) * stride - self.wd) % stride
         if two_side_pad:
-            self._pad = [pad_wd//2, pad_wd - pad_wd//2, pad_ht//2, pad_ht - pad_ht//2]
+            self._pad = [
+                pad_wd // 2,
+                pad_wd - pad_wd // 2,
+                pad_ht // 2,
+                pad_ht - pad_ht // 2,
+            ]
         else:
-            self._pad = [pad_wd//2, pad_wd - pad_wd//2, 0, pad_ht]
+            self._pad = [pad_wd // 2, pad_wd - pad_wd // 2, 0, pad_ht]
 
     def pad(self, x):
         in_shape = x.shape
@@ -61,13 +67,11 @@ class InputPadder:
 
     def unpad(self, x):
         ht, wd = x.shape[-2:]
-        c = [self._pad[2], ht-self._pad[3], self._pad[0], wd-self._pad[1]]
-        return x[..., c[0]:c[1], c[2]:c[3]]
+        c = [self._pad[2], ht - self._pad[3], self._pad[0], wd - self._pad[1]]
+        return x[..., c[0] : c[1], c[2] : c[3]]
 
 
-def read_pfm(
-    file_path: str
-) -> np.ndarray:
+def read_pfm(file_path: str) -> np.ndarray:
     """Read optical flow files in PFM format.
 
     Taken and adapted from https://github.com/princeton-vl/RAFT/blob/master/core/utils/frame_utils.py.
@@ -89,7 +93,7 @@ def read_pfm(
     ValueError
         If the file header is corrupted.
     """
-    with open(file_path, 'rb') as f:
+    with open(file_path, "rb") as f:
         color = None
         width = None
         height = None
@@ -97,27 +101,27 @@ def read_pfm(
         endian = None
 
         header = f.readline().rstrip()
-        if header == b'PF':
+        if header == b"PF":
             color = True
-        elif header == b'Pf':
+        elif header == b"Pf":
             color = False
         else:
-            raise ValueError('Not a PFM file.')
+            raise ValueError("Not a PFM file.")
 
-        dim_match = re.match(rb'^(\d+)\s(\d+)\s$', f.readline())
+        dim_match = re.match(rb"^(\d+)\s(\d+)\s$", f.readline())
         if dim_match:
             width, height = map(int, dim_match.groups())
         else:
-            raise ValueError('Malformed PFM header.')
+            raise ValueError("Malformed PFM header.")
 
         scale = float(f.readline().rstrip())
         if scale < 0:  # little-endian
-            endian = '<'
+            endian = "<"
             scale = -scale
         else:
-            endian = '>'  # big-endian
+            endian = ">"  # big-endian
 
-        data = np.fromfile(f, endian + 'f')
+        data = np.fromfile(f, endian + "f")
         shape = (height, width, 3) if color else (height, width)
 
         data = np.reshape(data, shape)
@@ -126,5 +130,5 @@ def read_pfm(
     # Mark invalid pixels as NaN
     mask = np.tile(data[:, :, 2:3], (1, 1, 2))
     flow = data[:, :, :2].astype(np.float32)
-    flow[mask > 0.5] = float('nan')
+    flow[mask > 0.5] = float("nan")
     return flow

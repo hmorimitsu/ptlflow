@@ -2,27 +2,34 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from scipy import interpolate
+
 # from torch_scatter import scatter_softmax, scatter_add
 
 
 class InputPadder:
-    """ Pads images such that dimensions are divisible by 32 """
-    def __init__(self, dims, mode='sintel'):
+    """Pads images such that dimensions are divisible by 32"""
+
+    def __init__(self, dims, mode="sintel"):
         self.ht, self.wd = dims[-2:]
         pad_ht = (((self.ht // 32) + 1) * 32 - self.ht) % 32
         pad_wd = (((self.wd // 32) + 1) * 32 - self.wd) % 32
-        if mode == 'sintel':
-            self._pad = [pad_wd//2, pad_wd - pad_wd//2, pad_ht//2, pad_ht - pad_ht//2]
+        if mode == "sintel":
+            self._pad = [
+                pad_wd // 2,
+                pad_wd - pad_wd // 2,
+                pad_ht // 2,
+                pad_ht - pad_ht // 2,
+            ]
         else:
-            self._pad = [pad_wd//2, pad_wd - pad_wd//2, 0, pad_ht]
+            self._pad = [pad_wd // 2, pad_wd - pad_wd // 2, 0, pad_ht]
 
     def pad(self, *inputs):
-        return [F.pad(x, self._pad, mode='replicate') for x in inputs]
+        return [F.pad(x, self._pad, mode="replicate") for x in inputs]
 
-    def unpad(self,x):
+    def unpad(self, x):
         ht, wd = x.shape[-2:]
-        c = [self._pad[2], ht-self._pad[3], self._pad[0], wd-self._pad[1]]
-        return x[..., c[0]:c[1], c[2]:c[3]]
+        c = [self._pad[2], ht - self._pad[3], self._pad[0], wd - self._pad[1]]
+        return x[..., c[0] : c[1], c[2] : c[3]]
 
 
 def forward_interpolate(flow):
@@ -34,7 +41,7 @@ def forward_interpolate(flow):
 
     x1 = x0 + dx
     y1 = y0 + dy
-    
+
     x1 = x1.reshape(-1)
     y1 = y1.reshape(-1)
     dx = dx.reshape(-1)
@@ -47,21 +54,23 @@ def forward_interpolate(flow):
     dy = dy[valid]
 
     flow_x = interpolate.griddata(
-        (x1, y1), dx, (x0, y0), method='nearest', fill_value=0)
+        (x1, y1), dx, (x0, y0), method="nearest", fill_value=0
+    )
 
     flow_y = interpolate.griddata(
-        (x1, y1), dy, (x0, y0), method='nearest', fill_value=0)
+        (x1, y1), dy, (x0, y0), method="nearest", fill_value=0
+    )
 
     flow = np.stack([flow_x, flow_y], axis=0)
     return torch.from_numpy(flow).float()
 
 
-def bilinear_sampler(img, coords, mode='bilinear', mask=False):
-    """ Wrapper for grid_sample, uses pixel coordinates """
+def bilinear_sampler(img, coords, mode="bilinear", mask=False):
+    """Wrapper for grid_sample, uses pixel coordinates"""
     H, W = img.shape[-2:]
-    xgrid, ygrid = coords.split([1,1], dim=-1)
-    xgrid = 2*xgrid/(W-1) - 1
-    ygrid = 2*ygrid/(H-1) - 1
+    xgrid, ygrid = coords.split([1, 1], dim=-1)
+    xgrid = 2 * xgrid / (W - 1) - 1
+    ygrid = 2 * ygrid / (H - 1) - 1
 
     grid = torch.cat([xgrid, ygrid], dim=-1)
     img = F.grid_sample(img, grid, align_corners=True)
@@ -73,7 +82,9 @@ def bilinear_sampler(img, coords, mode='bilinear', mask=False):
     return img
 
 
-def bilinear_sample(img, sample_coords, mode='bilinear', padding_mode='zeros', return_mask=False):
+def bilinear_sample(
+    img, sample_coords, mode="bilinear", padding_mode="zeros", return_mask=False
+):
     # img: [B, C, H, W]
     # sample_coords: [B, 2, H, W] in image scale
     if sample_coords.size(1) != 2:  # [B, H, W, 2]
@@ -87,10 +98,14 @@ def bilinear_sample(img, sample_coords, mode='bilinear', padding_mode='zeros', r
 
     grid = torch.stack([x_grid, y_grid], dim=-1)  # [B, H, W, 2]
 
-    img = F.grid_sample(img, grid, mode=mode, padding_mode=padding_mode, align_corners=True)
+    img = F.grid_sample(
+        img, grid, mode=mode, padding_mode=padding_mode, align_corners=True
+    )
 
     if return_mask:
-        mask = (x_grid >= -1) & (y_grid >= -1) & (x_grid <= 1) & (y_grid <= 1)  # [B, H, W]
+        mask = (
+            (x_grid >= -1) & (y_grid >= -1) & (x_grid <= 1) & (y_grid <= 1)
+        )  # [B, H, W]
 
         return img, mask
 
@@ -98,12 +113,12 @@ def bilinear_sample(img, sample_coords, mode='bilinear', padding_mode='zeros', r
 
 
 def coords_grid(batch, ht, wd):
-    coords = torch.meshgrid(torch.arange(ht), torch.arange(wd), indexing='ij')
+    coords = torch.meshgrid(torch.arange(ht), torch.arange(wd), indexing="ij")
     coords = torch.stack(coords[::-1], dim=0).float()
     return coords[None].expand(batch, -1, -1, -1)
 
 
-def flow_warp(image, flow, mask=False, padding_mode='zeros'):
+def flow_warp(image, flow, mask=False, padding_mode="zeros"):
     b, c, h, w = image.size()
     assert flow.size(1) == 2
 
@@ -114,7 +129,7 @@ def flow_warp(image, flow, mask=False, padding_mode='zeros'):
 
 def coords_grid_y_first(batch, ht, wd):
     """Place y grid before x grid"""
-    coords = torch.meshgrid(torch.arange(ht), torch.arange(wd), indexing='ij')
+    coords = torch.meshgrid(torch.arange(ht), torch.arange(wd), indexing="ij")
     coords = torch.stack(coords, dim=0).int()
     return coords[None].expand(batch, -1, -1, -1)
 
@@ -129,7 +144,7 @@ def soft_argmax(corr_me, B, H1, W1):
         coord_img_1 = coord[:, :2].to(corr_me.device)
         coord_img_2 = coord[:, 2:].to(corr_me.device)
         # relative positions (flow hypotheses)
-        rel_pos = (coord_img_2 - coord_img_1)
+        rel_pos = coord_img_2 - coord_img_1
         # augmented indices
         aug_coord_img_1 = (coord_img_1[:, 0:1] * W1 + coord_img_1[:, 1:2]).long()
         # run softmax on the score
@@ -137,31 +152,31 @@ def soft_argmax(corr_me, B, H1, W1):
         rel_pos_weighted = weight * rel_pos
         out = scatter_add(rel_pos_weighted, aug_coord_img_1, dim=0)
         # Need to permute (y, x) to (x, y) for flow
-        flow_pred[batch] = out[:, [1,0]].view(H1, W1, 2).permute(2, 0, 1)
+        flow_pred[batch] = out[:, [1, 0]].view(H1, W1, 2).permute(2, 0, 1)
     return flow_pred
 
 
-def upflow8(flow, mode='bilinear'):
+def upflow8(flow, mode="bilinear"):
     new_size = (8 * flow.shape[2], 8 * flow.shape[3])
     return 8 * F.interpolate(flow, size=new_size, mode=mode, align_corners=True)
 
 
-def upflow4(flow, mode='bilinear'):
+def upflow4(flow, mode="bilinear"):
     new_size = (4 * flow.shape[2], 4 * flow.shape[3])
     return 4 * F.interpolate(flow, size=new_size, mode=mode, align_corners=True)
 
 
-def upflow2(flow, mode='bilinear'):
+def upflow2(flow, mode="bilinear"):
     new_size = (2 * flow.shape[2], 2 * flow.shape[3])
     return 2 * F.interpolate(flow, size=new_size, mode=mode, align_corners=True)
 
 
-def downflow8(flow, mode='bilinear'):
+def downflow8(flow, mode="bilinear"):
     new_size = (flow.shape[2] // 8, flow.shape[3] // 8)
     return F.interpolate(flow, size=new_size, mode=mode, align_corners=True) / 8
 
 
-def downflow4(flow, mode='bilinear'):
+def downflow4(flow, mode="bilinear"):
     new_size = (flow.shape[2] // 4, flow.shape[3] // 4)
     return F.interpolate(flow, size=new_size, mode=mode, align_corners=True) / 4
 
@@ -183,13 +198,18 @@ def compute_interpolation_weights(yx_warped):
     w3 = (y_warped - y_f) * (x_warped - x_f)
 
     weights = [w0, w1, w2, w3]
-    indices = [torch.stack([y_f, x_f], dim=1), torch.stack([y_c, x_f], dim=1),
-               torch.stack([y_f, x_c], dim=1), torch.stack([y_c, x_c], dim=1)]
+    indices = [
+        torch.stack([y_f, x_f], dim=1),
+        torch.stack([y_c, x_f], dim=1),
+        torch.stack([y_f, x_c], dim=1),
+        torch.stack([y_c, x_c], dim=1),
+    ]
     weights = torch.cat(weights, dim=1)
     indices = torch.cat(indices, dim=2)
     # indices = torch.cat(indices, dim=0)  # [4*N, 2]
 
     return weights, indices
+
 
 # weights, indices = compute_interpolation_weights(xy_warped, b, h_i, w_i)
 

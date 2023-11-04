@@ -27,27 +27,108 @@ try:
         i2 = i1.clone()
 
         test_params = [
-            {'patch_size': (1, 1), 'stride': (1, 1), 'padding': (0, 0), 'dilation_patch': (1, 1)},
-            {'patch_size': (3, 3), 'stride': (1, 1), 'padding': (0, 0), 'dilation_patch': (1, 1)},
-            {'patch_size': (1, 1), 'stride': (2, 2), 'padding': (0, 0), 'dilation_patch': (1, 1)},
-            {'patch_size': (1, 1), 'stride': (1, 1), 'padding': (1, 1), 'dilation_patch': (1, 1)},
-            {'patch_size': (1, 1), 'stride': (1, 1), 'padding': (0, 0), 'dilation_patch': (2, 2)},
-            {'patch_size': (5, 5), 'stride': (3, 3), 'padding': (0, 0), 'dilation_patch': (1, 1)},
-            {'patch_size': (7, 7), 'stride': (1, 1), 'padding': (2, 2), 'dilation_patch': (1, 1)},
-            {'patch_size': (9, 9), 'stride': (1, 1), 'padding': (0, 0), 'dilation_patch': (3, 3)},
-            {'patch_size': (1, 1), 'stride': (2, 2), 'padding': (3, 3), 'dilation_patch': (1, 1)},
-            {'patch_size': (1, 1), 'stride': (4, 4), 'padding': (0, 0), 'dilation_patch': (4, 4)},
-            {'patch_size': (1, 1), 'stride': (1, 1), 'padding': (4, 4), 'dilation_patch': (5, 5)},
-            {'patch_size': (3, 3), 'stride': (2, 2), 'padding': (1, 1), 'dilation_patch': (1, 1)},
-            {'patch_size': (5, 5), 'stride': (2, 2), 'padding': (0, 0), 'dilation_patch': (2, 2)},
-            {'patch_size': (7, 7), 'stride': (1, 1), 'padding': (1, 1), 'dilation_patch': (2, 2)},
-            {'patch_size': (1, 1), 'stride': (2, 2), 'padding': (1, 1), 'dilation_patch': (2, 2)},
-            {'patch_size': (9, 9), 'stride': (3, 3), 'padding': (5, 5), 'dilation_patch': (4, 4)}
+            {
+                "patch_size": (1, 1),
+                "stride": (1, 1),
+                "padding": (0, 0),
+                "dilation_patch": (1, 1),
+            },
+            {
+                "patch_size": (3, 3),
+                "stride": (1, 1),
+                "padding": (0, 0),
+                "dilation_patch": (1, 1),
+            },
+            {
+                "patch_size": (1, 1),
+                "stride": (2, 2),
+                "padding": (0, 0),
+                "dilation_patch": (1, 1),
+            },
+            {
+                "patch_size": (1, 1),
+                "stride": (1, 1),
+                "padding": (1, 1),
+                "dilation_patch": (1, 1),
+            },
+            {
+                "patch_size": (1, 1),
+                "stride": (1, 1),
+                "padding": (0, 0),
+                "dilation_patch": (2, 2),
+            },
+            {
+                "patch_size": (5, 5),
+                "stride": (3, 3),
+                "padding": (0, 0),
+                "dilation_patch": (1, 1),
+            },
+            {
+                "patch_size": (7, 7),
+                "stride": (1, 1),
+                "padding": (2, 2),
+                "dilation_patch": (1, 1),
+            },
+            {
+                "patch_size": (9, 9),
+                "stride": (1, 1),
+                "padding": (0, 0),
+                "dilation_patch": (3, 3),
+            },
+            {
+                "patch_size": (1, 1),
+                "stride": (2, 2),
+                "padding": (3, 3),
+                "dilation_patch": (1, 1),
+            },
+            {
+                "patch_size": (1, 1),
+                "stride": (4, 4),
+                "padding": (0, 0),
+                "dilation_patch": (4, 4),
+            },
+            {
+                "patch_size": (1, 1),
+                "stride": (1, 1),
+                "padding": (4, 4),
+                "dilation_patch": (5, 5),
+            },
+            {
+                "patch_size": (3, 3),
+                "stride": (2, 2),
+                "padding": (1, 1),
+                "dilation_patch": (1, 1),
+            },
+            {
+                "patch_size": (5, 5),
+                "stride": (2, 2),
+                "padding": (0, 0),
+                "dilation_patch": (2, 2),
+            },
+            {
+                "patch_size": (7, 7),
+                "stride": (1, 1),
+                "padding": (1, 1),
+                "dilation_patch": (2, 2),
+            },
+            {
+                "patch_size": (1, 1),
+                "stride": (2, 2),
+                "padding": (1, 1),
+                "dilation_patch": (2, 2),
+            },
+            {
+                "patch_size": (9, 9),
+                "stride": (3, 3),
+                "padding": (5, 5),
+                "dilation_patch": (4, 4),
+            },
         ]
         for p in test_params:
             cref = spatial_correlation_sample(i1, i2, **p)
             ctest = iter_spatial_correlation_sample(i1, i2, **p)
             diff = torch.abs(cref - ctest).max().item()
             assert diff < 10
+
 except ModuleNotFoundError:
     pass

@@ -8,11 +8,13 @@ class Attention1D(nn.Module):
     without multi-head and dropout support for faster speed
     """
 
-    def __init__(self, in_channels,
-                 y_attention=False,
-                 double_cross_attn=False,  # cross attn feature1 before computing cross attn feature2
-                 **kwargs,
-                 ):
+    def __init__(
+        self,
+        in_channels,
+        y_attention=False,
+        double_cross_attn=False,  # cross attn feature1 before computing cross attn feature2
+        **kwargs,
+    ):
         super(Attention1D, self).__init__()
 
         self.y_attention = y_attention
@@ -20,10 +22,12 @@ class Attention1D(nn.Module):
 
         # self attn feature1 before cross attn
         if double_cross_attn:
-            self.self_attn = copy.deepcopy(Attention1D(in_channels=in_channels,
-                                                       y_attention=not y_attention,
-                                                       )
-                                           )
+            self.self_attn = copy.deepcopy(
+                Attention1D(
+                    in_channels=in_channels,
+                    y_attention=not y_attention,
+                )
+            )
 
         self.query_conv = nn.Conv2d(in_channels, in_channels, 1)
         self.key_conv = nn.Conv2d(in_channels, in_channels, 1)
@@ -38,7 +42,9 @@ class Attention1D(nn.Module):
 
         # self attn before cross attn
         if self.double_cross_attn:
-            feature1 = self.self_attn(feature1, feature1, position)[0]  # self attn feature1
+            feature1 = self.self_attn(feature1, feature1, position)[
+                0
+            ]  # self attn feature1
 
         query = feature1 + position if position is not None else feature1
         query = self.query_conv(query)  # [B, C, H, W]
@@ -47,7 +53,7 @@ class Attention1D(nn.Module):
 
         key = self.key_conv(key)  # [B, C, H, W]
         value = feature2 if value is None else value  # [B, C, H, W]
-        scale_factor = c ** 0.5
+        scale_factor = c**0.5
 
         if self.y_attention:
             query = query.permute(0, 3, 2, 1)  # [B, W, H, C]

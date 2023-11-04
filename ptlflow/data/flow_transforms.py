@@ -39,10 +39,7 @@ import torchvision.transforms as tt
 class Compose(object):
     """Similar to torchvision Compose. Applies a series of transforms from the input list in sequence."""
 
-    def __init__(
-        self,
-        transforms_list: Sequence[object]
-    ) -> None:
+    def __init__(self, transforms_list: Sequence[object]) -> None:
         """Initialize Compose.
 
         Parameters
@@ -53,8 +50,7 @@ class Compose(object):
         self.transforms_list = transforms_list
 
     def __call__(
-        self,
-        inputs: Dict[str, Union[np.ndarray, Sequence[np.ndarray]]]
+        self, inputs: Dict[str, Union[np.ndarray, Sequence[np.ndarray]]]
     ) -> Dict[str, torch.Tensor]:
         """Perform the transformation on the inputs.
 
@@ -82,9 +78,9 @@ class ToTensor(object):
     def __init__(
         self,
         fp16: bool = False,
-        device: Union[str, torch.device] = 'cpu',
+        device: Union[str, torch.device] = "cpu",
         use_keys: Optional[Union[KeysView, Sequence[str]]] = None,
-        ignore_keys: Optional[Union[KeysView, Sequence[str]]] = None
+        ignore_keys: Optional[Union[KeysView, Sequence[str]]] = None,
     ) -> None:
         """Initialize ToTensor.
 
@@ -106,8 +102,7 @@ class ToTensor(object):
         self.ignore_keys = ignore_keys
 
     def __call__(
-        self,
-        inputs: Dict[str, Union[np.ndarray, Sequence[np.ndarray]]]
+        self, inputs: Dict[str, Union[np.ndarray, Sequence[np.ndarray]]]
     ) -> Dict[str, torch.Tensor]:
         """Perform the transformation on the inputs.
 
@@ -157,8 +152,8 @@ class ColorJitter(tt.ColorJitter):
         saturation: Union[float, Tuple[float, float]] = 0.0,
         hue: Union[float, Tuple[float, float]] = 0.0,
         asymmetric_prob: float = 0.0,
-        use_keys: Optional[Union[KeysView, Sequence[str]]] = ('images',),
-        ignore_keys: Optional[Union[KeysView, Sequence[str]]] = None
+        use_keys: Optional[Union[KeysView, Sequence[str]]] = ("images",),
+        ignore_keys: Optional[Union[KeysView, Sequence[str]]] = None,
     ) -> None:
         """Initialize ColorJitter.
 
@@ -181,15 +176,14 @@ class ColorJitter(tt.ColorJitter):
         ignore_keys : Optional[Union[KeysView, Sequence[str]]], optional
             If use_keys is None, the these keys are NOT transformed by this operation.
         """
-        super().__init__(brightness=brightness, contrast=contrast, saturation=saturation, hue=hue)
+        super().__init__(
+            brightness=brightness, contrast=contrast, saturation=saturation, hue=hue
+        )
         self.asymmetric_prob = asymmetric_prob
         self.use_keys = use_keys
         self.ignore_keys = ignore_keys
 
-    def __call__(
-        self,
-        inputs: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+    def __call__(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Perform the transformation on the inputs.
 
         Parameters
@@ -219,8 +213,8 @@ class GaussianNoise(object):
     def __init__(
         self,
         stdev: float = 0.0,
-        use_keys: Optional[Union[KeysView, Sequence[str]]] = ('images',),
-        ignore_keys: Optional[Union[KeysView, Sequence[str]]] = None
+        use_keys: Optional[Union[KeysView, Sequence[str]]] = ("images",),
+        ignore_keys: Optional[Union[KeysView, Sequence[str]]] = None,
     ) -> None:
         """Initialize GaussianNoise.
 
@@ -238,10 +232,7 @@ class GaussianNoise(object):
         self.use_keys = use_keys
         self.ignore_keys = ignore_keys
 
-    def __call__(
-        self,
-        inputs: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+    def __call__(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Perform the transformation on the inputs.
 
         Parameters
@@ -258,7 +249,9 @@ class GaussianNoise(object):
         for k in valid_keys:
             v = inputs[k]
             std = random.uniform(0.0, self.stdev)
-            inputs[k] = (v + std * torch.randn(*v.shape, dtype=v.dtype, device=v.device)).clamp(0.0, 1.0)
+            inputs[k] = (
+                v + std * torch.randn(*v.shape, dtype=v.dtype, device=v.device)
+            ).clamp(0.0, 1.0)
         return inputs
 
 
@@ -273,9 +266,9 @@ class RandomPatchEraser(object):
         erase_prob: float = 0.0,
         num_patches: Union[int, Tuple[int, int]] = 1,
         patch_size: Union[Tuple[int, int], Tuple[int, int, int, int]] = (0, 0),
-        noise_type: str = 'mean',
-        use_keys: Optional[Union[KeysView, Sequence[str]]] = ('images',),
-        ignore_keys: Optional[Union[KeysView, Sequence[str]]] = None
+        noise_type: str = "mean",
+        use_keys: Optional[Union[KeysView, Sequence[str]]] = ("images",),
+        ignore_keys: Optional[Union[KeysView, Sequence[str]]] = None,
     ) -> None:
         """Initialize RandomPatchEraser.
 
@@ -305,12 +298,14 @@ class RandomPatchEraser(object):
             self.num_patches = (num_patches, num_patches)
         self.patch_size = patch_size
         if len(patch_size) == 2:
-            self.patch_size = (patch_size[0], patch_size[1], patch_size[0], patch_size[1])
+            self.patch_size = (
+                patch_size[0],
+                patch_size[1],
+                patch_size[0],
+                patch_size[1],
+            )
 
-    def __call__(
-        self,
-        inputs: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+    def __call__(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Perform the transformation on the inputs.
 
         Parameters
@@ -328,22 +323,30 @@ class RandomPatchEraser(object):
             for k in valid_keys:
                 im2 = inputs[k][1]
                 c, h, w = im2.shape
-                if self.noise_type == 'mean':
+                if self.noise_type == "mean":
                     mean_color = im2.reshape(c, -1).mean(dim=1)
-                for _ in range(random.randint(self.num_patches[0], self.num_patches[1])):
+                for _ in range(
+                    random.randint(self.num_patches[0], self.num_patches[1])
+                ):
                     hp = random.randint(self.patch_size[0], self.patch_size[1])
                     wp = random.randint(self.patch_size[2], self.patch_size[3])
                     if hp > 0 and wp > 0:
-                        yp = random.randint(0, h-hp)
-                        xp = random.randint(0, w-wp)
-                        if self.noise_type == 'mean':
+                        yp = random.randint(0, h - hp)
+                        xp = random.randint(0, w - wp)
+                        if self.noise_type == "mean":
                             noise = mean_color[:, None, None].repeat(1, hp, wp)
                         else:
                             im_min = im2.min()
                             im_max = im2.max()
                             im_inter = im_max - im_min
-                            noise = im_inter*torch.rand(c, hp, wp, dtype=im2.dtype, device=im2.device) + im_min
-                        im2[:, yp:yp+hp, xp:xp+wp] = noise
+                            noise = (
+                                im_inter
+                                * torch.rand(
+                                    c, hp, wp, dtype=im2.dtype, device=im2.device
+                                )
+                                + im_min
+                            )
+                        im2[:, yp : yp + hp, xp : xp + wp] = noise
         return inputs
 
 
@@ -360,8 +363,8 @@ class RandomFlip(object):
         asymmetric_prob: float = 0.0,
         use_keys: Optional[Union[KeysView, Sequence[str]]] = None,
         ignore_keys: Optional[Union[KeysView, Sequence[str]]] = None,
-        image_keys: Union[KeysView, Sequence[str]] = ('images',),
-        flow_keys: Union[KeysView, Sequence[str]] = ('flows', 'flows_b')
+        image_keys: Union[KeysView, Sequence[str]] = ("images",),
+        flow_keys: Union[KeysView, Sequence[str]] = ("flows", "flows_b"),
     ) -> None:
         """Initialize RandomFlip.
 
@@ -391,10 +394,7 @@ class RandomFlip(object):
         self.image_keys = list(image_keys)
         self.flow_keys = list(flow_keys)
 
-    def __call__(
-        self,
-        inputs: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+    def __call__(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Perform the transformation on the inputs.
 
         Parameters
@@ -413,16 +413,25 @@ class RandomFlip(object):
                 if random.random() < self.flip_probs[iorient]:
                     inputs = self._flip_inputs(inputs, iorient == 0, valid_keys)
             else:
-                is_flips = [random.random() < self.flip_probs[iorient] for _ in range(inputs[self.image_keys[0]].shape[0])]
+                is_flips = [
+                    random.random() < self.flip_probs[iorient]
+                    for _ in range(inputs[self.image_keys[0]].shape[0])
+                ]
                 for i in range(inputs[self.flow_keys[0]].shape[0]):
                     if is_flips[i]:
-                        inputs = self._flip_inputs(inputs, iorient == 0, valid_keys, ibatch=i)
-                    if is_flips[i] != is_flips[i+1]:
+                        inputs = self._flip_inputs(
+                            inputs, iorient == 0, valid_keys, ibatch=i
+                        )
+                    if is_flips[i] != is_flips[i + 1]:
                         for fk in self.flow_keys:
-                            inputs[fk][i] = self._mirror_flow(inputs[fk][i], iorient == 0)
+                            inputs[fk][i] = self._mirror_flow(
+                                inputs[fk][i], iorient == 0
+                            )
                 if is_flips[-1]:
                     for ik in self.image_keys:
-                        inputs = self._flip_inputs(inputs, iorient == 0, inputs_keys=[ik], ibatch=-1)
+                        inputs = self._flip_inputs(
+                            inputs, iorient == 0, inputs_keys=[ik], ibatch=-1
+                        )
 
         return inputs
 
@@ -431,7 +440,7 @@ class RandomFlip(object):
         inputs: Dict[str, torch.Tensor],
         is_hflip: bool,
         valid_keys: Optional[Sequence[str]] = None,
-        ibatch: Optional[int] = None
+        ibatch: Optional[int] = None,
     ) -> Dict[str, torch.Tensor]:
         """Flips all inputs horizontally or vertically.
 
@@ -465,19 +474,15 @@ class RandomFlip(object):
         for k in valid_keys:
             if ibatch is None:
                 inputs[k] = torch.flip(inputs[k], [iinp])
-                if 'flows' in k:
+                if "flows" in k:
                     inputs[k][:, iflow] *= -1
             else:
-                inputs[k][ibatch] = torch.flip(inputs[k][ibatch], [iinp-1])
-                if 'flows' in k:
+                inputs[k][ibatch] = torch.flip(inputs[k][ibatch], [iinp - 1])
+                if "flows" in k:
                     inputs[k][ibatch, iflow] *= -1
         return inputs
 
-    def _mirror_flow(
-        self,
-        flow: torch.Tensor,
-        is_hflip: bool
-    ) -> torch.Tensor:
+    def _mirror_flow(self, flow: torch.Tensor, is_hflip: bool) -> torch.Tensor:
         """Reflects the flow along the center line of the image.
 
         This function is used when an asymmetric flip happens (one image flips, but the next does not, or vice-versa).
@@ -494,14 +499,16 @@ class RandomFlip(object):
         torch.Tensor
             The mirrored flow.
         """
-        grid = torch.meshgrid(torch.arange(flow.shape[1]), torch.arange(flow.shape[2]), indexing='ij')
+        grid = torch.meshgrid(
+            torch.arange(flow.shape[1]), torch.arange(flow.shape[2]), indexing="ij"
+        )
         grid = torch.stack(grid[::-1]).float()
         if is_hflip:
-            mean_coord = (flow.shape[2]-1) / 2.0
-            flow[0] = 2*(mean_coord-grid[0]) - flow[0]
+            mean_coord = (flow.shape[2] - 1) / 2.0
+            flow[0] = 2 * (mean_coord - grid[0]) - flow[0]
         else:
-            mean_coord = (flow.shape[1]-1) / 2.0
-            flow[1] = 2*(mean_coord-grid[1]) - flow[1]
+            mean_coord = (flow.shape[1] - 1) / 2.0
+            flow[1] = 2 * (mean_coord - grid[1]) - flow[1]
         return flow
 
 
@@ -548,13 +555,26 @@ class RandomScaleAndCrop(object):
         self,
         crop_size: Optional[Tuple[int, int]] = None,
         major_scale: Tuple[float, float] = (0.0, 0.0),
-        space_scale: Union[Tuple[float, float], Tuple[float, float, float, float]] = (0.0, 0.0),
-        time_scale: Union[Tuple[float, float], Tuple[float, float, float, float]] = (0.0, 0.0),
-        binary_keys: Union[KeysView, Sequence[str]] = ('mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b'),
-        flow_keys: Union[KeysView, Sequence[str]] = ('flows', 'flows_b'),
-        occlusion_keys: Union[KeysView, Sequence[str]] = ('occs', 'occs_b'),
+        space_scale: Union[Tuple[float, float], Tuple[float, float, float, float]] = (
+            0.0,
+            0.0,
+        ),
+        time_scale: Union[Tuple[float, float], Tuple[float, float, float, float]] = (
+            0.0,
+            0.0,
+        ),
+        binary_keys: Union[KeysView, Sequence[str]] = (
+            "mbs",
+            "occs",
+            "valids",
+            "mbs_b",
+            "occs_b",
+            "valids_b",
+        ),
+        flow_keys: Union[KeysView, Sequence[str]] = ("flows", "flows_b"),
+        occlusion_keys: Union[KeysView, Sequence[str]] = ("occs", "occs_b"),
         sparse: bool = False,
-        valid_key: str = 'valids'
+        valid_key: str = "valids",
     ) -> None:
         """Initialize RandomScaleAndCrop.
 
@@ -584,16 +604,33 @@ class RandomScaleAndCrop(object):
         self.crop_size = crop_size
         self.major_scale = major_scale
         if len(major_scale) == 2:
-            self.major_scale = (major_scale[0], major_scale[1], major_scale[0], major_scale[1])
+            self.major_scale = (
+                major_scale[0],
+                major_scale[1],
+                major_scale[0],
+                major_scale[1],
+            )
         self.space_scale = space_scale
         if len(space_scale) == 2:
-            self.space_scale = (space_scale[0], space_scale[1], space_scale[0], space_scale[1])
+            self.space_scale = (
+                space_scale[0],
+                space_scale[1],
+                space_scale[0],
+                space_scale[1],
+            )
         self.time_scale = time_scale
         if len(time_scale) == 2:
-            self.time_scale = (time_scale[0], time_scale[1], time_scale[0], time_scale[1])
+            self.time_scale = (
+                time_scale[0],
+                time_scale[1],
+                time_scale[0],
+                time_scale[1],
+            )
 
-        self.use_time_scale = (abs(self.time_scale[1]-self.time_scale[0]) > 1e-5
-                               and abs(self.time_scale[3]-self.time_scale[2]) > 1e-5)
+        self.use_time_scale = (
+            abs(self.time_scale[1] - self.time_scale[0]) > 1e-5
+            and abs(self.time_scale[3] - self.time_scale[2]) > 1e-5
+        )
         self.binary_keys = list(binary_keys)
         self.flow_keys = list(flow_keys)
         self.occlusion_keys = list(occlusion_keys)
@@ -601,8 +638,7 @@ class RandomScaleAndCrop(object):
         self.valid_key = valid_key
 
     def __call__(  # noqa: C901
-        self,
-        inputs: Dict[str, torch.Tensor]
+        self, inputs: Dict[str, torch.Tensor]
     ) -> Dict[str, torch.Tensor]:
         """Perform the transformation on the inputs.
 
@@ -623,24 +659,40 @@ class RandomScaleAndCrop(object):
         """
         h, w = inputs[self.flow_keys[0]].shape[2:4]
         major_scale = 2 ** random.uniform(self.major_scale[0], self.major_scale[1])
-        space_scales = (2 ** random.uniform(self.space_scale[0], self.space_scale[1]),
-                        2 ** random.uniform(self.space_scale[2], self.space_scale[3]))
+        space_scales = (
+            2 ** random.uniform(self.space_scale[0], self.space_scale[1]),
+            2 ** random.uniform(self.space_scale[2], self.space_scale[3]),
+        )
         if self.use_time_scale:
-            raise NotImplementedError('time_scale is currently not supported')
+            raise NotImplementedError("time_scale is currently not supported")
         else:
             min_size = self.crop_size
             if min_size is None:
                 min_size = (1, 1)
-            scaled_size = (max(min_size[0], int(h*major_scale*space_scales[0])),
-                           max(min_size[1], int(w*major_scale*space_scales[1])))
+            scaled_size = (
+                max(min_size[0], int(h * major_scale * space_scales[0])),
+                max(min_size[1], int(w * major_scale * space_scales[1])),
+            )
             if self.crop_size is not None:
-                y_crop = random.randint(0, scaled_size[0]-self.crop_size[0])
-                x_crop = random.randint(0, scaled_size[1]-self.crop_size[1])
+                y_crop = random.randint(0, scaled_size[0] - self.crop_size[0])
+                x_crop = random.randint(0, scaled_size[1] - self.crop_size[1])
 
-            inputs = _resize(inputs, scaled_size, self.binary_keys, self.flow_keys, self.sparse, self.valid_key)
+            inputs = _resize(
+                inputs,
+                scaled_size,
+                self.binary_keys,
+                self.flow_keys,
+                self.sparse,
+                self.valid_key,
+            )
             if self.crop_size is not None:
                 for k, v in inputs.items():
-                    v = v[:, :, y_crop:y_crop+self.crop_size[0], x_crop:x_crop+self.crop_size[1]]
+                    v = v[
+                        :,
+                        :,
+                        y_crop : y_crop + self.crop_size[0],
+                        x_crop : x_crop + self.crop_size[1],
+                    ]
                     inputs[k] = v
 
             # Update occlusion masks for out-of-bounds flows
@@ -663,8 +715,8 @@ class RandomTranslate(object):
     def __init__(
         self,
         translation: Union[int, Tuple[int, int]] = 0,
-        flow_keys: Union[KeysView, Sequence[str]] = ('flows', 'flows_b'),
-        occlusion_keys: Union[KeysView, Sequence[str]] = ('occs', 'occs_b')
+        flow_keys: Union[KeysView, Sequence[str]] = ("flows", "flows_b"),
+        occlusion_keys: Union[KeysView, Sequence[str]] = ("occs", "occs_b"),
     ) -> None:
         """Initialize RandomTranslate.
 
@@ -684,10 +736,7 @@ class RandomTranslate(object):
         self.flow_keys = flow_keys
         self.occlusion_keys = occlusion_keys
 
-    def __call__(
-        self,
-        inputs: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+    def __call__(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Perform the transformation on the inputs.
 
         Parameters
@@ -707,7 +756,10 @@ class RandomTranslate(object):
         if tw == 0 and th == 0:
             return inputs
 
-        trans_inputs = {k: torch.empty_like(v[:, :, :h-abs(th), :w-abs(tw)]) for k, v in inputs.items()}
+        trans_inputs = {
+            k: torch.empty_like(v[:, :, : h - abs(th), : w - abs(tw)])
+            for k, v in inputs.items()
+        }
 
         # Translate: 0: even indexed inputs, 1: odd indexed inputs
         for t in range(2):
@@ -717,8 +769,8 @@ class RandomTranslate(object):
             else:
                 ftw = -tw
                 fth = -th
-            x1, x2 = max(0, ftw), min(w+ftw, w)
-            y1, y2 = max(0, fth), min(h+fth, h)
+            x1, x2 = max(0, ftw), min(w + ftw, w)
+            y1, y2 = max(0, fth), min(h + fth, h)
             for k, v in inputs.items():
                 trans_inputs[k][t::2] = v[t::2, :, y1:y2, x1:x2]
                 if k in self.flow_keys:
@@ -748,11 +800,18 @@ class RandomRotate(object):
         self,
         angle: float = 0.0,
         diff_angle: float = 0.0,
-        flow_keys: Union[KeysView, Sequence[str]] = ('flows', 'flows_b'),
-        occlusion_keys: Union[KeysView, Sequence[str]] = ('occs', 'occs_b'),
-        valid_keys: Union[KeysView, Sequence[str]] = ('valids', 'valids_b'),
-        binary_keys: Union[KeysView, Sequence[str]] = ('mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b'),
-        sparse: bool = False
+        flow_keys: Union[KeysView, Sequence[str]] = ("flows", "flows_b"),
+        occlusion_keys: Union[KeysView, Sequence[str]] = ("occs", "occs_b"),
+        valid_keys: Union[KeysView, Sequence[str]] = ("valids", "valids_b"),
+        binary_keys: Union[KeysView, Sequence[str]] = (
+            "mbs",
+            "occs",
+            "valids",
+            "mbs_b",
+            "occs_b",
+            "valids_b",
+        ),
+        sparse: bool = False,
     ) -> None:
         """Initialize RandomRotate.
 
@@ -782,8 +841,7 @@ class RandomRotate(object):
         self.sparse = sparse
 
     def __call__(  # noqa: C901
-        self,
-        inputs: Dict[str, torch.Tensor]
+        self, inputs: Dict[str, torch.Tensor]
     ) -> Dict[str, torch.Tensor]:
         """Perform the transformation on the inputs.
 
@@ -804,57 +862,52 @@ class RandomRotate(object):
         b, _, h, w = input_tensor.shape
 
         def generate_rotation_grid(
-            rot_angle: float,
-            batch_size: int,
-            dtype: torch.dtype,
-            device: torch.device
+            rot_angle: float, batch_size: int, dtype: torch.dtype, device: torch.device
         ) -> torch.Tensor:
-            vy, vx = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
+            vy, vx = torch.meshgrid(torch.arange(h), torch.arange(w), indexing="ij")
             vx = vx.type(dtype)
             vy = vy.type(dtype)
             vx = vx.to(device)
             vy = vy.to(device)
-            vx -= (w-1.0)/2.0
-            vy -= (h-1.0)/2.0
-            angle_rad = rot_angle*2*np.pi / 360
-            rotx = np.cos(angle_rad)*vx - np.sin(angle_rad)*vy
-            roty = np.sin(angle_rad)*vx + np.cos(angle_rad)*vy
-            rotx = rotx / ((w-1)/2)
-            roty = roty / ((h-1)/2)
+            vx -= (w - 1.0) / 2.0
+            vy -= (h - 1.0) / 2.0
+            angle_rad = rot_angle * 2 * np.pi / 360
+            rotx = np.cos(angle_rad) * vx - np.sin(angle_rad) * vy
+            roty = np.sin(angle_rad) * vx + np.cos(angle_rad) * vy
+            rotx = rotx / ((w - 1) / 2)
+            roty = roty / ((h - 1) / 2)
             rot_grid = torch.stack((rotx, roty), dim=2)[None]
             rot_grid = rot_grid.repeat(batch_size, 1, 1, 1)
             return rot_grid
 
         def generate_rotation_matrix(
-            rot_angle: float,
-            batch_size: int,
-            dtype: torch.dtype,
-            device: torch.device
+            rot_angle: float, batch_size: int, dtype: torch.dtype, device: torch.device
         ) -> torch.Tensor:
-            vx, vy = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
+            vx, vy = torch.meshgrid(torch.arange(h), torch.arange(w), indexing="ij")
             vx = vx.type(dtype)
             vy = vy.type(dtype)
             vx = vx.to(device)
             vy = vy.to(device)
-            rotx = (vx - h/2.0) * (rot_angle*np.pi/180.0)
-            roty = -(vy - w/2.0) * (rot_angle*np.pi/180.0)
+            rotx = (vx - h / 2.0) * (rot_angle * np.pi / 180.0)
+            roty = -(vy - w / 2.0) * (rot_angle * np.pi / 180.0)
             rot_mat = torch.stack((rotx, roty), dim=0)[None]
             rot_mat = rot_mat.repeat(batch_size, 1, 1, 1)
             return rot_mat
 
-        def rotate_flow(
-            flow: torch.Tensor,
-            rot_angle: float
-        ) -> torch.Tensor:
-            angle_rad = rot_angle*2*np.pi / 360
+        def rotate_flow(flow: torch.Tensor, rot_angle: float) -> torch.Tensor:
+            angle_rad = rot_angle * 2 * np.pi / 360
             rot_flow = flow.clone()
             rot_flow[:, 0] = (
-                np.cos(angle_rad)*flow[:, 0] + np.sin(angle_rad)*flow[:, 1])
+                np.cos(angle_rad) * flow[:, 0] + np.sin(angle_rad) * flow[:, 1]
+            )
             rot_flow[:, 1] = (
-                -np.sin(angle_rad)*flow[:, 0] + np.cos(angle_rad)*flow[:, 1])
+                -np.sin(angle_rad) * flow[:, 0] + np.cos(angle_rad) * flow[:, 1]
+            )
             return rot_flow
 
-        rot_mat = generate_rotation_matrix(inter_angle, b//2+1, input_tensor.dtype, input_tensor.device)
+        rot_mat = generate_rotation_matrix(
+            inter_angle, b // 2 + 1, input_tensor.dtype, input_tensor.device
+        )
         for t in range(2):
             if t == 0:
                 inangle = -inter_angle
@@ -865,22 +918,38 @@ class RandomRotate(object):
             angle = major_angle + inangle / 2
             num_flows = input_tensor[t::2].shape[0]
             num_images = num_flows + 1
-            rot_grid = generate_rotation_grid(angle, num_images, input_tensor.dtype, input_tensor.device)
+            rot_grid = generate_rotation_grid(
+                angle, num_images, input_tensor.dtype, input_tensor.device
+            )
             for k, v in inputs.items():
                 if k in self.flow_keys:
                     v[t::2] += rmat[:num_flows]
 
                 if k in self.binary_keys:
-                    v[t::2] = F.grid_sample(v[t::2], rot_grid[:v[t::2].shape[0]], mode='nearest')
+                    v[t::2] = F.grid_sample(
+                        v[t::2], rot_grid[: v[t::2].shape[0]], mode="nearest"
+                    )
                 else:
                     if k in self.flow_keys:
                         if self.sparse:
-                            v[t::2] = F.grid_sample(v[t::2], rot_grid[:v[t::2].shape[0]], mode='nearest')
+                            v[t::2] = F.grid_sample(
+                                v[t::2], rot_grid[: v[t::2].shape[0]], mode="nearest"
+                            )
                         else:
-                            v[t::2] = F.grid_sample(v[t::2], rot_grid[:v[t::2].shape[0]], mode='bilinear', align_corners=True)
+                            v[t::2] = F.grid_sample(
+                                v[t::2],
+                                rot_grid[: v[t::2].shape[0]],
+                                mode="bilinear",
+                                align_corners=True,
+                            )
                         v[t::2] = rotate_flow(v[t::2], angle)
                     else:
-                        v[t::2] = F.grid_sample(v[t::2], rot_grid[:v[t::2].shape[0]], mode='bilinear', align_corners=True)
+                        v[t::2] = F.grid_sample(
+                            v[t::2],
+                            rot_grid[: v[t::2].shape[0]],
+                            mode="bilinear",
+                            align_corners=True,
+                        )
 
                 if k in self.flow_keys:
                     v[t::2] = rotate_flow(v[t::2], angle)
@@ -909,10 +978,17 @@ class Resize(object):
         self,
         size: Tuple[int, int] = (0, 0),
         scale: float = 1.0,
-        binary_keys: Union[KeysView, Sequence[str]] = ('mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b'),
-        flow_keys: Union[KeysView, Sequence[str]] = ('flows', 'flows_b'),
+        binary_keys: Union[KeysView, Sequence[str]] = (
+            "mbs",
+            "occs",
+            "valids",
+            "mbs_b",
+            "occs_b",
+            "valids_b",
+        ),
+        flow_keys: Union[KeysView, Sequence[str]] = ("flows", "flows_b"),
         sparse: bool = False,
-        valid_key: str = 'valids'
+        valid_key: str = "valids",
     ) -> None:
         """Initialize Resize.
 
@@ -941,10 +1017,7 @@ class Resize(object):
         self.sparse = sparse
         self.valid_key = valid_key
 
-    def __call__(
-        self,
-        inputs: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+    def __call__(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Perform the transformation on the inputs.
 
         Parameters
@@ -959,16 +1032,23 @@ class Resize(object):
         """
         h, w = inputs[list(inputs.keys())[0]].shape[2:4]
         if self.size is None or self.size[0] < 1 or self.size[1] < 1:
-            self.size = (int(self.scale*h), int(self.scale*w))
+            self.size = (int(self.scale * h), int(self.scale * w))
         if self.size[0] != h or self.size[1] != w:
-            inputs = _resize(inputs, self.size, self.binary_keys, self.flow_keys, self.sparse, self.valid_key)
+            inputs = _resize(
+                inputs,
+                self.size,
+                self.binary_keys,
+                self.flow_keys,
+                self.sparse,
+                self.valid_key,
+            )
         return inputs
 
 
 def _get_valid_keys(
     inputs_keys: Union[KeysView, Sequence[str]],
     use_keys: Optional[Union[KeysView, Sequence[str]]],
-    ignore_keys: Optional[Union[KeysView, Sequence[str]]]
+    ignore_keys: Optional[Union[KeysView, Sequence[str]]],
 ) -> Union[KeysView, Sequence[str]]:
     """Get only the valid keys from the input.
 
@@ -1001,7 +1081,7 @@ def _resize(
     binary_keys: Union[KeysView, Sequence[str]],
     flow_keys: Union[KeysView, Sequence[str]],
     sparse: bool,
-    valid_key: str
+    valid_key: str,
 ):
     """Resize inputs to a target size. Set sparse=True when the valid mask has holes.
     This ensures that the resized valid mask does not interpolate the valid positions.
@@ -1030,28 +1110,37 @@ def _resize(
         The updated occlusion masks. Flows which went out-of-bounds are marked as occluded.
     """
     if sparse:
-        assert valid_key in inputs, f'sparse is True, but valid_key({valid_key}) is not in inputs'
+        assert (
+            valid_key in inputs
+        ), f"sparse is True, but valid_key({valid_key}) is not in inputs"
         valids = inputs[valid_key]
         n, k, h, w = valids.shape
         hs, ws = target_size
-        scale_factor = torch.Tensor([float(ws) / w, float(hs) / h], device=valids.device)
-        valids_flat = rearrange(valids, 'n k h w -> n (k h w)')
+        scale_factor = torch.Tensor(
+            [float(ws) / w, float(hs) / h], device=valids.device
+        )
+        valids_flat = rearrange(valids, "n k h w -> n (k h w)")
         xy_scaled_list = []
         inbounds_list = []
         valids_out = torch.zeros(n, k, hs, ws, dtype=torch.float, device=valids.device)
         for i, vflat in enumerate(valids_flat):
             coords = torch.meshgrid(
-                torch.arange(w, device=valids.device), torch.arange(h, device=valids.device), indexing='ij')
+                torch.arange(w, device=valids.device),
+                torch.arange(h, device=valids.device),
+                indexing="ij",
+            )
             coords = torch.stack(coords, dim=-1)
-            coords = rearrange(coords, 'h w k -> (w h) k')
+            coords = rearrange(coords, "h w k -> (w h) k")
 
             coords_valid = coords[vflat >= 1]
 
             coords_scaled = coords_valid * scale_factor
 
-            x_scaled = torch.round(coords_scaled[:,0]).long()
-            y_scaled = torch.round(coords_scaled[:,1]).long()
-            inbounds = (x_scaled > 0) & (x_scaled < ws) & (y_scaled > 0) & (y_scaled < hs)
+            x_scaled = torch.round(coords_scaled[:, 0]).long()
+            y_scaled = torch.round(coords_scaled[:, 1]).long()
+            inbounds = (
+                (x_scaled > 0) & (x_scaled < ws) & (y_scaled > 0) & (y_scaled < hs)
+            )
             inbounds_list.append(inbounds)
             x_scaled = x_scaled[inbounds]
             y_scaled = y_scaled[inbounds]
@@ -1064,40 +1153,48 @@ def _resize(
         for k, v in inputs.items():
             if k != valid_key:
                 if k in binary_keys or k in flow_keys:
-                    v_out = torch.zeros(v.shape[0], v.shape[1], hs, ws, dtype=v.dtype, device=v.device)
+                    v_out = torch.zeros(
+                        v.shape[0], v.shape[1], hs, ws, dtype=v.dtype, device=v.device
+                    )
                     for i, v_one in enumerate(v):
-                        v_flat = rearrange(v_one, 'k h w -> (h w) k')
+                        v_flat = rearrange(v_one, "k h w -> (h w) k")
                         v_valid = v_flat[valids_flat[i] >= 1]
                         if k in flow_keys:
                             v_valid = v_valid * scale_factor
                         v_valid = v_valid[inbounds_list[i]]
-                        v_valid = rearrange(v_valid, 'n k -> k n')
-                        v_out[i, :, xy_scaled_list[i][1], xy_scaled_list[i][0]] = v_valid
+                        v_valid = rearrange(v_valid, "n k -> k n")
+                        v_out[
+                            i, :, xy_scaled_list[i][1], xy_scaled_list[i][0]
+                        ] = v_valid
                     v = v_out
                 else:
-                    v = F.interpolate(v, size=target_size, mode='bilinear', align_corners=True)
+                    v = F.interpolate(
+                        v, size=target_size, mode="bilinear", align_corners=True
+                    )
             inputs[k] = v
     else:
         for k, v in inputs.items():
             h, w = v.shape[-2:]
             if k in binary_keys:
-                v = F.interpolate(v, size=target_size, mode='nearest')
+                v = F.interpolate(v, size=target_size, mode="nearest")
             else:
-                v = F.interpolate(v, size=target_size, mode='bilinear', align_corners=True)
+                v = F.interpolate(
+                    v, size=target_size, mode="bilinear", align_corners=True
+                )
 
             if k in flow_keys:
-                scale_mult = torch.Tensor([float(target_size[1]) / w, float(target_size[0]) / h], device=v.device)[None, :, None, None]
+                scale_mult = torch.Tensor(
+                    [float(target_size[1]) / w, float(target_size[0]) / h],
+                    device=v.device,
+                )[None, :, None, None]
                 v = v * scale_mult
-            
+
             inputs[k] = v
 
     return inputs
 
 
-def _update_oob_flows(
-    occs: torch.Tensor,
-    flows: torch.Tensor
-) -> torch.Tensor:
+def _update_oob_flows(occs: torch.Tensor, flows: torch.Tensor) -> torch.Tensor:
     """Update occlusion maps to include flow which went out-of-bounds.
 
     Parameters
@@ -1115,12 +1212,15 @@ def _update_oob_flows(
     grid = torch.meshgrid(
         torch.arange(flows.shape[2], dtype=flows.dtype, device=flows.device),
         torch.arange(flows.shape[3], dtype=flows.dtype, device=flows.device),
-        indexing='ij')
+        indexing="ij",
+    )
     grid = torch.stack(grid[::-1]).float()[None].repeat(flows.shape[0], 1, 1, 1)
     coords = flows + grid
     oob_occs = coords < 0
     oob_occs[:, 0] |= coords[:, 0] > flows.shape[3]
     oob_occs[:, 1] |= coords[:, 1] > flows.shape[2]
-    oob_occs = oob_occs.max(dim=1, keepdim=True)[0].to(dtype=occs.dtype, device=occs.device)
+    oob_occs = oob_occs.max(dim=1, keepdim=True)[0].to(
+        dtype=occs.dtype, device=occs.device
+    )
     occs = torch.max(torch.stack([occs, oob_occs], dim=0), dim=0)[0]
     return occs

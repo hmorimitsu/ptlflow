@@ -4,7 +4,7 @@ import shutil
 import ptlflow
 import model_benchmark
 
-TEST_MODEL = 'raft_small'
+TEST_MODEL = "raft_small"
 
 
 def test_benchmark(tmp_path: Path) -> None:
