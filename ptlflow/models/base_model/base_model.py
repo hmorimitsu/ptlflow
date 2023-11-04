@@ -23,17 +23,12 @@ In order to use this module, the concrete model should just need to:
 # =============================================================================
 
 import logging
-import warnings
 from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
 from packaging import version
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-with warnings.catch_warnings():
-    warnings.simplefilter(
-        "ignore"
-    )  # Workaround until pl stop raising the metrics deprecation warning
-    import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
@@ -352,12 +347,15 @@ class BaseModel(pl.LightningModule):
                 metrics_mean = {}
                 for k, v in metrics_cum.items():
                     metrics_mean[k] = v[0] / v[1]
-                self.log_dict(metrics_mean)
+                self.log_dict(metrics_mean, sync_dist=True)
 
                 # Find the EPE metric on the full split
                 epe_key = [k for k in metrics_mean if "full" in k and "epe" in k][0]
                 self.log(
-                    self.val_dataloader_names[i], metrics_mean[epe_key], prog_bar=True
+                    self.val_dataloader_names[i],
+                    metrics_mean[epe_key],
+                    prog_bar=True,
+                    sync_dist=True,
                 )
 
     def configure_optimizers(self) -> Dict[str, Any]:

@@ -20,9 +20,10 @@ from argparse import ArgumentParser, Namespace
 from pathlib import Path
 import sys
 
-import pytorch_lightning as pl
+import lightning
+import lightning.pytorch as pl
 import torch
-from pytorch_lightning.strategies import DDPStrategy
+from lightning.pytorch.strategies import DDPStrategy
 
 from ptlflow import get_model, get_model_reference
 from ptlflow.utils.callbacks.logger import LoggerCallback
@@ -74,7 +75,7 @@ def train(args: Namespace) -> None:
     """
     _print_untested_warning()
 
-    pl.utilities.seed.seed_everything(args.random_seed)
+    lightning.fabric.utilities.seed.seed_everything(args.random_seed)
 
     if args.train_transform_cuda:
         from torch.multiprocessing import set_start_method
@@ -161,36 +162,16 @@ def _gen_dataset_id(dataset_string: str) -> str:
 
 
 def _print_untested_warning():
-    print(
-        "###############################################################################"
-    )
-    print(
-        "# WARNING, please read!                                                       #"
-    )
-    print(
-        "#                                                                             #"
-    )
-    print(
-        "# This training script has not been tested!                                   #"
-    )
-    print(
-        "# Therefore, there is no guarantee that a model trained with this script      #"
-    )
-    print(
-        "# will produce good results after the training!                               #"
-    )
-    print(
-        "#                                                                             #"
-    )
-    print(
-        "# You can find more information at                                            #"
-    )
-    print(
-        "# https://ptlflow.readthedocs.io/en/latest/starting/training.html             #"
-    )
-    print(
-        "###############################################################################"
-    )
+    print("###########################################################################")
+    print("# WARNING, please read!                                                   #")
+    print("#                                                                         #")
+    print("# This training script has not been tested!                               #")
+    print("# Therefore, there is no guarantee that a model trained with this script  #")
+    print("# will produce good results after the training!                           #")
+    print("#                                                                         #")
+    print("# You can find more information at                                        #")
+    print("# https://ptlflow.readthedocs.io/en/latest/starting/training.html         #")
+    print("###########################################################################")
 
 
 if __name__ == "__main__":

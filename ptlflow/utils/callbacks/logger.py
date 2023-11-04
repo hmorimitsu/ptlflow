@@ -25,12 +25,12 @@ except ImportError:
     NeptuneFile = None
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from pytorch_lightning.callbacks import Callback
-from pytorch_lightning.loggers.comet import CometLogger
-from pytorch_lightning.loggers.neptune import NeptuneLogger
-from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
-from pytorch_lightning.loggers.wandb import WandbLogger
-from pytorch_lightning.trainer.trainer import Trainer
+from lightning.pytorch.callbacks import Callback
+from lightning.pytorch.loggers.comet import CometLogger
+from lightning.pytorch.loggers.neptune import NeptuneLogger
+from lightning.pytorch.loggers.tensorboard import TensorBoardLogger
+from lightning.pytorch.loggers.wandb import WandbLogger
+from lightning.pytorch.trainer.trainer import Trainer
 import torch
 import torch.nn.functional as F
 from torchvision.utils import make_grid

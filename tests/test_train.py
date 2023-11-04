@@ -16,13 +16,8 @@
 
 from pathlib import Path
 import shutil
-import warnings
 
-with warnings.catch_warnings():
-    warnings.simplefilter(
-        "ignore"
-    )  # Workaround until pl stop raising the metrics deprecation warning
-    import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 
 import ptlflow
