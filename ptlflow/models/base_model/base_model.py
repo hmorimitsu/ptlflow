@@ -717,7 +717,9 @@ class BaseModel(pl.LightningModule):
                 [
                     ft.ToTensor(device=device, fp16=self.args.train_transform_fp16),
                     ft.RandomScaleAndCrop(
-                        (cy, cx), (-0.1, 1.0), (-0.2, 0.2),
+                        (cy, cx),
+                        (-0.1, 1.0),
+                        (-0.2, 0.2),
                     ),
                     ft.ColorJitter(0.4, 0.4, 0.4, 0.5 / 3.14, 0.2),
                     ft.GaussianNoise(0.02),
@@ -760,7 +762,9 @@ class BaseModel(pl.LightningModule):
                 [
                     ft.ToTensor(device=device, fp16=self.args.train_transform_fp16),
                     ft.RandomScaleAndCrop(
-                        (cy, cx), (-0.1, 1.0), (-0.2, 0.2),
+                        (cy, cx),
+                        (-0.1, 1.0),
+                        (-0.2, 0.2),
                     ),
                     ft.ColorJitter(0.4, 0.4, 0.4, 0.5 / 3.14, 0.2),
                     ft.GaussianNoise(0.02),
@@ -803,7 +807,9 @@ class BaseModel(pl.LightningModule):
                 [
                     ft.ToTensor(device=device, fp16=self.args.train_transform_fp16),
                     ft.RandomScaleAndCrop(
-                        (cy, cx), (-0.1, 1.0), (-0.2, 0.2),
+                        (cy, cx),
+                        (-0.1, 1.0),
+                        (-0.2, 0.2),
                     ),
                     ft.ColorJitter(0.4, 0.4, 0.4, 0.5 / 3.14, 0.2),
                     ft.GaussianNoise(0.02),
@@ -958,9 +964,7 @@ class BaseModel(pl.LightningModule):
             transform = ft.Compose(
                 [
                     ft.ToTensor(device=device, fp16=self.args.train_transform_fp16),
-                    ft.RandomScaleAndCrop(
-                        (cy, cx), (-0.2, 0.6), (-0.2, 0.2)
-                    ),
+                    ft.RandomScaleAndCrop((cy, cx), (-0.2, 0.6), (-0.2, 0.2)),
                     ft.ColorJitter(0.4, 0.4, 0.4, 0.5 / 3.14, 0.2),
                     ft.GaussianNoise(0.02),
                     ft.RandomPatchEraser(
@@ -1014,9 +1018,7 @@ class BaseModel(pl.LightningModule):
             transform = ft.Compose(
                 [
                     ft.ToTensor(device=device, fp16=self.args.train_transform_fp16),
-                    ft.RandomScaleAndCrop(
-                        (cy, cx), (-0.2, 0.6), (-0.2, 0.2)
-                    ),
+                    ft.RandomScaleAndCrop((cy, cx), (-0.2, 0.6), (-0.2, 0.2)),
                     ft.ColorJitter(0.4, 0.4, 0.4, 0.5 / 3.14, 0.2),
                     ft.GaussianNoise(0.02),
                     ft.RandomPatchEraser(
@@ -1070,9 +1072,7 @@ class BaseModel(pl.LightningModule):
             transform = ft.Compose(
                 [
                     ft.ToTensor(device=device, fp16=self.args.train_transform_fp16),
-                    ft.RandomScaleAndCrop(
-                        (cy, cx), (-0.4, 0.8), (-0.2, 0.2)
-                    ),
+                    ft.RandomScaleAndCrop((cy, cx), (-0.4, 0.8), (-0.2, 0.2)),
                     ft.ColorJitter(0.4, 0.4, 0.4, 0.5 / 3.14, 0.2),
                     ft.GaussianNoise(0.02),
                     ft.RandomPatchEraser(
