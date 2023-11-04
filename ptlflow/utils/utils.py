@@ -56,7 +56,7 @@ class InputPadder(_InputPadder):
         )
         self.tgt_size = (
             int(math.ceil(float(dims[-2]) / stride)) * stride,
-            int(math.ceil(float(dims[-1]) / stride)) * stride
+            int(math.ceil(float(dims[-1]) / stride)) * stride,
         )
 
     def fill(self, x):
@@ -91,7 +91,7 @@ class InputInterpolator(object):
         self.stride = stride
         self.tgt_size = (
             int(math.ceil(float(dims[-2]) / stride)) * stride,
-            int(math.ceil(float(dims[-1]) / stride)) * stride
+            int(math.ceil(float(dims[-1]) / stride)) * stride,
         )
 
     def fill(self, x):
@@ -112,7 +112,9 @@ class InputInterpolator(object):
         if in_shape[-2] == self.tgt_size[0] and in_shape[-1] == self.tgt_size[1]:
             if len(in_shape) > 4:
                 x = x.view(-1, *in_shape[-3:])
-            x = F.interpolate(x, size=self.dims[-2:], mode="bilinear", align_corners=True)
+            x = F.interpolate(
+                x, size=self.dims[-2:], mode="bilinear", align_corners=True
+            )
             if len(in_shape) > 4:
                 x = x.view(*in_shape[:-2], *x.shape[-2:])
         return x
