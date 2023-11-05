@@ -141,11 +141,18 @@ class Flow1D(BaseModel):
 
     def forward(self, inputs, flow_init=None):
         """Estimate optical flow between pair of frames"""
-        image1 = inputs["images"][:, 0]
-        image2 = inputs["images"][:, 1]
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-0.5,
+            bgr_mult=2.0,
+            bgr_to_rgb=True,
+            resize_mode="pad",
+            pad_mode="replicate",
+            pad_two_side=True,
+        )
 
-        image1 = 2 * image1 - 1.0
-        image2 = 2 * image2 - 1.0
+        image1 = images[:, 0]
+        image2 = images[:, 1]
 
         # run the feature network
         feature1, feature2 = self.fnet([image1, image2])
@@ -211,9 +218,11 @@ class Flow1D(BaseModel):
             if self.training:
                 # upsample predictions
                 flow_up = self.learned_upflow(coords1 - coords0, up_mask)
+                flow_up = self.postprocess_predictions(flow_up, image_resizer)
                 flow_predictions.append(flow_up)
             elif itr == self.args.iters - 1:
                 flow_up = self.learned_upflow(coords1 - coords0, up_mask)
+                flow_up = self.postprocess_predictions(flow_up, image_resizer)
 
         if self.training:
             outputs = {"flows": flow_up[:, None], "flow_preds": flow_predictions}
