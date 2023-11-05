@@ -110,27 +110,29 @@ class CSFlow(BaseModel):
         return up_flow.reshape(N, 2, 8 * H, 8 * W)
 
     def forward(self, inputs, flow_init=None):
-        """Estimate optical flow between pair of frames"""
-        image1 = inputs["images"][:, 0]
-        image2 = inputs["images"][:, 1]
         """Estimate optical flow between pair of frames."""
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-0.5,
+            bgr_mult=2.0,
+            bgr_to_rgb=True,
+            resize_mode="pad",
+            pad_mode="replicate",
+            pad_two_side=True,
+        )
+
+        image1 = images[:, 0]
+        image2 = images[:, 1]
 
         if not self.args.skip_encode:
-            # Modified, take image pairs as input
-            image1 = 2 * image1 - 1.0
-            image2 = 2 * image2 - 1.0
-
-            image1 = image1.contiguous()
-            image2 = image2.contiguous()
-
             # run the feature network
             fmap1, fmap2 = self.fnet([image1, image2])
 
             fmap1 = fmap1.float()
             fmap2 = fmap2.float()
         else:
-            fmap1 = image1 * 255.0
-            fmap2 = image2 * 255.0
+            fmap1 = (image1 + 1) * 127.5
+            fmap2 = (image2 + 1) * 127.5
 
         hdim = self.hidden_dim
         cdim = self.context_dim
@@ -189,6 +191,7 @@ class CSFlow(BaseModel):
 
         # add loss
         flow_up = upflow8(coords1 - coords0)
+        flow_up = self.postprocess_predictions(flow_up, image_resizer)
         flow_predictions.append(flow_up)
 
         for itr in range(self.args.iters):
@@ -207,6 +210,7 @@ class CSFlow(BaseModel):
             else:
                 flow_up = self.upsample_flow(coords1 - coords0, up_mask)
 
+            flow_up = self.postprocess_predictions(flow_up, image_resizer)
             flow_predictions.append(flow_up)
 
         if self.training:
