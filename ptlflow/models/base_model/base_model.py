@@ -884,10 +884,14 @@ class BaseModel(pl.LightningModule):
             transform = ft.ToTensor()
 
         split = "trainval"
-        if len(args) > 0 and args[0] in ["train", "val", "trainval", "test"]:
-            split = args[0]
+        sequence_length = 2
+        for v in args:
+            if v in ["train", "val", "trainval", "test"]:
+                split = args[0]
+            elif v.startswith("seqlen"):
+                sequence_length = int(v[6:])
 
-        dataset = Hd1kDataset(self.args.hd1k_root_dir, split=split, transform=transform)
+        dataset = Hd1kDataset(self.args.hd1k_root_dir, split=split, transform=transform, sequence_length=sequence_length)
         return dataset
 
     def _get_kitti_dataset(self, is_train: bool, *args: str) -> Dataset:
@@ -977,6 +981,7 @@ class BaseModel(pl.LightningModule):
         pass_names = ["clean", "final"]
         split = "trainval"
         get_occlusion_mask = False
+        sequence_length = 2
         for v in args:
             if v in ["clean", "final"]:
                 pass_names = [v]
@@ -984,6 +989,8 @@ class BaseModel(pl.LightningModule):
                 split = v
             elif v == "occ":
                 get_occlusion_mask = True
+            elif v.startswith("seqlen"):
+                sequence_length = int(v[6:])
 
         dataset = SintelDataset(
             self.args.mpi_sintel_root_dir,
@@ -991,6 +998,7 @@ class BaseModel(pl.LightningModule):
             pass_names=pass_names,
             transform=transform,
             get_occlusion_mask=get_occlusion_mask,
+            sequence_length=sequence_length
         )
         return dataset
 
@@ -1031,6 +1039,7 @@ class BaseModel(pl.LightningModule):
         split = "train"
         add_reverse = False
         get_backward = False
+        sequence_length = 2
         for v in args:
             if v in ["train", "val", "trainval"]:
                 split = v
@@ -1038,6 +1047,8 @@ class BaseModel(pl.LightningModule):
                 add_reverse = True
             elif v == "back":
                 get_backward = True
+            elif v.startswith("seqlen"):
+                sequence_length = int(v[6:])
 
         dataset = SpringDataset(
             self.args.spring_root_dir,
@@ -1046,6 +1057,7 @@ class BaseModel(pl.LightningModule):
             add_reverse=add_reverse,
             transform=transform,
             get_backward=get_backward,
+            sequence_length=sequence_length
         )
         return dataset
 
@@ -1089,6 +1101,7 @@ class BaseModel(pl.LightningModule):
         get_occlusion_mask = False
         get_motion_boundary_mask = False
         get_backward = False
+        sequence_length = 2
         for v in args:
             if v in ["clean", "final"]:
                 pass_names = [v]
@@ -1104,6 +1117,8 @@ class BaseModel(pl.LightningModule):
                 get_motion_boundary_mask = True
             elif v == "back":
                 get_backward = True
+            elif v.startswith("seqlen"):
+                sequence_length = int(v[6:])
 
         if is_subset:
             dataset = FlyingThings3DSubsetDataset(
@@ -1116,6 +1131,7 @@ class BaseModel(pl.LightningModule):
                 get_occlusion_mask=get_occlusion_mask,
                 get_motion_boundary_mask=get_motion_boundary_mask,
                 get_backward=get_backward,
+                sequence_length=sequence_length
             )
         else:
             dataset = FlyingThings3DDataset(
@@ -1128,6 +1144,7 @@ class BaseModel(pl.LightningModule):
                 get_occlusion_mask=get_occlusion_mask,
                 get_motion_boundary_mask=get_motion_boundary_mask,
                 get_backward=get_backward,
+                sequence_length=sequence_length
             )
         return dataset
 
