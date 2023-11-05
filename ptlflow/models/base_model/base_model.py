@@ -891,7 +891,12 @@ class BaseModel(pl.LightningModule):
             elif v.startswith("seqlen"):
                 sequence_length = int(v[6:])
 
-        dataset = Hd1kDataset(self.args.hd1k_root_dir, split=split, transform=transform, sequence_length=sequence_length)
+        dataset = Hd1kDataset(
+            self.args.hd1k_root_dir,
+            split=split,
+            transform=transform,
+            sequence_length=sequence_length,
+        )
         return dataset
 
     def _get_kitti_dataset(self, is_train: bool, *args: str) -> Dataset:
@@ -998,7 +1003,7 @@ class BaseModel(pl.LightningModule):
             pass_names=pass_names,
             transform=transform,
             get_occlusion_mask=get_occlusion_mask,
-            sequence_length=sequence_length
+            sequence_length=sequence_length,
         )
         return dataset
 
@@ -1057,7 +1062,7 @@ class BaseModel(pl.LightningModule):
             add_reverse=add_reverse,
             transform=transform,
             get_backward=get_backward,
-            sequence_length=sequence_length
+            sequence_length=sequence_length,
         )
         return dataset
 
@@ -1131,7 +1136,7 @@ class BaseModel(pl.LightningModule):
                 get_occlusion_mask=get_occlusion_mask,
                 get_motion_boundary_mask=get_motion_boundary_mask,
                 get_backward=get_backward,
-                sequence_length=sequence_length
+                sequence_length=sequence_length,
             )
         else:
             dataset = FlyingThings3DDataset(
@@ -1144,7 +1149,7 @@ class BaseModel(pl.LightningModule):
                 get_occlusion_mask=get_occlusion_mask,
                 get_motion_boundary_mask=get_motion_boundary_mask,
                 get_backward=get_backward,
-                sequence_length=sequence_length
+                sequence_length=sequence_length,
             )
         return dataset
 
