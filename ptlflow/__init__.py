@@ -150,7 +150,7 @@ models_dict = {
 def download_scripts(destination_dir: Path = Path("ptlflow_scripts")) -> None:
     """Download the main scripts and configs to start working with PTLFlow."""
     github_url = "https://raw.githubusercontent.com/hmorimitsu/ptlflow/main/"
-    script_names = ["datasets.yml", "infer.py", "test.py", "train.py", "validate.py"]
+    script_names = ["datasets.yml", "infer.py", "model_benchmark.py", "test.py", "train.py", "validate.py"]
 
     destination_dir.mkdir(parents=True, exist_ok=True)
 
