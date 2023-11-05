@@ -20,7 +20,7 @@ import logging
 import math
 from argparse import ArgumentParser
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
@@ -38,7 +38,12 @@ class InputPadder(_InputPadder):
     """
 
     def __init__(
-        self, dims: Sequence[int], stride: int, two_side_pad=True, pad_mode="replicate"
+        self,
+        dims: Sequence[int],
+        stride: int,
+        two_side_pad: bool = True,
+        pad_mode: str = "replicate",
+        pad_value: float = 0.0,
     ) -> None:
         """Initialize InputPadder.
 
@@ -50,9 +55,19 @@ class InputPadder(_InputPadder):
         stride : int
             The number to compute the amount of padding. The padding will be applied so that the input size is divisible
             by stride.
+        two_side_pad : bool, default True
+            If True, half of the padding goes to left/top and the rest to right/bottom. Otherwise, all the padding goes to the bottom right.
+        pad_mode : str, default "replicate"
+            How to pad the input. Must be one of the values accepted by the 'mode' argument of torch.nn.functional.pad.
+        pad_value : float, default 0.0
+            Used if pad_mode == "constant". The value to fill in the padded area.
         """
         super().__init__(
-            dims, stride=stride, two_side_pad=two_side_pad, pad_mode=pad_mode
+            dims,
+            stride=stride,
+            two_side_pad=two_side_pad,
+            pad_mode=pad_mode,
+            pad_value=pad_value,
         )
         self.tgt_size = (
             int(math.ceil(float(dims[-2]) / stride)) * stride,
@@ -68,64 +83,13 @@ class InputPadder(_InputPadder):
         return x
 
 
-class InputInterpolator(object):
-    """Bilinearly interpolate images such that dimensions are divisible by stride."""
-
-    def __init__(
-        self,
-        dims: Sequence[int],
-        stride: int,
-    ) -> None:
-        """Initialize InputPadder.
-
-        Parameters
-        ----------
-        dims : Sequence[int]
-            The shape of the original input. It must have at least two elements. It is assumed that the last two dimensions
-            are (height, width).
-        stride : int
-            The number to compute the amount of padding. The padding will be applied so that the input size is divisible
-            by stride.
-        """
-        self.dims = dims
-        self.stride = stride
-        self.tgt_size = (
-            int(math.ceil(float(dims[-2]) / stride)) * stride,
-            int(math.ceil(float(dims[-1]) / stride)) * stride,
-        )
-
-    def fill(self, x):
-        in_shape = x.shape
-        if len(in_shape) > 4:
-            x = x.view(-1, *in_shape[-3:])
-        new_size = (
-            int(math.ceil(float(x.shape[-2]) / self.stride)) * self.stride,
-            int(math.ceil(float(x.shape[-1]) / self.stride)) * self.stride,
-        )
-        x = F.interpolate(x, size=new_size, mode="bilinear", align_corners=True)
-        if len(in_shape) > 4:
-            x = x.view(*in_shape[:-2], *x.shape[-2:])
-        return x
-
-    def unfill(self, x):
-        in_shape = x.shape
-        if in_shape[-2] == self.tgt_size[0] and in_shape[-1] == self.tgt_size[1]:
-            if len(in_shape) > 4:
-                x = x.view(-1, *in_shape[-3:])
-            x = F.interpolate(
-                x, size=self.dims[-2:], mode="bilinear", align_corners=True
-            )
-            if len(in_shape) > 4:
-                x = x.view(*in_shape[:-2], *x.shape[-2:])
-        return x
-
-
 class InputScaler(object):
     """Scale 2D torch.Tensor input to a target size, and then rescale it back to the original size."""
 
     def __init__(
         self,
         orig_shape: Tuple[int, int],
+        stride: Optional[int] = None,
         size: Optional[Tuple[int, int]] = None,
         scale_factor: Optional[float] = 1.0,
         interpolation_mode: str = "bilinear",
@@ -137,10 +101,12 @@ class InputScaler(object):
         ----------
         orig_shape : Tuple[int, int]
             The shape of the input tensor before the scale. I.e., the shape to which it will be rescaled back.
+        stride : Optional[int], optional
+            If provided, the input will be resized to the closest larger multiple of stride.
         size : Optional[Tuple[int, int]], optional
             The desired size after scaling defined as (height, width). If not provided, then scale_factor will be used instead.
         scale_factor : Optional[float], default 1.0
-            This value is only used if size is None. The multiplier that will be applied to the original shape to scale
+            This value is only used if stride and size are None. The multiplier that will be applied to the original shape to scale
             the input.
         interpolation_mode : str, default 'bilinear'
             How to perform the interpolation. It must be a value accepted by the 'mode' argument from
@@ -154,11 +120,16 @@ class InputScaler(object):
         """
         super().__init__()
         self.orig_height, self.orig_width = orig_shape[-2:]
-        if size is None:
+        if stride is not None:
+            assert size is None, "only stride OR size can be provided, NOT BOTH."
+            self.tgt_height = int(math.ceil(float(self.orig_height) / stride)) * stride
+            self.tgt_width = int(math.ceil(float(self.orig_width) / stride)) * stride
+        elif size is not None:
+            assert stride is None, "only stride OR size can be provided, NOT BOTH."
+            self.tgt_height, self.tgt_width = size
+        else:
             self.tgt_height = int(self.orig_height * scale_factor)
             self.tgt_width = int(self.orig_width * scale_factor)
-        else:
-            self.tgt_height, self.tgt_width = size
 
         self.interpolation_mode = interpolation_mode
         self.interpolation_align_corners = interpolation_align_corners
@@ -381,3 +352,57 @@ def tensor_dict_to_numpy(
             v = v.permute(1, 2, 0).numpy()
         npy_dict[k] = v
     return npy_dict
+
+
+def bgr_val_as_tensor(
+    bgr_val: Union[float, Tuple[float, float, float], np.ndarray, torch.Tensor],
+    reference_tensor: torch.Tensor,
+    bgr_tensor_shape_position: int = -3,
+) -> torch.Tensor:
+    """Convert multiple types of BGR values given as input to a torch.Tensor where the BGR values are in the same position as a reference tensor.
+
+    The bgr values can be:
+    - a single number, in which case it will be repeated three times to represent BGR.
+    - a tuple, list, np.ndarray, or torch.Tensor with three elements.
+
+    The resulting tensor will have the BGR values in the same index position as the reference_tensor.
+    For example, given a reference tensor with shape [B, 3, H, W] and setting bgr_tensor_shape_position == -3
+    indicates that the BGR position in this reference_tensor is at shape index -3, which is equivalent to index 1.
+    Given these inputs, the resulting BGR tensor will have shape [1, 3, 1, 1], and the BGR values will be at shape index 1.
+
+    Parameters
+    ----------
+    bgr_val : Union[float, Tuple[float, float, float], np.ndarray, torch.Tensor]
+        The BGR values to be converted into a tensor that will have a compatible shape with the input.
+    reference_tensor: torch.Tensor
+        The tensor with the reference shape to convert the bgr_val.
+    bgr_tensor_shape_position : int, default -3
+        Which position of the reference_tensor corresponds to the BGR values.
+        Typical values are -1 (used in channels-last tensors) or -3 (..., CHW tensors)
+
+    Returns
+    -------
+    torch.Tensor
+        The bgr_val converted into a tensor with a shape compatible with reference_tensor.
+    """
+    if isinstance(bgr_val, torch.Tensor):
+        assert len(bgr_val.shape) == 1 and bgr_val.shape[0] == 3
+    elif isinstance(bgr_val, np.ndarray):
+        assert len(bgr_val.shape) == 1 and bgr_val.shape[0] == 3
+        bgr_val = torch.from_numpy(bgr_val).to(
+            dtype=reference_tensor.dtype, device=reference_tensor.device
+        )
+    elif isinstance(bgr_val, (tuple, list)):
+        assert len(bgr_val) == 3
+        bgr_val = torch.Tensor(bgr_val).to(
+            dtype=reference_tensor.dtype, device=reference_tensor.device
+        )
+    elif isinstance(bgr_val, (int, float)):
+        bgr_val = (
+            torch.zeros(3, dtype=reference_tensor.dtype, device=reference_tensor.device)
+            + bgr_val
+        )
+
+    bgr_dims = [1] * len(reference_tensor.shape)
+    bgr_dims[bgr_tensor_shape_position] = 3
+    return bgr_val.reshape(bgr_dims)

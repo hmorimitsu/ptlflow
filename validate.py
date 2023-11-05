@@ -319,7 +319,6 @@ def validate_one_dataloader(
                 target_scale_factor=scale_factor,
                 cuda=torch.cuda.is_available(),
                 fp16=args.fp16,
-                fill_mode="pad",
             )
             inputs = io_adapter.prepare_inputs(inputs=inputs, image_only=True)
             inputs["prev_preds"] = prev_preds

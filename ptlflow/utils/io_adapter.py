@@ -24,7 +24,7 @@ import torch
 
 from ptlflow.data.flow_transforms import ToTensor
 from ptlflow.models.base_model.base_model import BaseModel
-from ptlflow.utils.utils import InputPadder, InputScaler, InputInterpolator
+from ptlflow.utils.utils import InputScaler
 
 
 class IOAdapter(object):
@@ -40,7 +40,6 @@ class IOAdapter(object):
         interpolation_align_corners: bool = False,
         cuda: bool = False,
         fp16: bool = False,
-        fill_mode: str = "pad",
     ) -> None:
         """Initialize IOAdapter.
 
@@ -63,10 +62,6 @@ class IOAdapter(object):
             Whether the interpolation keep the corners aligned. As defined in torch.nn.functional.interpolate.
         cuda : bool
             If True, the input tensors are transferred to GPU (if a GPU is available).
-        fill_mode : str, default 'pad'
-            How to change the input size to adapt to the model stride.
-            If pad, the input is padded with zeros.
-            If interpolate, the input is resized with bilinear interpolation.
         """
         self.output_stride = model.output_stride
         self.target_size = target_size
@@ -90,21 +85,6 @@ class IOAdapter(object):
                 interpolation_align_corners=interpolation_align_corners,
             )
 
-            if target_size is not None and min(target_size) > 0:
-                padder_input_size = target_size
-            else:
-                padder_input_size = (
-                    int(target_scale_factor * input_size[0]),
-                    int(target_scale_factor * input_size[1]),
-                )
-
-        if fill_mode == "pad":
-            self.filler = InputPadder(padder_input_size, model.output_stride)
-        elif fill_mode == "interpolate":
-            self.filler = InputInterpolator(padder_input_size, model.output_stride)
-        else:
-            raise ValueError()
-
     def prepare_inputs(
         self,
         images: Optional[Union[np.ndarray, List[np.ndarray]]] = None,
@@ -113,9 +93,9 @@ class IOAdapter(object):
         image_only: bool = False,
         **kwargs: Union[np.ndarray, List[np.ndarray]]
     ) -> Dict[str, torch.Tensor]:
-        """Transform numpy inputs into the input format of theoptical flow models.
+        """Transform numpy inputs into the input format of the optical flow models.
 
-        This basically consists on tranform the numpy arrays into torch tensors, and then putting them into a dict.
+        This basically consists on transform the numpy arrays into torch tensors, and then putting them into a dict.
 
         Parameters
         ----------
@@ -157,7 +137,6 @@ class IOAdapter(object):
                     v = v.unsqueeze(0)
                 if self.scaler is not None:
                     v = self.scaler.scale(v, is_flow=k.startswith("flow"))
-                v = self.filler.fill(v)
                 inputs[k] = v
 
         inputs = self._to_cuda(inputs)
@@ -197,7 +176,6 @@ class IOAdapter(object):
                 continue
 
             if isinstance(v, torch.Tensor):
-                v = self.filler.unfill(v)
                 if self.scaler is not None:
                     v = self.scaler.unscale(v, is_flow=k.startswith("flow"))
                 outputs[k] = v

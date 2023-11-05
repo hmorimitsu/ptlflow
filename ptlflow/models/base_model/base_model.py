@@ -29,6 +29,7 @@ from packaging import version
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import lightning.pytorch as pl
+import numpy as np
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
@@ -45,8 +46,8 @@ from ptlflow.data.datasets import (
     FlyingThings3DSubsetDataset,
     SpringDataset,
 )
-from ptlflow.utils.external.raft import InputPadder
-from ptlflow.utils.utils import config_logging, make_divisible
+from ptlflow.utils.utils import InputPadder, InputScaler
+from ptlflow.utils.utils import config_logging, make_divisible, bgr_val_as_tensor
 from ptlflow.utils.flow_metrics import FlowMetrics
 
 config_logging()
@@ -181,6 +182,122 @@ class BaseModel(pl.LightningModule):
         )
         return parser
 
+    def preprocess_images(
+        self,
+        images: torch.Tensor,
+        bgr_add: Union[float, Tuple[float, float, float], np.ndarray, torch.Tensor] = 0,
+        bgr_mult: Union[
+            float, Tuple[float, float, float], np.ndarray, torch.Tensor
+        ] = 1,
+        bgr_to_rgb: bool = False,
+        image_resizer: Optional[Union[InputPadder, InputScaler]] = None,
+        resize_mode: str = "pad",
+        pad_mode: str = "replicate",
+        pad_value: float = 0.0,
+        pad_two_side: bool = True,
+        interpolation_mode: str = "bilinear",
+        interpolation_align_corners: bool = True,
+    ) -> Tuple[torch.Tensor, Union[InputPadder, InputScaler]]:
+        """Applies basic pre-processing to the images.
+
+        The pre-processing is done in this order:
+        1. images = images + bgr_add
+        2. images = images * bgr_mult
+        3. (optional) Convert BGR channels to RGB
+        4. Pad or resize the input to the closest larger size multiple of self.output_stride
+
+        Parameters
+        ----------
+        images : torch.Tensor
+            A tensor with at least 3 dimensions in this order: [..., 3, H, W].
+        bgr_add : Union[float, Tuple[float, float, float], np.ndarray, torch.Tensor], default 0
+            A value or a triple of BGR values to be added to the images.
+        bgr_mult : Union[float, Tuple[float, float, float], np.ndarray, torch.Tensor], default 1
+            A value or a triple of BGR values to be multiplied by the images.
+        bgr_to_rgb : bool, default False
+            If True, flip the channels to convert from BGR to RGB.
+        image_resizer : Optional[Union[InputPadder, InputScaler]]
+            An instance of InputPadder or InputScaler that will be used to resize the images.
+            If not provided, a new one will be created based on the given resize_mode.
+        resize_mode : str, default "pad"
+            How to resize the input. Accepted values are "pad" and "interpolation".
+        pad_mode : str, default "replicate"
+            Used if resize_mode == "pad". How to pad the input. Must be one of the values accepted by the 'mode' argument of torch.nn.functional.pad.
+        pad_value : float, default 0.0
+            Used if resize_mode == "pad" and pad_mode == "constant". The value to fill in the padded area.
+        pad_two_side : bool, default True
+            Used if resize_mode == "pad". If True, half of the padding goes to left/top and the rest to right/bottom. Otherwise, all the padding goes to the bottom right.
+        interpolation_mode : str, default "bilinear"
+            Used if resize_mode == "interpolation". How to interpolate the input. Must be one of the values accepted by the 'mode' argument of torch.nn.functional.interpolate.
+        interpolation_align_corners : bool, default True
+            Used if resize_mode == "interpolation". See 'align_corners' in https://pytorch.org/docs/stable/generated/torch.nn.functional.interpolate.html.
+
+        Returns
+        -------
+        torch.Tensor
+            A copy of the input images after applying all of the pre-processing steps.
+        Union[InputPadder, InputScaler]
+            An instance of InputPadder or InputScaler that was used to resize the images.
+            Can be used to reverse the resizing operations.
+        """
+        bgr_add = bgr_val_as_tensor(
+            bgr_add, reference_tensor=images, bgr_tensor_shape_position=-3
+        )
+        images = images + bgr_add
+        bgr_mult = bgr_val_as_tensor(
+            bgr_mult, reference_tensor=images, bgr_tensor_shape_position=-3
+        )
+        images *= bgr_mult
+        if bgr_to_rgb:
+            images = torch.flip(images, [-3])
+
+        if image_resizer is None:
+            if resize_mode == "pad":
+                image_resizer = InputPadder(
+                    images.shape,
+                    stride=self.output_stride,
+                    pad_mode=pad_mode,
+                    two_side_pad=pad_two_side,
+                    pad_value=pad_value,
+                )
+            elif resize_mode == "interpolation":
+                image_resizer = InputScaler(
+                    images.shape,
+                    stride=self.output_stride,
+                    interpolation_mode=interpolation_mode,
+                    interpolation_align_corners=interpolation_align_corners,
+                )
+            else:
+                raise ValueError(
+                    f"resize_mode must be one of (pad, interpolation). Found: {resize_mode}."
+                )
+
+        images = image_resizer.fill(images)
+        images = images.contiguous()
+        return images, image_resizer
+
+    def postprocess_predictions(
+        self,
+        prediction: torch.Tensor,
+        image_resizer: Optional[Union[InputPadder, InputScaler]],
+    ) -> torch.Tensor:
+        """Simple resizing post-processing. Just use image_resizer to revert the resizing operations.
+
+        Parameters
+        ----------
+        prediction : torch.Tensor
+            A tensor with at least 3 dimensions in this order: [..., C, H, W].
+        image_resizer : Optional[Union[InputPadder, InputScaler]]
+            An instance of InputPadder or InputScaler that will be used to reverse the resizing done to the inputs.
+            Typically, this will be the instance returned by self.preprocess_images().
+
+        Returns
+        -------
+        torch.Tensor
+            A copy of the prediction after reversing the resizing.
+        """
+        return image_resizer.unfill(prediction)
+
     @abstractmethod
     def forward(
         self,
@@ -293,14 +410,7 @@ class BaseModel(pl.LightningModule):
         --------
         ptlflow.utils.flow_metrics.FlowMetrics : class to manage and compute the optical flow metrics.
         """
-        padder = InputPadder(batch["images"].shape, stride=self.output_stride)
-        batch["images"] = padder.pad(batch["images"])
         preds = self(batch)
-        batch["images"] = padder.unpad(batch["images"])
-        keys = ["flows", "occs", "mbs", "confs"]
-        for k in keys:
-            if k in preds:
-                preds[k] = padder.unpad(preds[k])
         self.last_inputs = batch
         self.last_predictions = preds
         metrics = self.val_metrics(preds, batch)
