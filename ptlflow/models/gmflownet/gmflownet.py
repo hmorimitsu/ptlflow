@@ -151,12 +151,18 @@ class GMFlowNet(BaseModel):
 
     def forward(self, inputs, flow_init=None):
         """Estimate optical flow between pair of frames"""
-        inputs["images"] = 2 * inputs["images"] - 1.0
-        image1 = inputs["images"][:, 0]
-        image2 = inputs["images"][:, 1]
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-0.5,
+            bgr_mult=2.0,
+            bgr_to_rgb=True,
+            resize_mode="pad",
+            pad_mode="replicate",
+            pad_two_side=True,
+        )
 
-        image1 = image1.contiguous()
-        image2 = image2.contiguous()
+        image1 = images[:, 0]
+        image2 = images[:, 1]
 
         hdim = self.hidden_dim
         cdim = self.context_dim
@@ -234,6 +240,7 @@ class GMFlowNet(BaseModel):
             else:
                 flow_up = self.upsample_flow(coords1 - coords0, up_mask)
 
+            flow_up = self.postprocess_predictions(flow_up, image_resizer)
             flow_predictions.append(flow_up)
 
         if self.training:
