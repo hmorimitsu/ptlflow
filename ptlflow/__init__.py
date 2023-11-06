@@ -247,7 +247,10 @@ def get_model(
             )
 
         state_dict = ckpt["state_dict"]
+        if "hyper_parameters" in ckpt and "train_size" in ckpt["hyper_parameters"]:
+            model.train_size = ckpt["hyper_parameters"]["train_size"]
         model.load_state_dict(state_dict)
+
     return model
 
 
