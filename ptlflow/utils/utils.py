@@ -134,7 +134,7 @@ class InputScaler(object):
         self.interpolation_mode = interpolation_mode
         self.interpolation_align_corners = interpolation_align_corners
 
-    def scale(self, x: torch.Tensor, is_flow: bool = False) -> torch.Tensor:
+    def fill(self, x: torch.Tensor, is_flow: bool = False) -> torch.Tensor:
         """Scale the input to the target size specified during initialization.
 
         Parameters
@@ -151,7 +151,7 @@ class InputScaler(object):
         """
         return self._scale_keep_dims(x, (self.tgt_height, self.tgt_width), is_flow)
 
-    def unscale(self, x: torch.Tensor, is_flow: bool = False) -> torch.Tensor:
+    def unfill(self, x: torch.Tensor, is_flow: bool = False) -> torch.Tensor:
         """Scale the input to back to the original size defined during initialization.
 
         Parameters
