@@ -206,15 +206,15 @@ class Guidance(nn.Module):
 
 
 class SeparableFlow(BaseModel):
-    # pretrained_checkpoints = {
-    #     'chairs': ,
-    #     'things': ,
-    #     'sintel': ,
-    #     'kitti': '
-    # }
+    pretrained_checkpoints = {
+        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/separableflow-things-31fe3b2d.ckpt',
+        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/separableflow-sintel-4c9a8c03.ckpt',
+        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/separableflow-kitti-c9395318.ckpt',
+        'universal': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/separableflow-universal-87350d91.ckpt',
+    }
 
     def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=8)
+        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=64)
 
         hdim = self.args.hidden_dim
         cdim = self.args.context_dim
@@ -288,19 +288,18 @@ class SeparableFlow(BaseModel):
 
     def forward(self, inputs, flow_init=None):
         """Estimate optical flow between pair of frames"""
-        inputs["images"] = torch.flip(inputs["images"], [2])
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-0.5,
+            bgr_mult=2.0,
+            bgr_to_rgb=True,
+            resize_mode="pad",
+            pad_mode="replicate",
+            pad_two_side=True,
+        )
 
-        image1 = inputs["images"][:, 0]
-        image2 = inputs["images"][:, 1]
-
-        padder = InputPadder(inputs["images"].shape[-2:])
-        image1, image2 = padder.pad(image1, image2)
-
-        image1 = 2 * image1 - 1.0
-        image2 = 2 * image2 - 1.0
-
-        image1 = image1.contiguous()
-        image2 = image2.contiguous()
+        image1 = images[:, 0]
+        image2 = images[:, 1]
 
         hdim = self.args.hidden_dim
         cdim = self.args.context_dim
@@ -363,10 +362,9 @@ class SeparableFlow(BaseModel):
                 flow_up = upflow8(coords1 - coords0)
             else:
                 flow_up = self.upsample_flow(coords1 - coords0, up_mask)
+            flow_up = self.postprocess_predictions(flow_up, image_resizer)
             if self.training:
                 flow_predictions.append(flow_up)
-
-        flow_up = padder.unpad(flow_up)
 
         if self.training:
             outputs = {"flows": flow_up[:, None], "flow_preds": flow_predictions}
