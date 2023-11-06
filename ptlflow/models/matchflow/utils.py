@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -242,3 +243,40 @@ def compute_inverse_interpolation_img(weights, indices, img, b, h_i, w_i):
     img_out.scatter_add_(1, cc_idx[(...,) + (None,) * k].expand_as(img_3), img_3)
 
     return img_out  # [b, h_i*w_i, ...]
+
+
+def compute_grid_indices(image_shape, patch_size, min_overlap=20):
+    if min_overlap >= patch_size[0] or min_overlap >= patch_size[1]:
+        raise ValueError("!!")
+    hs = list(range(0, image_shape[0], patch_size[0] - min_overlap))
+    ws = list(range(0, image_shape[1], patch_size[1] - min_overlap))
+    # Make sure the final patch is flush with the image boundary
+    hs[-1] = image_shape[0] - patch_size[0]
+    ws[-1] = image_shape[1] - patch_size[1]
+    # unique
+    hs = np.unique(hs)
+    # ws.append(32)
+    return [(h, w) for h in hs for w in ws]
+
+
+def compute_weight(hws, image_shape, patch_size, sigma=1.0, wtype="gaussian"):
+    patch_num = len(hws)
+    h, w = torch.meshgrid(torch.arange(patch_size[0]), torch.arange(patch_size[1]))
+    h, w = h / float(patch_size[0]), w / float(patch_size[1])
+    c_h, c_w = 0.5, 0.5
+    h, w = h - c_h, w - c_w
+    weights_hw = (h**2 + w**2) ** 0.5 / sigma
+    denorm = 1 / (sigma * math.sqrt(2 * math.pi))
+    weights_hw = denorm * torch.exp(-0.5 * (weights_hw) ** 2)
+
+    weights = torch.zeros(1, patch_num, *image_shape)
+    for idx, (h, w) in enumerate(hws):
+        weights[:, idx, h : h + patch_size[0], w : w + patch_size[1]] = weights_hw
+    weights = weights.cuda()
+    patch_weights = []
+    for idx, (h, w) in enumerate(hws):
+        patch_weights.append(
+            weights[:, idx : idx + 1, h : h + patch_size[0], w : w + patch_size[1]]
+        )
+
+    return patch_weights

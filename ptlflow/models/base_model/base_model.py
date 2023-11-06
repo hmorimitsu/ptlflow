@@ -92,7 +92,9 @@ class BaseModel(pl.LightningModule):
         self.last_predictions = None
 
         if version.parse(pl.__version__) >= version.parse("1.6.0"):
-            self.save_hyperparameters(ignore=["loss_fn"], )
+            self.save_hyperparameters(
+                ignore=["loss_fn"],
+            )
         else:
             self.save_hyperparameters()
 

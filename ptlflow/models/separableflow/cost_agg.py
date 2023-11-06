@@ -45,7 +45,7 @@ class BasicConv(nn.Module):
         bn=True,
         l2=True,
         relu=True,
-        **kwargs
+        **kwargs,
     ):
         super(BasicConv, self).__init__()
         #        print(in_channels, out_channels, deconv, is_3d, bn, relu, kwargs)

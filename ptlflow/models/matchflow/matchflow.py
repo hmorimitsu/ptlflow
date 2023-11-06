@@ -143,7 +143,7 @@ class MatchFlow(BaseModel):
             return self.forward_tile(inputs)
         else:
             return self.forward_resize(inputs, flow_init)
-        
+
     def forward_resize(self, inputs, flow_init=None):
         orig_image_size = inputs["images"].shape[-2:]
         images, image_resizer = self.preprocess_images(
@@ -153,30 +153,44 @@ class MatchFlow(BaseModel):
             bgr_to_rgb=True,
             resize_mode="interpolation",
             interpolation_mode="bilinear",
-            interpolation_align_corners=True
+            interpolation_align_corners=True,
         )
         resized_image_size = images.shape[-2:]
 
-        flow_predictions, flow_small = self.predict(images[:, 0], images[:, 1], flow_init)
+        flow_predictions, flow_small = self.predict(
+            images[:, 0], images[:, 1], flow_init
+        )
         output_flow = flow_predictions[-1]
-        rescale_factor = torch.Tensor([float(orig_image_size[1]) / resized_image_size[1], float(orig_image_size[0]) / resized_image_size[0]]).to(dtype=output_flow.dtype, device=output_flow.device).reshape(1, 2, 1, 1)
+        rescale_factor = (
+            torch.Tensor(
+                [
+                    float(orig_image_size[1]) / resized_image_size[1],
+                    float(orig_image_size[0]) / resized_image_size[0],
+                ]
+            )
+            .to(dtype=output_flow.dtype, device=output_flow.device)
+            .reshape(1, 2, 1, 1)
+        )
 
         if self.training:
             for i, p in enumerate(flow_predictions):
                 p = p * rescale_factor
                 flow_predictions[i] = self.postprocess_predictions(p, image_resizer)
-            outputs = {"flows": flow_predictions[-1][:, None], "flow_preds": flow_predictions}
+            outputs = {
+                "flows": flow_predictions[-1][:, None],
+                "flow_preds": flow_predictions,
+            }
         else:
             output_flow = self.postprocess_predictions(output_flow, image_resizer)
             output_flow = output_flow * rescale_factor
             outputs = {"flows": output_flow[:, None], "flow_small": flow_small}
 
         return outputs
-        
+
     def forward_tile(self, inputs):
         assert not self.training
         assert self.train_size is not None
-        input_size = inputs['images'].shape[-2:]
+        input_size = inputs["images"].shape[-2:]
         image_size = (self.args.tile_height, input_size[-1])
         hws = compute_grid_indices(image_size, self.train_size)
         weights = compute_weight(hws, image_size, self.train_size, self.args.tile_sigma)
@@ -189,7 +203,7 @@ class MatchFlow(BaseModel):
             resize_mode="interpolation",
             interpolation_mode="bilinear",
             interpolation_align_corners=True,
-            interpolation_target_size=image_size
+            interpolation_target_size=image_size,
         )
 
         image1 = images[:, 0]
@@ -199,20 +213,35 @@ class MatchFlow(BaseModel):
         flow_count = 0
 
         for idx, (h, w) in enumerate(hws):
-            image1_tile = image1[:, :, h:h + self.train_size[0], w:w + self.train_size[1]]
-            image2_tile = image2[:, :, h:h + self.train_size[0], w:w + self.train_size[1]]
+            image1_tile = image1[
+                :, :, h : h + self.train_size[0], w : w + self.train_size[1]
+            ]
+            image2_tile = image2[
+                :, :, h : h + self.train_size[0], w : w + self.train_size[1]
+            ]
 
             flow_predictions, _ = self.predict(image1_tile, image2_tile)
             flow_pre = flow_predictions[-1]
 
-            padding = (w, image_size[1] - w - self.train_size[1], h, image_size[0] - h - self.train_size[0], 0, 0)
+            padding = (
+                w,
+                image_size[1] - w - self.train_size[1],
+                h,
+                image_size[0] - h - self.train_size[0],
+                0,
+                0,
+            )
             flows += F.pad(flow_pre * weights[idx], padding)
             flow_count += F.pad(weights[idx], padding)
 
         output_flow = flows / flow_count
 
         output_flow = self.postprocess_predictions(output_flow, image_resizer)
-        rescale_factor = torch.Tensor([1.0, float(input_size[0]) / image_size[0]]).to(dtype=output_flow.dtype, device=output_flow.device).reshape(1, 2, 1, 1)
+        rescale_factor = (
+            torch.Tensor([1.0, float(input_size[0]) / image_size[0]])
+            .to(dtype=output_flow.dtype, device=output_flow.device)
+            .reshape(1, 2, 1, 1)
+        )
         output_flow = output_flow * rescale_factor
         return {"flows": output_flow[:, None]}
 

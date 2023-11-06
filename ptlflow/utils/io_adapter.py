@@ -91,7 +91,7 @@ class IOAdapter(object):
         flows: Optional[Union[np.ndarray, List[np.ndarray]]] = None,
         inputs: Optional[Dict[str, Any]] = None,
         image_only: bool = False,
-        **kwargs: Union[np.ndarray, List[np.ndarray]]
+        **kwargs: Union[np.ndarray, List[np.ndarray]],
     ) -> Dict[str, torch.Tensor]:
         """Transform numpy inputs into the input format of the optical flow models.
 

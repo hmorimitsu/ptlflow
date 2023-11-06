@@ -207,10 +207,10 @@ class Guidance(nn.Module):
 
 class SeparableFlow(BaseModel):
     pretrained_checkpoints = {
-        'things': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/separableflow-things-31fe3b2d.ckpt',
-        'sintel': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/separableflow-sintel-4c9a8c03.ckpt',
-        'kitti': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/separableflow-kitti-c9395318.ckpt',
-        'universal': 'https://github.com/hmorimitsu/ptlflow/releases/download/weights1/separableflow-universal-87350d91.ckpt',
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/separableflow-things-31fe3b2d.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/separableflow-sintel-4c9a8c03.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/separableflow-kitti-c9395318.ckpt",
+        "universal": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/separableflow-universal-87350d91.ckpt",
     }
 
     def __init__(self, args: Namespace) -> None:
