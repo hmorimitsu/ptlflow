@@ -88,11 +88,11 @@ maskflownet-kitti-d2ccb09b.ckpt,8caNov12-1532_300000.pth,https://github.com/catt
 maskflownet-sintel-c52423aa.ckpt,5adNov03-0005_1000000.pth,
 maskflownet_s-sintel-79196ff3.ckpt,771Sep25-0735_500000.pth,
 maskflownet_s-things-a8a8ed9e.ckpt,dbbSep30-1206_1000000.pth,
-matchflow_gma-chairs-e6519f99.ckpt,matchflow-g-chairs.pth,https://github.com/DQiaole/MatchFlow
-matchflow_gma-kitti-91f4a33c.ckpt,matchflow-g-kitti.pth,
-matchflow_gma-sintel-59650b06.ckpt,matchflow-g-sintel.pth,
-matchflow_gma-things-cde8bbac.ckpt,matchflow-g-things.pth,
-matchflow_raft-things-f4729f27.ckpt,matchflow-r-things.pth,
+matchflow_gma-chairs-02519b53.ckpt,matchflow-g-chairs.pth,https://github.com/DQiaole/MatchFlow
+matchflow_gma-kitti-bc72ce81.ckpt,matchflow-g-kitti.pth,
+matchflow_gma-sintel-683422f4.ckpt,matchflow-g-sintel.pth,
+matchflow_gma-things-49295bd8.ckpt,matchflow-g-things.pth,
+matchflow_raft-things-bf560032.ckpt,matchflow-r-things.pth,
 ms_raft_plus-mixed-2bb01f62.ckpt,mixed.pth,https://github.com/cv-stuttgart/MS_RAFT_plus
 pwcdcnet-sintel-c7d08a46.ckpt,pwc_net.pth.tar,https://github.com/NVlabs/PWC-Net/tree/master/PyTorch
 pwcdcnet-things-cc223701.ckpt,pwc_net_chairs.pth.tar,
