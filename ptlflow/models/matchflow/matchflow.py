@@ -8,7 +8,7 @@ from .update import BasicUpdateBlock, GMAUpdateBlock
 from .extractor import BasicEncoder
 from .matching_encoder import MatchingModel
 from .corr import CorrBlock
-from .utils import coords_grid, upflow8
+from .utils import coords_grid, upflow8, compute_grid_indices, compute_weight
 from .gma import Attention
 from ..base_model.base_model import BaseModel
 
@@ -43,10 +43,10 @@ class SequenceLoss(nn.Module):
 
 class MatchFlow(BaseModel):
     pretrained_checkpoints = {
-        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/matchflow_gma-chairs-e6519f99.ckpt",
-        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/matchflow_gma-kitti-91f4a33c.ckpt",
-        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/matchflow_gma-sintel-59650b06.ckpt",
-        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/matchflow_gma-things-cde8bbac.ckpt",
+        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/matchflow_gma-chairs-02519b53.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/matchflow_gma-kitti-bc72ce81.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/matchflow_gma-sintel-683422f4.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/matchflow_gma-things-49295bd8.ckpt",
     }
 
     def __init__(self, args: Namespace) -> None:
@@ -77,6 +77,19 @@ class MatchFlow(BaseModel):
         else:
             self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)
 
+    @property
+    def train_size(self):
+        return self._train_size
+
+    @train_size.setter
+    def train_size(self, value):
+        if value is not None:
+            assert isinstance(value, (tuple, list))
+            assert len(value) == 2
+            assert isinstance(value[0], int) and isinstance(value[1], int)
+        self._train_size = value
+        self.fnet = MatchingModel(cfg=self.args, train_size=self.train_size)
+
     @staticmethod
     def add_model_specific_args(parent_parser=None):
         parent_parser = BaseModel.add_model_specific_args(parent_parser)
@@ -90,13 +103,9 @@ class MatchFlow(BaseModel):
         parser.add_argument("--matching_model_path", type=str, default="")
         parser.add_argument("--num_heads", type=int, default=1)
         parser.add_argument("--raft", action="store_true")
-        parser.add_argument(
-            "--image_size",
-            type=int,
-            nargs=2,
-            choices=((416, 736), (384, 768), (288, 960)),
-            default=[384, 512],
-        )
+        parser.add_argument("--use_tile_input", action="store_true")
+        parser.add_argument("--tile_height", type=int, default=416)
+        parser.add_argument("--tile_sigma", type=float, default=0.05)
         parser.add_argument("--position_only", action="store_true")
         parser.add_argument("--position_and_content", action="store_true")
         return parser
@@ -130,17 +139,84 @@ class MatchFlow(BaseModel):
 
     def forward(self, inputs, flow_init=None):
         """Estimate optical flow between pair of frames"""
-        inputs["images"] = torch.flip(inputs["images"], [2])
+        if self.args.use_tile_input:
+            return self.forward_tile(inputs)
+        else:
+            return self.forward_resize(inputs, flow_init)
+        
+    def forward_resize(self, inputs, flow_init=None):
+        orig_image_size = inputs["images"].shape[-2:]
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-0.5,
+            bgr_mult=2.0,
+            bgr_to_rgb=True,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=True
+        )
+        resized_image_size = images.shape[-2:]
 
-        image1 = inputs["images"][:, 0]
-        image2 = inputs["images"][:, 1]
+        flow_predictions, flow_small = self.predict(images[:, 0], images[:, 1], flow_init)
+        output_flow = flow_predictions[-1]
+        rescale_factor = torch.Tensor([float(orig_image_size[1]) / resized_image_size[1], float(orig_image_size[0]) / resized_image_size[0]]).to(dtype=output_flow.dtype, device=output_flow.device).reshape(1, 2, 1, 1)
 
-        image1 = 2 * image1 - 1.0
-        image2 = 2 * image2 - 1.0
+        if self.training:
+            for i, p in enumerate(flow_predictions):
+                p = p * rescale_factor
+                flow_predictions[i] = self.postprocess_predictions(p, image_resizer)
+            outputs = {"flows": flow_predictions[-1][:, None], "flow_preds": flow_predictions}
+        else:
+            output_flow = self.postprocess_predictions(output_flow, image_resizer)
+            output_flow = output_flow * rescale_factor
+            outputs = {"flows": output_flow[:, None], "flow_small": flow_small}
 
-        image1 = image1.contiguous()
-        image2 = image2.contiguous()
+        return outputs
+        
+    def forward_tile(self, inputs):
+        assert not self.training
+        assert self.train_size is not None
+        input_size = inputs['images'].shape[-2:]
+        image_size = (self.args.tile_height, input_size[-1])
+        hws = compute_grid_indices(image_size, self.train_size)
+        weights = compute_weight(hws, image_size, self.train_size, self.args.tile_sigma)
 
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-0.5,
+            bgr_mult=2.0,
+            bgr_to_rgb=True,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=True,
+            interpolation_target_size=image_size
+        )
+
+        image1 = images[:, 0]
+        image2 = images[:, 1]
+
+        flows = 0
+        flow_count = 0
+
+        for idx, (h, w) in enumerate(hws):
+            image1_tile = image1[:, :, h:h + self.train_size[0], w:w + self.train_size[1]]
+            image2_tile = image2[:, :, h:h + self.train_size[0], w:w + self.train_size[1]]
+
+            flow_predictions, _ = self.predict(image1_tile, image2_tile)
+            flow_pre = flow_predictions[-1]
+
+            padding = (w, image_size[1] - w - self.train_size[1], h, image_size[0] - h - self.train_size[0], 0, 0)
+            flows += F.pad(flow_pre * weights[idx], padding)
+            flow_count += F.pad(weights[idx], padding)
+
+        output_flow = flows / flow_count
+
+        output_flow = self.postprocess_predictions(output_flow, image_resizer)
+        rescale_factor = torch.Tensor([1.0, float(input_size[0]) / image_size[0]]).to(dtype=output_flow.dtype, device=output_flow.device).reshape(1, 2, 1, 1)
+        output_flow = output_flow * rescale_factor
+        return {"flows": output_flow[:, None]}
+
+    def predict(self, image1, image2, flow_init=None):
         hdim = self.hidden_dim
         cdim = self.context_dim
 
@@ -190,17 +266,12 @@ class MatchFlow(BaseModel):
 
             flow_predictions.append(flow_up)
 
-        if self.training:
-            outputs = {"flows": flow_up[:, None], "flow_preds": flow_predictions}
-        else:
-            outputs = {"flows": flow_up[:, None], "flow_small": coords1 - coords0}
-
-        return outputs
+        return flow_predictions, coords1 - coords0
 
 
 class MatchFlowRAFT(MatchFlow):
     pretrained_checkpoints = {
-        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/matchflow_raft-things-f4729f27.ckpt"
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/matchflow_raft-things-bf560032.ckpt"
     }
 
     def __init__(self, args: Namespace) -> None:

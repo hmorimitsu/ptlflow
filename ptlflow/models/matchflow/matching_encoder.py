@@ -278,10 +278,10 @@ class PositionEncodingSineNorm(nn.Module):
 
 
 class MatchingModel(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, train_size=(384, 512)):
         super().__init__()
         self.cfg = cfg
-        self.image_size = self.cfg.image_size
+        self.image_size = train_size
         self.backbone = ResNetFPN_8_2(cfg)
 
         self.pos_encoding = PositionEncodingSineNorm(256)
