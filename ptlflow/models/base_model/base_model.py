@@ -75,6 +75,8 @@ class BaseModel(pl.LightningModule):
         self.loss_fn = loss_fn
         self.output_stride = output_stride
 
+        self.train_size = None
+
         self.train_metrics = FlowMetrics(prefix="train/")
         self.val_metrics = FlowMetrics(prefix="val/")
 
@@ -90,9 +92,21 @@ class BaseModel(pl.LightningModule):
         self.last_predictions = None
 
         if version.parse(pl.__version__) >= version.parse("1.6.0"):
-            self.save_hyperparameters(ignore=["loss_fn"])
+            self.save_hyperparameters(ignore=["loss_fn"], )
         else:
             self.save_hyperparameters()
+
+    @property
+    def train_size(self):
+        return self._train_size
+
+    @train_size.setter
+    def train_size(self, value):
+        if value is not None:
+            assert isinstance(value, (tuple, list))
+            assert len(value) == 2
+            assert isinstance(value[0], int) and isinstance(value[1], int)
+        self._train_size = value
 
     @staticmethod
     def add_model_specific_args(
@@ -197,6 +211,7 @@ class BaseModel(pl.LightningModule):
         pad_two_side: bool = True,
         interpolation_mode: str = "bilinear",
         interpolation_align_corners: bool = True,
+        interpolation_target_size: Optional[Tuple[int, int]] = None,
     ) -> Tuple[torch.Tensor, Union[InputPadder, InputScaler]]:
         """Applies basic pre-processing to the images.
 
@@ -231,6 +246,8 @@ class BaseModel(pl.LightningModule):
             Used if resize_mode == "interpolation". How to interpolate the input. Must be one of the values accepted by the 'mode' argument of torch.nn.functional.interpolate.
         interpolation_align_corners : bool, default True
             Used if resize_mode == "interpolation". See 'align_corners' in https://pytorch.org/docs/stable/generated/torch.nn.functional.interpolate.html.
+        interpolation_target_size : Optional[Tuple[int, int]], default None
+            Used if resize_mode == "interpolation". If given, the images will be interpolated to this size, instead of calculating a multiple of self.output_stride.
 
         Returns
         -------
@@ -261,9 +278,13 @@ class BaseModel(pl.LightningModule):
                     pad_value=pad_value,
                 )
             elif resize_mode == "interpolation":
+                stride = self.output_stride
+                if interpolation_target_size is not None:
+                    stride = None
                 image_resizer = InputScaler(
                     images.shape,
-                    stride=self.output_stride,
+                    stride=stride,
+                    size=interpolation_target_size,
                     interpolation_mode=interpolation_mode,
                     interpolation_align_corners=interpolation_align_corners,
                 )
