@@ -51,7 +51,7 @@ class GMFlow(BaseModel):
     }
 
     def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=16)
+        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=32)
 
         # CNN backbone
         self.backbone = CNNEncoder(
@@ -167,10 +167,18 @@ class GMFlow(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
-        img0 = inputs["images"][:, 0]
-        img1 = inputs["images"][:, 1]
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=[-0.406, -0.456, -0.485],
+            bgr_mult=[1 / 0.225, 1 / 0.224, 1 / 0.229],
+            bgr_to_rgb=True,
+            resize_mode="pad",
+            pad_mode="replicate",
+            pad_two_side=True,
+        )
 
-        img0, img1 = normalize_img(img0, img1)  # [B, 3, H, W]
+        img0 = images[:, 0]
+        img1 = images[:, 1]
 
         flow_preds = []
 
@@ -247,6 +255,9 @@ class GMFlow(BaseModel):
                 flow_bilinear = self.upsample_flow(
                     flow, None, bilinear=True, upsample_factor=upsample_factor
                 )
+                flow_bilinear = self.postprocess_predictions(
+                    flow_bilinear, image_resizer, is_flow=True
+                )
                 flow_preds.append(flow_bilinear)
 
             # flow propagation with self-attn
@@ -266,10 +277,16 @@ class GMFlow(BaseModel):
                 flow_up = self.upsample_flow(
                     flow, feature0, bilinear=True, upsample_factor=upsample_factor
                 )
+                flow_up = self.postprocess_predictions(
+                    flow_up, image_resizer, is_flow=True
+                )
                 flow_preds.append(flow_up)
 
             if scale_idx == self.args.num_scales - 1:
                 flow_up = self.upsample_flow(flow, feature0)
+                flow_up = self.postprocess_predictions(
+                    flow_up, image_resizer, is_flow=True
+                )
                 flow_preds.append(flow_up)
 
         if self.training:
@@ -289,7 +306,7 @@ class GMFlowWithRefinement(GMFlow):
     }
 
     def __init__(self, args: Namespace) -> None:
-        args.attn_splits_list = (2, 2)
+        args.attn_splits_list = (2, 8)
         args.corr_radius_list = (-1, 4)
         args.num_scales = 2
         args.prop_radius_list = (-1, 1)
