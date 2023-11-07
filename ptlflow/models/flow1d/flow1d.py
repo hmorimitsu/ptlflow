@@ -218,11 +218,15 @@ class Flow1D(BaseModel):
             if self.training:
                 # upsample predictions
                 flow_up = self.learned_upflow(coords1 - coords0, up_mask)
-                flow_up = self.postprocess_predictions(flow_up, image_resizer)
+                flow_up = self.postprocess_predictions(
+                    flow_up, image_resizer, is_flow=True
+                )
                 flow_predictions.append(flow_up)
             elif itr == self.args.iters - 1:
                 flow_up = self.learned_upflow(coords1 - coords0, up_mask)
-                flow_up = self.postprocess_predictions(flow_up, image_resizer)
+                flow_up = self.postprocess_predictions(
+                    flow_up, image_resizer, is_flow=True
+                )
 
         if self.training:
             outputs = {"flows": flow_up[:, None], "flow_preds": flow_predictions}

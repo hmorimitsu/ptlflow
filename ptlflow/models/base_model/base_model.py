@@ -303,6 +303,7 @@ class BaseModel(pl.LightningModule):
         self,
         prediction: torch.Tensor,
         image_resizer: Optional[Union[InputPadder, InputScaler]],
+        is_flow: bool,
     ) -> torch.Tensor:
         """Simple resizing post-processing. Just use image_resizer to revert the resizing operations.
 
@@ -313,13 +314,19 @@ class BaseModel(pl.LightningModule):
         image_resizer : Optional[Union[InputPadder, InputScaler]]
             An instance of InputPadder or InputScaler that will be used to reverse the resizing done to the inputs.
             Typically, this will be the instance returned by self.preprocess_images().
+        is_flow : bool
+            Indicates if prediction is an optical flow prediction of not.
+            Only used if image_resizer is an instance of InputScaler, in which case the flow values need to be scaled.
 
         Returns
         -------
         torch.Tensor
             A copy of the prediction after reversing the resizing.
         """
-        return image_resizer.unfill(prediction)
+        if isinstance(image_resizer, InputScaler):
+            return image_resizer.unfill(prediction, is_flow=is_flow)
+        else:
+            return image_resizer.unfill(prediction)
 
     @abstractmethod
     def forward(

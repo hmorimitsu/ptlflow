@@ -364,7 +364,7 @@ class CRAFT(BaseModel):
                 # by using the mask to take a weighted combination over the neighborhood.
                 flow_up = self.upsample_flow(coords1 - coords0, up_mask)
 
-            flow_up = self.postprocess_predictions(flow_up, image_resizer)
+            flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
             flow_predictions.append(flow_up)
 
         if self.training:

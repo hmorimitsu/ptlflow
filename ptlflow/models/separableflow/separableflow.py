@@ -362,7 +362,7 @@ class SeparableFlow(BaseModel):
                 flow_up = upflow8(coords1 - coords0)
             else:
                 flow_up = self.upsample_flow(coords1 - coords0, up_mask)
-            flow_up = self.postprocess_predictions(flow_up, image_resizer)
+            flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
             if self.training:
                 flow_predictions.append(flow_up)
 

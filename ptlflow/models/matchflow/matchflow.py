@@ -161,28 +161,20 @@ class MatchFlow(BaseModel):
             images[:, 0], images[:, 1], flow_init
         )
         output_flow = flow_predictions[-1]
-        rescale_factor = (
-            torch.Tensor(
-                [
-                    float(orig_image_size[1]) / resized_image_size[1],
-                    float(orig_image_size[0]) / resized_image_size[0],
-                ]
-            )
-            .to(dtype=output_flow.dtype, device=output_flow.device)
-            .reshape(1, 2, 1, 1)
-        )
 
         if self.training:
             for i, p in enumerate(flow_predictions):
-                p = p * rescale_factor
-                flow_predictions[i] = self.postprocess_predictions(p, image_resizer)
+                flow_predictions[i] = self.postprocess_predictions(
+                    p, image_resizer, is_flow=True
+                )
             outputs = {
                 "flows": flow_predictions[-1][:, None],
                 "flow_preds": flow_predictions,
             }
         else:
-            output_flow = self.postprocess_predictions(output_flow, image_resizer)
-            output_flow = output_flow * rescale_factor
+            output_flow = self.postprocess_predictions(
+                output_flow, image_resizer, is_flow=True
+            )
             outputs = {"flows": output_flow[:, None], "flow_small": flow_small}
 
         return outputs
@@ -236,13 +228,9 @@ class MatchFlow(BaseModel):
 
         output_flow = flows / flow_count
 
-        output_flow = self.postprocess_predictions(output_flow, image_resizer)
-        rescale_factor = (
-            torch.Tensor([1.0, float(input_size[0]) / image_size[0]])
-            .to(dtype=output_flow.dtype, device=output_flow.device)
-            .reshape(1, 2, 1, 1)
+        output_flow = self.postprocess_predictions(
+            output_flow, image_resizer, is_flow=True
         )
-        output_flow = output_flow * rescale_factor
         return {"flows": output_flow[:, None]}
 
     def predict(self, image1, image2, flow_init=None):
