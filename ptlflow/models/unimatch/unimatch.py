@@ -52,12 +52,12 @@ class SequenceLoss(nn.Module):
 
 class UniMatch(BaseModel):
     pretrained_checkpoints = {
-        "mix": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale1_mixdata-eaf948e3.ckpt",
-        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale1_things-5e5a4b7a.ckpt",
+        "mix": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/unimatch-mixdata-9d7c1e4d.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/unimatch-things-2433864a.ckpt",
     }
 
     def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=16)
+        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=32)
 
         # CNN
         self.backbone = CNNEncoder(
@@ -162,24 +162,21 @@ class UniMatch(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
-        inputs["images"] = torch.flip(inputs["images"], [2])
-
-        img0 = inputs["images"][:, 0]
-        img1 = inputs["images"][:, 1]
-
-        padder = InputPadder(
-            inputs["images"].shape[-2:], padding_factor=self.output_stride
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=[-0.406, -0.456, -0.485],
+            bgr_mult=[1 / 0.225, 1 / 0.224, 1 / 0.229],
+            bgr_to_rgb=True,
+            resize_mode="pad",
+            pad_mode="replicate",
+            pad_two_side=True,
         )
-        img0, img1 = padder.pad(img0, img1)
 
-        img0 = img0.contiguous()
-        img1 = img1.contiguous()
+        img0 = images[:, 0]
+        img1 = images[:, 1]
 
         results_dict = {}
         flow_preds = []
-
-        # stereo and depth tasks have normalized img in dataloader
-        img0, img1 = normalize_img(img0, img1)  # [B, 3, H, W]
 
         # list of features, resolution low to high
         feature0_list, feature1_list = self.extract_feature(
@@ -257,6 +254,9 @@ class UniMatch(BaseModel):
                 flow_bilinear = self.upsample_flow(
                     flow, None, bilinear=True, upsample_factor=upsample_factor
                 )
+                flow_bilinear = self.postprocess_predictions(
+                    flow_bilinear, image_resizer, is_flow=True
+                )
                 flow_preds.append(flow_bilinear)
 
             # flow propagation with self-attn
@@ -277,12 +277,18 @@ class UniMatch(BaseModel):
                 flow_up = self.upsample_flow(
                     flow, feature0, bilinear=True, upsample_factor=upsample_factor
                 )
+                flow_up = self.postprocess_predictions(
+                    flow_up, image_resizer, is_flow=True
+                )
                 flow_preds.append(flow_up)
 
             if scale_idx == self.args.num_scales - 1:
                 if not self.args.reg_refine:
                     # upsample to the original image resolution
                     flow_up = self.upsample_flow(flow, feature0)
+                    flow_up = self.postprocess_predictions(
+                        flow_up, image_resizer, is_flow=True
+                    )
                     flow_preds.append(flow_up)
                 else:
                     # task-specific local regression refinement
@@ -293,6 +299,9 @@ class UniMatch(BaseModel):
                             feature0,
                             bilinear=True,
                             upsample_factor=upsample_factor,
+                        )
+                        flow_up = self.postprocess_predictions(
+                            flow_up, image_resizer, is_flow=True
                         )
                         flow_preds.append(flow_up)
 
@@ -329,11 +338,12 @@ class UniMatch(BaseModel):
                                 flow, up_mask, upsample_factor=self.args.upsample_factor
                             )
 
+                            flow_up = self.postprocess_predictions(
+                                flow_up, image_resizer, is_flow=True
+                            )
                             flow_preds.append(flow_up)
 
         results_dict.update({"flow_preds": flow_preds})
-
-        flow_up = padder.unpad(flow_up)
 
         if self.training:
             outputs = {"flows": flow_up[:, None], "flow_preds": flow_preds}
@@ -345,15 +355,15 @@ class UniMatch(BaseModel):
 
 class UniMatchScale2(UniMatch):
     pretrained_checkpoints = {
-        "mix": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_mixdata-d9a42210.ckpt",
-        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_things-9353862b.ckpt",
-        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_sintel-f94ab7db.ckpt",
+        "mix": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/unimatch_scale2-mixdata-b514dde2.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/unimatch_scale2-things-e75ae2f7.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/unimatch_scale2-sintel-f43b76ab.ckpt",
     }
 
     def __init__(self, args: Namespace) -> None:
         args.num_scales = 2
         args.upsample_factor = 4
-        args.attn_splits_list = (2, 2)
+        args.attn_splits_list = (2, 8)
         args.corr_radius_list = (-1, 4)
         args.prop_radius_list = (-1, 1)
         super().__init__(args)
@@ -361,16 +371,16 @@ class UniMatchScale2(UniMatch):
 
 class UniMatchScale2With6Refinements(UniMatch):
     pretrained_checkpoints = {
-        "mix": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_ref6_mixdata-36413e25.ckpt",
-        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_ref6_things-41920bbd.ckpt",
-        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_ref6_sintel-30e624a6.ckpt",
-        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-scale2_ref6_kitti-77dd88e3.ckpt",
+        "mix": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/unimatch_scale2_refine6-mixdata-398760b1.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/unimatch_scale2_refine6-things-54d7505b.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/unimatch_scale2_refine6-sintel-95ab1410.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/unimatch_scale2_refine6-kitti-0626279a.ckpt",
     }
 
     def __init__(self, args: Namespace) -> None:
         args.num_scales = 2
         args.upsample_factor = 4
-        args.attn_splits_list = (2, 2)
+        args.attn_splits_list = (2, 8)
         args.corr_radius_list = (-1, 4)
         args.prop_radius_list = (-1, 1)
         args.reg_refine = True
