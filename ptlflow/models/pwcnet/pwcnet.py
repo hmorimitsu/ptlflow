@@ -193,8 +193,18 @@ class PWCNet(BaseModel):
         return output * mask
 
     def forward(self, inputs):
-        im1 = inputs["images"][:, 0]
-        im2 = inputs["images"][:, 1]
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=0.0,
+            bgr_mult=1.0,
+            bgr_to_rgb=False,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=False,
+        )
+
+        im1 = images[:, 0]
+        im2 = images[:, 1]
 
         c11 = self.conv1b(self.conv1aa(self.conv1a(im1)))
         c21 = self.conv1b(self.conv1aa(self.conv1a(im2)))
@@ -283,6 +293,7 @@ class PWCNet(BaseModel):
         flow2 = self.predict_flow2(x)
 
         flow_up = self.upsample1(flow2 * self.args.div_flow)
+        flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
 
         outputs = {}
         if self.training:
@@ -323,8 +334,18 @@ class PWCDCNet(PWCNet):
                     m.bias.data.zero_()
 
     def forward(self, inputs):
-        im1 = inputs["images"][:, 0]
-        im2 = inputs["images"][:, 1]
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=0.0,
+            bgr_mult=1.0,
+            bgr_to_rgb=True,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=True,
+        )
+
+        im1 = images[:, 0]
+        im2 = images[:, 1]
 
         c11 = self.conv1b(self.conv1aa(self.conv1a(im1)))
         c21 = self.conv1b(self.conv1aa(self.conv1a(im2)))
@@ -416,6 +437,7 @@ class PWCDCNet(PWCNet):
         flow2 = flow2 + self.dc_conv7(self.dc_conv6(self.dc_conv5(x)))
 
         flow_up = self.upsample1(flow2 * self.args.div_flow)
+        flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
 
         outputs = {}
         if self.training:
