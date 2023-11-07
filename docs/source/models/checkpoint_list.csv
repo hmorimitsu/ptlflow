@@ -9,6 +9,9 @@ dicl-chairs-fdc24e2f.ckpt,ckpt_chairs.pth.tar,https://github.com/jytime/DICL-Flo
 dicl-kitti-4813ccab.ckpt,ckpt_kitti.pth.tar,
 dicl-sintel-fa9fc259.ckpt,ckpt_sintel.pth.tar,
 dicl-things-20bc573d.ckpt,ckpt_things.pth.tar,
+dip-kitti-b0b678b4.ckpt,DIP_kitti.pth,https://github.com/zihuazheng/DIP
+dip-sintel-7abeb652.ckpt,DIP_sintel.pth,
+dip-things-688d52a0.ckpt,DIP_things.pth,
 fastflownet-chairs-89e7a48e.ckpt,fastflownet_chairs.pth,https://github.com/ltkong218/FastFlowNet
 fastflownet-kitti-6d3526a8.ckpt,fastflownet_ft_kitti.pth,
 fastflownet-mix-fd9b8c0d.ckpt,fastflownet_ft_mix.pth,

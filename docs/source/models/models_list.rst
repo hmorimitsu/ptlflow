@@ -40,6 +40,17 @@ DICL-Flow
 
 - Model names: ``dicl``
 
+DIP
+---
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/dip>`__
+
+- Paper: **DIP: Deep Inverse Patchmatch for High-Resolution Optical Flow** - `https://arxiv.org/abs/2204.00330 <https://arxiv.org/abs/2204.00330>`_
+
+- Reference code: `https://github.com/zihuazheng/DIP <https://github.com/zihuazheng/DIP>`_
+
+- Model names: ``dip``
+
 FastFlownet
 -----------
 

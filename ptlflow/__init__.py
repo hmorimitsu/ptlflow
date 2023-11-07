@@ -31,6 +31,7 @@ from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.models.craft.craft import CRAFT
 from ptlflow.models.csflow.csflow import CSFlow
 from ptlflow.models.dicl.dicl import DICL
+from ptlflow.models.dip.dip import DIP
 from ptlflow.models.fastflownet.fastflownet import FastFlowNet
 from ptlflow.models.flow1d.flow1d import Flow1D
 from ptlflow.models.flowformer.flowformer import FlowFormer
@@ -90,6 +91,7 @@ models_dict = {
     "craft": CRAFT,
     "csflow": CSFlow,
     "dicl": DICL,
+    "dip": DIP,
     "fastflownet": FastFlowNet,
     "flow1d": Flow1D,
     "flowformer": FlowFormer,
