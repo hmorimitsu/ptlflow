@@ -291,9 +291,17 @@ class LiteFlowNet(BaseModel):
         return parser
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        images = inputs["images"]
-        images_mean = images.view(*images.shape[:3], -1).mean(dim=-1)[..., None, None]
-        images = images - images_mean
+        # The original implementation uses different BGR means for im1 and im2
+        # Here, we use the same for both to make it simpler
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=[-0.454253, -0.434631, -0.411618],
+            bgr_mult=1.0,
+            bgr_to_rgb=True,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=False,
+        )
 
         feats_pyr = self.feature_net(images)
         images_pyr = self._create_images_pyr(images, feats_pyr)
@@ -314,6 +322,7 @@ class LiteFlowNet(BaseModel):
 
         flow = flow * self.args.div_flow
         flow = F.interpolate(flow, scale_factor=2, mode="bilinear", align_corners=False)
+        flow = self.postprocess_predictions(flow, image_resizer, is_flow=True)
 
         outputs = {}
         if self.training:
