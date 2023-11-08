@@ -140,9 +140,18 @@ class ScopeFlow(BaseModel):
         return parser
 
     def forward(self, inputs):
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=0.0,
+            bgr_mult=1.0,
+            bgr_to_rgb=True,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=False,
+        )
         # Extract input
-        x1_raw = inputs["images"][:, 0]
-        x2_raw = inputs["images"][:, 1]
+        x1_raw = images[:, 0]
+        x2_raw = images[:, 1]
         batch_size, _, height_im, width_im = x1_raw.size()
 
         # Get pyramid, on the bottom level are original images
@@ -262,35 +271,28 @@ class ScopeFlow(BaseModel):
                 flows.append([flow_f, flow_b])
                 occs.append([occ_f, occ_b])
 
+        flow_f_up = upsample2d_as(flow_f, x1_raw, mode="bilinear") * (1.0 / self.args.div_flow)
+        flow_f_up = self.postprocess_predictions(flow_f_up, image_resizer, is_flow=True)
+        flow_b_up = upsample2d_as(flow_b, x1_raw, mode="bilinear") * (1.0 / self.args.div_flow)
+        flow_b_up = self.postprocess_predictions(flow_b_up, image_resizer, is_flow=True)
+        occ_f_up = upsample2d_as(torch.sigmoid(occ_f), x1_raw, mode="bilinear")
+        occ_f_up = self.postprocess_predictions(occ_f_up, image_resizer, is_flow=False)
+        occ_b_up = upsample2d_as(torch.sigmoid(occ_b), x1_raw, mode="bilinear")
+        occ_b_up = self.postprocess_predictions(occ_b_up, image_resizer, is_flow=False)
+
         outputs = {}
         if self.training:
             outputs["flow_preds"] = flows
             outputs["occ_preds"] = occs
-            outputs["flows"] = (
-                upsample2d_as(flow_f, x1_raw, mode="bilinear") / self.args.div_flow
-            )[:, None]
-            outputs["occs"] = upsample2d_as(
-                torch.sigmoid(occ_f), x1_raw, mode="bilinear"
-            )[:, None]
-            outputs["flows_b"] = (
-                upsample2d_as(flow_b, x1_raw, mode="bilinear") / self.args.div_flow
-            )[:, None]
-            outputs["occs_b"] = upsample2d_as(
-                torch.sigmoid(occ_b), x1_raw, mode="bilinear"
-            )[:, None]
+            outputs["flows"] = flow_f_up[:, None]
+            outputs["occs"] = occ_f_up[:, None]
+            outputs["flows_b"] = flow_b_up[:, None]
+            outputs["occs_b"] = occ_b_up[:, None]
         else:
-            outputs["flows"] = (
-                upsample2d_as(flow_f, x1_raw, mode="bilinear") / self.args.div_flow
-            )[:, None]
-            outputs["occs"] = upsample2d_as(
-                torch.sigmoid(occ_f), x1_raw, mode="bilinear"
-            )[:, None]
-            outputs["flows_b"] = (
-                upsample2d_as(flow_b, x1_raw, mode="bilinear") / self.args.div_flow
-            )[:, None]
-            outputs["occs_b"] = upsample2d_as(
-                torch.sigmoid(occ_b), x1_raw, mode="bilinear"
-            )[:, None]
+            outputs["flows"] = flow_f_up[:, None]
+            outputs["occs"] = occ_f_up[:, None]
+            outputs["flows_b"] = flow_b_up[:, None]
+            outputs["occs_b"] = occ_b_up[:, None]
         return outputs
 
     def submodules_summary(self):
