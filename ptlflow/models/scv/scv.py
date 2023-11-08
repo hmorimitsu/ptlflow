@@ -187,14 +187,18 @@ class SCVQuarter(SCVBase):
 
     def forward(self, inputs, flow_init=None):
         """Estimate optical flow between pair of frames"""
-        image1 = inputs["images"][:, 0]
-        image2 = inputs["images"][:, 1]
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-0.5,
+            bgr_mult=2.0,
+            bgr_to_rgb=True,
+            resize_mode="pad",
+            pad_mode="replicate",
+            pad_two_side=True,
+        )
 
-        image1 = 2 * image1 - 1.0
-        image2 = 2 * image2 - 1.0
-
-        image1 = image1.contiguous()
-        image2 = image2.contiguous()
+        image1 = images[:, 0]
+        image2 = images[:, 1]
 
         # run the feature and context network
         fmap1, fmap2 = self.fnet([image1, image2])
@@ -295,6 +299,7 @@ class SCVQuarter(SCVBase):
             else:
                 flow_up = self.upsample_flow_quarter(coords1 - coords0, up_mask)
 
+            flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
             flow_predictions.append(flow_up)
 
         if self.training:
@@ -355,14 +360,18 @@ class SCVEighth(SCVBase):
 
     def forward(self, inputs, flow_init=None):
         """Estimate optical flow between pair of frames"""
-        image1 = inputs["images"][:, 0]
-        image2 = inputs["images"][:, 1]
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-0.5,
+            bgr_mult=2.0,
+            bgr_to_rgb=True,
+            resize_mode="pad",
+            pad_mode="replicate",
+            pad_two_side=True,
+        )
 
-        image1 = 2 * image1 - 1.0
-        image2 = 2 * image2 - 1.0
-
-        image1 = image1.contiguous()
-        image2 = image2.contiguous()
+        image1 = images[:, 0]
+        image2 = images[:, 1]
 
         # run the feature and context network
         fmap1, fmap2 = self.fnet([image1, image2])
@@ -462,6 +471,7 @@ class SCVEighth(SCVBase):
             else:
                 flow_up = self.upsample_flow(coords1 - coords0, up_mask)
 
+            flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
             flow_predictions.append(flow_up)
 
         if self.training:

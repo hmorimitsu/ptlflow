@@ -14,12 +14,12 @@ def swig_ptr_from_Tensor(x):
 
     if x.dtype == torch.float32:
         return faiss.cast_integer_to_float_ptr(
-            x.storage().data_ptr() + x.storage_offset() * 4
+            x.untyped_storage().data_ptr() + x.storage_offset() * 4
         )
 
     if x.dtype == torch.int64:
         return faiss.cast_integer_to_int_ptr(
-            x.storage().data_ptr() + x.storage_offset() * 8
+            x.untyped_storage().data_ptr() + x.storage_offset() * 8
         )
 
     raise Exception("tensor type not supported: {}".format(x.dtype))
