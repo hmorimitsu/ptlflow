@@ -28,7 +28,7 @@ class IRRPWCNet(BaseModel):
 
     def __init__(self, args):
         super(IRRPWCNet, self).__init__(
-            args=args, loss_fn=MultiScaleEPE_PWC(args), output_stride=64
+            args=args, loss_fn=MultiScaleEPE_PWC(args), output_stride=1
         )
         self.leakyRELU = nn.LeakyReLU(0.1, inplace=True)
 
@@ -71,8 +71,18 @@ class IRRPWCNet(BaseModel):
         return parser
 
     def forward(self, inputs):
-        x1_raw = inputs["images"][:, 0]
-        x2_raw = inputs["images"][:, 1]
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=0.0,
+            bgr_mult=1.0,
+            bgr_to_rgb=True,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=False,
+        )
+
+        x1_raw = images[:, 0]
+        x2_raw = images[:, 1]
         _, _, height_im, width_im = x1_raw.size()
 
         # on the bottom level are original images
@@ -131,16 +141,13 @@ class IRRPWCNet(BaseModel):
                 flows.append(flow)
                 break
 
+        flow_up = upsample2d_as(flow, x1_raw, mode="bilinear") * (1.0 / self.args.div_flow)
+        flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
+
         outputs = {}
         if self.training:
             outputs["flow_preds"] = flows
-            outputs["flows"] = (
-                upsample2d_as(flow, x1_raw, mode="bilinear")
-                * (1.0 / self.args.div_flow)
-            )[:, None]
+            outputs["flows"] = flow_up[:, None]
         else:
-            outputs["flows"] = (
-                upsample2d_as(flow, x1_raw, mode="bilinear")
-                * (1.0 / self.args.div_flow)
-            )[:, None]
+            outputs["flows"] = flow_up[:, None]
         return outputs
