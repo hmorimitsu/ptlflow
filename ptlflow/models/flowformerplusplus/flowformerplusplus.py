@@ -1,19 +1,22 @@
 from argparse import ArgumentParser, Namespace
 
+import torch.nn.functional as F
+
 from .FlowFormer.encoders import twins_svt_large, convnext_large
 from .FlowFormer.PerCostFormer3.encoder import MemoryEncoder
 from .FlowFormer.PerCostFormer3.decoder import MemoryDecoder
 from .FlowFormer.PerCostFormer3.cnn import BasicEncoder
+from .utils import compute_grid_indices, compute_weight
 from ..base_model.base_model import BaseModel
 
 
 class FlowFormerPlusPlus(BaseModel):
     pretrained_checkpoints = {
-        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-chairs-228c2fec.ckpt",
-        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-things-71639183.ckpt",
-        "things288960": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-things_288960-1a21a884.ckpt",
-        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-sintel-90b72ab7.ckpt",
-        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-kitti-453e8476.ckpt",
+        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-chairs-a7745dd5.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-things-4db3ecff.ckpt",
+        "things288960": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-things_288960-a4291d41.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-sintel-d14a1968.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformerplusplus-kitti-65b828c3.ckpt",
     }
 
     def __init__(self, args: Namespace) -> None:
@@ -45,14 +48,6 @@ class FlowFormerPlusPlus(BaseModel):
     def add_model_specific_args(parent_parser=None):
         parent_parser = BaseModel.add_model_specific_args(parent_parser)
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        # parser.add_argument('--add_flow_token', action='store_true')
-        # parser.add_argument('--context_concat', action='store_true')
-        # parser.add_argument('--feat_cross_attn', action='store_true')
-        # parser.add_argument('--gamma', type=float, default=0.8)
-        # parser.add_argument('--max_flow', type=float, default=400.0)
-        # parser.add_argument('--only_global', action='store_true')
-        # parser.add_argument('--use_mlp', action='store_true')
-        # parser.add_argument('--vertical_conv', action='store_true')
         parser.add_argument(
             "--cnet",
             type=str,
@@ -118,55 +113,142 @@ class FlowFormerPlusPlus(BaseModel):
         parser.add_argument("--use_rpe", action="store_true")
         parser.add_argument("--gma", type=str, choices=("GMA", "GMA-SK"), default="GMA")
         parser.add_argument("--detach_local", action="store_true")
+        parser.add_argument("--use_tile_input", action="store_true")
+        parser.add_argument("--tile_height", type=int, default=432)
+        parser.add_argument("--tile_sigma", type=float, default=0.05)
+        parser.add_argument(
+            "--train_size",
+            type=int,
+            nargs=2,
+            default=None,
+            help="train_size will be normally loaded from the checkpoint. However, if you provide this value, it will override the value from the checkpoint.",
+        )
         return parser
 
     def forward(self, inputs, flow_init=None, mask=None, output=None):
         """Estimate optical flow between pair of frames"""
-        image1 = inputs["images"][:, 0]
-        image2 = inputs["images"][:, 1]
-
-        image1 = image1.contiguous()
-        image2 = image2.contiguous()
-
         if self.args.pretrain_mode:
-            image1 = image1 * 255.0
-            image2 = image2 * 255.0
+            image1 = (image1 + 1) * 127.5
+            image2 = (image2 + 1) * 127.5
             loss = self.pretrain_forward(image1, image2, mask=mask, output=output)
             return loss
+
+        if self.args.use_tile_input:
+            return self.forward_tile(inputs)
         else:
-            # Following https://github.com/princeton-vl/RAFT/
-            image1 = 2 * image1 - 1.0
-            image2 = 2 * image2 - 1.0
+            return self.forward_pad(inputs, flow_init)
 
-            data = {}
+    def forward_pad(self, inputs, flow_init=None):
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-0.5,
+            bgr_mult=2.0,
+            bgr_to_rgb=True,
+            resize_mode="pad",
+            pad_mode="replicate",
+            pad_two_side=True,
+        )
 
-            context, _ = self.context_encoder(image1)
-            context_quater = None
-
-            (
-                cost_memory,
-                cost_patches,
-                feat_s_quater,
-                feat_t_quater,
-            ) = self.memory_encoder(image1, image2, data, context)
-
-            flow_predictions = self.memory_decoder(
-                cost_memory,
-                context,
-                context_quater,
-                feat_s_quater,
-                feat_t_quater,
-                data,
-                flow_init=flow_init,
-                cost_patches=cost_patches,
-            )
+        flow_predictions, flow_small = self.predict(
+            images[:, 0], images[:, 1], flow_init
+        )
+        output_flow = flow_predictions[-1]
 
         if self.training:
+            for i, p in enumerate(flow_predictions):
+                flow_predictions[i] = self.postprocess_predictions(
+                    p, image_resizer, is_flow=True
+                )
             outputs = {
-                "flows": flow_predictions[0][:, None],
+                "flows": flow_predictions[-1][:, None],
                 "flow_preds": flow_predictions,
             }
         else:
-            outputs = {"flows": flow_predictions[0][:, None]}
+            output_flow = self.postprocess_predictions(
+                output_flow, image_resizer, is_flow=True
+            )
+            outputs = {"flows": output_flow[:, None], "flow_small": flow_small}
 
         return outputs
+
+    def forward_tile(self, inputs):
+        assert not self.training
+        if self.args.train_size is not None:
+            train_size = self.args.train_size
+        else:
+            train_size = self.train_size
+        assert train_size is not None
+        input_size = inputs["images"].shape[-2:]
+        image_size = (self.args.tile_height, input_size[-1])
+        hws = compute_grid_indices(image_size, train_size)
+        weights = compute_weight(hws, image_size, train_size, self.args.tile_sigma)
+
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-0.5,
+            bgr_mult=2.0,
+            bgr_to_rgb=True,
+            resize_mode="pad",
+            target_size=image_size,
+            pad_two_side=False,
+            pad_mode="constant",
+            pad_value=-1,
+        )
+
+        image1 = images[:, 0]
+        image2 = images[:, 1]
+
+        flows = 0
+        flow_count = 0
+
+        for idx, (h, w) in enumerate(hws):
+            image1_tile = image1[:, :, h : h + train_size[0], w : w + train_size[1]]
+            image2_tile = image2[:, :, h : h + train_size[0], w : w + train_size[1]]
+
+            flow_predictions, _ = self.predict(image1_tile, image2_tile)
+            flow_pre = flow_predictions[-1]
+
+            padding = (
+                w,
+                image_size[1] - w - train_size[1],
+                h,
+                image_size[0] - h - train_size[0],
+                0,
+                0,
+            )
+            flows += F.pad(flow_pre * weights[idx], padding)
+            flow_count += F.pad(weights[idx], padding)
+
+        output_flow = flows / flow_count
+
+        output_flow = self.postprocess_predictions(
+            output_flow, image_resizer, is_flow=True
+        )
+        return {"flows": output_flow[:, None]}
+
+    def predict(self, image1, image2, flow_init=None):
+        """Estimate optical flow between pair of frames"""
+        data = {}
+
+        context, _ = self.context_encoder(image1)
+        context_quater = None
+
+        (
+            cost_memory,
+            cost_patches,
+            feat_s_quater,
+            feat_t_quater,
+        ) = self.memory_encoder(image1, image2, data, context)
+
+        flow_predictions, flow_small = self.memory_decoder(
+            cost_memory,
+            context,
+            context_quater,
+            feat_s_quater,
+            feat_t_quater,
+            data,
+            flow_init=flow_init,
+            cost_patches=cost_patches,
+        )
+
+        return flow_predictions, flow_small
