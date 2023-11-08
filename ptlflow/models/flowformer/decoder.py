@@ -313,7 +313,4 @@ class MemoryDecoder(nn.Module):
             flow_up = self.upsample_flow(coords1 - coords0, up_mask)
             flow_predictions.append(flow_up)
 
-        if self.training:
-            return flow_predictions
-        else:
-            return flow_predictions[-1], coords1 - coords0
+        return flow_predictions, coords1 - coords0

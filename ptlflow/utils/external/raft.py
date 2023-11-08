@@ -42,13 +42,23 @@ class InputPadder:
     """Pads images such that dimensions are divisible by stride."""
 
     def __init__(
-        self, dims, stride=8, two_side_pad=True, pad_mode="replicate", pad_value=0.0
+        self,
+        dims,
+        stride=8,
+        two_side_pad=True,
+        pad_mode="replicate",
+        pad_value=0.0,
+        size=None,
     ):
         self.pad_mode = pad_mode
         self.pad_value = pad_value
-        self.ht, self.wd = dims[-2:]
-        pad_ht = (((self.ht // stride) + 1) * stride - self.ht) % stride
-        pad_wd = (((self.wd // stride) + 1) * stride - self.wd) % stride
+        ht, wd = dims[-2:]
+        if size is None:
+            pad_ht = (((ht // stride) + 1) * stride - ht) % stride
+            pad_wd = (((wd // stride) + 1) * stride - wd) % stride
+        else:
+            pad_ht = size[0] - ht
+            pad_wd = size[1] - wd
         if two_side_pad:
             self._pad = [
                 pad_wd // 2,

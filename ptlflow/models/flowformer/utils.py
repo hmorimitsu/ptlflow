@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -7,8 +9,9 @@ from scipy import interpolate
 class InputPadder:
     """Pads images such that dimensions are divisible by 8"""
 
-    def __init__(self, dims, mode="sintel"):
+    def __init__(self, dims, pad_mode, mode="sintel"):
         self.ht, self.wd = dims[-2:]
+        self.pad_mode = pad_mode
         pad_ht = (((self.ht // 8) + 1) * 8 - self.ht) % 8
         pad_wd = (((self.wd // 8) + 1) * 8 - self.wd) % 8
         if mode == "sintel":
@@ -18,13 +21,17 @@ class InputPadder:
                 pad_ht // 2,
                 pad_ht - pad_ht // 2,
             ]
+        elif mode == "kitti432":
+            self._pad = [0, 0, 0, 432 - self.ht]
         elif mode == "kitti400":
             self._pad = [0, 0, 0, 400 - self.ht]
+        elif mode == "kitti376":
+            self._pad = [0, 0, 0, 376 - self.ht]
         else:
             self._pad = [pad_wd // 2, pad_wd - pad_wd // 2, 0, pad_ht]
 
     def pad(self, *inputs):
-        return [F.pad(x, self._pad, mode="replicate") for x in inputs]
+        return [F.pad(x, self._pad, mode=self.pad_mode, value=0.0) for x in inputs]
 
     def unpad(self, x):
         ht, wd = x.shape[-2:]
@@ -111,3 +118,37 @@ def coords_grid(batch, ht, wd):
 def upflow8(flow, mode="bilinear"):
     new_size = (8 * flow.shape[2], 8 * flow.shape[3])
     return 8 * F.interpolate(flow, size=new_size, mode=mode, align_corners=True)
+
+
+def compute_grid_indices(image_shape, patch_size, min_overlap=20):
+    if min_overlap >= patch_size[0] or min_overlap >= patch_size[1]:
+        raise ValueError("!!")
+    hs = list(range(0, image_shape[0], patch_size[0] - min_overlap))
+    ws = list(range(0, image_shape[1], patch_size[1] - min_overlap))
+    # Make sure the final patch is flush with the image boundary
+    hs[-1] = image_shape[0] - patch_size[0]
+    ws[-1] = image_shape[1] - patch_size[1]
+    return [(h, w) for h in hs for w in ws]
+
+
+def compute_weight(hws, image_shape, patch_size, sigma=1.0, wtype="gaussian"):
+    patch_num = len(hws)
+    h, w = torch.meshgrid(torch.arange(patch_size[0]), torch.arange(patch_size[1]))
+    h, w = h / float(patch_size[0]), w / float(patch_size[1])
+    c_h, c_w = 0.5, 0.5
+    h, w = h - c_h, w - c_w
+    weights_hw = (h**2 + w**2) ** 0.5 / sigma
+    denorm = 1 / (sigma * math.sqrt(2 * math.pi))
+    weights_hw = denorm * torch.exp(-0.5 * (weights_hw) ** 2)
+
+    weights = torch.zeros(1, patch_num, *image_shape)
+    for idx, (h, w) in enumerate(hws):
+        weights[:, idx, h : h + patch_size[0], w : w + patch_size[1]] = weights_hw
+    weights = weights.cuda()
+    patch_weights = []
+    for idx, (h, w) in enumerate(hws):
+        patch_weights.append(
+            weights[:, idx : idx + 1, h : h + patch_size[0], w : w + patch_size[1]]
+        )
+
+    return patch_weights

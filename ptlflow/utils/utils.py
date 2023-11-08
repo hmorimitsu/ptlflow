@@ -41,6 +41,7 @@ class InputPadder(_InputPadder):
         self,
         dims: Sequence[int],
         stride: int,
+        size: Optional[Tuple[int, int]] = None,
         two_side_pad: bool = True,
         pad_mode: str = "replicate",
         pad_value: float = 0.0,
@@ -55,6 +56,8 @@ class InputPadder(_InputPadder):
         stride : int
             The number to compute the amount of padding. The padding will be applied so that the input size is divisible
             by stride.
+        size : Optional[Tuple[int, int]], optional
+            The desired size after scaling defined as (height, width). If not provided, then scale_factor will be used instead.
         two_side_pad : bool, default True
             If True, half of the padding goes to left/top and the rest to right/bottom. Otherwise, all the padding goes to the bottom right.
         pad_mode : str, default "replicate"
@@ -65,14 +68,18 @@ class InputPadder(_InputPadder):
         super().__init__(
             dims,
             stride=stride,
+            size=size,
             two_side_pad=two_side_pad,
             pad_mode=pad_mode,
             pad_value=pad_value,
         )
-        self.tgt_size = (
-            int(math.ceil(float(dims[-2]) / stride)) * stride,
-            int(math.ceil(float(dims[-1]) / stride)) * stride,
-        )
+        if size is None:
+            self.tgt_size = (
+                int(math.ceil(float(dims[-2]) / stride)) * stride,
+                int(math.ceil(float(dims[-1]) / stride)) * stride,
+            )
+        else:
+            self.tgt_size = size
 
     def fill(self, x):
         return self.pad(x)

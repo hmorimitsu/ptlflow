@@ -398,9 +398,9 @@ class CostPerceiverEncoder(nn.Module):
                 ]
             )
         self.cost_scale_aug = None
-        # if ('cost_scale_aug' in cfg.keys()):
-        #     self.cost_scale_aug = cfg.cost_scale_aug
-        #     print("[Using cost_scale_aug: {}]".format(self.cost_scale_aug))
+        if hasattr(cfg, "cost_scale_aug"):
+            self.cost_scale_aug = cfg.cost_scale_aug
+            print("[Using cost_scale_aug: {}]".format(self.cost_scale_aug))
 
     def forward(self, cost_volume, data, context=None):
         B, heads, H1, W1, H2, W2 = cost_volume.shape
@@ -499,11 +499,19 @@ class MemoryEncoder(nn.Module):
         return corr
 
     def forward(self, img1, img2, data, context=None):
-        feat_s = self.feat_encoder(img1)
-        feat_t = self.feat_encoder(img2)
+        # The original implementation
+        # feat_s = self.feat_encoder(img1)
+        # feat_t = self.feat_encoder(img2)
+        # feat_s = self.channel_convertor(feat_s)
+        # feat_t = self.channel_convertor(feat_t)
 
-        feat_s = self.channel_convertor(feat_s)
-        feat_t = self.channel_convertor(feat_t)
+        imgs = torch.cat([img1, img2], dim=0)
+        feats = self.feat_encoder(imgs)
+        feats = self.channel_convertor(feats)
+        B = feats.shape[0] // 2
+
+        feat_s = feats[:B]
+        feat_t = feats[B:]
 
         B, C, H, W = feat_s.shape
         size = (H, W)

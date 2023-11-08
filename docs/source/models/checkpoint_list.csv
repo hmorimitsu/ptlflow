@@ -22,10 +22,10 @@ flow1d-things-bcd92815.ckpt,flow1d_things-fd4bee1f.pth,
 flow1d-sintel-28a093d3.ckpt,flow1d_sintel-276ce58e.pth,
 flow1d-kitti-803a0181.ckpt,flow1d_kitti-04b1caa2.pth,
 flow1d-highres-7ab476dc.ckpt,flow1d_highres-e0b98d7e.pth,
-flowformer-chairs-2b34ea4b.ckpt,chairs.pth,https://github.com/drinkingcoder/FlowFormer-Official
-flowformer-kitti-1e45a6c8.ckpt,kitti.pth,
-flowformer-sintel-27cc959a.ckpt,sintel.pth,
-flowformer-things-ab5f3255.ckpt,things.pth,
+flowformer-chairs-84881320.ckpt,chairs.pth,https://github.com/drinkingcoder/FlowFormer-Official
+flowformer-kitti-d4225180.ckpt,kitti.pth,
+flowformer-sintel-cce498f8.ckpt,sintel.pth,
+flowformer-things-dbe62dd3.ckpt,things.pth,
 flowformerplusplus-chairs-228c2fec.ckpt,chairs.pth,https://github.com/XiaoyuShi97/FlowFormerPlusPlus
 flowformerplusplus-kitti-453e8476.ckpt,kitti.pth,
 flowformerplusplus-sintel-90b72ab7.ckpt,sintel.pth,

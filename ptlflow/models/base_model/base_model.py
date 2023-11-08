@@ -208,12 +208,12 @@ class BaseModel(pl.LightningModule):
         bgr_to_rgb: bool = False,
         image_resizer: Optional[Union[InputPadder, InputScaler]] = None,
         resize_mode: str = "pad",
+        target_size: Optional[Tuple[int, int]] = None,
         pad_mode: str = "replicate",
         pad_value: float = 0.0,
         pad_two_side: bool = True,
         interpolation_mode: str = "bilinear",
         interpolation_align_corners: bool = True,
-        interpolation_target_size: Optional[Tuple[int, int]] = None,
     ) -> Tuple[torch.Tensor, Union[InputPadder, InputScaler]]:
         """Applies basic pre-processing to the images.
 
@@ -238,6 +238,8 @@ class BaseModel(pl.LightningModule):
             If not provided, a new one will be created based on the given resize_mode.
         resize_mode : str, default "pad"
             How to resize the input. Accepted values are "pad" and "interpolation".
+        target_size : Optional[Tuple[int, int]], default None
+            If given, the images will be resized to this size, instead of calculating a multiple of self.output_stride.
         pad_mode : str, default "replicate"
             Used if resize_mode == "pad". How to pad the input. Must be one of the values accepted by the 'mode' argument of torch.nn.functional.pad.
         pad_value : float, default 0.0
@@ -248,8 +250,6 @@ class BaseModel(pl.LightningModule):
             Used if resize_mode == "interpolation". How to interpolate the input. Must be one of the values accepted by the 'mode' argument of torch.nn.functional.interpolate.
         interpolation_align_corners : bool, default True
             Used if resize_mode == "interpolation". See 'align_corners' in https://pytorch.org/docs/stable/generated/torch.nn.functional.interpolate.html.
-        interpolation_target_size : Optional[Tuple[int, int]], default None
-            Used if resize_mode == "interpolation". If given, the images will be interpolated to this size, instead of calculating a multiple of self.output_stride.
 
         Returns
         -------
@@ -270,23 +270,25 @@ class BaseModel(pl.LightningModule):
         if bgr_to_rgb:
             images = torch.flip(images, [-3])
 
+        stride = self.output_stride
+        if target_size is not None:
+            stride = None
+
         if image_resizer is None:
             if resize_mode == "pad":
                 image_resizer = InputPadder(
                     images.shape,
-                    stride=self.output_stride,
+                    stride=stride,
+                    size=target_size,
                     pad_mode=pad_mode,
                     two_side_pad=pad_two_side,
                     pad_value=pad_value,
                 )
             elif resize_mode == "interpolation":
-                stride = self.output_stride
-                if interpolation_target_size is not None:
-                    stride = None
                 image_resizer = InputScaler(
                     images.shape,
                     stride=stride,
-                    size=interpolation_target_size,
+                    size=target_size,
                     interpolation_mode=interpolation_mode,
                     interpolation_align_corners=interpolation_align_corners,
                 )
