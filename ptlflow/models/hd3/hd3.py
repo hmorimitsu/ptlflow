@@ -183,15 +183,15 @@ class BaseHD3(BaseModel):
         return flow_warp(x, vect)
 
     def forward(self, inputs):
-        x = inputs["images"]
-
-        mean = torch.from_numpy(np.array([0.485, 0.456, 0.406])).to(
-            dtype=x.dtype, device=x.device
-        )[None, None, :, None, None]
-        std = torch.from_numpy(np.array([0.229, 0.224, 0.225])).to(
-            dtype=x.dtype, device=x.device
-        )[None, None, :, None, None]
-        x = (x - mean) / std
+        x, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=[-0.485, -0.456, -0.406],
+            bgr_mult=[1 / 0.229, 1 / 0.224, 1 / 0.225],
+            bgr_to_rgb=False,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=True,
+        )
 
         # extract pyramid features
         bs = x.size(0)
@@ -249,19 +249,20 @@ class BaseHD3(BaseModel):
         ms_prob = [l[0] for l in ms_pred]
         ms_vect = [l[1] for l in ms_pred]
 
+        flow_up = F.interpolate(
+            ms_vect[-1], scale_factor=4, mode="bilinear", align_corners=False
+        )
+        flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
+
         outputs = {}
         if self.training:
             outputs["ms_prob"] = ms_prob
             outputs["ms_pred"] = ms_vect
             outputs["corr_range"] = self.args.corr_range
             outputs["downsample"] = self.args.downsample
-            outputs["flows"] = F.interpolate(
-                ms_vect[-1], scale_factor=4, mode="bilinear", align_corners=False
-            )[:, None]
+            outputs["flows"] = flow_up[:, None]
         else:
-            outputs["flows"] = F.interpolate(
-                ms_vect[-1], scale_factor=4, mode="bilinear", align_corners=False
-            )[:, None]
+            outputs["flows"] = flow_up[:, None]
         return outputs
 
 
