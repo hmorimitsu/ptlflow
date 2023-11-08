@@ -318,6 +318,7 @@ class DICLBase(BaseModel):
             nargs="+",
             default=((372, 372), (360, 360), (336, 336), (288, 288), (192, 192)),
         )
+        parser.add_argument("--pad_by_cons", action="store_true")
 
         return parser
 
@@ -355,8 +356,26 @@ class DICLBase(BaseModel):
 
     def forward(self, inputs):
         # left and right images normalized
-        x = inputs["images"][:, 0] * 2 - 1
-        y = inputs["images"][:, 1] * 2 - 1
+        if self.args.pad_by_cons:
+            pad_mode = "constant"
+            pad_value = 1
+        else:
+            pad_mode = "replicate"
+            pad_value = None
+
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-0.5,
+            bgr_mult=2.0,
+            bgr_to_rgb=True,
+            resize_mode="pad",
+            pad_mode=pad_mode,
+            pad_value=pad_value,
+            pad_two_side=False,
+        )
+
+        x = images[:, 0]
+        y = images[:, 1]
 
         # feature extraction
         _, x2, x3, x4, x5, x6 = self.feature(x)
@@ -501,6 +520,7 @@ class DICLBase(BaseModel):
         )[:, None]
         flow_out[:, :, 0] = flow_out[:, :, 0] * (float(x.shape[-1]) / flow2.shape[-1])
         flow_out[:, :, 1] = flow_out[:, :, 1] * (float(x.shape[-2]) / flow2.shape[-2])
+        flow_out = self.postprocess_predictions(flow_out, image_resizer, is_flow=True)
 
         output = {"flows": flow_out}
         if self.training:
