@@ -228,9 +228,9 @@ class BaseModel(pl.LightningModule):
         images : torch.Tensor
             A tensor with at least 3 dimensions in this order: [..., 3, H, W].
         bgr_add : Union[float, Tuple[float, float, float], np.ndarray, torch.Tensor], default 0
-            A value or a triple of BGR values to be added to the images.
+            BGR values to be added to the images. It can be a single value, a triple, or a tensor with a shape compatible with images.
         bgr_mult : Union[float, Tuple[float, float, float], np.ndarray, torch.Tensor], default 1
-            A value or a triple of BGR values to be multiplied by the images.
+            BGR values to be multiplied by the images. It can be a single value, a triple, or a tensor with a shape compatible with images.
         bgr_to_rgb : bool, default False
             If True, flip the channels to convert from BGR to RGB.
         image_resizer : Optional[Union[InputPadder, InputScaler]]

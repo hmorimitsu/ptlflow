@@ -361,6 +361,37 @@ def tensor_dict_to_numpy(
     return npy_dict
 
 
+def are_shapes_compatible(
+    shape1: Sequence[int],
+    shape2: Sequence[int],
+) -> bool:
+    """Check if two tensor shapes are compatible.
+
+    Similar to PyTorch or Numpy, two shapes are considered "compatible" if either they have the same shape or if one shape can be broadcasted into the other.
+    We consider two shapes compatible if, and only if:
+    1. their shapes have the same length (same number of dimension), and
+    2. each dimension size is either equal or at least one of them is one.
+
+    Parameters
+    ----------
+    shape1 : Sequence[int]
+        The dimensions of the first shape.
+    shape2 : Sequence[int]
+        The dimensions of the second shape.
+
+    Returns
+    -------
+    bool
+        Whether the two given shapes are compatible.
+    """
+    if len(shape1) != len(shape2):
+        return False
+    for v1, v2 in zip(shape1, shape2):
+        if v1 != 1 and v2 != 1 and v1 != v2:
+            return False
+    return True
+
+
 def bgr_val_as_tensor(
     bgr_val: Union[float, Tuple[float, float, float], np.ndarray, torch.Tensor],
     reference_tensor: torch.Tensor,
@@ -392,10 +423,13 @@ def bgr_val_as_tensor(
     torch.Tensor
         The bgr_val converted into a tensor with a shape compatible with reference_tensor.
     """
+    is_compatible = False
     if isinstance(bgr_val, torch.Tensor):
-        assert len(bgr_val.shape) == 1 and bgr_val.shape[0] == 3
+        is_compatible = are_shapes_compatible(bgr_val.shape, reference_tensor.shape)
+        assert is_compatible or (len(bgr_val.shape) == 1 and bgr_val.shape[0] == 3)
     elif isinstance(bgr_val, np.ndarray):
-        assert len(bgr_val.shape) == 1 and bgr_val.shape[0] == 3
+        is_compatible = are_shapes_compatible(bgr_val.shape, reference_tensor.shape)
+        assert is_compatible or (len(bgr_val.shape) == 1 and bgr_val.shape[0] == 3)
         bgr_val = torch.from_numpy(bgr_val).to(
             dtype=reference_tensor.dtype, device=reference_tensor.device
         )
@@ -410,6 +444,8 @@ def bgr_val_as_tensor(
             + bgr_val
         )
 
-    bgr_dims = [1] * len(reference_tensor.shape)
-    bgr_dims[bgr_tensor_shape_position] = 3
-    return bgr_val.reshape(bgr_dims)
+    if not is_compatible:
+        bgr_dims = [1] * len(reference_tensor.shape)
+        bgr_dims[bgr_tensor_shape_position] = 3
+        bgr_val = bgr_val.reshape(bgr_dims)
+    return bgr_val

@@ -2,8 +2,8 @@
 Portions of this code copyright 2017, Clement Pinard
 """
 from argparse import Namespace
-from pathlib import Path
 
+from einops import rearrange
 import torch
 import torch.nn as nn
 from torch.nn import init
@@ -65,7 +65,19 @@ class FlowNetS(FlowNetBase):
         )
 
     def forward(self, inputs):
-        x = inputs["images"]
+        images = inputs["images"]
+        bgr_mean = rearrange(images, "b n c h w -> b n c (h w)").mean(-1)
+        bgr_mean = bgr_mean[..., None, None]
+        images, image_resizer = self.preprocess_images(
+            images,
+            bgr_add=-bgr_mean,
+            bgr_mult=1.0,
+            bgr_to_rgb=True,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=True,
+        )
+        x = images
 
         x = x.view(x.shape[0], x.shape[1] * x.shape[2], x.shape[3], x.shape[4])
         out_conv1 = self.conv1(x)
@@ -98,6 +110,9 @@ class FlowNetS(FlowNetBase):
         concat2 = torch.cat((out_conv2, out_deconv2, flow3_up), 1)
         flow2 = self.predict_flow2(concat2)
 
+        out_flow = self.args.div_flow * self.upsample1(flow2.float())
+        out_flow = self.postprocess_predictions(out_flow, image_resizer, is_flow=True)
+
         outputs = {}
 
         if self.training:
@@ -108,12 +123,8 @@ class FlowNetS(FlowNetBase):
                 flow5.float(),
                 flow6.float(),
             ]
-            outputs["flows"] = (
-                self.args.div_flow * self.upsample1(flow2.float())[:, None]
-            )
+            outputs["flows"] = out_flow[:, None]
         else:
-            outputs["flows"] = (
-                self.args.div_flow * self.upsample1(flow2.float())[:, None]
-            )
+            outputs["flows"] = out_flow[:, None]
 
         return outputs
