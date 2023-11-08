@@ -13,6 +13,7 @@ except ModuleNotFoundError:
     from ptlflow.utils.correlation import (
         IterSpatialCorrelationSampler as SpatialCorrelationSampler,
     )
+    from einops import rearrange
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -243,10 +244,18 @@ class FastFlowNet(BaseModel):
         return output
 
     def forward(self, inputs):
-        img1 = inputs["images"][:, 0]
-        img2 = inputs["images"][:, 1]
-
-        img1, img2, _ = centralize(img1, img2)
+        mean_bgr = rearrange(inputs["images"], 'b n c h w -> b c (n h w)').mean(2)[:, None, :, None, None]
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-mean_bgr,
+            bgr_mult=1.0,
+            bgr_to_rgb=False,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=False,
+        )
+        img1 = images[:, 0]
+        img2 = images[:, 1]
 
         f11 = self.pconv1_2(self.pconv1_1(img1))
         f21 = self.pconv1_2(self.pconv1_1(img2))
@@ -308,6 +317,7 @@ class FastFlowNet(BaseModel):
         flow_up = self.args.div_flow * F.interpolate(
             flow2, size=img2.shape[-2:], mode="bilinear", align_corners=False
         )
+        flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
 
         outputs = {}
         if self.training:
