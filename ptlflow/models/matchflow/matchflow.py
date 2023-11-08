@@ -145,7 +145,6 @@ class MatchFlow(BaseModel):
             return self.forward_resize(inputs, flow_init)
 
     def forward_resize(self, inputs, flow_init=None):
-        orig_image_size = inputs["images"].shape[-2:]
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=-0.5,
@@ -155,7 +154,6 @@ class MatchFlow(BaseModel):
             interpolation_mode="bilinear",
             interpolation_align_corners=True,
         )
-        resized_image_size = images.shape[-2:]
 
         flow_predictions, flow_small = self.predict(
             images[:, 0], images[:, 1], flow_init
@@ -193,9 +191,9 @@ class MatchFlow(BaseModel):
             bgr_mult=2.0,
             bgr_to_rgb=True,
             resize_mode="interpolation",
+            target_size=image_size,
             interpolation_mode="bilinear",
             interpolation_align_corners=True,
-            interpolation_target_size=image_size,
         )
 
         image1 = images[:, 0]
