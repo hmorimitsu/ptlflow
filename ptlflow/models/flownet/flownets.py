@@ -64,19 +64,22 @@ class FlowNetS(FlowNetBase):
             scale_factor=4, mode="bilinear", align_corners=False
         )
 
-    def forward(self, inputs):
+    def forward(self, inputs, skip_preprocess=False):
         images = inputs["images"]
-        bgr_mean = rearrange(images, "b n c h w -> b n c (h w)").mean(-1)
-        bgr_mean = bgr_mean[..., None, None]
-        images, image_resizer = self.preprocess_images(
-            images,
-            bgr_add=-bgr_mean,
-            bgr_mult=1.0,
-            bgr_to_rgb=True,
-            resize_mode="interpolation",
-            interpolation_mode="bilinear",
-            interpolation_align_corners=True,
-        )
+        if skip_preprocess:
+            image_resizer = None
+        else:
+            bgr_mean = rearrange(images, "b n c h w -> b n c (h w)").mean(-1)
+            bgr_mean = bgr_mean[..., None, None]
+            images, image_resizer = self.preprocess_images(
+                images,
+                bgr_add=-bgr_mean,
+                bgr_mult=1.0,
+                bgr_to_rgb=True,
+                resize_mode="interpolation",
+                interpolation_mode="bilinear",
+                interpolation_align_corners=True,
+            )
         x = images
 
         x = x.view(x.shape[0], x.shape[1] * x.shape[2], x.shape[3], x.shape[4])
@@ -111,7 +114,10 @@ class FlowNetS(FlowNetBase):
         flow2 = self.predict_flow2(concat2)
 
         out_flow = self.args.div_flow * self.upsample1(flow2.float())
-        out_flow = self.postprocess_predictions(out_flow, image_resizer, is_flow=True)
+        if image_resizer is not None:
+            out_flow = self.postprocess_predictions(
+                out_flow, image_resizer, is_flow=True
+            )
 
         outputs = {}
 

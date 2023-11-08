@@ -1,5 +1,6 @@
 from argparse import Namespace
-from pathlib import Path
+
+from einops import rearrange
 
 import torch
 import torch.nn as nn
@@ -68,18 +69,25 @@ class FlowNetC(FlowNetBase):
             scale_factor=4, mode="bilinear", align_corners=False
         )
 
-    def normalize(self, im):
-        im = im - 0.5
-        im = im / 0.5
-        return im
+    def forward(self, inputs, skip_preprocess=False):
+        images = inputs["images"]
+        if skip_preprocess:
+            image_resizer = None
+        else:
+            bgr_mean = rearrange(images, "b n c h w -> b n c (h w)").mean(-1)
+            bgr_mean = bgr_mean[..., None, None]
+            images, image_resizer = self.preprocess_images(
+                images,
+                bgr_add=-bgr_mean,
+                bgr_mult=1.0,
+                bgr_to_rgb=True,
+                resize_mode="interpolation",
+                interpolation_mode="bilinear",
+                interpolation_align_corners=True,
+            )
+        x1 = images[:, 0]
+        x2 = images[:, 1]
 
-    def forward(self, inputs):
-        x = inputs["images"]
-        x1 = x[:, 0]
-        x2 = x[:, 1]
-
-        x1 = self.normalize(x1)
-        x2 = self.normalize(x2)
         # FlownetC top input stream
         out_conv1a = self.conv1(x1)
         out_conv2a = self.conv2(out_conv1a)
@@ -131,12 +139,18 @@ class FlowNetC(FlowNetBase):
 
         flow2 = self.predict_flow2(concat2)
 
+        out_flow = self.args.div_flow * self.upsample1(flow2.float())
+        if image_resizer is not None:
+            out_flow = self.postprocess_predictions(
+                out_flow, image_resizer, is_flow=True
+            )
+
         outputs = {}
 
         if self.training:
             outputs["flow_preds"] = [flow2, flow3, flow4, flow5, flow6]
-            outputs["flows"] = self.upsample1(flow2 * self.args.div_flow)[:, None]
+            outputs["flows"] = out_flow[:, None]
         else:
-            outputs["flows"] = self.upsample1(flow2 * self.args.div_flow)[:, None]
+            outputs["flows"] = out_flow[:, None]
 
         return outputs

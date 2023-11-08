@@ -2,8 +2,8 @@
 Portions of this code copyright 2017, Clement Pinard
 """
 from argparse import Namespace
-from pathlib import Path
 
+from einops import rearrange
 import torch
 import torch.nn as nn
 from torch.nn import init
@@ -70,8 +70,23 @@ class FlowNetSD(FlowNetBase):
             scale_factor=4, mode="bilinear", align_corners=False
         )
 
-    def forward(self, inputs):
-        x = inputs["images"]
+    def forward(self, inputs, skip_preprocess=False):
+        images = inputs["images"]
+        if skip_preprocess:
+            image_resizer = None
+        else:
+            bgr_mean = rearrange(images, "b n c h w -> b n c (h w)").mean(-1)
+            bgr_mean = bgr_mean[..., None, None]
+            images, image_resizer = self.preprocess_images(
+                images,
+                bgr_add=-bgr_mean,
+                bgr_mult=1.0,
+                bgr_to_rgb=True,
+                resize_mode="interpolation",
+                interpolation_mode="bilinear",
+                interpolation_align_corners=True,
+            )
+        x = images
 
         x = x.view(x.shape[0], x.shape[1] * x.shape[2], x.shape[3], x.shape[4])
         out_conv0 = self.conv0(x)
@@ -110,6 +125,14 @@ class FlowNetSD(FlowNetBase):
         out_interconv2 = self.inter_conv2(concat2)
         flow2 = self.predict_flow2(out_interconv2)
 
+        # Results are noticeably better if dividing here, rather than multiplying
+        # Maybe it was trained with the inverse divisor?
+        out_flow = self.upsample1(flow2.float()) / self.args.div_flow
+        if image_resizer is not None:
+            out_flow = self.postprocess_predictions(
+                out_flow, image_resizer, is_flow=True
+            )
+
         outputs = {}
 
         if self.training:
@@ -120,12 +143,8 @@ class FlowNetSD(FlowNetBase):
                 flow5.float(),
                 flow6.float(),
             ]
-            outputs["flows"] = (
-                self.upsample1(flow2.float())[:, None] / self.args.div_flow
-            )
+            outputs["flows"] = out_flow[:, None]
         else:
-            outputs["flows"] = (
-                self.upsample1(flow2.float())[:, None] / self.args.div_flow
-            )
+            outputs["flows"] = out_flow[:, None]
 
         return outputs

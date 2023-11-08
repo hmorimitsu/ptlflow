@@ -1,6 +1,6 @@
 from argparse import Namespace
-from pathlib import Path
 
+from einops import rearrange
 import torch
 import torch.nn as nn
 from torch.nn import init
@@ -73,14 +73,23 @@ class FlowNetCS(FlowNetBase):
 
         return output * mask
 
-    def normalize(self, im):
-        im = im - 0.5
-        im = im / 0.5
-        return im
-
     def forward(self, inputs):
+        orig_images = inputs["images"]
+        bgr_mean = rearrange(orig_images, "b n c h w -> b n c (h w)").mean(-1)
+        bgr_mean = bgr_mean[..., None, None]
+        images, image_resizer = self.preprocess_images(
+            orig_images,
+            bgr_add=-bgr_mean,
+            bgr_mult=1.0,
+            bgr_to_rgb=True,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=True,
+        )
+        inputs["images"] = images
+
         # flownetc
-        flownetc_flow = self.flownetc(inputs)["flows"][:, 0]
+        flownetc_flow = self.flownetc(inputs, skip_preprocess=True)["flows"][:, 0]
 
         # warp img1 to img0; magnitude of diff between img0 and and warped_img1,
         resampled_img1 = self.warp(inputs["images"][:, 1], flownetc_flow)
@@ -100,6 +109,11 @@ class FlowNetCS(FlowNetBase):
         )
 
         # flownets1
-        flownets1_preds = self.flownets_1({"images": concat1[:, None]})
+        flownets1_preds = self.flownets_1({"images": concat1[:, None]}, skip_preprocess=True)
+        flownets1_preds['flows'] = self.postprocess_predictions(
+            flownets1_preds['flows'], image_resizer, is_flow=True
+        )
+
+        inputs["images"] = orig_images
 
         return flownets1_preds

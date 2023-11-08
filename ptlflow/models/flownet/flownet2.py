@@ -1,6 +1,6 @@
 from argparse import Namespace
-from pathlib import Path
 
+from einops import rearrange
 import torch
 import torch.nn as nn
 from torch.nn import init
@@ -84,14 +84,23 @@ class FlowNet2(FlowNetBase):
 
         return output * mask
 
-    def normalize(self, im):
-        im = im - 0.5
-        im = im / 0.5
-        return im
-
     def forward(self, inputs):
+        orig_images = inputs["images"]
+        bgr_mean = rearrange(orig_images, "b n c h w -> b n c (h w)").mean(-1)
+        bgr_mean = bgr_mean[..., None, None]
+        images, image_resizer = self.preprocess_images(
+            orig_images,
+            bgr_add=-bgr_mean,
+            bgr_mult=1.0,
+            bgr_to_rgb=True,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=True,
+        )
+        inputs["images"] = images
+
         # flownetc
-        flownetc_flow = self.flownetc(inputs)["flows"][:, 0]
+        flownetc_flow = self.flownetc(inputs, skip_preprocess=True)["flows"][:, 0]
 
         # warp img1 to img0; magnitude of diff between img0 and and warped_img1,
         resampled_img1 = self.warp(inputs["images"][:, 1], flownetc_flow)
@@ -111,7 +120,9 @@ class FlowNet2(FlowNetBase):
         )
 
         # flownets1
-        flownets1_flow = self.flownets_1({"images": concat1[:, None]})["flows"][:, 0]
+        flownets1_flow = self.flownets_1(
+            {"images": concat1[:, None]}, skip_preprocess=True
+        )["flows"][:, 0]
 
         # warp img1 to img0; magnitude of diff between img0 and and warped_img1,
         resampled_img1 = self.warp(inputs["images"][:, 1], flownets1_flow)
@@ -131,7 +142,9 @@ class FlowNet2(FlowNetBase):
         )
 
         # flownets2
-        flownets2_flow = self.flownets_2({"images": concat2[:, None]})["flows"][:, 0]
+        flownets2_flow = self.flownets_2(
+            {"images": concat2[:, None]}, skip_preprocess=True
+        )["flows"][:, 0]
         norm_flownets2_flow = torch.norm(flownets2_flow, p=2, dim=1, keepdim=True)
 
         diff_flownets2_flow = self.warp(inputs["images"][:, 1], flownets2_flow)
@@ -141,7 +154,8 @@ class FlowNet2(FlowNetBase):
 
         # flownetsd
         flownetsd_flow = (
-            self.flownets_d(inputs)["flows"][:, 0] / self.args.div_flow**2
+            self.flownets_d(inputs, skip_preprocess=True)["flows"][:, 0]
+            / self.args.div_flow**2
         )
         norm_flownetsd_flow = torch.norm(flownetsd_flow, p=2, dim=1, keepdim=True)
 
@@ -164,5 +178,10 @@ class FlowNet2(FlowNetBase):
             dim=1,
         )
         flownetfusion_preds = self.flownetfusion({"images": concat3[:, None]})
+        flownetfusion_preds['flows'] = self.postprocess_predictions(
+            flownetfusion_preds['flows'], image_resizer, is_flow=True
+        )
+
+        inputs["images"] = orig_images
 
         return flownetfusion_preds
