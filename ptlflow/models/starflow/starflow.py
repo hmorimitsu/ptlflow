@@ -24,7 +24,7 @@ class StarFlow(BaseModel):
     }
 
     def __init__(self, args):
-        super(StarFlow, self).__init__(args=args, loss_fn=None, output_stride=64)
+        super(StarFlow, self).__init__(args=args, loss_fn=None, output_stride=1)
         self.args = args
         self.leakyRELU = nn.LeakyReLU(0.1, inplace=True)
 
@@ -84,7 +84,15 @@ class StarFlow(BaseModel):
         return parser
 
     def forward(self, inputs):
-        images = inputs["images"]
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=0.0,
+            bgr_mult=1.0,
+            bgr_to_rgb=True,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=False,
+        )
         list_imgs = [images[:, i] for i in range(images.shape[1])]
 
         _, _, height_im, width_im = list_imgs[0].size()
@@ -394,38 +402,47 @@ class StarFlow(BaseModel):
                 b_size, 1, h_x1, w_x1, dtype=init_dtype, device=init_device
             ).float()
 
-        outputs = {}
-
-        if self.training:
-            raise NotImplementedError("Training is still not implemented for StarFlow.")
-        else:
-            outputs["flows"] = torch.stack(
+        flow_f_up = torch.stack(
                 [
                     upsample2d_as(f, list_imgs[0], mode="bilinear") / self.args.div_flow
                     for f in flows_f[-1]
                 ],
                 dim=1,
             )
-            outputs["occs"] = torch.stack(
-                [
-                    upsample2d_as(torch.sigmoid(o), list_imgs[0], mode="bilinear")
-                    for o in occs_f[-1]
-                ],
-                dim=1,
-            )
-            outputs["flows_b"] = torch.stack(
+        flow_f_up = self.postprocess_predictions(flow_f_up, image_resizer, is_flow=True)
+        flow_b_up = torch.stack(
                 [
                     upsample2d_as(f, list_imgs[0], mode="bilinear") / self.args.div_flow
                     for f in flows_b[-1]
                 ],
                 dim=1,
             )
-            outputs["occs_b"] = torch.stack(
+        flow_b_up = self.postprocess_predictions(flow_b_up, image_resizer, is_flow=True)
+        occs_f_up = torch.stack(
+                [
+                    upsample2d_as(torch.sigmoid(o), list_imgs[0], mode="bilinear")
+                    for o in occs_f[-1]
+                ],
+                dim=1,
+            )
+        occs_f_up = self.postprocess_predictions(occs_f_up, image_resizer, is_flow=False)
+        occs_b_up = torch.stack(
                 [
                     upsample2d_as(torch.sigmoid(o), list_imgs[0], mode="bilinear")
                     for o in occs_b[-1]
                 ],
                 dim=1,
             )
+        occs_b_up = self.postprocess_predictions(occs_b_up, image_resizer, is_flow=False)
+
+        outputs = {}
+
+        if self.training:
+            raise NotImplementedError("Training is still not implemented for StarFlow.")
+        else:
+            outputs["flows"] = flow_f_up
+            outputs["occs"] = occs_f_up
+            outputs["flows_b"] = flow_b_up
+            outputs["occs_b"] = occs_b_up
 
         return outputs
