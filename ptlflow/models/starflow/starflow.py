@@ -403,37 +403,41 @@ class StarFlow(BaseModel):
             ).float()
 
         flow_f_up = torch.stack(
-                [
-                    upsample2d_as(f, list_imgs[0], mode="bilinear") / self.args.div_flow
-                    for f in flows_f[-1]
-                ],
-                dim=1,
-            )
+            [
+                upsample2d_as(f, list_imgs[0], mode="bilinear") / self.args.div_flow
+                for f in flows_f[-1]
+            ],
+            dim=1,
+        )
         flow_f_up = self.postprocess_predictions(flow_f_up, image_resizer, is_flow=True)
         flow_b_up = torch.stack(
-                [
-                    upsample2d_as(f, list_imgs[0], mode="bilinear") / self.args.div_flow
-                    for f in flows_b[-1]
-                ],
-                dim=1,
-            )
+            [
+                upsample2d_as(f, list_imgs[0], mode="bilinear") / self.args.div_flow
+                for f in flows_b[-1]
+            ],
+            dim=1,
+        )
         flow_b_up = self.postprocess_predictions(flow_b_up, image_resizer, is_flow=True)
         occs_f_up = torch.stack(
-                [
-                    upsample2d_as(torch.sigmoid(o), list_imgs[0], mode="bilinear")
-                    for o in occs_f[-1]
-                ],
-                dim=1,
-            )
-        occs_f_up = self.postprocess_predictions(occs_f_up, image_resizer, is_flow=False)
+            [
+                upsample2d_as(torch.sigmoid(o), list_imgs[0], mode="bilinear")
+                for o in occs_f[-1]
+            ],
+            dim=1,
+        )
+        occs_f_up = self.postprocess_predictions(
+            occs_f_up, image_resizer, is_flow=False
+        )
         occs_b_up = torch.stack(
-                [
-                    upsample2d_as(torch.sigmoid(o), list_imgs[0], mode="bilinear")
-                    for o in occs_b[-1]
-                ],
-                dim=1,
-            )
-        occs_b_up = self.postprocess_predictions(occs_b_up, image_resizer, is_flow=False)
+            [
+                upsample2d_as(torch.sigmoid(o), list_imgs[0], mode="bilinear")
+                for o in occs_b[-1]
+            ],
+            dim=1,
+        )
+        occs_b_up = self.postprocess_predictions(
+            occs_b_up, image_resizer, is_flow=False
+        )
 
         outputs = {}
 

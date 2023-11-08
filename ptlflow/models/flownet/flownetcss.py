@@ -110,7 +110,9 @@ class FlowNetCSS(FlowNetBase):
         )
 
         # flownets1
-        flownets1_flow = self.flownets_1({"images": concat1[:, None]}, skip_preprocess=True)["flows"][:, 0]
+        flownets1_flow = self.flownets_1(
+            {"images": concat1[:, None]}, skip_preprocess=True
+        )["flows"][:, 0]
 
         # warp img1 to img0; magnitude of diff between img0 and and warped_img1,
         resampled_img1 = self.warp(inputs["images"][:, 1], flownets1_flow)
@@ -130,9 +132,11 @@ class FlowNetCSS(FlowNetBase):
         )
 
         # flownets2
-        flownets2_preds = self.flownets_2({"images": concat1[:, None]}, skip_preprocess=True)
-        flownets2_preds['flows'] = self.postprocess_predictions(
-            flownets2_preds['flows'], image_resizer, is_flow=True
+        flownets2_preds = self.flownets_2(
+            {"images": concat1[:, None]}, skip_preprocess=True
+        )
+        flownets2_preds["flows"] = self.postprocess_predictions(
+            flownets2_preds["flows"], image_resizer, is_flow=True
         )
 
         return flownets2_preds

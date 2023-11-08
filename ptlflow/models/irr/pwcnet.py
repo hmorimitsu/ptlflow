@@ -141,7 +141,9 @@ class IRRPWCNet(BaseModel):
                 flows.append(flow)
                 break
 
-        flow_up = upsample2d_as(flow, x1_raw, mode="bilinear") * (1.0 / self.args.div_flow)
+        flow_up = upsample2d_as(flow, x1_raw, mode="bilinear") * (
+            1.0 / self.args.div_flow
+        )
         flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
 
         outputs = {}

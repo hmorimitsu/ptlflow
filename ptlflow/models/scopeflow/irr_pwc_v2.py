@@ -271,9 +271,13 @@ class ScopeFlow(BaseModel):
                 flows.append([flow_f, flow_b])
                 occs.append([occ_f, occ_b])
 
-        flow_f_up = upsample2d_as(flow_f, x1_raw, mode="bilinear") * (1.0 / self.args.div_flow)
+        flow_f_up = upsample2d_as(flow_f, x1_raw, mode="bilinear") * (
+            1.0 / self.args.div_flow
+        )
         flow_f_up = self.postprocess_predictions(flow_f_up, image_resizer, is_flow=True)
-        flow_b_up = upsample2d_as(flow_b, x1_raw, mode="bilinear") * (1.0 / self.args.div_flow)
+        flow_b_up = upsample2d_as(flow_b, x1_raw, mode="bilinear") * (
+            1.0 / self.args.div_flow
+        )
         flow_b_up = self.postprocess_predictions(flow_b_up, image_resizer, is_flow=True)
         occ_f_up = upsample2d_as(torch.sigmoid(occ_f), x1_raw, mode="bilinear")
         occ_f_up = self.postprocess_predictions(occ_f_up, image_resizer, is_flow=False)

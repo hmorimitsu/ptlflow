@@ -178,8 +178,8 @@ class FlowNet2(FlowNetBase):
             dim=1,
         )
         flownetfusion_preds = self.flownetfusion({"images": concat3[:, None]})
-        flownetfusion_preds['flows'] = self.postprocess_predictions(
-            flownetfusion_preds['flows'], image_resizer, is_flow=True
+        flownetfusion_preds["flows"] = self.postprocess_predictions(
+            flownetfusion_preds["flows"], image_resizer, is_flow=True
         )
 
         inputs["images"] = orig_images

@@ -109,9 +109,11 @@ class FlowNetCS(FlowNetBase):
         )
 
         # flownets1
-        flownets1_preds = self.flownets_1({"images": concat1[:, None]}, skip_preprocess=True)
-        flownets1_preds['flows'] = self.postprocess_predictions(
-            flownets1_preds['flows'], image_resizer, is_flow=True
+        flownets1_preds = self.flownets_1(
+            {"images": concat1[:, None]}, skip_preprocess=True
+        )
+        flownets1_preds["flows"] = self.postprocess_predictions(
+            flownets1_preds["flows"], image_resizer, is_flow=True
         )
 
         inputs["images"] = orig_images

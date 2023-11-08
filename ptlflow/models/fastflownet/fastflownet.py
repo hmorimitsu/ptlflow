@@ -244,7 +244,9 @@ class FastFlowNet(BaseModel):
         return output
 
     def forward(self, inputs):
-        mean_bgr = rearrange(inputs["images"], 'b n c h w -> b c (n h w)').mean(2)[:, None, :, None, None]
+        mean_bgr = rearrange(inputs["images"], "b n c h w -> b c (n h w)").mean(2)[
+            :, None, :, None, None
+        ]
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=-mean_bgr,
