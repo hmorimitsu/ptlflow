@@ -256,8 +256,13 @@ def get_model(
             )
 
         state_dict = ckpt["state_dict"]
-        if "hyper_parameters" in ckpt and "train_size" in ckpt["hyper_parameters"]:
-            model.train_size = ckpt["hyper_parameters"]["train_size"]
+        if "hyper_parameters" in ckpt:
+            if "train_size" in ckpt["hyper_parameters"]:
+                model.train_size = ckpt["hyper_parameters"]["train_size"]
+            if "extra_params" in ckpt["hyper_parameters"]:
+                extra_params = ckpt["hyper_parameters"]["extra_params"]
+                for name, value in extra_params.items():
+                    model.add_extra_param(name, value)
         model.load_state_dict(state_dict)
 
     return model

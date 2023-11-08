@@ -274,8 +274,8 @@ class VCNSmall(BaseModel):
     """
 
     pretrained_checkpoints = {
-        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn_small-chairs-2a5f72ba.ckpt",
-        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn_small-things-e5a44ada.ckpt",
+        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn_small-chairs-56243688.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn_small-things-2f19af2d.ckpt",
     }
 
     def __init__(self, args, md=[4, 4, 4, 4, 4]):
@@ -537,7 +537,21 @@ class VCNSmall(BaseModel):
         return [param for name, param in self.named_parameters() if "bias" in name]
 
     def forward(self, inputs, disc_aux=None):
-        im = inputs["images"]
+        if self.extra_params is not None and "mean_bgr_L" in self.extra_params:
+            mean_bgr = self.extra_params["mean_bgr_L"]
+        else:
+            mean_bgr = [0.33, 0.33, 0.33]
+        mean_bgr = [-x for x in mean_bgr]
+
+        im, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=mean_bgr,
+            bgr_mult=1.0,
+            bgr_to_rgb=True,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=True,
+        )
         im = im.view(im.shape[0] * im.shape[1], im.shape[2], im.shape[3], im.shape[4])
 
         bs = im.shape[0] // 2
@@ -809,15 +823,19 @@ class VCNSmall(BaseModel):
         flow3 = F.interpolate(
             flow3, [im.size()[2], im.size()[3]], mode="bilinear", align_corners=False
         )
+        flow3 = self.postprocess_predictions(flow3, image_resizer, is_flow=True)
         flow4 = F.interpolate(
             flow4, [im.size()[2], im.size()[3]], mode="bilinear", align_corners=False
         )
+        flow4 = self.postprocess_predictions(flow4, image_resizer, is_flow=True)
         flow5 = F.interpolate(
             flow5, [im.size()[2], im.size()[3]], mode="bilinear", align_corners=False
         )
+        flow5 = self.postprocess_predictions(flow5, image_resizer, is_flow=True)
         flow6 = F.interpolate(
             flow6, [im.size()[2], im.size()[3]], mode="bilinear", align_corners=False
         )
+        flow6 = self.postprocess_predictions(flow6, image_resizer, is_flow=True)
         flow2 = flow3 * 2
         flows = [flow6, flow5, flow4, flow3, flow2]
 
@@ -843,10 +861,10 @@ class VCN(VCNSmall):
     """
 
     pretrained_checkpoints = {
-        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-chairs-792544a0.ckpt",
-        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-things-afc0f455.ckpt",
-        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-sintel-5aac0540.ckpt",
-        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-kitti-29aa0c1a.ckpt",
+        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-chairs-6d37848e.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-things-3f6d9f0b.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-sintel-a3e6d864.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-kitti-171a566b.ckpt",
     }
 
     def __init__(self, args, md=[4, 4, 4, 4, 4]):
@@ -930,7 +948,24 @@ class VCN(VCNSmall):
                     m.bias.data.zero_()
 
     def forward(self, inputs, disc_aux=None):
-        im = inputs["images"]
+        # The original implementation uses different BGR means for im1 and im2
+        # Here, we use the same for both to make it simpler
+        if self.extra_params is not None and "mean_bgr_L" in self.extra_params:
+            mean_bgr = self.extra_params["mean_bgr_L"]
+        else:
+            mean_bgr = [0.33, 0.33, 0.33]
+        mean_bgr = [-x for x in mean_bgr]
+
+        im, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=mean_bgr,
+            bgr_mult=1.0,
+            bgr_to_rgb=True,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=True,
+        )
+
         im = im.view(im.shape[0] * im.shape[1], im.shape[2], im.shape[3], im.shape[4])
 
         bs = im.shape[0] // 2
@@ -1275,18 +1310,23 @@ class VCN(VCNSmall):
         flow2 = F.interpolate(
             flow2, [im.size()[2], im.size()[3]], mode="bilinear", align_corners=False
         )
+        flow2 = self.postprocess_predictions(flow2, image_resizer, is_flow=True)
         flow3 = F.interpolate(
             flow3, [im.size()[2], im.size()[3]], mode="bilinear", align_corners=False
         )
+        flow3 = self.postprocess_predictions(flow3, image_resizer, is_flow=True)
         flow4 = F.interpolate(
             flow4, [im.size()[2], im.size()[3]], mode="bilinear", align_corners=False
         )
+        flow4 = self.postprocess_predictions(flow4, image_resizer, is_flow=True)
         flow5 = F.interpolate(
             flow5, [im.size()[2], im.size()[3]], mode="bilinear", align_corners=False
         )
+        flow5 = self.postprocess_predictions(flow5, image_resizer, is_flow=True)
         flow6 = F.interpolate(
             flow6, [im.size()[2], im.size()[3]], mode="bilinear", align_corners=False
         )
+        flow6 = self.postprocess_predictions(flow6, image_resizer, is_flow=True)
         flows = [flow6, flow5, flow4, flow3, flow2]
 
         outputs = {}

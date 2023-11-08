@@ -77,6 +77,8 @@ class BaseModel(pl.LightningModule):
 
         self.train_size = None
 
+        self.extra_params = None
+
         self.train_metrics = FlowMetrics(prefix="train/")
         self.val_metrics = FlowMetrics(prefix="val/")
 
@@ -109,6 +111,11 @@ class BaseModel(pl.LightningModule):
             assert len(value) == 2
             assert isinstance(value[0], int) and isinstance(value[1], int)
         self._train_size = value
+
+    def add_extra_param(self, name, value):
+        if self.extra_params is None:
+            self.extra_params = {}
+        self.extra_params[name] = value
 
     @staticmethod
     def add_model_specific_args(
