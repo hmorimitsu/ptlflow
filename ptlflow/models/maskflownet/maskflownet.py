@@ -355,7 +355,9 @@ class MaskFlownet_S(BaseModel):
 
     def forward(self, inputs, skip_preprocess=False):
         if not skip_preprocess:
-            bgr_mean = rearrange(inputs["images"], 'b n c h w -> b c (n h w)').mean(2)[:, None, :, None, None]
+            bgr_mean = rearrange(inputs["images"], "b n c h w -> b c (n h w)").mean(2)[
+                :, None, :, None, None
+            ]
             images, image_resizer = self.preprocess_images(
                 inputs["images"],
                 bgr_add=-bgr_mean,
@@ -500,11 +502,11 @@ class MaskFlownet_S(BaseModel):
         srcs = [c1s, c2s, flows, c30, c40]
 
         flow_up = F.interpolate(
-                predictions[-1],
-                size=im1.shape[-2:],
-                mode="bilinear",
-                align_corners=True,
-            )
+            predictions[-1],
+            size=im1.shape[-2:],
+            mode="bilinear",
+            align_corners=True,
+        )
         occ_up = F.interpolate(
             occlusion_masks[-1],
             size=im1.shape[-2:],
@@ -738,7 +740,9 @@ class MaskFlownet(BaseModel):
         return output * mask
 
     def forward(self, inputs):
-        bgr_mean = rearrange(inputs["images"], 'b n c h w -> b c (n h w)').mean(2)[:, None, :, None, None]
+        bgr_mean = rearrange(inputs["images"], "b n c h w -> b c (n h w)").mean(2)[
+            :, None, :, None, None
+        ]
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=-bgr_mean,
@@ -875,11 +879,11 @@ class MaskFlownet(BaseModel):
         visuals.append(flow2[:, :1])
 
         flow_up = F.interpolate(
-                preds[-1],
-                size=images.shape[-2:],
-                mode="bilinear",
-                align_corners=False,
-            )
+            preds[-1],
+            size=images.shape[-2:],
+            mode="bilinear",
+            align_corners=False,
+        )
         flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
 
         output = {
