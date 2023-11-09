@@ -80,8 +80,8 @@ liteflownet3s-kitti-5dffb261.ckpt,LiteFlowNet3-S-ft-kitti.caffemodel,
 liteflownet3s-sintel-89793e34.ckpt,LiteFlowNet3-S-ft-sintel.caffemodel,
 maskflownet-kitti-d2ccb09b.ckpt,8caNov12-1532_300000.pth,https://github.com/cattaneod/MaskFlownet-Pytorch
 maskflownet-sintel-c52423aa.ckpt,5adNov03-0005_1000000.pth,
-maskflownet_s-sintel-79196ff3.ckpt,771Sep25-0735_500000.pth,
-maskflownet_s-things-a8a8ed9e.ckpt,dbbSep30-1206_1000000.pth,
+maskflownet_s-sintel-79196ff3.ckpt,dbbSep30-1206_1000000.pth,
+maskflownet_s-things-a8a8ed9e.ckpt,771Sep25-0735_500000.pth,
 matchflow_gma-chairs-02519b53.ckpt,matchflow-g-chairs.pth,https://github.com/DQiaole/MatchFlow
 matchflow_gma-kitti-bc72ce81.ckpt,matchflow-g-kitti.pth,
 matchflow_gma-sintel-683422f4.ckpt,matchflow-g-sintel.pth,
