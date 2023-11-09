@@ -1034,17 +1034,21 @@ class BaseModel(pl.LightningModule):
 
         split = "trainval"
         sequence_length = 2
+        sequence_position = "first"
         for v in args:
             if v in ["train", "val", "trainval", "test"]:
                 split = args[0]
             elif v.startswith("seqlen"):
-                sequence_length = int(v[6:])
+                sequence_length = int(v.split("_")[1])
+            elif v.startswith("seqpos"):
+                sequence_position = v.split("_")[1]
 
         dataset = Hd1kDataset(
             self.args.hd1k_root_dir,
             split=split,
             transform=transform,
             sequence_length=sequence_length,
+            sequence_position=sequence_position,
         )
         return dataset
 
@@ -1136,6 +1140,7 @@ class BaseModel(pl.LightningModule):
         split = "trainval"
         get_occlusion_mask = False
         sequence_length = 2
+        sequence_position = "first"
         for v in args:
             if v in ["clean", "final"]:
                 pass_names = [v]
@@ -1144,7 +1149,9 @@ class BaseModel(pl.LightningModule):
             elif v == "occ":
                 get_occlusion_mask = True
             elif v.startswith("seqlen"):
-                sequence_length = int(v[6:])
+                sequence_length = int(v.split("_")[1])
+            elif v.startswith("seqpos"):
+                sequence_position = v.split("_")[1]
 
         dataset = SintelDataset(
             self.args.mpi_sintel_root_dir,
@@ -1153,6 +1160,7 @@ class BaseModel(pl.LightningModule):
             transform=transform,
             get_occlusion_mask=get_occlusion_mask,
             sequence_length=sequence_length,
+            sequence_position=sequence_position,
         )
         return dataset
 
@@ -1194,6 +1202,7 @@ class BaseModel(pl.LightningModule):
         add_reverse = False
         get_backward = False
         sequence_length = 2
+        sequence_position = "first"
         for v in args:
             if v in ["train", "val", "trainval"]:
                 split = v
@@ -1202,7 +1211,9 @@ class BaseModel(pl.LightningModule):
             elif v == "back":
                 get_backward = True
             elif v.startswith("seqlen"):
-                sequence_length = int(v[6:])
+                sequence_length = int(v.split("_")[1])
+            elif v.startswith("seqpos"):
+                sequence_position = v.split("_")[1]
 
         dataset = SpringDataset(
             self.args.spring_root_dir,
@@ -1212,6 +1223,7 @@ class BaseModel(pl.LightningModule):
             transform=transform,
             get_backward=get_backward,
             sequence_length=sequence_length,
+            sequence_position=sequence_position,
         )
         return dataset
 
@@ -1256,6 +1268,7 @@ class BaseModel(pl.LightningModule):
         get_motion_boundary_mask = False
         get_backward = False
         sequence_length = 2
+        sequence_position = "first"
         for v in args:
             if v in ["clean", "final"]:
                 pass_names = [v]
@@ -1272,7 +1285,9 @@ class BaseModel(pl.LightningModule):
             elif v == "back":
                 get_backward = True
             elif v.startswith("seqlen"):
-                sequence_length = int(v[6:])
+                sequence_length = int(v.split("_")[1])
+            elif v.startswith("seqpos"):
+                sequence_position = v.split("_")[1]
 
         if is_subset:
             dataset = FlyingThings3DSubsetDataset(
@@ -1286,6 +1301,7 @@ class BaseModel(pl.LightningModule):
                 get_motion_boundary_mask=get_motion_boundary_mask,
                 get_backward=get_backward,
                 sequence_length=sequence_length,
+                sequence_position=sequence_position,
             )
         else:
             dataset = FlyingThings3DDataset(
@@ -1299,6 +1315,7 @@ class BaseModel(pl.LightningModule):
                 get_motion_boundary_mask=get_motion_boundary_mask,
                 get_backward=get_backward,
                 sequence_length=sequence_length,
+                sequence_position=sequence_position,
             )
         return dataset
 

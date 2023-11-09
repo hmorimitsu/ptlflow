@@ -113,15 +113,21 @@ class VideoFlowBOF(BaseModel):
 
     def forward(self, inputs, flow_init=None):
         """Estimate optical flow between pair of frames"""
+        assert (
+            inputs["images"].shape[1] == 3
+        ), "videoflow_bof requires inputs of 3 frames. Add the arguments seqlen_3-seqpos_middle to the dataset name."
 
-        images = inputs["images"]
-        if images.shape[1] == 2:
-            images = torch.cat([images[:, :1], images], 1)
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-0.5,
+            bgr_mult=2.0,
+            bgr_to_rgb=True,
+            resize_mode="pad",
+            pad_mode="replicate",
+            pad_two_side=True,
+        )
 
         B, N, _, H, W = images.shape
-
-        images = 2 * images - 1.0
-        images = images.contiguous()
 
         hdim = self.hidden_dim
         cdim = self.context_dim
@@ -185,6 +191,12 @@ class VideoFlowBOF(BaseModel):
             # upsample predictions
             flow_up_23 = self.upsample_flow(coords1_23 - coords0_23, up_mask_23)
             flow_up_21 = self.upsample_flow(coords1_21 - coords0_21, up_mask_21)
+            flow_up_23 = self.postprocess_predictions(
+                flow_up_23, image_resizer, is_flow=True
+            )
+            flow_up_21 = self.postprocess_predictions(
+                flow_up_21, image_resizer, is_flow=True
+            )
 
             flow_predictions.append(torch.stack([flow_up_23, flow_up_21], dim=1))
 

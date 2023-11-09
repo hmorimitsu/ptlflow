@@ -133,6 +133,15 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--fp16", action="store_true", help="If set, use half floating point precision."
     )
+    parser.add_argument(
+        "--seq_val_mode",
+        type=str,
+        default="all",
+        choices=("all", "first", "middle", "last"),
+        help=(
+            "Used only when the model predicts outputs for more than one frame. Select which predictions will be used for evaluation."
+        ),
+    )
     return parser
 
 
@@ -346,6 +355,19 @@ def validate_one_dataloader(
 
             inputs = io_adapter.unpad_and_unscale(inputs, image_only=True)
             preds = io_adapter.unpad_and_unscale(preds)
+
+            if inputs["flows"].shape[1] > 1 and args.seq_val_mode != "all":
+                if args.seq_val_mode == "first":
+                    k = 0
+                elif args.seq_val_mode == "middle":
+                    k = (preds["flows"].shape[1] + 1) // 2
+                elif args.seq_val_mode == "last":
+                    k = preds["flows"].shape[1] - 1
+                for key, val in inputs.items():
+                    if key == "images":
+                        inputs[key] = val[:, k:k+2]
+                    elif isinstance(val, torch.Tensor) and len(val.shape) == 5:
+                        inputs[key] = val[:, k:k+1]
 
             metrics = model.val_metrics(preds, inputs)
 

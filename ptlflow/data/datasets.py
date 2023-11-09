@@ -17,6 +17,7 @@
 # =============================================================================
 
 import logging
+import math
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -233,6 +234,31 @@ class BaseFlowDataset(Dataset):
             logging.info(
                 "Loading %d samples from %s dataset.", self.__len__(), self.dataset_name
             )
+
+    def _extend_paths_list(
+        self,
+        paths_list: List[Union[str, Path]],
+        sequence_length: int,
+        sequence_position: str,
+    ):
+        if sequence_position == "first":
+            begin_pad = 0
+            end_pad = sequence_length - 2
+        elif sequence_position == "middle":
+            begin_pad = sequence_length // 2
+            end_pad = int(math.ceil(sequence_length / 2.0)) - 2
+        elif sequence_position == "last":
+            begin_pad = sequence_length - 2
+            end_pad = 0
+        else:
+            raise ValueError(
+                f"Invalid sequence_position. Must be one of ('first', 'middle', 'last'). Received: {sequence_position}"
+            )
+        for _ in range(begin_pad):
+            paths_list.insert(0, paths_list[0])
+        for _ in range(end_pad):
+            paths_list.append(paths_list[-1])
+        return paths_list
 
 
 class AutoFlowDataset(BaseFlowDataset):
@@ -634,6 +660,7 @@ class FlyingThings3DDataset(BaseFlowDataset):
         get_backward: bool = True,
         get_meta: bool = True,
         sequence_length: int = 2,
+        sequence_position: str = "first",
     ) -> None:
         """Initialize FlyingThings3DDataset.
 
@@ -667,6 +694,12 @@ class FlyingThings3DDataset(BaseFlowDataset):
         sequence_length : int, default 2
             How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
             temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
         """
         super().__init__(
             dataset_name="FlyingThings3D",
@@ -683,6 +716,7 @@ class FlyingThings3DDataset(BaseFlowDataset):
         self.add_reverse = add_reverse
         self.pass_names = pass_names
         self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
         if isinstance(self.pass_names, str):
             self.pass_names = [self.pass_names]
         self.side_names = side_names
@@ -715,6 +749,9 @@ class FlyingThings3DDataset(BaseFlowDataset):
                                 image_paths = sorted(
                                     (seq_path / side).glob("*.png"), reverse=rev
                                 )
+                                image_paths = self._extend_paths_list(
+                                    image_paths, sequence_length, sequence_position
+                                )
                                 flow_paths = sorted(
                                     (
                                         Path(
@@ -724,6 +761,9 @@ class FlyingThings3DDataset(BaseFlowDataset):
                                         / side
                                     ).glob("*.pfm"),
                                     reverse=rev,
+                                )
+                                flow_paths = self._extend_paths_list(
+                                    flow_paths, sequence_length, sequence_position
                                 )
 
                                 occ_paths = []
@@ -740,6 +780,9 @@ class FlyingThings3DDataset(BaseFlowDataset):
                                         ).glob("*.png"),
                                         reverse=rev,
                                     )
+                                    occ_paths = self._extend_paths_list(
+                                        occ_paths, sequence_length, sequence_position
+                                    )
                                 mb_paths = []
                                 if (Path(self.root_dir) / "motion_boundaries").exists():
                                     mb_paths = sorted(
@@ -753,6 +796,9 @@ class FlyingThings3DDataset(BaseFlowDataset):
                                             / side
                                         ).glob("*.png"),
                                         reverse=rev,
+                                    )
+                                    mb_paths = self._extend_paths_list(
+                                        mb_paths, sequence_length, sequence_position
                                     )
 
                                 flow_b_paths = []
@@ -771,6 +817,9 @@ class FlyingThings3DDataset(BaseFlowDataset):
                                         ).glob("*.pfm"),
                                         reverse=rev,
                                     )
+                                    flow_b_paths = self._extend_paths_list(
+                                        flow_b_paths, sequence_length, sequence_position
+                                    )
                                     if (Path(self.root_dir) / "occlusions").exists():
                                         occ_b_paths = sorted(
                                             (
@@ -783,6 +832,11 @@ class FlyingThings3DDataset(BaseFlowDataset):
                                                 / side
                                             ).glob("*.png"),
                                             reverse=rev,
+                                        )
+                                        occ_b_paths = self._extend_paths_list(
+                                            occ_b_paths,
+                                            sequence_length,
+                                            sequence_position,
                                         )
                                     if (
                                         Path(self.root_dir) / "motion_boundaries"
@@ -798,6 +852,11 @@ class FlyingThings3DDataset(BaseFlowDataset):
                                                 / side
                                             ).glob("*.png"),
                                             reverse=rev,
+                                        )
+                                        mb_b_paths = self._extend_paths_list(
+                                            mb_b_paths,
+                                            sequence_length,
+                                            sequence_position,
                                         )
 
                                 for i in range(
@@ -894,6 +953,7 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
         get_backward: bool = True,
         get_meta: bool = True,
         sequence_length: int = 2,
+        sequence_position: str = "first",
     ) -> None:
         """Initialize FlyingThings3DSubsetDataset.
 
@@ -927,6 +987,12 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
         sequence_length : int, default 2
             How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
             temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
         """
         super().__init__(
             dataset_name="FlyingThings3DSubset",
@@ -943,6 +1009,7 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
         self.add_reverse = add_reverse
         self.pass_names = pass_names
         self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
         if isinstance(self.pass_names, str):
             self.pass_names = [self.pass_names]
         self.side_names = side_names
@@ -982,6 +1049,9 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
                             prev_idx = idx
 
                         for flow_group in flow_groups_paths:
+                            flow_group = self._extend_paths_list(
+                                flow_group, sequence_length, sequence_position
+                            )
                             for i in range(len(flow_group) - self.sequence_length + 2):
                                 flow_paths = flow_group[
                                     i : i + self.sequence_length - 1
@@ -1055,6 +1125,9 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
                                 prev_idx = idx
 
                             for flow_group in flow_groups_paths:
+                                flow_group = self._extend_paths_list(
+                                    flow_group, sequence_length, sequence_position
+                                )
                                 for i in range(
                                     len(flow_group) - self.sequence_length + 2
                                 ):
@@ -1125,6 +1198,7 @@ class Hd1kDataset(BaseFlowDataset):
         get_valid_mask: bool = True,
         get_meta: bool = True,
         sequence_length: int = 2,
+        sequence_position: str = "first",
     ) -> None:
         """Initialize Hd1kDataset.
 
@@ -1146,6 +1220,12 @@ class Hd1kDataset(BaseFlowDataset):
         sequence_length : int, default 2
             How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
             temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
         """
         super().__init__(
             dataset_name="HD1K",
@@ -1161,6 +1241,7 @@ class Hd1kDataset(BaseFlowDataset):
         self.root_dir = root_dir
         self.split = split
         self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
 
         if split == "test":
             split_dir = "hd1k_challenge"
@@ -1195,6 +1276,9 @@ class Hd1kDataset(BaseFlowDataset):
                 ]
 
         for seq_img_names in img_names_grouped.values():
+            seq_img_names = self._extend_paths_list(
+                seq_img_names, sequence_length, sequence_position
+            )
             for i in range(len(seq_img_names) - self.sequence_length + 1):
                 self.img_paths.append(
                     [
@@ -1374,6 +1458,7 @@ class SintelDataset(BaseFlowDataset):
         get_occlusion_mask: bool = True,
         get_meta: bool = True,
         sequence_length: int = 2,
+        sequence_position: str = "first",
     ) -> None:
         """Initialize SintelDataset.
 
@@ -1399,6 +1484,12 @@ class SintelDataset(BaseFlowDataset):
         sequence_length : int, default 2
             How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
             temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
         """
         if isinstance(pass_names, str):
             pass_names = [pass_names]
@@ -1417,6 +1508,7 @@ class SintelDataset(BaseFlowDataset):
         self.split = split
         self.pass_names = pass_names
         self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
 
         # Get sequence names for the given split
         if split == "test":
@@ -1443,6 +1535,9 @@ class SintelDataset(BaseFlowDataset):
                 image_paths = sorted(
                     (Path(self.root_dir) / split_dir / passd / seq_name).glob("*.png")
                 )
+                image_paths = self._extend_paths_list(
+                    image_paths, sequence_length, sequence_position
+                )
                 flow_paths = []
                 occ_paths = []
                 if split != "test":
@@ -1450,6 +1545,9 @@ class SintelDataset(BaseFlowDataset):
                         (Path(self.root_dir) / split_dir / "flow" / seq_name).glob(
                             "*.flo"
                         )
+                    )
+                    flow_paths = self._extend_paths_list(
+                        flow_paths, sequence_length, sequence_position
                     )
                     assert len(image_paths) - 1 == len(
                         flow_paths
@@ -1462,6 +1560,9 @@ class SintelDataset(BaseFlowDataset):
                                 / "occlusions"
                                 / seq_name
                             ).glob("*.png")
+                        )
+                        occ_paths = self._extend_paths_list(
+                            occ_paths, sequence_length, sequence_position
                         )
                         assert len(occ_paths) == len(flow_paths)
                 for i in range(len(image_paths) - self.sequence_length + 1):
@@ -1513,6 +1614,7 @@ class SpringDataset(BaseFlowDataset):
         get_backward: bool = False,
         get_meta: bool = True,
         sequence_length: int = 2,
+        sequence_position: str = "first",
     ) -> None:
         """Initialize SintelDataset.
 
@@ -1540,6 +1642,12 @@ class SpringDataset(BaseFlowDataset):
         sequence_length : int, default 2
             How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
             temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
         """
         if isinstance(side_names, str):
             side_names = [side_names]
@@ -1558,6 +1666,7 @@ class SpringDataset(BaseFlowDataset):
         self.split = split
         self.side_names = side_names
         self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
 
         # Get sequence names for the given split
         if split == "test":
@@ -1584,6 +1693,9 @@ class SpringDataset(BaseFlowDataset):
                         ).glob("*.png"),
                         reverse=rev,
                     )
+                    image_paths = self._extend_paths_list(
+                        image_paths, sequence_length, sequence_position
+                    )
                     flow_paths = []
                     flow_b_paths = []
                     if split != "test":
@@ -1595,6 +1707,9 @@ class SpringDataset(BaseFlowDataset):
                                 / f"flow_{direcs[0]}_{side}"
                             ).glob("*.flo5"),
                             reverse=rev,
+                        )
+                        flow_paths = self._extend_paths_list(
+                            flow_paths, sequence_length, sequence_position
                         )
                         assert len(image_paths) - 1 == len(
                             flow_paths
@@ -1608,6 +1723,9 @@ class SpringDataset(BaseFlowDataset):
                                     / f"flow_{direcs[1]}_{side}"
                                 ).glob("*.flo5"),
                                 reverse=rev,
+                            )
+                            flow_b_paths = self._extend_paths_list(
+                                flow_b_paths, sequence_length, sequence_position
                             )
                             assert len(image_paths) - 1 == len(
                                 flow_paths
@@ -1676,9 +1794,6 @@ class MiddleburyDataset(BaseFlowDataset):
             Whether to get occlusion masks.
         get_meta : bool, default True
             Whether to get metadata.
-        sequence_length : int, default 2
-            How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
-            temporal information.
         """
         super().__init__(
             dataset_name="Middlebury",
@@ -1758,6 +1873,7 @@ class MonkaaDataset(BaseFlowDataset):
         get_backward: bool = True,
         get_meta: bool = True,
         sequence_length: int = 2,
+        sequence_position: str = "first",
     ) -> None:
         """Initialize MonkaaDataset.
 
@@ -1785,6 +1901,12 @@ class MonkaaDataset(BaseFlowDataset):
         sequence_length : int, default 2
             How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
             temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
         """
         super().__init__(
             dataset_name="Monkaa",
@@ -1802,6 +1924,7 @@ class MonkaaDataset(BaseFlowDataset):
         self.add_reverse = add_reverse
         self.pass_names = pass_names
         self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
         if isinstance(self.pass_names, str):
             self.pass_names = [self.pass_names]
         self.side_names = side_names
@@ -1825,6 +1948,9 @@ class MonkaaDataset(BaseFlowDataset):
                         image_paths = sorted(
                             (seq_path / side).glob("*.png"), reverse=rev
                         )
+                        image_paths = self._extend_paths_list(
+                            image_paths, sequence_length, sequence_position
+                        )
                         flow_paths = sorted(
                             (
                                 Path(str(seq_path).replace(passd, "optical_flow"))
@@ -1832,6 +1958,9 @@ class MonkaaDataset(BaseFlowDataset):
                                 / side
                             ).glob("*.pfm"),
                             reverse=rev,
+                        )
+                        flow_paths = self._extend_paths_list(
+                            flow_paths, sequence_length, sequence_position
                         )
 
                         flow_b_paths = []
@@ -1843,6 +1972,9 @@ class MonkaaDataset(BaseFlowDataset):
                                     / side
                                 ).glob("*.pfm"),
                                 reverse=rev,
+                            )
+                            flow_b_paths = self._extend_paths_list(
+                                flow_b_paths, sequence_length, sequence_position
                             )
 
                         for i in range(len(image_paths) - self.sequence_length + 1):
