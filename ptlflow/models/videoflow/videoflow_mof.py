@@ -168,14 +168,44 @@ class VideoFlowMOF(BaseModel):
         """Estimate optical flow between pair of frames"""
         down_ratio = self.args.down_ratio
 
-        images = inputs["images"]
-        if images.shape[1] == 2:
-            images = torch.cat([images[:, :1], images], 1)
+        assert (
+            inputs["images"].shape[1] > 2
+        ), "videoflow_mof requires inputs of at least 3 frames. Add the arguments seqlen_N-seqpos_middle to the dataset name, replacing N with a number larger than 2."
+
+        images = inputs["images"].clone()
+        N_orig = images.shape[1]
+
+        num_left_reps = 0
+        if images.shape[1] > 3 and "meta" in inputs and "image_paths" in inputs["meta"]:
+            # Remove multiple repeated images to the left and right
+            # VideoFlow only accepts at most one repetition on each side
+            paths = [p[0] for p in inputs["meta"]["image_paths"]]
+            num_left_reps = 0
+            i = 1
+            while i < len(paths) and paths[0] == paths[i]:
+                num_left_reps += 1
+                i += 1
+            num_right_reps = 0
+            i = len(paths) - 2
+            while i >= 0 and paths[-1] == paths[i]:
+                num_right_reps += 1
+                i -= 1
+            if num_left_reps > 0:
+                images = images[:, num_left_reps-1:]
+            if num_right_reps > 0:
+                images = images[:, :images.shape[1]-num_right_reps]
+
+        images, image_resizer = self.preprocess_images(
+            images,
+            bgr_add=-0.5,
+            bgr_mult=2.0,
+            bgr_to_rgb=True,
+            resize_mode="pad",
+            pad_mode="replicate",
+            pad_two_side=True,
+        )
 
         B, N, _, H, W = images.shape
-
-        images = 2 * images - 1.0
-        images = images.contiguous()
 
         hdim = self.hidden_dim
         cdim = self.context_dim
@@ -289,8 +319,18 @@ class VideoFlowMOF(BaseModel):
                     backward_coords1 - backward_coords0, backward_up_mask
                 )
 
-            forward_flow_up = forward_flow_up.reshape(B, N - 2, 2, H, W)
-            backward_flow_up = backward_flow_up.reshape(B, N - 2, 2, H, W)
+            pred_mid = (N_orig - 2) // 2
+            if num_left_reps > 0:
+                pred_mid -= num_left_reps - 1
+
+            forward_flow_up = forward_flow_up.reshape(B, N - 2, 2, H, W)[:, pred_mid:pred_mid+1]
+            backward_flow_up = backward_flow_up.reshape(B, N - 2, 2, H, W)[:, pred_mid:pred_mid+1]
+            forward_flow_up = self.postprocess_predictions(
+                forward_flow_up, image_resizer, is_flow=True
+            )
+            backward_flow_up = self.postprocess_predictions(
+                backward_flow_up, image_resizer, is_flow=True
+            )
             flow_predictions.append(
                 torch.cat([forward_flow_up, backward_flow_up], dim=1)
             )
