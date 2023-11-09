@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 
+from einops import rearrange
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -352,9 +353,21 @@ class MaskFlownet_S(BaseModel):
 
         return output * mask
 
-    def forward(self, inputs):
-        im1 = inputs["images"][:, 0]
-        im2 = inputs["images"][:, 1]
+    def forward(self, inputs, skip_preprocess=False):
+        if not skip_preprocess:
+            bgr_mean = rearrange(inputs["images"], 'b n c h w -> b c (n h w)').mean(2)[:, None, :, None, None]
+            images, image_resizer = self.preprocess_images(
+                inputs["images"],
+                bgr_add=-bgr_mean,
+                bgr_mult=1.0,
+                bgr_to_rgb=True,
+                resize_mode="interpolation",
+                interpolation_mode="bilinear",
+                interpolation_align_corners=False,
+            )
+
+        im1 = images[:, 0]
+        im2 = images[:, 1]
 
         c11 = self.conv1c(self.conv1b(self.conv1a(im1)))
         c21 = self.conv1c(self.conv1b(self.conv1a(im2)))
@@ -486,19 +499,25 @@ class MaskFlownet_S(BaseModel):
         c40 = torch.cat((c40, mask0), 1)
         srcs = [c1s, c2s, flows, c30, c40]
 
-        output = {
-            "flows": F.interpolate(
+        flow_up = F.interpolate(
                 predictions[-1],
                 size=im1.shape[-2:],
                 mode="bilinear",
                 align_corners=True,
-            )[:, None],
-            "occs": F.interpolate(
-                occlusion_masks[-1],
-                size=im1.shape[-2:],
-                mode="bilinear",
-                align_corners=True,
-            )[:, None],
+            )
+        occ_up = F.interpolate(
+            occlusion_masks[-1],
+            size=im1.shape[-2:],
+            mode="bilinear",
+            align_corners=True,
+        )
+        if not skip_preprocess:
+            flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
+            occ_up = self.postprocess_predictions(occ_up, image_resizer, is_flow=False)
+
+        output = {
+            "flows": flow_up[:, None],
+            "occs": occ_up[:, None],
             "srcs": srcs,
         }
         if self.training:
@@ -719,6 +738,18 @@ class MaskFlownet(BaseModel):
         return output * mask
 
     def forward(self, inputs):
+        bgr_mean = rearrange(inputs["images"], 'b n c h w -> b c (n h w)').mean(2)[:, None, :, None, None]
+        images, image_resizer = self.preprocess_images(
+            inputs["images"],
+            bgr_add=-bgr_mean,
+            bgr_mult=1.0,
+            bgr_to_rgb=True,
+            resize_mode="interpolation",
+            interpolation_mode="bilinear",
+            interpolation_align_corners=False,
+        )
+        orig_images = inputs["images"]
+        inputs["images"] = images
         mfns_out = self.MaskFlownet_S(inputs)
         srcs = mfns_out["srcs"]
         c1s, c2s, flows, c30, c40 = srcs
@@ -843,17 +874,22 @@ class MaskFlownet(BaseModel):
         visuals = []
         visuals.append(flow2[:, :1])
 
-        output = {
-            "flows": F.interpolate(
+        flow_up = F.interpolate(
                 preds[-1],
-                size=inputs["images"].shape[-2:],
+                size=images.shape[-2:],
                 mode="bilinear",
-                align_corners=True,
-            )[:, None],
+                align_corners=False,
+            )
+        flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
+
+        output = {
+            "flows": flow_up[:, None],
             "visuals": visuals[-1][:, None],
         }
         if self.training:
             output["flow_preds"] = preds
+
+        inputs["images"] = orig_images
 
         return output
 
