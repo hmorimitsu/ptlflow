@@ -136,7 +136,7 @@ class IOAdapter(object):
                 while len(v.shape) < 5:
                     v = v.unsqueeze(0)
                 if self.scaler is not None:
-                    v = self.scaler.scale(v, is_flow=k.startswith("flow"))
+                    v = self.scaler.fill(v, is_flow=k.startswith("flow"))
                 inputs[k] = v
 
         inputs = self._to_cuda(inputs)
@@ -177,7 +177,7 @@ class IOAdapter(object):
 
             if isinstance(v, torch.Tensor):
                 if self.scaler is not None:
-                    v = self.scaler.unscale(v, is_flow=k.startswith("flow"))
+                    v = self.scaler.unfill(v, is_flow=k.startswith("flow"))
                 outputs[k] = v
 
         return outputs
