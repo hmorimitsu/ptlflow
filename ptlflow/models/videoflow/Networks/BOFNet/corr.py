@@ -9,7 +9,6 @@ try:
     import alt_cuda_corr
 except:
     # alt_cuda_corr is not compiled
-    print("[!!alt_cuda_corr is not compiled!!]")
     pass
 
 
