@@ -181,7 +181,7 @@ class MatchFlow(BaseModel):
         assert not self.training
         assert self.train_size is not None
         input_size = inputs["images"].shape[-2:]
-        image_size = (self.args.tile_height, input_size[-1])
+        image_size = (max(self.args.tile_height, input_size[-2]), input_size[-1])
         hws = compute_grid_indices(image_size, self.train_size)
         weights = compute_weight(hws, image_size, self.train_size, self.args.tile_sigma)
 
