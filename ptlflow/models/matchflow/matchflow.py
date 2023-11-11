@@ -108,6 +108,13 @@ class MatchFlow(BaseModel):
         parser.add_argument("--tile_sigma", type=float, default=0.05)
         parser.add_argument("--position_only", action="store_true")
         parser.add_argument("--position_and_content", action="store_true")
+        parser.add_argument(
+            "--train_size",
+            type=int,
+            nargs=2,
+            default=None,
+            help="train_size will be normally loaded from the checkpoint. However, if you provide this value, it will override the value from the checkpoint.",
+        )
         return parser
 
     def freeze_bn(self):
@@ -179,11 +186,15 @@ class MatchFlow(BaseModel):
 
     def forward_tile(self, inputs):
         assert not self.training
-        assert self.train_size is not None
+        if self.args.train_size is not None:
+            train_size = self.args.train_size
+        else:
+            train_size = self.train_size
+        assert train_size is not None
         input_size = inputs["images"].shape[-2:]
         image_size = (max(self.args.tile_height, input_size[-2]), input_size[-1])
-        hws = compute_grid_indices(image_size, self.train_size)
-        weights = compute_weight(hws, image_size, self.train_size, self.args.tile_sigma)
+        hws = compute_grid_indices(image_size, train_size)
+        weights = compute_weight(hws, image_size, train_size, self.args.tile_sigma)
 
         images, image_resizer = self.preprocess_images(
             inputs["images"],
@@ -204,10 +215,10 @@ class MatchFlow(BaseModel):
 
         for idx, (h, w) in enumerate(hws):
             image1_tile = image1[
-                :, :, h : h + self.train_size[0], w : w + self.train_size[1]
+                :, :, h : h + train_size[0], w : w + train_size[1]
             ]
             image2_tile = image2[
-                :, :, h : h + self.train_size[0], w : w + self.train_size[1]
+                :, :, h : h + train_size[0], w : w + train_size[1]
             ]
 
             flow_predictions, _ = self.predict(image1_tile, image2_tile)
@@ -215,9 +226,9 @@ class MatchFlow(BaseModel):
 
             padding = (
                 w,
-                image_size[1] - w - self.train_size[1],
+                image_size[1] - w - train_size[1],
                 h,
-                image_size[0] - h - self.train_size[0],
+                image_size[0] - h - train_size[0],
                 0,
                 0,
             )
