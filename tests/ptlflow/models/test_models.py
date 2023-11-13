@@ -48,24 +48,21 @@ def test_forward() -> None:
         if mname in EXCLUDE_MODELS:
             continue
 
-        try:
-            print(mname)
-            model = ptlflow.get_model(mname)
-            model = model.eval()
+        print(mname)
+        model = ptlflow.get_model(mname)
+        model = model.eval()
 
-            s = make_divisible(128, model.output_stride)
-            num_images = 2
-            if mname in ["videoflow_bof", "videoflow_mof"]:
-                num_images = 3
-            inputs = {"images": torch.rand(1, num_images, 3, s, s)}
+        s = make_divisible(256, model.output_stride)
+        num_images = 2
+        if mname in ["videoflow_bof", "videoflow_mof"]:
+            num_images = 3
+        inputs = {"images": torch.rand(1, num_images, 3, s, s)}
 
-            if torch.cuda.is_available():
-                model = model.cuda()
-                inputs["images"] = inputs["images"].cuda()
+        if torch.cuda.is_available():
+            model = model.cuda()
+            inputs["images"] = inputs["images"].cuda()
 
-            model(inputs)
-        except (ImportError, RuntimeError):
-            continue
+        model(inputs)
 
 
 @pytest.mark.skip(
