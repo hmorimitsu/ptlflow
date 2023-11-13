@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.utils import forward_interpolate_batch
 from .extractor import BasicEncoder
 from .attention import Attention1D
 from .position import PositionEmbeddingSine
@@ -139,7 +140,7 @@ class Flow1D(BaseModel):
             n, 2, self.args.downsample_factor * h, self.args.downsample_factor * w
         )
 
-    def forward(self, inputs, flow_init=None):
+    def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
         images, image_resizer = self.preprocess_images(
             inputs["images"],
@@ -192,8 +193,9 @@ class Flow1D(BaseModel):
 
         coords0, coords1 = self.initialize_flow(image1)  # 1/8 resolution or 1/4
 
-        if flow_init is not None:  # flow_init is 1/8 resolution or 1/4
-            coords1 = coords1 + flow_init
+        if inputs.get("prev_preds") is not None and inputs["prev_preds"].get("flow_small") is not None:
+            forward_flow = forward_interpolate_batch(inputs["prev_preds"]["flow_small"])
+            coords1 = coords1 + forward_flow
 
         flow_predictions = []
         for itr in range(self.args.iters):

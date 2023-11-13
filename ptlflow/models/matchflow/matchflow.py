@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock, GMAUpdateBlock
 from .extractor import BasicEncoder
 from .matching_encoder import MatchingModel
@@ -144,14 +145,14 @@ class MatchFlow(BaseModel):
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
         return up_flow.reshape(N, 2, 8 * H, 8 * W)
 
-    def forward(self, inputs, flow_init=None):
+    def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
         if self.args.use_tile_input:
             return self.forward_tile(inputs)
         else:
-            return self.forward_resize(inputs, flow_init)
+            return self.forward_resize(inputs)
 
-    def forward_resize(self, inputs, flow_init=None):
+    def forward_resize(self, inputs):
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=-0.5,
@@ -162,8 +163,12 @@ class MatchFlow(BaseModel):
             interpolation_align_corners=True,
         )
 
+        flow_prev = None
+        if inputs.get("prev_preds") is not None and inputs["prev_preds"].get("flow_small") is not None:
+            flow_prev = inputs["prev_preds"]["flow_small"]
+
         flow_predictions, flow_small = self.predict(
-            images[:, 0], images[:, 1], flow_init
+            images[:, 0], images[:, 1], flow_prev
         )
         output_flow = flow_predictions[-1]
 
@@ -238,7 +243,7 @@ class MatchFlow(BaseModel):
         )
         return {"flows": output_flow[:, None]}
 
-    def predict(self, image1, image2, flow_init=None):
+    def predict(self, image1, image2, flow_prev=None):
         hdim = self.hidden_dim
         cdim = self.context_dim
 
@@ -261,8 +266,9 @@ class MatchFlow(BaseModel):
 
         coords0, coords1 = self.initialize_flow(image1)
 
-        if flow_init is not None:
-            coords1 = coords1 + flow_init
+        if flow_prev is not None:
+            forward_flow = forward_interpolate_batch(flow_prev)
+            coords1 = coords1 + forward_flow
 
         flow_predictions = []
         for itr in range(self.args.iters):

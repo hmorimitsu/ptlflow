@@ -111,7 +111,7 @@ class VideoFlowBOF(BaseModel):
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
         return up_flow.reshape(N, 2, 8 * H, 8 * W)
 
-    def forward(self, inputs, flow_init=None):
+    def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
         assert (
             inputs["images"].shape[1] == 3

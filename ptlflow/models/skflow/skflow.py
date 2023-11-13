@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.utils import forward_interpolate_batch
 from .update import *
 from .extractor import BasicEncoder
 from .corr import CorrBlock
@@ -146,7 +147,7 @@ class SKFlow(BaseModel):
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
         return up_flow.reshape(N, 2, 8 * H, 8 * W)
 
-    def forward(self, inputs, flow_init=None):
+    def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
         images, image_resizer = self.preprocess_images(
             inputs["images"],
@@ -181,8 +182,9 @@ class SKFlow(BaseModel):
 
         coords0, coords1 = self.initialize_flow(image1)
 
-        if flow_init is not None:
-            coords1 = coords1 + flow_init
+        if inputs.get("prev_preds") is not None and inputs["prev_preds"].get("flow_small") is not None:
+            forward_flow = forward_interpolate_batch(inputs["prev_preds"]["flow_small"])
+            coords1 = coords1 + forward_flow
 
         flow_predictions = []
         for itr in range(self.args.iters):

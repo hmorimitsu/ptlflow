@@ -125,7 +125,7 @@ class FlowFormerPlusPlus(BaseModel):
         )
         return parser
 
-    def forward(self, inputs, flow_init=None, mask=None, output=None):
+    def forward(self, inputs, mask=None, output=None):
         """Estimate optical flow between pair of frames"""
         if self.args.pretrain_mode:
             image1 = (image1 + 1) * 127.5
@@ -136,9 +136,9 @@ class FlowFormerPlusPlus(BaseModel):
         if self.args.use_tile_input:
             return self.forward_tile(inputs)
         else:
-            return self.forward_pad(inputs, flow_init)
+            return self.forward_pad(inputs)
 
-    def forward_pad(self, inputs, flow_init=None):
+    def forward_pad(self, inputs):
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=-0.5,
@@ -149,8 +149,12 @@ class FlowFormerPlusPlus(BaseModel):
             pad_two_side=True,
         )
 
+        prev_flow = None
+        if inputs.get("prev_preds") is not None and inputs["prev_preds"].get("flow_small") is not None:
+            prev_flow = inputs["prev_preds"]["flow_small"]
+
         flow_predictions, flow_small = self.predict(
-            images[:, 0], images[:, 1], flow_init
+            images[:, 0], images[:, 1], prev_flow
         )
         output_flow = flow_predictions[-1]
 
@@ -226,7 +230,7 @@ class FlowFormerPlusPlus(BaseModel):
         )
         return {"flows": output_flow[:, None]}
 
-    def predict(self, image1, image2, flow_init=None):
+    def predict(self, image1, image2, prev_flow=None):
         """Estimate optical flow between pair of frames"""
         data = {}
 
@@ -247,7 +251,7 @@ class FlowFormerPlusPlus(BaseModel):
             feat_s_quater,
             feat_t_quater,
             data,
-            flow_init=flow_init,
+            prev_flow=prev_flow,
             cost_patches=cost_patches,
         )
 

@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 from einops import rearrange
 
+from ptlflow.utils.utils import forward_interpolate_batch
 from .utils import coords_grid, bilinear_sampler
 from .attention import (
     MultiHeadAttention,
@@ -253,7 +254,7 @@ class MemoryDecoder(nn.Module):
         corr = corr.view(batch, h1, w1, -1).permute(0, 3, 1, 2)
         return corr
 
-    def forward(self, cost_memory, context, data={}, flow_init=None):
+    def forward(self, cost_memory, context, data={}, prev_flow=None):
         """
         memory: [B*H1*W1, H2'*W2', C]
         context: [B, D, H1, W1]
@@ -261,9 +262,9 @@ class MemoryDecoder(nn.Module):
         cost_maps = data["cost_maps"]
         coords0, coords1 = initialize_flow(context)
 
-        if flow_init is not None:
-            # print("[Using warm start]")
-            coords1 = coords1 + flow_init
+        if prev_flow is not None:
+            forward_flow = forward_interpolate_batch(prev_flow)
+            coords1 = coords1 + forward_flow
 
         # flow = coords1
 

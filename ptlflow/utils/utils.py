@@ -28,7 +28,7 @@ import torch.nn.functional as F
 import yaml
 
 import ptlflow
-from ptlflow.utils.external.raft import InputPadder as _InputPadder
+from ptlflow.utils.external.raft import InputPadder as _InputPadder, forward_interpolate
 
 
 class InputPadder(_InputPadder):
@@ -449,3 +449,26 @@ def bgr_val_as_tensor(
         bgr_dims[bgr_tensor_shape_position] = 3
         bgr_val = bgr_val.reshape(bgr_dims)
     return bgr_val
+
+
+def forward_interpolate_batch(prev_flow: torch.Tensor) -> torch.Tensor:
+    """Apply RAFT's forward_interpolate in a batch of torch.Tensors.
+
+    forward_interpolate in the warm start strategy where the previous flow estimation is forward projected
+    and then used as initialization for the next estimation.
+
+    Parameters
+    ----------
+    prev_flow : torch.Tensor
+        A 4D tensor [B, 2, H, W] containing a batch of previous flow predictions.
+
+    Returns
+    -------
+    torch.Tensor
+        The previous flow predictions after being forward interpolated.
+    """
+    forward_flow = []
+    for i in range(prev_flow.shape[0]):
+        forward_flow.append(forward_interpolate(prev_flow[i]).to(dtype=prev_flow.dtype, device=prev_flow.device))
+    forward_flow = torch.stack(forward_flow, 0)
+    return forward_flow

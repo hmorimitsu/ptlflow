@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
 
+from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock
 from .extractor import BasicEncoder, Basic_Context_Encoder
 from .corr import AlternateCorrBlock, CorrBlock
@@ -128,7 +129,7 @@ class MSRAFTPlus(BaseModel):
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
         return up_flow.reshape(N, 2, scale * H, scale * W)
 
-    def forward(self, inputs, flow_init=None):
+    def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
         images, image_resizer = self.preprocess_images(
             inputs["images"],
@@ -150,8 +151,10 @@ class MSRAFTPlus(BaseModel):
 
         coords0, coords1 = self.initialize_flow16(image1)
         flow_predictions = []
-        if flow_init is not None:
-            coords1 = coords1 + flow_init
+
+        if inputs.get("prev_preds") is not None and inputs["prev_preds"].get("flow_small") is not None:
+            forward_flow = forward_interpolate_batch(inputs["prev_preds"]["flow_small"])
+            coords1 = coords1 + forward_flow
 
         assert len(fnet_pyramid) == len(
             cnet_pyramid

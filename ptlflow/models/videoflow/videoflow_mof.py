@@ -164,7 +164,7 @@ class VideoFlowMOF(BaseModel):
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
         return up_flow.reshape(N, 2, 2 * H, 2 * W)
 
-    def forward(self, inputs, flow_init=None):
+    def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
         down_ratio = self.args.down_ratio
 
