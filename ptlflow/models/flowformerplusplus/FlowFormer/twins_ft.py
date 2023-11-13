@@ -23,7 +23,7 @@ import torch.nn.functional as F
 from functools import partial
 
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-from timm.models.layers import Mlp, DropPath, to_2tuple, trunc_normal_
+from timm.layers import Mlp, DropPath, to_2tuple, trunc_normal_
 from timm.models.fx_features import register_notrace_module
 from timm.models.registry import register_model
 from timm.models.vision_transformer import Attention

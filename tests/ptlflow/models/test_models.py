@@ -39,6 +39,8 @@ EXCLUDE_MODELS = [
     "scv4",
     "scv8",
     "separableflow",
+    "videoflow_bof",
+    "videoflow_mof"
 ]  # Has additional requirements
 
 

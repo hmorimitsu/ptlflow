@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
-from timm.models.layers import DropPath
+from timm.layers import DropPath
 
-from timm.models.layers import trunc_normal_
 from torch.autograd import Function
 from torch.cuda.amp import custom_fwd, custom_bwd
 

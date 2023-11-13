@@ -8,4 +8,4 @@ pypng==0.20220715.0
 scipy<1.12
 tabulate<0.10
 tensorboard<2.16
-timm<0.10
+timm>=0.9.0,<0.10

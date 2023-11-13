@@ -3,7 +3,7 @@ import torch.nn as nn
 from einops.einops import rearrange
 import math
 import copy
-from timm.models.layers import DropPath, trunc_normal_
+from timm.layers import DropPath, trunc_normal_
 from .quadtree_attention import QuadtreeAttention
 from .common import torch_init_model
 from .resnet_fpn import ResNetFPN_8_2

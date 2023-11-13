@@ -9,7 +9,7 @@ from .attention import (
     ExpPositionEmbeddingSine,
 )
 
-from timm.models.layers import DropPath
+from timm.layers import DropPath
 
 from .gru import BasicUpdateBlock, GMAUpdateBlock
 from .gma import Attention
