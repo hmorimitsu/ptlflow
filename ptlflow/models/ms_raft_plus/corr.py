@@ -6,8 +6,7 @@ from .utils import bilinear_sampler
 try:
     import alt_cuda_corr
 except:
-    # alt_cuda_corr is not compiled
-    pass
+    alt_cuda_corr = None
 
 
 class CorrBlock:
@@ -67,6 +66,11 @@ class AlternateCorrBlock:
     def __init__(self, fmap1, fmap2, num_levels=2, radius=4):
         self.num_levels = num_levels
         self.radius = radius
+
+        if alt_cuda_corr is None:
+            raise ModuleNotFoundError(
+                "alt_cuda_corr is not compiled for ms_raft+! Please follow the instruction at ptlflow/utils/external/alt_cuda_corr/README.md"
+            )
 
         self.pyramid = [(fmap1, fmap2)]
         for i in range(self.num_levels):

@@ -39,8 +39,6 @@ EXCLUDE_MODELS = [
     "scv4",
     "scv8",
     "separableflow",
-    "videoflow_bof",
-    "videoflow_mof"
 ]  # Has additional requirements
 
 
@@ -56,7 +54,10 @@ def test_forward() -> None:
             model = model.eval()
 
             s = make_divisible(128, model.output_stride)
-            inputs = {"images": torch.rand(1, 2, 3, s, s)}
+            num_images = 2
+            if mname in ["videoflow_bof", "videoflow_mof"]:
+                num_images = 3
+            inputs = {"images": torch.rand(1, num_images, 3, s, s)}
 
             if torch.cuda.is_available():
                 model = model.cuda()

@@ -1,13 +1,8 @@
 from einops.einops import rearrange
-import torch
 from torch.autograd import Function
 
-try:
-    import score_computation_cuda
-    import value_aggregation_cuda
-except ModuleNotFoundError:
-    score_computation_cuda = None
-    value_aggregation_cuda = None
+import score_computation_cuda
+import value_aggregation_cuda
 
 
 class ScoreComputation(Function):

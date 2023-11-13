@@ -2,10 +2,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from timm.layers import trunc_normal_
 
-from .QuadtreeAttention.QuadtreeAttention.modules.quadtree_attention import (
-    QTAttA,
-    QTAttB,
-)
+try:
+    from .QuadtreeAttention.QuadtreeAttention.modules.quadtree_attention import (
+        QTAttA,
+        QTAttB,
+    )
+except ModuleNotFoundError:
+    QTAttA = None
+    QTAttB = None
 
 
 class QuadtreeAttention(nn.Module):
@@ -36,6 +40,12 @@ class QuadtreeAttention(nn.Module):
         self.q_proj = nn.Conv2d(dim, dim, kernel_size=1, stride=1, bias=qkv_bias)
         self.k_proj = nn.Conv2d(dim, dim, kernel_size=1, stride=1, bias=qkv_bias)
         self.v_proj = nn.Conv2d(dim, dim, kernel_size=1, stride=1, bias=qkv_bias)
+
+        if QTAttA is None and QTAttB is None:
+            raise ModuleNotFoundError(
+                "QuadTreeAttention is not compiled for matchflow! Please follow the instruction at ptlflow/models/matchflow/README.md"
+            )
+
         if attn_type == "A":
             self.py_att = QTAttA(num_heads, dim // num_heads, scale=scale, topks=topks)
         else:

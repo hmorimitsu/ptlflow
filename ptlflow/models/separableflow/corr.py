@@ -1,8 +1,12 @@
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from .utils import bilinear_sampler, coords_grid
-from .libs.GANet.modules.GANet import NLFMax, NLFIter
+from .utils import bilinear_sampler
+
+try:
+    from .libs.GANet.modules.GANet import NLFIter
+except ModuleNotFoundError:
+    NLFIter = None
 
 try:
     import alt_cuda_corr

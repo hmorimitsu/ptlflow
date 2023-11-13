@@ -2,10 +2,7 @@ import torch
 from torch.autograd import Function
 from torch.autograd import Variable
 
-try:
-    from ..build.lib import GANet
-except ImportError:
-    pass
+from ..build.lib import GANet
 
 
 # import GANet
