@@ -214,12 +214,8 @@ class MatchFlow(BaseModel):
         flow_count = 0
 
         for idx, (h, w) in enumerate(hws):
-            image1_tile = image1[
-                :, :, h : h + train_size[0], w : w + train_size[1]
-            ]
-            image2_tile = image2[
-                :, :, h : h + train_size[0], w : w + train_size[1]
-            ]
+            image1_tile = image1[:, :, h : h + train_size[0], w : w + train_size[1]]
+            image2_tile = image2[:, :, h : h + train_size[0], w : w + train_size[1]]
 
             flow_predictions, _ = self.predict(image1_tile, image2_tile)
             flow_pre = flow_predictions[-1]

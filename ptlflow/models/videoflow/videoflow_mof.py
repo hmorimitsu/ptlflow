@@ -191,9 +191,9 @@ class VideoFlowMOF(BaseModel):
                 num_right_reps += 1
                 i -= 1
             if num_left_reps > 0:
-                images = images[:, num_left_reps-1:]
+                images = images[:, num_left_reps - 1 :]
             if num_right_reps > 0:
-                images = images[:, :images.shape[1]-num_right_reps]
+                images = images[:, : images.shape[1] - num_right_reps]
 
         images, image_resizer = self.preprocess_images(
             images,
@@ -323,8 +323,12 @@ class VideoFlowMOF(BaseModel):
             if num_left_reps > 0:
                 pred_mid -= num_left_reps - 1
 
-            forward_flow_up = forward_flow_up.reshape(B, N - 2, 2, H, W)[:, pred_mid:pred_mid+1]
-            backward_flow_up = backward_flow_up.reshape(B, N - 2, 2, H, W)[:, pred_mid:pred_mid+1]
+            forward_flow_up = forward_flow_up.reshape(B, N - 2, 2, H, W)[
+                :, pred_mid : pred_mid + 1
+            ]
+            backward_flow_up = backward_flow_up.reshape(B, N - 2, 2, H, W)[
+                :, pred_mid : pred_mid + 1
+            ]
             forward_flow_up = self.postprocess_predictions(
                 forward_flow_up, image_resizer, is_flow=True
             )
