@@ -1,10 +1,9 @@
 # PyTorch Lightning Optical Flow
 
-![GitHub CI flake8 status](https://github.com/hmorimitsu/ptlflow/actions/workflows/flake8.yml/badge.svg)
 ![GitHub CI python status](https://github.com/hmorimitsu/ptlflow/actions/workflows/python.yml/badge.svg)
 ![GitHub CI pytorch status](https://github.com/hmorimitsu/ptlflow/actions/workflows/pytorch.yml/badge.svg)
-![GitHub CI pytorch-lightning status](https://github.com/hmorimitsu/ptlflow/actions/workflows/pytorch-lightning.yml/badge.svg)
-![GitHub CI pytest pip status](https://github.com/hmorimitsu/ptlflow/actions/workflows/pytest_pip.yml/badge.svg)
+![GitHub CI lightning status](https://github.com/hmorimitsu/ptlflow/actions/workflows/lightning.yml/badge.svg)
+![GitHub CI build status](https://github.com/hmorimitsu/ptlflow/actions/workflows/build.yml/badge.svg)
 
 ## Introduction
 
