@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lightning: [1.8.6, 1.9.5]
+        lightning: [1.9.5]
 
     steps:
       - uses: actions/checkout@v4

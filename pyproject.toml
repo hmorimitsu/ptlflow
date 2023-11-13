@@ -10,7 +10,7 @@ authors = [
 ]
 description = "PyTorch Lightning Optical Flow"
 readme = "README.md"
-requires-python = ">=3.8,<3.11"
+requires-python = ">=3.8,<3.12"
 keywords = ["torch", "pytorch lightning", "optical flow", "models"]
 license = {text = "Apache 2.0 License"}
 classifiers = [
@@ -22,6 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development",
@@ -31,7 +32,7 @@ classifiers = [
 dependencies = [
     "einops<0.8",
     "h5py<3.11",
-    "lightning<2",
+    "lightning>=1.9.0,<2",
     "opencv-python<4.9",
     "pandas<2.2",
     "plotly<5.19",

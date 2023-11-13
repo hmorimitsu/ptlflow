@@ -11,7 +11,7 @@ For example, you can create one using `miniconda <https://docs.conda.io/projects
     conda activate ptlflow
 
 
-Next, install PyTorch following the official instructions at `https://pytorch.org/ <https://pytorch.org/>`__ (PTLFlow has been tested until PyTorch version 2.1.0).
+Next, install PyTorch following the official instructions at `https://pytorch.org/ <https://pytorch.org/>`__ (PTLFlow has been tested with PyTorch versions >= 1.12.1 and <= 2.1.0).
 
 Afterward, you can use PTLFlow in one of two ways:
 
