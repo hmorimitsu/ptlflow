@@ -365,11 +365,13 @@ def validate_one_dataloader(
                     k = inputs["flows"].shape[1] - 1
                 for key, val in inputs.items():
                     if key == "meta":
-                        inputs["meta"]["image_paths"] = inputs["meta"]["image_paths"][k:k+1]
+                        inputs["meta"]["image_paths"] = inputs["meta"]["image_paths"][
+                            k : k + 1
+                        ]
                     elif key == "images":
-                        inputs[key] = val[:, k:k+2]
+                        inputs[key] = val[:, k : k + 2]
                     elif isinstance(val, torch.Tensor) and len(val.shape) == 5:
-                        inputs[key] = val[:, k:k+1]
+                        inputs[key] = val[:, k : k + 1]
 
             metrics = model.val_metrics(preds, inputs)
 

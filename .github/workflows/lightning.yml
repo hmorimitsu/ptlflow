@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests with a variety of Python versions
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: python
+name: lightning
 
 on:
   push:
@@ -16,14 +16,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8', '3.9', '3.10']
+        lightning: [1.8.6, 1.9.5]
 
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+      - name: Replace lightning
+        uses: jacobtomlinson/gha-find-replace@v3
         with:
-          python-version: ${{ matrix.python-version }}
+          find: "lightning<2"
+          replace: "lightning==${{ matrix.lightning }}"
+          regex: false
+          include: "requirements.txt"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

@@ -4,6 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ptlflow"
+version = "0.3.0"
 authors = [
     {name = "Henrique Morimitsu", email = "henriquem87@gmail.com"},
 ]
@@ -40,4 +41,14 @@ dependencies = [
     "tensorboard<2.16",
     "timm<0.10",
 ]
-dynamic = ["version"]
+
+[project.urls]
+"Source Code" = "https://github.com/hmorimitsu/ptlflow"
+"Documentation" = "https://ptlflow.readthedocs.io/"
+
+[tool.setuptools.packages.find]
+include = ["ptlflow*"]
+exclude = ["tests"]
+
+[options.package_data]
+"*" = ["*.md", "*.txt", "*LICENSE", "*.ttf"]
