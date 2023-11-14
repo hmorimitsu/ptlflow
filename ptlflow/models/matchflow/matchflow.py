@@ -8,7 +8,7 @@ from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock, GMAUpdateBlock
 from .extractor import BasicEncoder
 from .matching_encoder import MatchingModel
-from .corr import CorrBlock
+from .corr import CorrBlock, AlternateCorrBlock
 from .utils import coords_grid, upflow8, compute_grid_indices, compute_weight
 from .gma import Attention
 from ..base_model.base_model import BaseModel
@@ -109,6 +109,7 @@ class MatchFlow(BaseModel):
         parser.add_argument("--tile_sigma", type=float, default=0.05)
         parser.add_argument("--position_only", action="store_true")
         parser.add_argument("--position_and_content", action="store_true")
+        parser.add_argument("--alternate_corr", action="store_true")
         parser.add_argument(
             "--train_size",
             type=int,
@@ -253,7 +254,10 @@ class MatchFlow(BaseModel):
         fmap1 = fmap1.float()
         fmap2 = fmap2.float()
 
-        corr_fn = CorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
+        if self.args.alternate_corr:
+            corr_fn = AlternateCorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
+        else:
+            corr_fn = CorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
 
         # run the context network
         cnet = self.cnet(image1)

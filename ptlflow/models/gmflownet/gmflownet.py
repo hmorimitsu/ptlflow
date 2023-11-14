@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock
 from .extractor import BasicEncoder, BasicConvEncoder
-from .corr import CorrBlock, AlternateCorrBlock
+from .corr import CorrBlock
 from .utils.utils import coords_grid, upflow8
 from .swin_transformer import POLAUpdate, MixAxialPOLAUpdate
 from .loss import compute_supervision_coarse, compute_coarse_loss, backwarp
