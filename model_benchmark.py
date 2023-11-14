@@ -470,7 +470,7 @@ if __name__ == "__main__":
             device_id = 0
 
         pynvml.nvmlInit()
-        device_handle = pynvml.nvmlDeviceGetHandleByIndex(1)
+        device_handle = pynvml.nvmlDeviceGetHandleByIndex(device_id)
 
     if args.csv_path is None:
         df = benchmark(args, device_handle)
