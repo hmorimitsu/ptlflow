@@ -7,8 +7,8 @@ import torch.nn.functional as F
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import *
 from .extractor import BasicEncoder
-from .corr import CorrBlock
-from .utils import coords_grid, upflow8
+from .corr import CorrBlock, AlternateCorrBlock
+from .utils import upflow8
 from .gma import Attention
 from ..base_model.base_model import BaseModel
 
@@ -105,6 +105,7 @@ class SKFlow(BaseModel):
             action="store_true",
             help="use position and content-wise attention",
         )
+        parser.add_argument("--alternate_corr", action="store_true")
         return parser
 
     def freeze_bn(self):
@@ -170,7 +171,10 @@ class SKFlow(BaseModel):
 
         fmap1 = fmap1.float()
         fmap2 = fmap2.float()
-        corr_fn = CorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
+        if self.args.alternate_corr:
+            corr_fn = AlternateCorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
+        else:
+            corr_fn = CorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
 
         # run the context network
         cnet = self.cnet(image1)
