@@ -653,7 +653,7 @@ class BaseModel(pl.LightningModule):
             valid dataset strings.
         """
         if self.args.val_dataset is None:
-            self.args.val_dataset = "sintel-final-trainval-occ+sintel-clean-trainval-occ+kitti-2012-trainval+kitti-2015-trainval"
+            self.args.val_dataset = "sintel-final-trainval-occ+sintel-clean-trainval-occ+kitti-2015-trainval"
             logging.warning(
                 "--val_dataset is not set. It will be set as %s. If you want to skip validation, then set --val_dataset none.",
                 self.args.val_dataset,
