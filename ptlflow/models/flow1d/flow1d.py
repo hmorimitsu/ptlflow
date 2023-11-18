@@ -96,7 +96,7 @@ class Flow1D(BaseModel):
         parser.add_argument("--hidden_dim", type=int, default=128)
         parser.add_argument("--context_dim", type=int, default=128)
         parser.add_argument("--corr_radius", type=int, default=32)
-        parser.add_argument("--iters", type=int, default=12)
+        parser.add_argument("--iters", type=int, default=32)
         parser.add_argument("--mixed_precision", action="store_true")
         parser.add_argument("--gamma", type=float, default=0.8)
         parser.add_argument("--max_flow", type=float, default=400)

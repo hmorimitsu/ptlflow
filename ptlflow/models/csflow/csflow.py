@@ -73,7 +73,7 @@ class CSFlow(BaseModel):
         parser.add_argument("--dropout", type=float, default=0.0)
         parser.add_argument("--gamma", type=float, default=0.8)
         parser.add_argument("--max_flow", type=float, default=400.0)
-        parser.add_argument("--iters", type=int, default=12)
+        parser.add_argument("--iters", type=int, default=32)
         parser.add_argument("--gen_fmap", action="store_true")
         parser.add_argument("--skip_encode", action="store_true")
         return parser

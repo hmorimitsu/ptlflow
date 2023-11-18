@@ -71,7 +71,7 @@ class FlowFormerPlusPlus(BaseModel):
         )
         parser.add_argument("--encoder_depth", type=int, default=3)
         parser.add_argument("--encoder_latent_dim", type=int, default=256)
-        parser.add_argument("--decoder_depth", type=int, default=12)
+        parser.add_argument("--decoder_depth", type=int, default=32)
         parser.add_argument("--dropout", type=float, default=0.0)
         parser.add_argument("--vert_c_dim", type=int, default=64)
         parser.add_argument("--query_latent_dim", type=int, default=64)

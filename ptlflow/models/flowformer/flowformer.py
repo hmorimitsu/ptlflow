@@ -78,7 +78,7 @@ class FlowFormer(BaseModel):
         parser.add_argument("--cost_latent_dim", type=int, default=128)
         parser.add_argument("--cost_latent_input_dim", type=int, default=64)
         parser.add_argument("--cost_latent_token_num", type=int, default=8)
-        parser.add_argument("--decoder_depth", type=int, default=12)
+        parser.add_argument("--decoder_depth", type=int, default=32)
         parser.add_argument("--dropout", type=float, default=0.0)
         parser.add_argument("--encoder_depth", type=int, default=3)
         parser.add_argument("--encoder_latent_dim", type=int, default=256)

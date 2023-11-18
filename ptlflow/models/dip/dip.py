@@ -54,7 +54,6 @@ class DIP(BaseModel):
         self.context_dim = 128
 
         self.dropout = 0
-        self.iters = 5
 
         # feature network, and update block
         self.fnet = BasicEncoderQuarter(
@@ -73,7 +72,7 @@ class DIP(BaseModel):
         parser.add_argument("--dropout", type=float, default=0.0)
         parser.add_argument("--gamma", type=float, default=0.8)
         parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, default=12)
+        parser.add_argument("--iters", type=int, default=5)
         parser.add_argument("--max_offset", type=int, default=256)
         return parser
 

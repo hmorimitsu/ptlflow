@@ -93,7 +93,7 @@ class GMA(BaseModel):
         parser.add_argument("--dropout", type=float, default=0.0)
         parser.add_argument("--gamma", type=float, default=0.8)
         parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, default=12)
+        parser.add_argument("--iters", type=int, default=32)
         parser.add_argument("--num_heads", type=int, default=1)
         parser.add_argument("--position_only", action="store_true")
         parser.add_argument("--position_and_content", action="store_true")
