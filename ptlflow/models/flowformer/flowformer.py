@@ -99,7 +99,9 @@ class FlowFormer(BaseModel):
         parser.add_argument("--use_mlp", action="store_true")
         parser.add_argument("--vert_c_dim", type=int, default=64)
         parser.add_argument("--vertical_conv", action="store_true")
-        parser.add_argument("--use_tile_input", action="store_true")
+        parser.add_argument(
+            "--not_use_tile_input", action="store_false", dest="use_tile_input"
+        )
         parser.add_argument("--tile_height", type=int, default=432)
         parser.add_argument("--tile_sigma", type=float, default=0.05)
         parser.add_argument(

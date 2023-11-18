@@ -113,7 +113,9 @@ class FlowFormerPlusPlus(BaseModel):
         parser.add_argument("--use_rpe", action="store_true")
         parser.add_argument("--gma", type=str, choices=("GMA", "GMA-SK"), default="GMA")
         parser.add_argument("--detach_local", action="store_true")
-        parser.add_argument("--use_tile_input", action="store_true")
+        parser.add_argument(
+            "--not_use_tile_input", action="store_false", dest="use_tile_input"
+        )
         parser.add_argument("--tile_height", type=int, default=432)
         parser.add_argument("--tile_sigma", type=float, default=0.05)
         parser.add_argument(

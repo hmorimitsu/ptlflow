@@ -114,7 +114,9 @@ class MatchFlow(BaseModel):
         parser.add_argument("--matching_model_path", type=str, default="")
         parser.add_argument("--num_heads", type=int, default=1)
         parser.add_argument("--raft", action="store_true")
-        parser.add_argument("--use_tile_input", action="store_true")
+        parser.add_argument(
+            "--not_use_tile_input", action="store_false", dest="use_tile_input"
+        )
         parser.add_argument("--tile_height", type=int, default=416)
         parser.add_argument("--tile_sigma", type=float, default=0.05)
         parser.add_argument("--position_only", action="store_true")
