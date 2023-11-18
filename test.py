@@ -219,8 +219,8 @@ def test_one_dataloader(
                 else:
                     prev_flows = preds["flows"].detach()
 
-        inputs = io_adapter.unpad_and_unscale(inputs)
-        preds = io_adapter.unpad_and_unscale(preds)
+        inputs = io_adapter.unscale(inputs)
+        preds = io_adapter.unscale(preds)
 
         generate_outputs(args, inputs, preds, dataloader_name, i, inputs.get("meta"))
 

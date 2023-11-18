@@ -353,8 +353,8 @@ def validate_one_dataloader(
                         f'warm_start is not implemented for dataset {inputs["meta"]["dataset_name"][0]}'
                     )
 
-            inputs = io_adapter.unpad_and_unscale(inputs, image_only=True)
-            preds = io_adapter.unpad_and_unscale(preds)
+            inputs = io_adapter.unscale(inputs, image_only=True)
+            preds = io_adapter.unscale(preds)
 
             if inputs["flows"].shape[1] > 1 and args.seq_val_mode != "all":
                 if args.seq_val_mode == "first":
