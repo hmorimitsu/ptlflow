@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock, SmallUpdateBlock
 from .extractor import BasicEncoderQuarter
 from .utils import upflow4
@@ -224,14 +225,12 @@ class DIP(BaseModel):
 
         return flow_up
 
-    def forward(self, inputs, init_flow=None):
+    def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=-0.5,
             bgr_mult=2.0,
-            # bgr_add=-0.0,
-            # bgr_mult=1.0,
             bgr_to_rgb=False,
             resize_mode="pad",
             pad_mode="constant",
@@ -241,6 +240,13 @@ class DIP(BaseModel):
 
         image1 = images[:, 0]
         image2 = images[:, 1]
+
+        init_flow = None
+        if (
+            inputs.get("prev_preds") is not None
+            and inputs["prev_preds"].get("flow_small") is not None
+        ):
+            init_flow = forward_interpolate_batch(inputs["prev_preds"]["flow_small"])
 
         if not self.training and init_flow is not None:
             flow_up = self.inference(
