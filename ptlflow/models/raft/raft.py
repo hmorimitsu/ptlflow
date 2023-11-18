@@ -7,9 +7,14 @@ import torch.nn.functional as F
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock, SmallUpdateBlock
 from .extractor import BasicEncoder, SmallEncoder
-from .corr import CorrBlock, AlternateCorrBlock
+from .corr import get_corr_block
 from .utils import coords_grid, upflow8
 from ..base_model.base_model import BaseModel
+
+try:
+    import alt_cuda_corr
+except:
+    alt_cuda_corr = None
 
 
 class SequenceLoss(nn.Module):
@@ -68,6 +73,9 @@ class RAFT(BaseModel):
             output_dim=hdim + cdim, norm_fn="batch", dropout=args.dropout
         )
         self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)
+
+        if self.args.alternate_corr and alt_cuda_corr is None:
+            print('!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!')
 
     @staticmethod
     def add_model_specific_args(parent_parser=None):
@@ -132,10 +140,13 @@ class RAFT(BaseModel):
 
         fmap1 = fmap1.float()
         fmap2 = fmap2.float()
-        if self.args.alternate_corr:
-            corr_fn = AlternateCorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
-        else:
-            corr_fn = CorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
+        corr_fn = get_corr_block(
+            fmap1=fmap1,
+            fmap2=fmap2,
+            radius=self.args.corr_radius,
+            num_levels=self.args.corr_levels,
+            alternate_corr=self.args.alternate_corr,
+        )
 
         # run the context network
         cnet = self.cnet(image1)
@@ -145,7 +156,10 @@ class RAFT(BaseModel):
 
         coords0, coords1 = self.initialize_flow(image1)
 
-        if inputs.get("prev_preds") is not None and inputs["prev_preds"].get("flow_small") is not None:
+        if (
+            inputs.get("prev_preds") is not None
+            and inputs["prev_preds"].get("flow_small") is not None
+        ):
             forward_flow = forward_interpolate_batch(inputs["prev_preds"]["flow_small"])
             coords1 = coords1 + forward_flow
 

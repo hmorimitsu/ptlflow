@@ -1,21 +1,24 @@
 from argparse import ArgumentParser, Namespace
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.transforms.functional as TF
 
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock
 from .extractor import BasicEncoder, Basic_Context_Encoder
-from .corr import AlternateCorrBlock, CorrBlock
-from .utils import bilinear_sampler, coords_grid, upflow2, get_correlation_depth
+from .corr import get_corr_block
+from .utils import coords_grid, upflow2, get_correlation_depth
 from ..base_model.base_model import BaseModel
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+try:
+    import alt_cuda_corr
+except:
+    alt_cuda_corr = None
 
 
 def downflow(flow, mode="bilinear", factor=0.125):
@@ -84,6 +87,9 @@ class MSRAFTPlus(BaseModel):
             self.args, self.correlation_depth, hidden_dim=128, scale=2
         )
 
+        if self.args.alternate_corr and alt_cuda_corr is None:
+            print('!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!')
+
     @staticmethod
     def add_model_specific_args(parent_parser=None):
         parent_parser = BaseModel.add_model_specific_args(parent_parser)
@@ -93,7 +99,7 @@ class MSRAFTPlus(BaseModel):
         parser.add_argument("--iters", type=int, nargs="+", default=[4, 6, 5, 10])
         parser.add_argument("--lookup_pyramid_levels", type=int, default=2)
         parser.add_argument("--lookup_radius", default=4)
-        parser.add_argument("--no_cuda_corr", action="store_false", dest="cuda_corr")
+        parser.add_argument("--no_alternate_corr", action="store_false", dest="alternate_corr")
         return parser
 
     def freeze_bn(self):
@@ -169,21 +175,13 @@ class MSRAFTPlus(BaseModel):
         for index, (fmap1, fmap2) in enumerate(fnet_pyramid):
             fmap1 = fmap1.float()
             fmap2 = fmap2.float()
-
-            if self.args.cuda_corr:
-                corr_fn = AlternateCorrBlock(
-                    fmap1,
-                    fmap2,
-                    num_levels=self.args.lookup_pyramid_levels,
-                    radius=self.args.lookup_radius,
-                )
-            else:
-                corr_fn = CorrBlock(
-                    fmap1,
-                    fmap2,
-                    num_levels=self.args.lookup_pyramid_levels,
-                    radius=self.args.lookup_radius,
-                )
+            corr_fn = get_corr_block(
+                fmap1=fmap1,
+                fmap2=fmap2,
+                radius=self.args.lookup_radius,
+                num_levels=self.args.lookup_pyramid_levels,
+                alternate_corr=self.args.alternate_corr,
+            )
 
             net, inp = torch.split(cnet_pyramid[index], [128, 128], dim=1)
             net = torch.tanh(net)

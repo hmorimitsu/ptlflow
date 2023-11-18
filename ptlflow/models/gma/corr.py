@@ -3,13 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .utils import bilinear_sampler
 
-# from compute_sparse_correlation import compute_sparse_corr, compute_sparse_corr_torch, compute_sparse_corr_mink
-
 try:
     import alt_cuda_corr
 except:
-    # alt_cuda_corr is not compiled
-    pass
+    alt_cuda_corr = None
+from ptlflow.utils.correlation import IterativeCorrBlock
 
 
 class CorrBlock:
@@ -136,3 +134,20 @@ class AlternateCorrBlock:
         corr = torch.stack(corr_list, dim=1)
         corr = corr.reshape(B, -1, H, W)
         return corr / torch.sqrt(torch.tensor(dim).float())
+
+
+def get_corr_block(
+    fmap1: torch.Tensor,
+    fmap2: torch.Tensor,
+    num_levels: int = 4,
+    radius: int = 4,
+    alternate_corr: bool = False,
+):
+    if alternate_corr:
+        if alt_cuda_corr is None:
+            corr_fn = IterativeCorrBlock
+        else:
+            corr_fn = AlternateCorrBlock
+    else:
+        corr_fn = CorrBlock
+    return corr_fn(fmap1=fmap1, fmap2=fmap2, radius=radius, num_levels=num_levels)

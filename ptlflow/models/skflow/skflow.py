@@ -7,10 +7,15 @@ import torch.nn.functional as F
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import *
 from .extractor import BasicEncoder
-from .corr import CorrBlock, AlternateCorrBlock
+from .corr import get_corr_block
 from .utils import upflow8
 from .gma import Attention
 from ..base_model.base_model import BaseModel
+
+try:
+    import alt_cuda_corr
+except:
+    alt_cuda_corr = None
 
 
 class SequenceLoss(nn.Module):
@@ -74,6 +79,9 @@ class SKFlow(BaseModel):
             max_pos_size=160,
             dim_head=cdim,
         )
+
+        if self.args.alternate_corr and alt_cuda_corr is None:
+            print('!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!')
 
     @staticmethod
     def add_model_specific_args(parent_parser=None):
@@ -171,10 +179,13 @@ class SKFlow(BaseModel):
 
         fmap1 = fmap1.float()
         fmap2 = fmap2.float()
-        if self.args.alternate_corr:
-            corr_fn = AlternateCorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
-        else:
-            corr_fn = CorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
+        corr_fn = get_corr_block(
+            fmap1=fmap1,
+            fmap2=fmap2,
+            radius=self.args.corr_radius,
+            num_levels=self.args.corr_levels,
+            alternate_corr=self.args.alternate_corr,
+        )
 
         # run the context network
         cnet = self.cnet(image1)

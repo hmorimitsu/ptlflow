@@ -23,8 +23,10 @@ It is also not as efficient as the original SpatialCorrelationSampler.
 # limitations under the License.
 # =============================================================================
 
+import math
 from typing import Optional, Tuple, Union
 
+from einops import rearrange
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -220,7 +222,8 @@ def _init_coords_grid(flow: torch.Tensor) -> torch.Tensor:
 def iter_translated_spatial_correlation_sample(
     input1: torch.Tensor,
     input2: torch.Tensor,
-    flow: torch.Tensor,
+    flow: Optional[torch.Tensor] = None,
+    coords: Optional[torch.Tensor] = None,
     kernel_size: Union[int, Tuple[int, int]] = 1,
     patch_size: Union[int, Tuple[int, int]] = 1,
     stride: Union[int, Tuple[int, int]] = 1,
@@ -245,10 +248,14 @@ def iter_translated_spatial_correlation_sample(
         The origin feature map.
     input2 : torch.Tensor
         The target feature map.
-    flow : torch.Tensor
+    flow : Optional[torch.Tensor]
+        This argument and "coords" are mutually exclusive, only one of them can be not None.
         The optical flow field to translate the points from input1. The flow values should be represented in number of pixels
         (do not provide normalized values, e.g. between -1 and 1). It should be a 4D tensor (b, 2, h, w), where
         flow[:, 0] represent the horizontal flow and flow[:, 1] the vertical ones.
+    coords : torch.Tensor
+        This argument and "flow" are mutually exclusive, only one of them can be not None.
+        This value should be equivalent to "flow" + "coords_grid".
     kernel_size : Union[int, Tuple[int, int]], default 1
         Total size of your correlation kernel, in pixels
     patch_size : Union[int, Tuple[int, int]], default 1
@@ -278,6 +285,9 @@ def iter_translated_spatial_correlation_sample(
     NotImplementedError
         If dilation != 1.
     """
+    assert (flow is None and coords is not None) or (
+        flow is not None and coords is None
+    )
     # Make inputs be tuples
     kernel_size = (
         (kernel_size, kernel_size) if isinstance(kernel_size, int) else kernel_size
@@ -308,10 +318,11 @@ def iter_translated_spatial_correlation_sample(
         dtype=input1.dtype, device=input1.device
     )
 
-    if coords_grid is None:
-        coords_grid = _init_coords_grid(flow)
+    if coords is None:
+        if coords_grid is None:
+            coords_grid = _init_coords_grid(flow)
+        coords = coords_grid + flow
 
-    coords = coords_grid + flow
     cx = 2 * coords[:, 0] / (w - 1) - 1
     cy = 2 * coords[:, 1] / (h - 1) - 1
 
@@ -320,8 +331,6 @@ def iter_translated_spatial_correlation_sample(
         dilation_patch[1] * ((patch_size[1] - 1) // 2),
     )
 
-    # for i in range(-interval[0], interval[1], dilation_patch[0]):
-    #     for j in range(-interval[2], interval[3], dilation_patch[1]):
     for i in range(0, patch_size[0] * dilation_patch[0], dilation_patch[0]):
         for j in range(0, patch_size[1] * dilation_patch[1], dilation_patch[1]):
             grid = torch.stack(
@@ -428,3 +437,76 @@ class IterTranslatedSpatialCorrelationSampler(nn.Module):
             dilation_patch=self.dilation_patch,
             coords_grid=self.coords_grid,
         )
+
+
+class IterativeCorrBlock(nn.Module):
+    """Another wrapper for iter_translated_spatial_correlation_sample.
+
+    This block is designed to mimic the operations of RAFT's AlternateCorrBlock package (see ptlflow/models/raft/corr.py).
+    This block can be used when alt_cuda_corr has not been compiled (see ptlflow/utils/external/alt_cuda_corr).
+
+    IMPORTANT: this implementation is slower than alt_cuda_corr.
+    """
+
+    def __init__(
+        self,
+        fmap1: torch.Tensor,
+        fmap2: torch.Tensor,
+        radius: int = 1,
+        num_levels: int = 1,
+    ):
+        """Initialize IterativeCorrBlock.
+
+        Parameters
+        ----------
+        fmap1 : torch.Tensor
+            The origin feature map.
+        fmap2 : torch.Tensor
+            The target feature map.
+        radius : int, default 1
+            The radius if the correlation patch. The patch_size will be 2 * radius + 1.
+        num_levels : int, default 1
+            Number of correlation pooling levels to use (see ptlflow/models/raft/corr.py).
+        """
+        super(IterativeCorrBlock, self).__init__()
+
+        self.patch_size = 2 * radius + 1
+        self.num_levels = num_levels
+
+        self.pyramid = [(fmap1, fmap2)]
+        for _ in range(self.num_levels):
+            fmap1 = F.avg_pool2d(fmap1, 2, stride=2)
+            fmap2 = F.avg_pool2d(fmap2, 2, stride=2)
+            self.pyramid.append((fmap1, fmap2))
+
+    def forward(self, coords):
+        """Compute the correlation sampling from input1 to input2.
+
+        Parameters
+        ----------
+        coords : torch.Tensor
+            The addition (optical flow + coords_grid) to translate the points from input1. The coords values should be represented in number of pixels
+            (do not provide normalized values, e.g. between -1 and 1). It should be a 4D tensor (b, 2, h, w), where
+            coords[:, 0] represent the x axis and flow[:, 1] the y axis.
+
+        Returns
+        -------
+        torch.Tensor
+            Result of correlation sampling.
+        """
+        dim = self.pyramid[0][0].shape[1]
+
+        corr_list = []
+        for i in range(self.num_levels):
+            fmap1_i = self.pyramid[0][0]
+            fmap2_i = self.pyramid[i][1]
+
+            coords_i = coords / 2**i
+            corr = iter_translated_spatial_correlation_sample(
+                input1=fmap1_i, input2=fmap2_i, coords=coords_i, patch_size=self.patch_size
+            )
+            corr = rearrange(corr, "b c d h w -> b (d c) h w")
+            corr_list.append(corr)
+
+        corr = torch.cat(corr_list, dim=1)
+        return corr / math.sqrt(dim)
