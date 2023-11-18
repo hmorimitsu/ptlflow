@@ -81,7 +81,9 @@ class SKFlow(BaseModel):
         )
 
         if self.args.alternate_corr and alt_cuda_corr is None:
-            print('!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!')
+            print(
+                "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
+            )
 
     @staticmethod
     def add_model_specific_args(parent_parser=None):

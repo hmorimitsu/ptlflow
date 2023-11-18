@@ -84,7 +84,9 @@ class MatchFlow(BaseModel):
             self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)
 
         if self.args.alternate_corr and alt_cuda_corr is None:
-            print('!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!')
+            print(
+                "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
+            )
 
     @property
     def train_size(self):

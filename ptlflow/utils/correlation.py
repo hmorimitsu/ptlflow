@@ -503,7 +503,10 @@ class IterativeCorrBlock(nn.Module):
 
             coords_i = coords / 2**i
             corr = iter_translated_spatial_correlation_sample(
-                input1=fmap1_i, input2=fmap2_i, coords=coords_i, patch_size=self.patch_size
+                input1=fmap1_i,
+                input2=fmap2_i,
+                coords=coords_i,
+                patch_size=self.patch_size,
             )
             corr = rearrange(corr, "b c d h w -> b (d c) h w")
             corr_list.append(corr)
