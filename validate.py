@@ -63,6 +63,15 @@ def _init_parser() -> ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--exclude",
+        type=str,
+        nargs="+",
+        default=None,
+        help=(
+            "Used in combination with model=all. A list of model names that will not be validated."
+        ),
+    )
+    parser.add_argument(
         "--output_path",
         type=str,
         default=str(Path("outputs/validate")),
@@ -141,6 +150,9 @@ def _init_parser() -> ArgumentParser:
         help=(
             "Used only when the model predicts outputs for more than one frame. Select which predictions will be used for evaluation."
         ),
+    )
+    parser.add_argument(
+        "--write_individual_metrics", action="store_true", help="If set, save a table of metrics for every image."
     )
     return parser
 
@@ -245,7 +257,13 @@ def validate_list_of_models(args: Namespace) -> None:
     if args.reversed:
         model_names = reversed(model_names)
 
+    exclude = args.exclude
+    if exclude is None:
+        exclude = []
     for mname in model_names:
+        if mname in exclude:
+            continue
+
         logging.info(mname)
         model_ref = ptlflow.get_model_reference(mname)
 
@@ -308,7 +326,11 @@ def validate_one_dataloader(
         The average metric values for this dataloader.
     """
     metrics_sum = {}
-    metrics_individual = {"filename": [], "epe": [], "outlier": []}
+
+    metrics_individual = None
+    if args.write_individual_metrics:
+        metrics_individual = {"filename": [], "epe": [], "outlier": []}
+
     with tqdm(dataloader) as tdl:
         prev_sequence = None
         prev_preds = None
@@ -388,9 +410,11 @@ def validate_one_dataloader(
             if "sintel" in inputs["meta"]["dataset_name"][0].lower():
                 filename = f'{Path(inputs["meta"]["image_paths"][0][0]).parent.name}/'
             filename += Path(inputs["meta"]["image_paths"][0][0]).stem
-            metrics_individual["filename"].append(filename)
-            metrics_individual["epe"].append(metrics["val/epe"].item())
-            metrics_individual["outlier"].append(metrics["val/outlier"].item())
+
+            if metrics_individual is not None:
+                metrics_individual["filename"].append(filename)
+                metrics_individual["epe"].append(metrics["val/epe"].item())
+                metrics_individual["outlier"].append(metrics["val/outlier"].item())
 
             generate_outputs(
                 args, inputs, preds, dataloader_name, i, inputs.get("meta")
@@ -399,10 +423,12 @@ def validate_one_dataloader(
             if args.max_samples is not None and i >= (args.max_samples - 1):
                 break
 
-    ind_df = pd.DataFrame(metrics_individual)
-    ind_df.to_csv(
-        Path(args.output_path) / f"{dataloader_name}_epe_outlier.csv", index=None
-    )
+    if args.write_individual_metrics:
+        ind_df = pd.DataFrame(metrics_individual)
+        args.output_path.mkdir(parents=True, exist_ok=True)
+        ind_df.to_csv(
+            Path(args.output_path) / f"{dataloader_name}_epe_outlier.csv", index=None
+        )
 
     metrics_mean = {}
     for k, v in metrics_sum.items():
