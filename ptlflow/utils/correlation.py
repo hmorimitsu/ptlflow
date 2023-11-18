@@ -301,7 +301,7 @@ def iter_translated_spatial_correlation_sample(
         input1 = F.pad(input1, (padding[1], padding[1], padding[0], padding[0]))
         input2 = F.pad(input2, (padding[1], padding[1], padding[0], padding[0]))
 
-    b, _, h, w = input1.shape
+    b, _, h, w = input2.shape
     input1 = input1[:, :, :: stride[0], :: stride[1]]
     sh, sw = input1.shape[2:4]
     corr = torch.zeros(b, patch_size[0], patch_size[1], sh, sw).to(
