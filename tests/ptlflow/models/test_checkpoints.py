@@ -417,6 +417,22 @@ EXCLUDE_MODELS = ["scv4", "scv8"]  # Has additional requirements
 
 
 @pytest.mark.skip(reason="Requires to download all checkpoints. Just run occasionally.")
+def test_ckpt_exists() -> None:
+    model_names = ptlflow.models_dict.keys()
+    for mname in model_names:
+        if mname in EXCLUDE_MODELS:
+            continue
+        model_ref = ptlflow.get_model_reference(mname)
+        if hasattr(model_ref, "pretrained_checkpoints"):
+            ckpt_names = list(model_ref.pretrained_checkpoints.keys())
+        for cname in ckpt_names:
+            parser = model_ref.add_model_specific_args()
+            args = parser.parse_args([])
+
+            model = ptlflow.get_model(mname, cname, args)
+
+
+@pytest.mark.skip(reason="Requires to download all checkpoints. Just run occasionally.")
 def test_accuracy() -> None:
     data = _load_data()
     model_names = ptlflow.models_dict.keys()
