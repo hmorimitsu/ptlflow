@@ -72,7 +72,6 @@ class IOAdapter(object):
         self.fp16 = fp16
 
         self.transform = ToTensor()
-        padder_input_size = input_size
         self.scaler = None
         if (target_size is not None and min(target_size) > 0) or (
             target_scale_factor is not None and target_scale_factor > 0
@@ -143,12 +142,12 @@ class IOAdapter(object):
 
         return inputs
 
-    def unpad_and_unscale(
+    def unscale(
         self, outputs: Dict[str, Any], image_only: bool = False
     ) -> Dict[str, torch.Tensor]:
-        """Remove padding and scaling to restore the original shapes.
+        """Remove scaling to restore the original shapes.
 
-        The inputs and outputs obtained from prepare_inputs() may have been padded and scaled.
+        The inputs and outputs obtained from prepare_inputs() may have been scaled.
         This function can be used to revert those operations.
 
         Typically, this function should be used on both the inputs and outputs of the model after the model generated the
@@ -157,10 +156,9 @@ class IOAdapter(object):
         Parameters
         ----------
         outputs : Dict[str, Any]
-            It can be either the inputs or the outputs of optical flow models. All tensors will have the extra padding and
-            rescaling removed.
+            It can be either the inputs or the outputs of optical flow models. All tensors will have the extra scaling removed.
         image_only : Optional[bool]
-            If True, only removes scaling and padding from the images.
+            If True, only removes scaling from the images.
 
         Returns
         -------
