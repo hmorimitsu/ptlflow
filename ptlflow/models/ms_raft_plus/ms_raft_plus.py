@@ -152,7 +152,10 @@ class MSRAFTPlus(BaseModel):
         coords0, coords1 = self.initialize_flow16(image1)
         flow_predictions = []
 
-        if inputs.get("prev_preds") is not None and inputs["prev_preds"].get("flow_small") is not None:
+        if (
+            inputs.get("prev_preds") is not None
+            and inputs["prev_preds"].get("flow_small") is not None
+        ):
             forward_flow = forward_interpolate_batch(inputs["prev_preds"]["flow_small"])
             coords1 = coords1 + forward_flow
 

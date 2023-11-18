@@ -469,6 +469,10 @@ def forward_interpolate_batch(prev_flow: torch.Tensor) -> torch.Tensor:
     """
     forward_flow = []
     for i in range(prev_flow.shape[0]):
-        forward_flow.append(forward_interpolate(prev_flow[i]).to(dtype=prev_flow.dtype, device=prev_flow.device))
+        forward_flow.append(
+            forward_interpolate(prev_flow[i]).to(
+                dtype=prev_flow.dtype, device=prev_flow.device
+            )
+        )
     forward_flow = torch.stack(forward_flow, 0)
     return forward_flow

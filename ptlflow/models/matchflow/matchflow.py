@@ -165,7 +165,10 @@ class MatchFlow(BaseModel):
         )
 
         flow_prev = None
-        if inputs.get("prev_preds") is not None and inputs["prev_preds"].get("flow_small") is not None:
+        if (
+            inputs.get("prev_preds") is not None
+            and inputs["prev_preds"].get("flow_small") is not None
+        ):
             flow_prev = inputs["prev_preds"]["flow_small"]
 
         flow_predictions, flow_small = self.predict(
