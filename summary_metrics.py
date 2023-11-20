@@ -64,13 +64,11 @@ def _init_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--ignore",
+        "--plot_ignore_models",
         type=str,
-        default="model",
-        help=(
-            "Name of the column to use to sort the outputs table. The name must match exactly a column name from the"
-            "metrics csv file."
-        ),
+        nargs="*",
+        default=None,
+        help=("Name of the models that should not be included in the plot."),
     )
     parser.add_argument(
         "--drop_checkpoints",
@@ -121,6 +119,11 @@ def save_plots(args: argparse.Namespace, df: pd.DataFrame) -> None:
     df : pd.DataFrame
         A DataFrame with the validation metrics.
     """
+
+    if args.plot_ignore_models is not None:
+        for name in args.plot_ignore_models:
+            df = df[df[df.columns[0]] != name]
+
     metric_pairs = {}
     for col in df.columns[2:]:
         for cmet in args.chosen_metrics:
@@ -130,25 +133,48 @@ def save_plots(args: argparse.Namespace, df: pd.DataFrame) -> None:
                     metric_pairs[dataset_name] = {}
                 metric_pairs[dataset_name][cmet] = col
 
-    for dataset_name, col_pair_dict in metric_pairs.items():
-        col1, col2 = col_pair_dict.values()
-        fig = px.scatter(
-            df,
-            x=col1,
-            y=col2,
-            color=df.columns[0],
-            symbol=df.columns[1],
-            title=f"{dataset_name} - {args.chosen_metrics[0]} x {args.chosen_metrics[1]}",
-        )
-        fig.update_traces(
-            marker={"size": 20, "line": {"width": 2, "color": "DarkSlateGrey"}},
-            selector={"mode": "markers"},
-        )
-        fig.update_layout(title_font_size=30)
-        file_name = f"{dataset_name}_{args.chosen_metrics[0]}_{args.chosen_metrics[1]}"
-        if args.drop_checkpoints is not None and len(args.drop_checkpoints) > 0:
-            file_name += f'-drop_{"_".join(args.drop_checkpoints)}'
-        fig.write_html(args.output_dir / (file_name + ".html"))
+    ckpt_groups = ["all", "chairs", "kitti", "sintel", "things", "others"]
+    assert ckpt_groups[-1] == "others"  # others must be the last element
+
+    not_others = None
+    for cgroup in ckpt_groups:
+        group_df = df
+        if cgroup == "all":
+            color = group_df.columns[0]
+            symbol = group_df.columns[1]
+        elif cgroup == "others":
+            group_df = df[~not_others]
+            color = group_df.columns[0]
+            symbol = group_df.columns[1]
+        else:
+            belong_to_group = df[df.columns[1]].str.contains(cgroup)
+            if not_others is None:
+                not_others = belong_to_group
+            else:
+                not_others = not_others | belong_to_group
+            group_df = df[belong_to_group]
+            color = group_df.columns[0]
+            symbol = group_df.columns[0]
+
+        for dataset_name, col_pair_dict in metric_pairs.items():
+            col1, col2 = col_pair_dict.values()
+            fig = px.scatter(
+                group_df,
+                x=col1,
+                y=col2,
+                color=color,
+                symbol=symbol,
+                title=f"{dataset_name} - {args.chosen_metrics[0]} x {args.chosen_metrics[1]} - checkpoint: {cgroup}",
+            )
+            fig.update_traces(
+                marker={"size": 20, "line": {"width": 2, "color": "DarkSlateGrey"}},
+                selector={"mode": "markers"},
+            )
+            fig.update_layout(title_font_size=30)
+            file_name = f"{dataset_name}_{args.chosen_metrics[0]}_{args.chosen_metrics[1]}_{cgroup}"
+            if args.drop_checkpoints is not None and len(args.drop_checkpoints) > 0:
+                file_name += f'-drop_{"_".join(args.drop_checkpoints)}'
+            fig.write_html(args.output_dir / (file_name + ".html"))
 
 
 def summarize(args: argparse.Namespace) -> None:
@@ -177,8 +203,8 @@ def summarize(args: argparse.Namespace) -> None:
     if args.drop_checkpoints is not None and len(args.drop_checkpoints) > 0:
         file_name += f'-drop_{"_".join(args.drop_checkpoints)}'
 
-    df.to_csv(args.output_dir / (file_name + ".csv"), index=False)
-    with open(args.output_dir / (file_name + ".md"), "w") as f:
+    df.to_csv(args.output_dir / f"{file_name}.csv", index=False)
+    with open(args.output_dir / f"{file_name}.md", "w") as f:
         df.to_markdown(f)
 
     if len(args.chosen_metrics) == 2:
