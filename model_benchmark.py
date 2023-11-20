@@ -85,6 +85,15 @@ def _init_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--exclude",
+        type=str,
+        nargs="+",
+        default=None,
+        help=(
+            "Used in combination with model=all. A list of model names that will not be validated."
+        ),
+    )
+    parser.add_argument(
         "--csv_path",
         type=str,
         default=None,
@@ -221,7 +230,14 @@ def benchmark(args: argparse.Namespace, device_handle) -> pd.DataFrame:
 
     for isize in range(0, len(args.input_size), 2):
         input_size = args.input_size[isize : isize + 2]
+
+        exclude = args.exclude
+        if exclude is None:
+            exclude = []
+
         for mname in tqdm(model_names):
+            if mname in exclude:
+                continue
             try:
                 all_times = []
                 all_memories = []
@@ -486,3 +502,4 @@ if __name__ == "__main__":
             args.plot_log_y,
         )
     print(f"Results saved to {str(args.output_path)}.")
+    print(df)
