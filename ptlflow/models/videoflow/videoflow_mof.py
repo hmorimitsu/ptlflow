@@ -95,6 +95,8 @@ class VideoFlowMOF(BaseModel):
                 nn.GELU(),
             )
 
+        self.has_showed_warning = False
+
     @staticmethod
     def add_model_specific_args(parent_parser=None):
         parent_parser = BaseModel.add_model_specific_args(parent_parser)
@@ -168,11 +170,7 @@ class VideoFlowMOF(BaseModel):
         """Estimate optical flow between pair of frames"""
         down_ratio = self.args.down_ratio
 
-        assert (
-            inputs["images"].shape[1] > 2
-        ), "videoflow_mof requires inputs of at least 3 frames. Add the arguments seqlen_N-seqpos_middle to the dataset name, replacing N with a number larger than 2."
-
-        images = inputs["images"].clone()
+        images = self._check_input_shape(inputs["images"].clone())
         N_orig = images.shape[1]
 
         num_left_reps = 0
@@ -354,3 +352,15 @@ class VideoFlowMOF(BaseModel):
             }
 
         return outputs
+
+    def _check_input_shape(self, images):
+        if images.shape[1] == 2:
+            if not self.has_showed_warning:
+                print(
+                    "Warning: videoflow_mof requires inputs of at least 3 frames, but the current input has only 2. "
+                    "The first frame will be replicated to run, which may decrease the prediction accuracy. "
+                    "If using validate.py or test.py, add the arguments seqlen_3-seqpos_middle to the [val/test]_dataset arg."
+                )
+                self.has_showed_warning = True
+            images = torch.cat([images[:, :1], images], 1)
+        return images

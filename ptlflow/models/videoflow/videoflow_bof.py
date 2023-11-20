@@ -67,6 +67,8 @@ class VideoFlowBOF(BaseModel):
             args=self.args, dim=128, heads=1, max_pos_size=160, dim_head=128
         )
 
+        self.has_showed_warning = False
+
     @staticmethod
     def add_model_specific_args(parent_parser=None):
         parent_parser = BaseModel.add_model_specific_args(parent_parser)
@@ -113,12 +115,10 @@ class VideoFlowBOF(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
-        assert (
-            inputs["images"].shape[1] == 3
-        ), "videoflow_bof requires inputs of 3 frames. Add the arguments seqlen_3-seqpos_middle to the dataset name."
+        images = self._check_input_shape(inputs["images"])
 
         images, image_resizer = self.preprocess_images(
-            inputs["images"],
+            images,
             bgr_add=-0.5,
             bgr_mult=2.0,
             bgr_to_rgb=True,
@@ -214,3 +214,18 @@ class VideoFlowBOF(BaseModel):
             }
 
         return outputs
+
+    def _check_input_shape(self, images):
+        assert (
+            images.shape[1] <= 3
+        ), f"videoflow_bof requires inputs of 3 frames. The current input has too many frames (found {images.shape[1]}), decrease it to 3 to run."
+        if images.shape[1] == 2:
+            if not self.has_showed_warning:
+                print(
+                    "Warning: videoflow_bof requires inputs of 3 frames, but the current input has only 2. "
+                    "The first frame will be replicated to run, which may decrease the prediction accuracy. "
+                    "If using validate.py or test.py, add the arguments seqlen_3-seqpos_middle to the [val/test]_dataset arg."
+                )
+                self.has_showed_warning = True
+            images = torch.cat([images[:, :1], images], 1)
+        return images
