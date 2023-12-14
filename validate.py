@@ -334,7 +334,6 @@ def validate_one_dataloader(
         metrics_individual = {"filename": [], "epe": [], "outlier": []}
 
     with tqdm(dataloader) as tdl:
-        prev_sequence = None
         prev_preds = None
         for i, inputs in enumerate(tdl):
             if args.scale_factor is not None:
@@ -359,23 +358,13 @@ def validate_one_dataloader(
             preds = model(inputs)
 
             if args.warm_start:
-                assert (
-                    inputs["images"].shape[0] == 1
-                ), "--warm_start requires batch_size=1"
-                if "sintel" in inputs["meta"]["dataset_name"][0].lower():
-                    sequence = Path(inputs["meta"]["image_paths"][0][0]).parent.name
-                    if sequence != prev_sequence:
-                        prev_sequence = sequence
-                        prev_preds = None
-                    else:
-                        prev_preds = preds
-                        for k, v in prev_preds.items():
-                            if isinstance(v, torch.Tensor):
-                                prev_preds[k] = v.detach()
+                if "is_seq_start" in inputs["meta"] and inputs["meta"]["is_seq_start"][0]:
+                    prev_preds = None
                 else:
-                    raise NotImplementedError(
-                        f'warm_start is not implemented for dataset {inputs["meta"]["dataset_name"][0]}'
-                    )
+                    prev_preds = preds
+                    for k, v in prev_preds.items():
+                        if isinstance(v, torch.Tensor):
+                            prev_preds[k] = v.detach()
 
             inputs = io_adapter.unscale(inputs, image_only=True)
             preds = io_adapter.unscale(preds)

@@ -341,6 +341,7 @@ class AutoFlowDataset(BaseFlowDataset):
                 "image_paths": [str(p) for p in paths],
                 "is_val": paths[0].stem in val_names,
                 "misc": "",
+                "is_seq_start": True,
             }
             for paths in self.img_paths
         ]
@@ -439,6 +440,7 @@ class FlyingChairsDataset(BaseFlowDataset):
                 "image_paths": [str(p) for p in paths],
                 "is_val": paths[0].stem in val_names,
                 "misc": "",
+                "is_seq_start": True,
             }
             for paths in self.img_paths
         ]
@@ -608,7 +610,12 @@ class FlyingChairs2Dataset(BaseFlowDataset):
                     )
 
         self.metadata = [
-            {"image_paths": [str(p) for p in paths], "is_val": False, "misc": ""}
+            {
+                "image_paths": [str(p) for p in paths],
+                "is_val": False,
+                "misc": "",
+                "is_seq_start": True,
+            }
             for paths in self.img_paths
         ]
 
@@ -887,6 +894,7 @@ class FlyingThings3DDataset(BaseFlowDataset):
                                             ],
                                             "is_val": False,
                                             "misc": "",
+                                            "is_seq_start": i == 0,
                                         }
                                     )
                                     if self.get_backward:
@@ -1104,6 +1112,7 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
                                         "image_paths": [str(p) for p in img_paths],
                                         "is_val": False,
                                         "misc": "",
+                                        "is_seq_start": i == 0,
                                     }
                                 )
 
@@ -1299,6 +1308,7 @@ class Hd1kDataset(BaseFlowDataset):
                         "image_paths": [str(p) for p in self.img_paths[-1]],
                         "is_val": (seq_img_names[i] in val_names),
                         "misc": "",
+                        "is_seq_start": True,
                     }
                 )
 
@@ -1430,6 +1440,7 @@ class KittiDataset(BaseFlowDataset):
                         "image_paths": [str(img1_paths[i]), str(img2_paths[i])],
                         "is_val": img1_paths[i].stem in val_names,
                         "misc": ver,
+                        "is_seq_start": True,
                     }
                     for i in range(len(img1_paths))
                     if img1_paths[i].stem not in remove_names
@@ -1583,6 +1594,7 @@ class SintelDataset(BaseFlowDataset):
                             ],
                             "is_val": seq_name in val_seqs,
                             "misc": seq_name,
+                            "is_seq_start": i == 0,
                         }
                     )
 
@@ -1749,6 +1761,7 @@ class SpringDataset(BaseFlowDataset):
                                 ],
                                 "is_val": False,
                                 "misc": seq_name,
+                                "is_seq_start": i == 0,
                             }
                         )
 
@@ -1846,6 +1859,7 @@ class MiddleburyDataset(BaseFlowDataset):
                         ],
                         "is_val": False,
                         "misc": seq_name,
+                        "is_seq_start": True,
                     }
                 )
 
@@ -1995,6 +2009,7 @@ class MonkaaDataset(BaseFlowDataset):
                                     ],
                                     "is_val": False,
                                     "misc": "",
+                                    "is_seq_start": i == 0,
                                 }
                             )
                             if self.get_backward:

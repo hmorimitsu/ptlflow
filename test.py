@@ -210,23 +210,13 @@ def test_one_dataloader(
         preds = model(inputs)
 
         if args.warm_start:
-            assert (
-                inputs["images"].shape[0] == 1
-            ), "--warm_start requires batch_size=1"
-            if "sintel" in inputs["meta"]["dataset_name"][0].lower():
-                sequence = Path(inputs["meta"]["image_paths"][0][0]).parent.name
-                if sequence != prev_sequence:
-                    prev_sequence = sequence
-                    prev_preds = None
-                else:
-                    prev_preds = preds
-                    for k, v in prev_preds.items():
-                        if isinstance(v, torch.Tensor):
-                            prev_preds[k] = v.detach()
+            if "is_seq_start" in inputs["meta"] and inputs["meta"]["is_seq_start"][0]:
+                prev_preds = None
             else:
-                raise NotImplementedError(
-                    f'warm_start is not implemented for dataset {inputs["meta"]["dataset_name"][0]}'
-                )
+                prev_preds = preds
+                for k, v in prev_preds.items():
+                    if isinstance(v, torch.Tensor):
+                        prev_preds[k] = v.detach()
 
         inputs = io_adapter.unscale(inputs)
         preds = io_adapter.unscale(preds)
@@ -281,16 +271,24 @@ def _write_to_file(
             out_viz_root_dir / dataloader_tokens[0] / dataloader_tokens[1]
         )
         flow_ext = "flo"
+    elif dataloader_tokens[0] == "spring":
+        out_root_dir = out_root_dir / dataloader_tokens[0] / dataloader_tokens[1]
+        out_viz_root_dir = (
+            out_viz_root_dir / dataloader_tokens[0] / dataloader_tokens[1]
+        )
+        flow_ext = "flo5"
 
     extra_dirs = ""
     if metadata is not None:
         img_path = Path(metadata["image_paths"][0][0])
         image_name = img_path.stem
-        if "sintel" in dataloader_name:
-            seq_name = img_path.parts[-2]
-            extra_dirs = seq_name
         if "kitti-2015" in dataloader_name:
             extra_dirs = "flow"
+        elif "sintel" in dataloader_name:
+            seq_name = img_path.parts[-2]
+            extra_dirs = seq_name
+        elif "spring" in dataloader_name:
+            extra_dirs = f"{img_path.parts[-3]}/{img_path.parts[-2]}"
     else:
         image_name = f"{batch_idx:08d}"
 
