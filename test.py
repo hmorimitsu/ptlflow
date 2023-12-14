@@ -272,9 +272,9 @@ def _write_to_file(
         )
         flow_ext = "flo"
     elif dataloader_tokens[0] == "spring":
-        out_root_dir = out_root_dir / dataloader_tokens[0] / dataloader_tokens[1]
+        out_root_dir = out_root_dir / dataloader_tokens[0]
         out_viz_root_dir = (
-            out_viz_root_dir / dataloader_tokens[0] / dataloader_tokens[1]
+            out_viz_root_dir / dataloader_tokens[0]
         )
         flow_ext = "flo5"
 
@@ -288,7 +288,13 @@ def _write_to_file(
             seq_name = img_path.parts[-2]
             extra_dirs = seq_name
         elif "spring" in dataloader_name:
-            extra_dirs = f"{img_path.parts[-3]}/{img_path.parts[-2]}"
+            if "back" in dataloader_tokens:
+                direc = "BW"
+            else:
+                direc = "FW"
+            side, idx = img_path.stem.split("_")[-2:]
+            extra_dirs = f"{img_path.parts[-3]}/flow_{direc}_{side}"
+            image_name = f"flow_{direc}_{side}_{idx}"
     else:
         image_name = f"{batch_idx:08d}"
 

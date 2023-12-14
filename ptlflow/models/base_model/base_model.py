@@ -187,7 +187,7 @@ class BaseModel(pl.LightningModule):
             type=str,
             nargs="+",
             default=None,
-            choices=["kitti-2012", "kitti-2015", "sintel"],
+            choices=["kitti-2012", "kitti-2015", "sintel", "spring"],
             help=(
                 "Specify the datasets for testing. This option should be used to generate predictions on the"
                 "test set of datasets that have official benchmarks."
@@ -653,7 +653,7 @@ class BaseModel(pl.LightningModule):
             valid dataset strings.
         """
         if self.args.val_dataset is None:
-            self.args.val_dataset = "sintel-final-trainval-occ+sintel-clean-trainval-occ+kitti-2015-trainval"
+            self.args.val_dataset = "sintel-clean+sintel-final+kitti-2015"
             logging.warning(
                 "--val_dataset is not set. It will be set as %s. If you want to skip validation, then set --val_dataset none.",
                 self.args.val_dataset,
@@ -710,6 +710,8 @@ class BaseModel(pl.LightningModule):
         if "sintel" in dataset_ids:
             dataset_ids.remove("sintel")
             dataset_ids.extend(["sintel-clean", "sintel-final"])
+        elif "spring" in dataset_ids:
+            dataset_ids.append("spring-back")
 
         dataloaders = []
         for dataset_id in self.args.test_dataset:
@@ -1204,7 +1206,7 @@ class BaseModel(pl.LightningModule):
         sequence_length = 2
         sequence_position = "first"
         for v in args:
-            if v in ["train", "val", "trainval"]:
+            if v in ["train", "val", "trainval", "test"]:
                 split = v
             elif v == "rev":
                 add_reverse = True
@@ -1231,35 +1233,6 @@ class BaseModel(pl.LightningModule):
         device = "cuda" if self.args.train_transform_cuda else "cpu"
         md = make_divisible
 
-        if is_train:
-            if self.args.train_crop_size is None:
-                cy, cx = (md(400, self.output_stride), md(720, self.output_stride))
-                self.args.train_crop_size = (cy, cx)
-                logging.warning(
-                    "--train_crop_size is not set. It will be set as (%d, %d).", cy, cx
-                )
-            else:
-                cy, cx = (
-                    md(self.args.train_crop_size[0], self.output_stride),
-                    md(self.args.train_crop_size[1], self.output_stride),
-                )
-
-            # These transforms are based on RAFT: https://github.com/princeton-vl/RAFT
-            transform = ft.Compose(
-                [
-                    ft.ToTensor(device=device, fp16=self.args.train_transform_fp16),
-                    ft.RandomScaleAndCrop((cy, cx), (-0.4, 0.8), (-0.2, 0.2)),
-                    ft.ColorJitter(0.4, 0.4, 0.4, 0.5 / 3.14, 0.2),
-                    ft.GaussianNoise(0.02),
-                    ft.RandomPatchEraser(
-                        0.5, (int(1), int(3)), (int(50), int(100)), "mean"
-                    ),
-                    ft.RandomFlip(min(0.5, 0.5), min(0.1, 0.5)),
-                ]
-            )
-        else:
-            transform = ft.ToTensor()
-
         pass_names = ["clean", "final"]
         split = "trainval"
         is_subset = False
@@ -1269,6 +1242,7 @@ class BaseModel(pl.LightningModule):
         get_backward = False
         sequence_length = 2
         sequence_position = "first"
+        sintel_transform = False
         for v in args:
             if v in ["clean", "final"]:
                 pass_names = [v]
@@ -1288,6 +1262,41 @@ class BaseModel(pl.LightningModule):
                 sequence_length = int(v.split("_")[1])
             elif v.startswith("seqpos"):
                 sequence_position = v.split("_")[1]
+            elif v == "sinteltransform":
+                sintel_transform = True
+
+        if is_train:
+            if self.args.train_crop_size is None:
+                cy, cx = (md(400, self.output_stride), md(720, self.output_stride))
+                self.args.train_crop_size = (cy, cx)
+                logging.warning(
+                    "--train_crop_size is not set. It will be set as (%d, %d).", cy, cx
+                )
+            else:
+                cy, cx = (
+                    md(self.args.train_crop_size[0], self.output_stride),
+                    md(self.args.train_crop_size[1], self.output_stride),
+                )
+
+            # These transforms are based on RAFT: https://github.com/princeton-vl/RAFT
+            if sintel_transform:
+                major_scale = (-0.2, 0.6)
+            else:
+                major_scale = (-0.4, 0.8)
+            transform = ft.Compose(
+                [
+                    ft.ToTensor(device=device, fp16=self.args.train_transform_fp16),
+                    ft.RandomScaleAndCrop((cy, cx), major_scale, (-0.2, 0.2)),
+                    ft.ColorJitter(0.4, 0.4, 0.4, 0.5 / 3.14, 0.2),
+                    ft.GaussianNoise(0.02),
+                    ft.RandomPatchEraser(
+                        0.5, (int(1), int(3)), (int(50), int(100)), "mean"
+                    ),
+                    ft.RandomFlip(min(0.5, 0.5), min(0.1, 0.5)),
+                ]
+            )
+        else:
+            transform = ft.ToTensor()
 
         if is_subset:
             dataset = FlyingThings3DSubsetDataset(
