@@ -137,7 +137,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--warm_start",
         action="store_true",
-        help="If set, in Sintel dataset, uses the previous flow as a starting point for prediction.",
+        help="If set, stores the previous estimation to be used a starting point for prediction.",
     )
     parser.add_argument(
         "--fp16", action="store_true", help="If set, use half floating point precision."
@@ -152,7 +152,9 @@ def _init_parser() -> ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--write_individual_metrics", action="store_true", help="If set, save a table of metrics for every image."
+        "--write_individual_metrics",
+        action="store_true",
+        help="If set, save a table of metrics for every image.",
     )
     return parser
 

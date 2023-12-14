@@ -97,7 +97,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--warm_start",
         action="store_true",
-        help="If set, in Sintel dataset, uses the previous flow as a starting point for prediction.",
+        help="If set, stores the previous estimation to be used a starting point for prediction.",
     )
     return parser
 
@@ -187,7 +187,7 @@ def test_one_dataloader(
         A string to identify this dataloader.
     """
     prev_sequence = None
-    prev_flows = None
+    prev_preds = None
     for i, inputs in enumerate(tqdm(dataloader)):
         if args.scale_factor is not None:
             scale_factor = args.scale_factor
@@ -205,19 +205,28 @@ def test_one_dataloader(
             cuda=torch.cuda.is_available(),
         )
         inputs = io_adapter.prepare_inputs(inputs=inputs)
-        inputs["prev_flows"] = prev_flows
+        inputs["prev_preds"] = prev_preds
 
         preds = model(inputs)
 
         if args.warm_start:
-            assert inputs["images"].shape[0] == 1, "--warm_start requires batch_size=1"
+            assert (
+                inputs["images"].shape[0] == 1
+            ), "--warm_start requires batch_size=1"
             if "sintel" in inputs["meta"]["dataset_name"][0].lower():
                 sequence = Path(inputs["meta"]["image_paths"][0][0]).parent.name
                 if sequence != prev_sequence:
                     prev_sequence = sequence
-                    prev_flows = None
+                    prev_preds = None
                 else:
-                    prev_flows = preds["flows"].detach()
+                    prev_preds = preds
+                    for k, v in prev_preds.items():
+                        if isinstance(v, torch.Tensor):
+                            prev_preds[k] = v.detach()
+            else:
+                raise NotImplementedError(
+                    f'warm_start is not implemented for dataset {inputs["meta"]["dataset_name"][0]}'
+                )
 
         inputs = io_adapter.unscale(inputs)
         preds = io_adapter.unscale(preds)
