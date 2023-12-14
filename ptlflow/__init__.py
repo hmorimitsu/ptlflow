@@ -63,6 +63,7 @@ from ptlflow.models.matchflow.matchflow import MatchFlow, MatchFlowRAFT
 from ptlflow.models.ms_raft_plus.ms_raft_plus import MSRAFTPlus
 from ptlflow.models.pwcnet.pwcnet import PWCNet, PWCDCNet
 from ptlflow.models.raft.raft import RAFT, RAFTSmall
+from ptlflow.models.rpknet.rpknet import RPKNet
 from ptlflow.models.scopeflow.irr_pwc_v2 import ScopeFlow
 from ptlflow.models.separableflow.separableflow import SeparableFlow
 from ptlflow.models.skflow.skflow import SKFlow
@@ -133,6 +134,7 @@ models_dict = {
     "pwcnet_nodc": PWCNet,
     "raft": RAFT,
     "raft_small": RAFTSmall,
+    "rpknet": RPKNet,
     "scopeflow": ScopeFlow,
     "scv4": SCVQuarter,
     "scv8": SCVEighth,
