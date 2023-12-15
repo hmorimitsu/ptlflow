@@ -1627,6 +1627,7 @@ class SpringDataset(BaseFlowDataset):
         get_meta: bool = True,
         sequence_length: int = 2,
         sequence_position: str = "first",
+        reverse_only: bool = False,
     ) -> None:
         """Initialize SintelDataset.
 
@@ -1660,6 +1661,8 @@ class SpringDataset(BaseFlowDataset):
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
             - "last": the main frame will be the penultimate in the sequence.
+        reverse_only : bool, default False
+            If True, only uses the backward samples, discarding the forward ones.
         """
         if isinstance(side_names, str):
             side_names = [side_names]
@@ -1690,9 +1693,12 @@ class SpringDataset(BaseFlowDataset):
             [p.stem for p in (Path(root_dir) / split_dir).glob("*")]
         )
 
-        directions = [("FW", "BW")]
-        if add_reverse:
-            directions.append(("BW", "FW"))
+        if reverse_only:
+            directions = [("BW", "FW")]
+        else:
+            directions = [("FW", "BW")]
+            if add_reverse:
+                directions.append(("BW", "FW"))
 
         # Read paths from disk
         for seq_name in sequence_names:

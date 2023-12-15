@@ -186,7 +186,6 @@ def test_one_dataloader(
     dataloader_name : str
         A string to identify this dataloader.
     """
-    prev_sequence = None
     prev_preds = None
     for i, inputs in enumerate(tqdm(dataloader)):
         if args.scale_factor is not None:
@@ -273,9 +272,7 @@ def _write_to_file(
         flow_ext = "flo"
     elif dataloader_tokens[0] == "spring":
         out_root_dir = out_root_dir / dataloader_tokens[0]
-        out_viz_root_dir = (
-            out_viz_root_dir / dataloader_tokens[0]
-        )
+        out_viz_root_dir = out_viz_root_dir / dataloader_tokens[0]
         flow_ext = "flo5"
 
     extra_dirs = ""
@@ -288,7 +285,7 @@ def _write_to_file(
             seq_name = img_path.parts[-2]
             extra_dirs = seq_name
         elif "spring" in dataloader_name:
-            if "back" in dataloader_tokens:
+            if "revonly" in dataloader_tokens:
                 direc = "BW"
             else:
                 direc = "FW"

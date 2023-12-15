@@ -711,10 +711,10 @@ class BaseModel(pl.LightningModule):
             dataset_ids.remove("sintel")
             dataset_ids.extend(["sintel-clean", "sintel-final"])
         elif "spring" in dataset_ids:
-            dataset_ids.append("spring-back")
+            dataset_ids.append("spring-revonly")
 
         dataloaders = []
-        for dataset_id in self.args.test_dataset:
+        for dataset_id in dataset_ids:
             dataset_id += "-test"
             dataset_tokens = dataset_id.split("-")
             dataset = getattr(self, f"_get_{dataset_tokens[0]}_dataset")(
@@ -1205,11 +1205,14 @@ class BaseModel(pl.LightningModule):
         get_backward = False
         sequence_length = 2
         sequence_position = "first"
+        reverse_only = False
         for v in args:
             if v in ["train", "val", "trainval", "test"]:
                 split = v
             elif v == "rev":
                 add_reverse = True
+            elif v == "revonly":
+                reverse_only = True
             elif v == "back":
                 get_backward = True
             elif v.startswith("seqlen"):
@@ -1226,6 +1229,7 @@ class BaseModel(pl.LightningModule):
             get_backward=get_backward,
             sequence_length=sequence_length,
             sequence_position=sequence_position,
+            reverse_only=reverse_only,
         )
         return dataset
 
