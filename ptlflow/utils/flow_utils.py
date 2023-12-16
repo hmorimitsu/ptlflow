@@ -135,5 +135,7 @@ def flow_write(
     """
     if (format is not None and format == "pfm") or str(output_file).endswith("pfm"):
         selflow.write_pfm(output_file, flow)
+    elif (format is not None and format == "flo5") or str(output_file).endswith("flo5"):
+        flow_IO.writeFlo5File(flow, output_file)
     else:
         flowpy.flow_write(output_file, flow, format)
