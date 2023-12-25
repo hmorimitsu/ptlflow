@@ -90,21 +90,28 @@ class ResidualPartialBlock(nn.Module):
             padding=1,
             stride=stride,
         )
-        self.norm1 = norm_layer(num_channels=planes) if norm_layer is not None else nn.Sequential()
-        self.conv2 = PKConv2d(
-            planes, planes, kernel_size=3, padding=1
+        self.norm1 = (
+            norm_layer(num_channels=planes)
+            if norm_layer is not None
+            else nn.Sequential()
         )
-        self.norm2 = norm_layer(num_channels=planes) if norm_layer is not None else nn.Sequential()
+        self.conv2 = PKConv2d(planes, planes, kernel_size=3, padding=1)
+        self.norm2 = (
+            norm_layer(num_channels=planes)
+            if norm_layer is not None
+            else nn.Sequential()
+        )
         self.act = nn.ReLU(inplace=True)
 
         if stride == 1:
             self.downsample = None
         else:
-            self.downsample = PKConv2d(
-                in_planes, planes, kernel_size=1, stride=stride
+            self.downsample = PKConv2d(in_planes, planes, kernel_size=1, stride=stride)
+            self.norm3 = (
+                norm_layer(num_channels=planes)
+                if norm_layer is not None
+                else nn.Sequential()
             )
-            self.norm3 = norm_layer(num_channels=planes) if norm_layer is not None else nn.Sequential()
-
 
     def forward(self, x, out_ch):
         y = x
@@ -209,7 +216,7 @@ def bilinear_sampler(img, coords, mask=False):
 
 def get_norm_layer(layer_name, affine=False, num_groups=8):
     if layer_name == "batch":
-        enc_norm_layer = BatchNorm2d
+        norm_layer = BatchNorm2d
     elif layer_name == "group":
         norm_layer = partial(
             GroupNorm,
@@ -217,9 +224,9 @@ def get_norm_layer(layer_name, affine=False, num_groups=8):
             num_groups=num_groups,
         )
     elif layer_name == "layer":
-        enc_norm_layer = partial(LayerNorm2d, affine=affine)
+        norm_layer = partial(LayerNorm2d, affine=affine)
     elif layer_name == "none":
-        enc_norm_layer = None
+        norm_layer = None
     else:
         raise ValueError(f"Unknown norm layer {layer_name}")
     return norm_layer
