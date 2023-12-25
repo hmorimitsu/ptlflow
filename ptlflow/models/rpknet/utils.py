@@ -18,13 +18,14 @@
 # forward_interpolate and bilinear_sampler: https://github.com/princeton-vl/RAFT/blob/master/core/utils/utils.py
 # =============================================================================
 
+from functools import partial
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-from scipy import interpolate
 
 from .pkconv import PKConv2d
+from .local_timm.norm import GroupNorm, LayerNorm2d, BatchNorm2d
 
 
 class SequentialPartial(nn.Module):
@@ -77,7 +78,7 @@ class ResidualPartialBlock(nn.Module):
     """ResNet block with PKConv layers"""
 
     def __init__(
-        self, in_planes, planes, norm_type="none", stride=1, use_out_activation=True
+        self, in_planes, planes, norm_layer=None, stride=1, use_out_activation=True
     ):
         super(ResidualPartialBlock, self).__init__()
 
@@ -88,30 +89,32 @@ class ResidualPartialBlock(nn.Module):
             kernel_size=3,
             padding=1,
             stride=stride,
-            post_norm=norm_type,
         )
+        self.norm1 = norm_layer(num_channels=planes) if norm_layer is not None else nn.Sequential()
         self.conv2 = PKConv2d(
-            planes, planes, kernel_size=3, padding=1, post_norm=norm_type
+            planes, planes, kernel_size=3, padding=1
         )
+        self.norm2 = norm_layer(num_channels=planes) if norm_layer is not None else nn.Sequential()
         self.act = nn.ReLU(inplace=True)
 
         if stride == 1:
             self.downsample = None
-
         else:
             self.downsample = PKConv2d(
-                in_planes, planes, kernel_size=1, stride=stride, post_norm=norm_type
+                in_planes, planes, kernel_size=1, stride=stride
             )
+            self.norm3 = norm_layer(num_channels=planes) if norm_layer is not None else nn.Sequential()
+
 
     def forward(self, x, out_ch):
         y = x
-        y = self.act(self.conv1(y, out_ch))
-        y = self.conv2(y, out_ch)
+        y = self.act(self.norm1(self.conv1(y, out_ch)))
+        y = self.norm2(self.conv2(y, out_ch))
         if self.use_out_activation:
             y = self.act(y)
 
         if self.downsample is not None:
-            x = self.downsample(x, out_ch)
+            x = self.norm3(self.downsample(x, out_ch))
 
         out = x + y
         if self.use_out_activation:
@@ -202,3 +205,21 @@ def bilinear_sampler(img, coords, mask=False):
         return img, mask
 
     return img
+
+
+def get_norm_layer(layer_name, affine=False, num_groups=8):
+    if layer_name == "batch":
+        enc_norm_layer = BatchNorm2d
+    elif layer_name == "group":
+        norm_layer = partial(
+            GroupNorm,
+            affine=affine,
+            num_groups=num_groups,
+        )
+    elif layer_name == "layer":
+        enc_norm_layer = partial(LayerNorm2d, affine=affine)
+    elif layer_name == "none":
+        enc_norm_layer = None
+    else:
+        raise ValueError(f"Unknown norm layer {layer_name}")
+    return norm_layer
