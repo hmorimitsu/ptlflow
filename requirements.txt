@@ -1,5 +1,6 @@
 einops<0.8
 h5py<3.11
+kaleido<0.3
 lightning>=1.9.0,<2
 opencv-python<4.9
 pandas<2.2
