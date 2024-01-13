@@ -97,6 +97,10 @@ raft-kitti-3a831a4b.ckpt,raft-kitti.pth,
 raft-sintel-fb44381e.ckpt,raft-sintel.pth,
 raft-things-802bbcfd.ckpt,raft-things.pth,
 raft_small-things-b7d9f997.ckpt,raft-small.pth,
+rpknet-chairs-a705b345.ckpt,Original,PTLFlow
+rpknet-kitti-39504eb4.ckpt,Original,
+rpknet-sintel-e7cc969e.ckpt,Original,
+rpknet-things-f79b0d81.ckpt,Original,
 scopeflow-chairs-ebfaa62d.ckpt,c1.ckpt,https://github.com/avirambh/ScopeFlow
 scopeflow-kitti-a20c434d.ckpt,kitti_comb.ckpt,
 scopeflow-sintel-21a91683.ckpt,sintel_comb.ckpt,

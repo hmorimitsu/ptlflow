@@ -277,6 +277,15 @@ RAFT
 
 - Model names: ``raft``, ``raft_small``
 
+RPKNet
+------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/rpknet>`__
+
+- Paper: **Recurrent Partial Kernel Network for Efficient Optical Flow Estimation** - `https://hmorimitsu.com/publication/2024-aaai-rpknet <https://hmorimitsu.com/publication/2024-aaai-rpknet>`_
+
+- Model names: ``rpknet``
+
 ScopeFlow
 ---------
 
