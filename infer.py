@@ -174,7 +174,7 @@ def infer(args: Namespace, model: BaseModel) -> None:
             preds = model(inputs)
 
             preds["images"] = inputs["images"]
-            preds = io_adapter.unpad_and_unscale(preds)
+            preds = io_adapter.unscale(preds)
             preds_npy = tensor_dict_to_numpy(preds)
 
             if flow_gt is not None:

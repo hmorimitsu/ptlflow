@@ -117,7 +117,7 @@ def get_corr_block(
     alternate_corr: bool = False,
 ):
     if alternate_corr:
-        if alt_cuda_corr is None:
+        if alt_cuda_corr is None or (not torch.cuda.is_available()):
             corr_fn = IterativeCorrBlock
         else:
             corr_fn = AlternateCorrBlock

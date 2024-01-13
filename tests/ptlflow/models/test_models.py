@@ -41,6 +41,11 @@ EXCLUDE_MODELS = [
     "separableflow",
 ]  # Has additional requirements
 
+MODEL_ARGS = {
+    "flowformer": {"use_tile_input": False},
+    "flowformer++": {"use_tile_input": False},
+}
+
 
 def test_forward() -> None:
     model_names = ptlflow.models_dict.keys()
@@ -49,7 +54,15 @@ def test_forward() -> None:
             continue
 
         print(mname)
-        model = ptlflow.get_model(mname)
+        model_ref = ptlflow.get_model_reference(mname)
+        parser = model_ref.add_model_specific_args()
+        args = parser.parse_args([])
+
+        if mname in MODEL_ARGS:
+            for name, val in MODEL_ARGS[mname].items():
+                setattr(args, name, val)
+
+        model = ptlflow.get_model(mname, args=args)
         model = model.eval()
 
         s = make_divisible(256, model.output_stride)

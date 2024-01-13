@@ -48,10 +48,9 @@ def test_validate(tmp_path: Path) -> None:
     assert min(metrics_df.shape) > 0
 
     dataset_name_path = [
-        ("kitti-2012-trainval", "000000_10"),
-        ("kitti-2015-trainval", "000000_10"),
-        ("sintel-clean-trainval-occ", "sequence_1/frame_0001"),
-        ("sintel-final-trainval-occ", "sequence_1/frame_0001"),
+        ("kitti-2015", "000000_10"),
+        ("sintel-clean", "sequence_1/frame_0001"),
+        ("sintel-final", "sequence_1/frame_0001"),
     ]
     for dname, dpath in dataset_name_path:
         assert (tmp_path / dname / "flows" / (dpath + ".flo")).exists()

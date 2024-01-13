@@ -358,7 +358,10 @@ def validate_one_dataloader(
             preds = model(inputs)
 
             if args.warm_start:
-                if "is_seq_start" in inputs["meta"] and inputs["meta"]["is_seq_start"][0]:
+                if (
+                    "is_seq_start" in inputs["meta"]
+                    and inputs["meta"]["is_seq_start"][0]
+                ):
                     prev_preds = None
                 else:
                     prev_preds = preds
