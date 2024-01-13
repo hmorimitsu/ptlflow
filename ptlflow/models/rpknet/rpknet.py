@@ -15,7 +15,6 @@
 # =============================================================================
 
 from argparse import ArgumentParser
-from functools import partial
 import math
 
 import torch
@@ -27,8 +26,7 @@ from .pwc_modules import rescale_flow, upsample2d_as
 from .update_partial import UpdatePartialBlock
 from .corr import get_corr_block
 from .pkconv_slk_encoder import PKConvSLKEncoder
-from .local_timm.norm import GroupNorm, LayerNorm2d, BatchNorm2d
-from .utils import ResidualPartialBlock, InterpolationTransition
+from .utils import ResidualPartialBlock, InterpolationTransition, get_norm_layer
 from .pkconv import PKConv2d
 from ..base_model.base_model import BaseModel
 
@@ -79,7 +77,7 @@ class UpNetPartial(nn.Module):
         self.res = ResidualPartialBlock(
             self.args.net_chs_fixed,
             self.args.net_chs_fixed,
-            norm_type=self.args.upgate_norm_type,
+            norm_layer=get_norm_layer(self.args.enc_norm_type, affine=self.args.use_norm_affine, num_groups=self.args.group_norm_num_groups),
             use_out_activation=False,
         )
 
@@ -165,19 +163,6 @@ class RPKNet(BaseModel):
 
         pyr_range = [min(self.args.pyramid_ranges), max(self.args.pyramid_ranges)]
 
-        if self.args.enc_norm_type == "group":
-            enc_norm_layer = partial(
-                GroupNorm,
-                affine=self.args.use_norm_affine,
-                num_groups=self.args.group_norm_num_groups,
-            )
-        elif self.args.enc_norm_type == "layer":
-            enc_norm_layer = partial(LayerNorm2d, affine=self.args.use_norm_affine)
-        elif self.args.enc_norm_type == "batch":
-            enc_norm_layer = BatchNorm2d
-        else:
-            enc_norm_layer = None
-
         self.fnet = PKConvSLKEncoder(
             pyr_range=pyr_range,
             hidden_chs=self.args.enc_hidden_chs,
@@ -185,7 +170,7 @@ class RPKNet(BaseModel):
             out_1x1_factor=self.args.out_1x1_factor,
             mlp_ratio=self.args.enc_mlp_ratio,
             depth=self.args.enc_depth,
-            norm_layer=enc_norm_layer,
+            norm_layer=get_norm_layer(self.args.enc_norm_type, affine=self.args.use_norm_affine, num_groups=self.args.group_norm_num_groups),
             stem_stride=self.args.enc_stem_stride,
         )
 
