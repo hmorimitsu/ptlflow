@@ -31,10 +31,6 @@ def pkconv2d(
     padding: int = 0,
     dilation: int = 1,
     groups: int = 1,
-    pre_act_fn=None,
-    post_act_fn=None,
-    pre_norm=None,
-    post_norm=None,
     is_transpose: bool = False,
     out_ch: Optional[int] = None,
 ) -> torch.Tensor:
@@ -78,12 +74,6 @@ def pkconv2d(
         if bias is not None:
             b = bias[slice_idx]
 
-    if pre_norm is not None:
-        x = pre_norm(x)
-
-    if pre_act_fn is not None:
-        x = pre_act_fn(x)
-
     if is_transpose:
         x = F.conv_transpose2d(
             x,
@@ -105,12 +95,6 @@ def pkconv2d(
             groups=bounded_groups,
         )
 
-    if post_norm is not None:
-        x = post_norm(x)
-
-    if post_act_fn is not None:
-        x = post_act_fn(x)
-
     return x
 
 
@@ -129,11 +113,6 @@ class PKConvBase(nn.Module):
         padding_mode="zeros",
         device=None,
         dtype=None,
-        pre_norm=None,
-        post_norm=None,
-        group_norm_groups=8,
-        pre_act_fn=None,
-        post_act_fn=None,
     ) -> None:
         super().__init__()
         self.is_transpose = is_transpose
@@ -149,10 +128,6 @@ class PKConvBase(nn.Module):
         self.padding_mode = padding_mode
         self.device = device
         self.dtype = dtype
-        self.pre_norm = pre_norm
-        self.post_norm = post_norm
-        self.pre_act_fn = pre_act_fn
-        self.post_act_fn = post_act_fn
 
         if self.is_transpose:
             self.register_parameter(
@@ -191,30 +166,6 @@ class PKConvBase(nn.Module):
         else:
             self.bias = None
 
-        if isinstance(pre_norm, str):
-            if pre_norm == "instance":
-                self.pre_norm = nn.InstanceNorm2d(1, track_running_stats=False)
-            elif pre_norm == "group":
-                self.pre_norm = nn.GroupNorm(
-                    group_norm_groups, out_channels, affine=False
-                )
-            elif pre_norm == "batch":
-                self.pre_norm = nn.BatchNorm2d(out_channels)
-        else:
-            self.pre_norm = pre_norm
-
-        if isinstance(post_norm, str):
-            if post_norm == "instance":
-                self.post_norm = nn.InstanceNorm2d(1, track_running_stats=False)
-            elif post_norm == "group":
-                self.post_norm = nn.GroupNorm(
-                    group_norm_groups, out_channels, affine=False
-                )
-            elif post_norm == "batch":
-                self.post_norm = nn.BatchNorm2d(out_channels)
-        else:
-            self.post_norm = post_norm
-
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -237,10 +188,6 @@ class PKConvBase(nn.Module):
             padding=self.padding,
             dilation=self.dilation,
             groups=self.groups,
-            pre_act_fn=self.pre_act_fn,
-            post_act_fn=self.post_act_fn,
-            pre_norm=self.pre_norm,
-            post_norm=self.post_norm,
             is_transpose=self.is_transpose,
             out_ch=out_ch,
         )
@@ -260,11 +207,6 @@ class PKConv2d(PKConvBase):
         padding_mode="zeros",
         device=None,
         dtype=None,
-        pre_norm=None,
-        post_norm=None,
-        group_norm_groups=8,
-        pre_act_fn=None,
-        post_act_fn=None,
     ) -> None:
         super().__init__(
             is_transpose=False,
@@ -279,11 +221,6 @@ class PKConv2d(PKConvBase):
             padding_mode=padding_mode,
             device=device,
             dtype=dtype,
-            pre_norm=pre_norm,
-            post_norm=post_norm,
-            group_norm_groups=group_norm_groups,
-            pre_act_fn=pre_act_fn,
-            post_act_fn=post_act_fn,
         )
 
 
@@ -301,11 +238,6 @@ class PKConvTranspose2d(PKConvBase):
         padding_mode="zeros",
         device=None,
         dtype=None,
-        pre_norm=None,
-        post_norm=None,
-        group_norm_groups=8,
-        pre_act_fn=None,
-        post_act_fn=None,
     ) -> None:
         super().__init__(
             is_transpose=True,
@@ -320,9 +252,4 @@ class PKConvTranspose2d(PKConvBase):
             padding_mode=padding_mode,
             device=device,
             dtype=dtype,
-            pre_norm=pre_norm,
-            post_norm=post_norm,
-            group_norm_groups=group_norm_groups,
-            pre_act_fn=pre_act_fn,
-            post_act_fn=post_act_fn,
         )

@@ -13,7 +13,7 @@ except ModuleNotFoundError:
     from ptlflow.utils.correlation import (
         IterSpatialCorrelationSampler as SpatialCorrelationSampler,
     )
-    from einops import rearrange
+from einops import rearrange
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
