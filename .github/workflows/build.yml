@@ -32,7 +32,7 @@ jobs:
           python -m pip install build==1.0.3
           python -m pip install --upgrade setuptools==68.0.0 wheel
           python -m pip install --upgrade pytest
-          pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cpu
       - name: Install package and remove local dir
         run: |
           python -m build
