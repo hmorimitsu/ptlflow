@@ -407,10 +407,13 @@ class BaseModel(pl.LightningModule):
         self.last_inputs = batch
         self.last_predictions = preds
         loss = self.loss_fn(preds, batch)
-        if isinstance(loss, dict):
-            loss = loss["loss"]
         metrics = self.train_metrics(preds, batch)
-        metrics["train/loss"] = loss.item()
+        if isinstance(loss, dict):
+            for k, v in loss.items():
+                metrics[f"train/{k}"] = v.item()
+            loss = loss["loss"]
+        else:
+            metrics["train/loss"] = loss.item()
         self.log_dict(metrics, on_step=True, on_epoch=True)
         self.log(
             "epe", metrics["train/epe"], prog_bar=True, on_step=True, on_epoch=True
