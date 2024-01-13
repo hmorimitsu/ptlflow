@@ -1,45 +1,83 @@
-# freda (todo) : 
+# freda (todo) :
 
 import torch.nn as nn
 import torch
 import numpy as np
+
 try:
     from spatial_correlation_sampler import spatial_correlation_sample
 except ModuleNotFoundError:
-    from ptlflow.utils.correlation import iter_spatial_correlation_sample as spatial_correlation_sample
+    from ptlflow.utils.correlation import (
+        iter_spatial_correlation_sample as spatial_correlation_sample,
+    )
+
 
 def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1):
     if batchNorm:
         return nn.Sequential(
-            nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=(kernel_size-1)//2, bias=False),
+            nn.Conv2d(
+                in_planes,
+                out_planes,
+                kernel_size=kernel_size,
+                stride=stride,
+                padding=(kernel_size - 1) // 2,
+                bias=False,
+            ),
             nn.BatchNorm2d(out_planes),
-            nn.LeakyReLU(0.1,inplace=True)
+            nn.LeakyReLU(0.1, inplace=True),
         )
     else:
         return nn.Sequential(
-            nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=(kernel_size-1)//2, bias=True),
-            nn.LeakyReLU(0.1,inplace=True)
+            nn.Conv2d(
+                in_planes,
+                out_planes,
+                kernel_size=kernel_size,
+                stride=stride,
+                padding=(kernel_size - 1) // 2,
+                bias=True,
+            ),
+            nn.LeakyReLU(0.1, inplace=True),
         )
 
-def i_conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, bias = True):
+
+def i_conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, bias=True):
     if batchNorm:
         return nn.Sequential(
-            nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=(kernel_size-1)//2, bias=bias),
+            nn.Conv2d(
+                in_planes,
+                out_planes,
+                kernel_size=kernel_size,
+                stride=stride,
+                padding=(kernel_size - 1) // 2,
+                bias=bias,
+            ),
             nn.BatchNorm2d(out_planes),
         )
     else:
         return nn.Sequential(
-            nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=(kernel_size-1)//2, bias=bias),
+            nn.Conv2d(
+                in_planes,
+                out_planes,
+                kernel_size=kernel_size,
+                stride=stride,
+                padding=(kernel_size - 1) // 2,
+                bias=bias,
+            ),
         )
 
+
 def predict_flow(in_planes):
-    return nn.Conv2d(in_planes,2,kernel_size=3,stride=1,padding=1,bias=True)
+    return nn.Conv2d(in_planes, 2, kernel_size=3, stride=1, padding=1, bias=True)
+
 
 def deconv(in_planes, out_planes):
     return nn.Sequential(
-        nn.ConvTranspose2d(in_planes, out_planes, kernel_size=4, stride=2, padding=1, bias=True),
-        nn.LeakyReLU(0.1,inplace=True)
+        nn.ConvTranspose2d(
+            in_planes, out_planes, kernel_size=4, stride=2, padding=1, bias=True
+        ),
+        nn.LeakyReLU(0.1, inplace=True),
     )
+
 
 class tofp16(nn.Module):
     def __init__(self):
@@ -60,25 +98,27 @@ class tofp32(nn.Module):
 def init_deconv_bilinear(weight):
     f_shape = weight.size()
     heigh, width = f_shape[-2], f_shape[-1]
-    f = np.ceil(width/2.0)
+    f = np.ceil(width / 2.0)
     c = (2 * f - 1 - f % 2) / (2.0 * f)
     bilinear = np.zeros([heigh, width])
     for x in range(width):
         for y in range(heigh):
             value = (1 - abs(x / f - c)) * (1 - abs(y / f - c))
             bilinear[x, y] = value
-    weight.data.fill_(0.)
+    weight.data.fill_(0.0)
     for i in range(f_shape[0]):
         for j in range(f_shape[1]):
-            weight.data[i,j,:,:] = torch.from_numpy(bilinear)
+            weight.data[i, j, :, :] = torch.from_numpy(bilinear)
 
 
 def save_grad(grads, name):
     def hook(grad):
         grads[name] = grad
+
     return hook
 
-'''
+
+"""
 def save_grad(grads, name):
     def hook(grad):
         grads[name] = grad
@@ -92,18 +132,21 @@ a.register_hook(save_grad(grads, 'a'))
 b = model(a)
 y = torch.mean(b)
 y.backward()
-'''
+"""
+
 
 def correlate(input1, input2):
-    out_corr = spatial_correlation_sample(input1,
-                                          input2,
-                                          kernel_size=1,
-                                          patch_size=21,
-                                          stride=1,
-                                          padding=0,
-                                          dilation_patch=2)
+    out_corr = spatial_correlation_sample(
+        input1,
+        input2,
+        kernel_size=1,
+        patch_size=21,
+        stride=1,
+        padding=0,
+        dilation_patch=2,
+    )
     # collate dimensions 1 and 2 in order to be treated as a
     # regular 4D tensor
     b, ph, pw, h, w = out_corr.size()
-    out_corr = out_corr.view(b, ph * pw, h, w)/input1.size(1)
+    out_corr = out_corr.view(b, ph * pw, h, w) / input1.size(1)
     return out_corr

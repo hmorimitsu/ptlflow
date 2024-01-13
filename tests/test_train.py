@@ -16,20 +16,17 @@
 
 from pathlib import Path
 import shutil
-import warnings
 
-with warnings.catch_warnings():
-    warnings.simplefilter('ignore')  # Workaround until pl stop raising the metrics deprecation warning
-    import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 
 import ptlflow
 import train
 from ptlflow.utils.dummy_datasets import write_flying_chairs, write_kitti, write_sintel
 
-TEST_MODEL = 'raft_small'
-TRAIN_DATASET = 'chairs-train'
-TRAIN_LOG_SUFFIX = 'chairs'
+TEST_MODEL = "raft_small"
+TRAIN_DATASET = "chairs-train"
+TRAIN_LOG_SUFFIX = "chairs"
 
 
 def test_train(tmp_path: Path) -> None:
@@ -49,10 +46,10 @@ def test_train(tmp_path: Path) -> None:
     args.limit_val_batches = 1
     args.num_sanity_val_steps = 0
     args.train_dataset = TRAIN_DATASET
-    args.mpi_sintel_root_dir = tmp_path / 'MPI-Sintel'
-    args.kitti_2012_root_dir = tmp_path / 'KITTI/2012'
-    args.kitti_2015_root_dir = tmp_path / 'KITTI/2015'
-    args.flying_chairs_root_dir = tmp_path / 'FlyingChairs_release'
+    args.mpi_sintel_root_dir = tmp_path / "MPI-Sintel"
+    args.kitti_2012_root_dir = tmp_path / "KITTI/2012"
+    args.kitti_2015_root_dir = tmp_path / "KITTI/2015"
+    args.flying_chairs_root_dir = tmp_path / "FlyingChairs_release"
     if torch.cuda.is_available():
         args.gpus = 1
 
@@ -62,16 +59,45 @@ def test_train(tmp_path: Path) -> None:
 
     train.train(args)
 
-    dir_names = ['default', 'lightning_logs']  # Name changes depending on PL version
+    dir_names = ["default", "lightning_logs"]  # Name changes depending on PL version
     hparams_res = []
     last_res = []
     train_res = []
     for dname in dir_names:
-        log_dirs = Path(f'{dname}/version_0')
+        log_dirs = Path(f"{dname}/version_0")
 
-        hparams_res.append((tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'hparams.yaml').exists())
-        last_res.append(len(list((tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'checkpoints').glob('*_last_*.ckpt'))))
-        train_res.append(len(list((tmp_path / f'{TEST_MODEL}-{TRAIN_LOG_SUFFIX}' / log_dirs / 'checkpoints').glob('*_train_*.ckpt'))))
+        hparams_res.append(
+            (
+                tmp_path
+                / f"{TEST_MODEL}-{TRAIN_LOG_SUFFIX}"
+                / log_dirs
+                / "hparams.yaml"
+            ).exists()
+        )
+        last_res.append(
+            len(
+                list(
+                    (
+                        tmp_path
+                        / f"{TEST_MODEL}-{TRAIN_LOG_SUFFIX}"
+                        / log_dirs
+                        / "checkpoints"
+                    ).glob("*_last_*.ckpt")
+                )
+            )
+        )
+        train_res.append(
+            len(
+                list(
+                    (
+                        tmp_path
+                        / f"{TEST_MODEL}-{TRAIN_LOG_SUFFIX}"
+                        / log_dirs
+                        / "checkpoints"
+                    ).glob("*_train_*.ckpt")
+                )
+            )
+        )
 
     assert max(hparams_res) is True
     assert max(last_res) > 0

@@ -27,54 +27,78 @@ IMG_SIDE = 29
 IMG_MIDDLE = IMG_SIDE // 2 + 1
 
 
-@pytest.mark.skip(reason='In some machines the colors are slightly off.')
+@pytest.mark.skip(reason="In some machines the colors are slightly off.")
 def test_convert_rgb_bg_bright() -> None:
-    rgb_gt = cv2.imread(str(
-        Path(f'tests/data/ptlflow/utils/flowpy_torch_rgb_bg_bright_{IMG_SIDE}x{IMG_SIDE}.png')))
-    flow = np.stack(np.meshgrid(np.arange(IMG_SIDE)-IMG_MIDDLE, np.arange(IMG_SIDE)-IMG_MIDDLE), axis=0).astype(np.float32)
+    rgb_gt = cv2.imread(
+        str(
+            Path(
+                f"tests/data/ptlflow/utils/flowpy_torch_rgb_bg_bright_{IMG_SIDE}x{IMG_SIDE}.png"
+            )
+        )
+    )
+    flow = np.stack(
+        np.meshgrid(np.arange(IMG_SIDE) - IMG_MIDDLE, np.arange(IMG_SIDE) - IMG_MIDDLE),
+        axis=0,
+    ).astype(np.float32)
     flow = torch.from_numpy(flow)
 
     for i in range(5):
         flow_tmp = flow.clone()
         for _ in range(i):
             flow_tmp = flow_tmp[None]
-        rgb = flowpy_torch.flow_to_rgb(flow_tmp, background='bright')
+        rgb = flowpy_torch.flow_to_rgb(flow_tmp, background="bright")
         for _ in range(i):
             rgb = rgb[0]
         rgb = (255 * rgb.permute(1, 2, 0).numpy()).astype(np.uint8)
         assert np.array_equal(rgb, rgb_gt)
 
 
-@pytest.mark.skip(reason='In some machines the colors are slightly off.')
+@pytest.mark.skip(reason="In some machines the colors are slightly off.")
 def test_convert_rgb_bg_dark() -> None:
-    rgb_gt = cv2.imread(str(
-        Path(f'tests/data/ptlflow/utils/flowpy_torch_rgb_bg_dark_{IMG_SIDE}x{IMG_SIDE}.png')))
-    flow = np.stack(np.meshgrid(np.arange(IMG_SIDE)-IMG_MIDDLE, np.arange(IMG_SIDE)-IMG_MIDDLE), axis=0).astype(np.float32)
+    rgb_gt = cv2.imread(
+        str(
+            Path(
+                f"tests/data/ptlflow/utils/flowpy_torch_rgb_bg_dark_{IMG_SIDE}x{IMG_SIDE}.png"
+            )
+        )
+    )
+    flow = np.stack(
+        np.meshgrid(np.arange(IMG_SIDE) - IMG_MIDDLE, np.arange(IMG_SIDE) - IMG_MIDDLE),
+        axis=0,
+    ).astype(np.float32)
     flow = torch.from_numpy(flow)
 
     for i in range(5):
         flow_tmp = flow.clone()
         for _ in range(i):
             flow_tmp = flow_tmp[None]
-        rgb = flowpy_torch.flow_to_rgb(flow_tmp, background='dark')
+        rgb = flowpy_torch.flow_to_rgb(flow_tmp, background="dark")
         for _ in range(i):
             rgb = rgb[0]
         rgb = (255 * rgb.permute(1, 2, 0).numpy()).astype(np.uint8)
         assert np.array_equal(rgb, rgb_gt)
 
 
-@pytest.mark.skip(reason='In some machines the colors are slightly off.')
+@pytest.mark.skip(reason="In some machines the colors are slightly off.")
 def test_convert_rgb_bg_dark_max5() -> None:
-    rgb_gt = cv2.imread(str(
-        Path(f'tests/data/ptlflow/utils/flowpy_torch_rgb_bg_dark_max5_{IMG_SIDE}x{IMG_SIDE}.png')))
-    flow = np.stack(np.meshgrid(np.arange(IMG_SIDE)-IMG_MIDDLE, np.arange(IMG_SIDE)-IMG_MIDDLE), axis=0).astype(np.float32)
+    rgb_gt = cv2.imread(
+        str(
+            Path(
+                f"tests/data/ptlflow/utils/flowpy_torch_rgb_bg_dark_max5_{IMG_SIDE}x{IMG_SIDE}.png"
+            )
+        )
+    )
+    flow = np.stack(
+        np.meshgrid(np.arange(IMG_SIDE) - IMG_MIDDLE, np.arange(IMG_SIDE) - IMG_MIDDLE),
+        axis=0,
+    ).astype(np.float32)
     flow = torch.from_numpy(flow)
 
     for i in range(5):
         flow_tmp = flow.clone()
         for _ in range(i):
             flow_tmp = flow_tmp[None]
-        rgb = flowpy_torch.flow_to_rgb(flow_tmp, background='dark', flow_max_radius=5)
+        rgb = flowpy_torch.flow_to_rgb(flow_tmp, background="dark", flow_max_radius=5)
         for _ in range(i):
             rgb = rgb[0]
         rgb = (255 * rgb.permute(1, 2, 0).numpy()).astype(np.uint8)

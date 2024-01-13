@@ -58,9 +58,30 @@ Papers:
 
 Dataset link: `http://www.cvlibs.net/datasets/kitti/eval_scene_flow.php?benchmark=flow <http://www.cvlibs.net/datasets/kitti/eval_scene_flow.php?benchmark=flow>`_
 
+Middlebury
+----------
+
+Paper: **A Database and Evaluation Methodology for Optical Flow,** - `https://vision.middlebury.edu/flow/floweval-ijcv2011.pdf <https://vision.middlebury.edu/flow/floweval-ijcv2011.pdf>`_
+
+Dataset link: `https://vision.middlebury.edu/flow/ <https://vision.middlebury.edu/flow//>`_
+
+Monkaa
+------
+
+Paper: **A Large Dataset to Train Convolutional Networks for Disparity, Optical Flow, and Scene Flow Estimation** - `https://arxiv.org/abs/1512.02134 <https://arxiv.org/abs/1512.02134>`_
+
+Dataset link: `https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html <https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html>`_
+
 MPI Sintel
 ----------
 
 Paper: **A naturalistic open source movie for optical flow evaluation** - `https://files.is.tue.mpg.de/black/papers/ButlerECCV2012.pdf <https://files.is.tue.mpg.de/black/papers/ButlerECCV2012.pdf>`_
 
 Dataset link: `http://sintel.is.tue.mpg.de/ <http://sintel.is.tue.mpg.de/>`_
+
+Spring
+------
+
+Paper: **Spring: A High-Resolution High-Detail Dataset and Benchmark for Scene Flow, Optical Flow and Stereo** - `https://arxiv.org/abs/2303.01943 <https://arxiv.org/abs/2303.01943>`_
+
+Dataset link: `https://spring-benchmark.org/ <https://spring-benchmark.org/>`_

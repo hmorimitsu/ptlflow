@@ -35,11 +35,9 @@ Note: If you plan to develop something that involve large changes, it is encoura
 
 The code should be compatible with the following library versions:
 
-- [Python](https://www.python.org/) >= 3.6
-- [PyTorch](https://pytorch.org/) >= 1.7
-- [PyTorch Lightning](https://www.pytorchlightning.ai/) >= 1.1
-
-We adopt [PEP8](https://www.python.org/dev/peps/pep-0008/) as the preferred code style, but we use a line length of 127 characters, the same as GitHub.
+- [Python](https://www.python.org/) >= 3.8
+- [PyTorch](https://pytorch.org/) >= 1.8
+- [PyTorch Lightning](https://www.pytorchlightning.ai/) == 1.9.X
 
 When writing your code, please adhere to these guidelines:
 
@@ -74,20 +72,7 @@ config_logging()
 # Your code here
 ```
 
-The code will be checked with [flake8](http://flake8.pycqa.org/en/latest/) with the following plugins:
-
-- [darglint](https://github.com/terrencepreilly/darglint)
-- [flake8-blind-except](https://github.com/elijahandrews/flake8-blind-except)
-- [flake8-bugbear](https://github.com/PyCQA/flake8-bugbear)
-- [flake8-comprehensions](https://github.com/adamchainz/flake8-comprehensions)
-- [flake8-docstrings](https://github.com/PyCQA/flake8-docstrings)
-- [flake8-eradicate](https://github.com/wemake-services/flake8-eradicate)
-- [flake8-rst-docstrings](https://github.com/peterjc/flake8-rst-docstrings)
-- [pep8-naming](https://github.com/PyCQA/pep8-naming)
-
-- The following errors are ignored: `ANN101,D105,E226,N812,W503`.
-
-
+- Use [black](https://pypi.org/project/black/) to format your code.
 
 ## Acknowledgements
 

@@ -21,7 +21,7 @@ import ptlflow
 import test
 from ptlflow.utils.dummy_datasets import write_kitti, write_sintel
 
-TEST_MODEL = 'raft_small'
+TEST_MODEL = "raft_small"
 
 
 def test_test(tmp_path: Path) -> None:
@@ -32,11 +32,11 @@ def test_test(tmp_path: Path) -> None:
 
     args = parser.parse_args([TEST_MODEL])
 
-    args.test_dataset = ['kitti-2012', 'kitti-2015', 'sintel']
+    args.test_dataset = ["kitti-2012", "kitti-2015", "sintel"]
     args.output_path = tmp_path
-    args.mpi_sintel_root_dir = tmp_path / 'MPI-Sintel'
-    args.kitti_2012_root_dir = tmp_path / 'KITTI/2012'
-    args.kitti_2015_root_dir = tmp_path / 'KITTI/2015'
+    args.mpi_sintel_root_dir = tmp_path / "MPI-Sintel"
+    args.kitti_2012_root_dir = tmp_path / "KITTI/2012"
+    args.kitti_2015_root_dir = tmp_path / "KITTI/2015"
 
     write_kitti(tmp_path)
     write_sintel(tmp_path)
@@ -45,11 +45,13 @@ def test_test(tmp_path: Path) -> None:
     test.test(args, model)
 
     dataset_name_path = [
-        ('kitti2012', '000000_10.png'),
-        ('kitti2015', '000000_10.png'),
-        ('sintel/clean', 'sequence_1/frame_0001.flo'),
-        ('sintel/final', 'sequence_1/frame_0001.flo')]
+        ("kitti2012", "000000_10.png"),
+        ("kitti2015", "flow/000000_10.png"),
+        ("sintel/clean", "sequence_1/frame_0001.flo"),
+        ("sintel/final", "sequence_1/frame_0001.flo"),
+    ]
     for dname, dpath in dataset_name_path:
+        print(tmp_path / dname / dpath)
         assert (tmp_path / dname / dpath).exists()
 
     shutil.rmtree(tmp_path)

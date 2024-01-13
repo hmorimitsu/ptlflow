@@ -1,5 +1,6 @@
 try:
     import faiss
+
     res = faiss.StandardGpuResources()
     res.setDefaultNullStreamAllDevices()
 except ImportError:
@@ -8,20 +9,25 @@ import torch
 
 
 def swig_ptr_from_Tensor(x):
-    """ gets a Faiss SWIG pointer from a pytorch tensor (on CPU or GPU) """
+    """gets a Faiss SWIG pointer from a pytorch tensor (on CPU or GPU)"""
     assert x.is_contiguous()
 
     if x.dtype == torch.float32:
-        return faiss.cast_integer_to_float_ptr(x.storage().data_ptr() + x.storage_offset() * 4)
+        return faiss.cast_integer_to_float_ptr(
+            x.untyped_storage().data_ptr() + x.storage_offset() * 4
+        )
 
     if x.dtype == torch.int64:
-        return faiss.cast_integer_to_int_ptr(x.storage().data_ptr() + x.storage_offset() * 8)
+        return faiss.cast_integer_to_int_ptr(
+            x.untyped_storage().data_ptr() + x.storage_offset() * 8
+        )
 
     raise Exception("tensor type not supported: {}".format(x.dtype))
 
 
-def search_raw_array_pytorch(res, xb, xq, k, D=None, I=None,
-                             metric=faiss.METRIC_L2 if faiss is not None else 0):
+def search_raw_array_pytorch(
+    res, xb, xq, k, D=None, I=None, metric=faiss.METRIC_L2 if faiss is not None else 0
+):
     """search xq in xb, without building an index"""
     assert xb.device == xq.device
 
@@ -29,10 +35,10 @@ def search_raw_array_pytorch(res, xb, xq, k, D=None, I=None,
     if xq.is_contiguous():
         xq_row_major = True
     elif xq.t().is_contiguous():
-        xq = xq.t()    # I initially wrote xq:t(), Lua is still haunting me :-)
+        xq = xq.t()  # I initially wrote xq:t(), Lua is still haunting me :-)
         xq_row_major = False
     else:
-        raise TypeError('matrix should be row or column-major')
+        raise TypeError("matrix should be row or column-major")
 
     xq_ptr = swig_ptr_from_Tensor(xq)
 
@@ -44,7 +50,7 @@ def search_raw_array_pytorch(res, xb, xq, k, D=None, I=None,
         xb = xb.t()
         xb_row_major = False
     else:
-        raise TypeError('matrix should be row or column-major')
+        raise TypeError("matrix should be row or column-major")
     xb_ptr = swig_ptr_from_Tensor(xb)
 
     if D is None:
@@ -80,14 +86,15 @@ def search_raw_array_pytorch(res, xb, xq, k, D=None, I=None,
 
 
 def knn_faiss_raw(fmap1, fmap2, k):
-
     b, ch, _ = fmap1.shape
 
     if b == 1:
         fmap1 = fmap1.view(ch, -1).t().contiguous()
         fmap2 = fmap2.view(ch, -1).t().contiguous()
 
-        dist, indx = search_raw_array_pytorch(res, fmap2, fmap1, k, metric=faiss.METRIC_INNER_PRODUCT)
+        dist, indx = search_raw_array_pytorch(
+            res, fmap2, fmap1, k, metric=faiss.METRIC_INNER_PRODUCT
+        )
 
         dist = dist.t().unsqueeze(0).contiguous()
         indx = indx.t().unsqueeze(0).contiguous()
@@ -97,7 +104,9 @@ def knn_faiss_raw(fmap1, fmap2, k):
         dist = []
         indx = []
         for i in range(b):
-            dist_i, indx_i = search_raw_array_pytorch(res, fmap2[i], fmap1[i], k, metric=faiss.METRIC_INNER_PRODUCT)
+            dist_i, indx_i = search_raw_array_pytorch(
+                res, fmap2[i], fmap1[i], k, metric=faiss.METRIC_INNER_PRODUCT
+            )
             dist_i = dist_i.t().unsqueeze(0).contiguous()
             indx_i = indx_i.t().unsqueeze(0).contiguous()
             dist.append(dist_i)

@@ -1,6 +1,6 @@
 ambush_2
-ambush_6
 bamboo_2
-cave_4
-market_6
+cave_2
+market_2
+shaman_2
 temple_2

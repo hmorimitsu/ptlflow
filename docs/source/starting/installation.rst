@@ -2,7 +2,28 @@
 Installation
 ============
 
-You can install it from PyPI:
+It is recommended that you first create a virtual environment.
+For example, you can create one using `miniconda <https://docs.conda.io/projects/miniconda/en/latest/>`__:
+
+.. code-block:: bash
+
+    conda create --name ptlflow python=3.10
+    conda activate ptlflow
+
+
+Next, install PyTorch following the official instructions at `https://pytorch.org/ <https://pytorch.org/>`__ (PTLFlow has been tested with PyTorch versions >= 1.13.1 and <= 2.1.2).
+
+Afterward, you can use PTLFlow in one of two ways:
+
+    1. :ref:`install-pypi` or
+    2. :ref:`running-from-source`
+
+.. _install-pypi:
+
+Installing PTLFlow from PyPI
+============================
+
+To install from PyPI, run:
 
 .. code-block:: bash
 
@@ -18,7 +39,7 @@ The PyPI package should contain the most recent stable version. If you want to i
 .. _initial-scripts:
 
 Getting initial scripts
-=======================
+-----------------------
 
 PTLFlow offers some scripts and config files to help you start using the optical flow models.
 
@@ -74,6 +95,18 @@ If you want to install it, you can run:
 
     pip install spatial-correlation-sampler
 
+Another useful package for decreasing memory consumption of some models is the ``alt_cuda_corr``.
+It is included inside PTLFlow, but you have to manually compile it following the instructions below:
+
+    1. Download and install the CUDA toolkit from `https://developer.nvidia.com/cuda-toolkit-archive <https://developer.nvidia.com/cuda-toolkit-archive>`__
+        **IMPORTANT!** You must choose the same CUDA version that is used in your PyTorch.
+    2. Enter the package directory and compile it with:
+
+.. code-block:: bash
+
+    cd ptlflow/utils/external/alt_cuda_corr/
+    python setup.py install
+
 Troubleshooting
 ===============
 
@@ -98,14 +131,11 @@ and enter the downloaded folder as:
     git clone https://github.com/hmorimitsu/ptlflow
     cd ptlflow
 
-You may also have to install the dependencies to run PTLFlow (in case you do not have them).
-The instructions below show how to create a conda environment and install the requirements:
+You may also have to install the dependencies to run PTLFlow (in case you do not have them):
 
 .. code-block:: bash
 
-    conda env create -f environment.yml
-
-This will create a conda environment called ``ptlflow`` with all the required dependencies already installed.
+    pip install -r requirements.txt
 
 Another option is to install PTLFlow to your environment. The benefit is that ptlflow will be
 accessible from anywhere while using the environment. The drawback is that you will have to reinstall

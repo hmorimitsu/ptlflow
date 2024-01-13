@@ -66,7 +66,7 @@ use the its original code.
    results/accuracy_epe
    results/accuracy_epe_outlier
    results/accuracy_plot
-   results/speed
+   results/model_benchmark
    results/speed_plot
 
 .. toctree::

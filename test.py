@@ -41,7 +41,11 @@ from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils import flow_utils
 from ptlflow.utils.io_adapter import IOAdapter
 from ptlflow.utils.utils import (
-    add_datasets_to_parser, config_logging, get_list_of_available_models_list, tensor_dict_to_numpy)
+    add_datasets_to_parser,
+    config_logging,
+    get_list_of_available_models_list,
+    tensor_dict_to_numpy,
+)
 
 config_logging()
 
@@ -49,22 +53,52 @@ config_logging()
 def _init_parser() -> ArgumentParser:
     parser = ArgumentParser()
     parser.add_argument(
-        'model', type=str, choices=get_list_of_available_models_list(),
-        help='Name of the model to use.')
+        "model",
+        type=str,
+        choices=get_list_of_available_models_list(),
+        help="Name of the model to use.",
+    )
     parser.add_argument(
-        '--output_path', type=str, default=str(Path('outputs/test')),
-        help='Path to the directory where the validation results will be saved.')
+        "--output_path",
+        type=str,
+        default=str(Path("outputs/test")),
+        help="Path to the directory where the validation results will be saved.",
+    )
     parser.add_argument(
-        '--show', action='store_true',
-        help='If set, the results are shown on the screen.')
+        "--show",
+        action="store_true",
+        help="If set, the results are shown on the screen.",
+    )
     parser.add_argument(
-        '--max_forward_side', type=int, default=None,
-        help=('If max(height, width) of the input image is larger than this value, then the image is downscaled '
-              'before the forward and the outputs are bilinearly upscaled to the original resolution.'))
+        "--max_forward_side",
+        type=int,
+        default=None,
+        help=(
+            "If max(height, width) of the input image is larger than this value, then the image is downscaled "
+            "before the forward and the outputs are bilinearly upscaled to the original resolution."
+        ),
+    )
     parser.add_argument(
-        '--max_show_side', type=int, default=1000,
-        help=('If max(height, width) of the output image is larger than this value, then the image is downscaled '
-              'before showing it on the screen.'))
+        "--scale_factor",
+        type=float,
+        default=None,
+        help=("Multiply the input image by this scale factor before forwarding."),
+    )
+    parser.add_argument(
+        "--max_show_side",
+        type=int,
+        default=1000,
+        help=(
+            "If max(height, width) of the output image is larger than this value, then the image is downscaled "
+            "before showing it on the screen."
+        ),
+    )
+    parser.add_argument("--save_viz", action="store_true")
+    parser.add_argument(
+        "--warm_start",
+        action="store_true",
+        help="If set, stores the previous estimation to be used a starting point for prediction.",
+    )
     return parser
 
 
@@ -74,7 +108,7 @@ def generate_outputs(
     preds: Dict[str, torch.Tensor],
     dataloader_name: str,
     batch_idx: int,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Display on screen and/or save outputs to disk, if required.
 
@@ -95,9 +129,9 @@ def generate_outputs(
     """
     inputs = tensor_dict_to_numpy(inputs)
     preds = tensor_dict_to_numpy(preds)
-    preds['flows_viz'] = flow_utils.flow_to_rgb(preds['flows'])[:, :, ::-1]
-    if preds.get('flows_b') is not None:
-        preds['flows_b_viz'] = flow_utils.flow_to_rgb(preds['flows_b'])[:, :, ::-1]
+    preds["flows_viz"] = flow_utils.flow_to_rgb(preds["flows"])[:, :, ::-1]
+    if preds.get("flows_b") is not None:
+        preds["flows_b_viz"] = flow_utils.flow_to_rgb(preds["flows_b"])[:, :, ::-1]
 
     _write_to_file(args, preds, dataloader_name, batch_idx, metadata)
 
@@ -105,10 +139,7 @@ def generate_outputs(
         _show(inputs, preds, args.max_show_side)
 
 
-def test(
-    args: Namespace,
-    model: BaseModel
-) -> None:
+def test(args: Namespace, model: BaseModel) -> None:
     """Run predictions on the test dataset.
 
     Parameters
@@ -127,7 +158,9 @@ def test(
         model = model.cuda()
 
     dataloaders = model.test_dataloader()
-    dataloaders = {model.test_dataloader_names[i]: dataloaders[i] for i in range(len(dataloaders))}
+    dataloaders = {
+        model.test_dataloader_names[i]: dataloaders[i] for i in range(len(dataloaders))
+    }
 
     for dataset_name, dl in dataloaders.items():
         test_one_dataloader(args, model, dl, dataset_name)
@@ -153,39 +186,66 @@ def test_one_dataloader(
     dataloader_name : str
         A string to identify this dataloader.
     """
+    prev_preds = None
     for i, inputs in enumerate(tqdm(dataloader)):
-        scale_factor = (
-            None if args.max_forward_side is None else float(args.max_forward_side) / min(inputs['images'].shape[-2:]))
+        if args.scale_factor is not None:
+            scale_factor = args.scale_factor
+        else:
+            scale_factor = (
+                None
+                if args.max_forward_side is None
+                else float(args.max_forward_side) / min(inputs["images"].shape[-2:])
+            )
 
         io_adapter = IOAdapter(
-            model, inputs['images'].shape[-2:], target_scale_factor=scale_factor, cuda=torch.cuda.is_available())
+            model,
+            inputs["images"].shape[-2:],
+            target_scale_factor=scale_factor,
+            cuda=torch.cuda.is_available(),
+        )
         inputs = io_adapter.prepare_inputs(inputs=inputs)
+        inputs["prev_preds"] = prev_preds
 
         preds = model(inputs)
 
-        inputs = io_adapter.unpad_and_unscale(inputs)
-        preds = io_adapter.unpad_and_unscale(preds)
+        if args.warm_start:
+            if "is_seq_start" in inputs["meta"] and inputs["meta"]["is_seq_start"][0]:
+                prev_preds = None
+            else:
+                prev_preds = preds
+                for k, v in prev_preds.items():
+                    if isinstance(v, torch.Tensor):
+                        prev_preds[k] = v.detach()
 
-        generate_outputs(args, inputs, preds, dataloader_name, i, inputs.get('meta'))
+        inputs = io_adapter.unscale(inputs)
+        preds = io_adapter.unscale(preds)
+
+        generate_outputs(args, inputs, preds, dataloader_name, i, inputs.get("meta"))
 
 
 def _show(
-    inputs: Dict[str, np.ndarray],
-    preds: Dict[str, np.ndarray],
-    max_show_side: int
+    inputs: Dict[str, np.ndarray], preds: Dict[str, np.ndarray], max_show_side: int
 ) -> None:
     for k, v in inputs.items():
-        if isinstance(v, np.ndarray) and (len(v.shape) == 2 or v.shape[2] == 1 or v.shape[2] == 3):
+        if isinstance(v, np.ndarray) and (
+            len(v.shape) == 2 or v.shape[2] == 1 or v.shape[2] == 3
+        ):
             if max(v.shape[:2]) > max_show_side:
                 scale_factor = float(max_show_side) / max(v.shape[:2])
-                v = cv.resize(v, (int(scale_factor*v.shape[1]), int(scale_factor*v.shape[0])))
+                v = cv.resize(
+                    v, (int(scale_factor * v.shape[1]), int(scale_factor * v.shape[0]))
+                )
             cv.imshow(k, v)
     for k, v in preds.items():
-        if isinstance(v, np.ndarray) and (len(v.shape) == 2 or v.shape[2] == 1 or v.shape[2] == 3):
+        if isinstance(v, np.ndarray) and (
+            len(v.shape) == 2 or v.shape[2] == 1 or v.shape[2] == 3
+        ):
             if max(v.shape[:2]) > max_show_side:
                 scale_factor = float(max_show_side) / max(v.shape[:2])
-                v = cv.resize(v, (int(scale_factor*v.shape[1]), int(scale_factor*v.shape[0])))
-            cv.imshow('pred_'+k, v)
+                v = cv.resize(
+                    v, (int(scale_factor * v.shape[1]), int(scale_factor * v.shape[0]))
+                )
+            cv.imshow("pred_" + k, v)
     cv.waitKey(1)
 
 
@@ -194,51 +254,82 @@ def _write_to_file(
     preds: Dict[str, np.ndarray],
     dataloader_name: str,
     batch_idx: int,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
     out_root_dir = Path(args.output_path)
-    dataloader_tokens = dataloader_name.split('-')
-    if dataloader_tokens[0] == 'kitti':
-        out_root_dir /= f'{dataloader_tokens[0]}{dataloader_tokens[1]}'
-        flow_ext = 'png'
-    elif dataloader_tokens[0] == 'sintel':
-        out_root_dir = out_root_dir / dataloader_tokens[0] / dataloader_tokens[1]
-        flow_ext = 'flo'
+    out_viz_root_dir = Path(args.output_path) / "viz"
 
-    extra_dirs = ''
+    dataloader_tokens = dataloader_name.split("-")
+    if dataloader_tokens[0] == "kitti":
+        out_root_dir /= f"{dataloader_tokens[0]}{dataloader_tokens[1]}"
+        out_viz_root_dir /= f"{dataloader_tokens[0]}{dataloader_tokens[1]}"
+        flow_ext = "png"
+    elif dataloader_tokens[0] == "sintel":
+        out_root_dir = out_root_dir / dataloader_tokens[0] / dataloader_tokens[1]
+        out_viz_root_dir = (
+            out_viz_root_dir / dataloader_tokens[0] / dataloader_tokens[1]
+        )
+        flow_ext = "flo"
+    elif dataloader_tokens[0] == "spring":
+        out_root_dir = out_root_dir / dataloader_tokens[0]
+        out_viz_root_dir = out_viz_root_dir / dataloader_tokens[0]
+        flow_ext = "flo5"
+
+    extra_dirs = ""
     if metadata is not None:
-        img_path = Path(metadata['image_paths'][0][0])
+        img_path = Path(metadata["image_paths"][0][0])
         image_name = img_path.stem
-        if 'sintel' in dataloader_name:
+        if "kitti-2015" in dataloader_name:
+            extra_dirs = "flow"
+        elif "sintel" in dataloader_name:
             seq_name = img_path.parts[-2]
             extra_dirs = seq_name
+        elif "spring" in dataloader_name:
+            if "revonly" in dataloader_tokens:
+                direc = "BW"
+            else:
+                direc = "FW"
+            side, idx = img_path.stem.split("_")[-2:]
+            extra_dirs = f"{img_path.parts[-3]}/flow_{direc}_{side}"
+            image_name = f"flow_{direc}_{side}_{idx}"
     else:
-        image_name = f'{batch_idx:08d}'
+        image_name = f"{batch_idx:08d}"
 
     out_dir = out_root_dir / extra_dirs
     out_dir.mkdir(parents=True, exist_ok=True)
-    flow_utils.flow_write(out_dir / f'{image_name}.{flow_ext}', preds['flows'])
+    flow_utils.flow_write(out_dir / f"{image_name}.{flow_ext}", preds["flows"])
+
+    if args.save_viz:
+        out_viz_dir = out_viz_root_dir / extra_dirs
+        out_viz_dir.mkdir(parents=True, exist_ok=True)
+        flow_viz = flow_utils.flow_to_rgb(preds["flows"])
+        viz_path = out_viz_dir / f"{image_name}.png"
+        cv.imwrite(str(viz_path), flow_viz[:, :, ::-1])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = _init_parser()
 
     # TODO: It is ugly that the model has to be gotten from the argv rather than the argparser.
     # However, I do not see another way, since the argparser requires the model to load some of the args.
     FlowModel = None
-    if len(sys.argv) > 1 and sys.argv[1] not in ['-h', '--help']:
+    if len(sys.argv) > 1 and sys.argv[1] not in ["-h", "--help"]:
         FlowModel = get_model_reference(sys.argv[1])
         parser = FlowModel.add_model_specific_args(parser)
 
-    add_datasets_to_parser(parser, 'datasets.yml')
+    add_datasets_to_parser(parser, "datasets.yml")
 
     args = parser.parse_args()
 
-    logging.info('The outputs will be saved to %s.', args.output_path)
+    logging.info("The outputs will be saved to %s.", args.output_path)
 
     model_id = args.model
     if args.pretrained_ckpt is not None:
-        model_id += f'_{args.pretrained_ckpt}'
+        model_id += f"_{Path(args.pretrained_ckpt).stem}"
+    if args.max_forward_side is not None:
+        model_id += f"_maxside{args.max_forward_side}"
+    if args.scale_factor is not None:
+        model_id += f"_scale{args.scale_factor}"
     args.output_path = Path(args.output_path) / model_id
     model = get_model(sys.argv[1], args.pretrained_ckpt, args)
     args.output_path.mkdir(parents=True, exist_ok=True)

@@ -23,7 +23,7 @@ CSFlow
 
 `[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/csflow>`__
 
-- Paper: **CSFlow: Learning optical flow via cross strip correlation for autonomous driving* - `https://arxiv.org/abs/2202.00909 <https://arxiv.org/abs/2202.00909>`_
+- Paper: **CSFlow: Learning optical flow via cross strip correlation for autonomous driving** - `https://arxiv.org/abs/2202.00909 <https://arxiv.org/abs/2202.00909>`_
 
 - Reference code: `https://github.com/MasterHow/CSFlow <https://github.com/MasterHow/CSFlow>`_
 
@@ -40,6 +40,17 @@ DICL-Flow
 
 - Model names: ``dicl``
 
+DIP
+---
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/dip>`__
+
+- Paper: **DIP: Deep Inverse Patchmatch for High-Resolution Optical Flow** - `https://arxiv.org/abs/2204.00330 <https://arxiv.org/abs/2204.00330>`_
+
+- Reference code: `https://github.com/zihuazheng/DIP <https://github.com/zihuazheng/DIP>`_
+
+- Model names: ``dip``
+
 FastFlownet
 -----------
 
@@ -51,16 +62,38 @@ FastFlownet
 
 - Model names: ``fastflownet``
 
+Flow1D
+------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/flow1d>`__
+
+- Paper: **High-Resolution Optical Flow from 1D Attention and Correlation** - `https://arxiv.org/abs/2104.13918 <https://arxiv.org/abs/2104.13918>`_
+
+- Reference code: `https://github.com/haofeixu/flow1d <https://github.com/haofeixu/flow1d>`_
+
+- Model names: ``flow1d``
+
 FlowFormer
 ----------
 
 `[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/flowformer>`__
 
-- Paper: **FlowFormer: A Transformer Architecture for Optical Flow* - `https://arxiv.org/abs/2203.16194 <https://arxiv.org/abs/2203.16194>`_
+- Paper: **FlowFormer: A Transformer Architecture for Optical Flow** - `https://arxiv.org/abs/2203.16194 <https://arxiv.org/abs/2203.16194>`_
 
 - Reference code: `https://github.com/drinkingcoder/FlowFormer-Official <https://github.com/drinkingcoder/FlowFormer-Official>`_
 
 - Model names: ``flowformer``
+
+FlowFormer++
+------------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/flowformerplusplus>`__
+
+- Paper: **Flowformer++: Masked cost volume autoencoding for pretraining optical flow estimation** - `https://arxiv.org/abs/2303.01237 <https://arxiv.org/abs/2303.01237>`_
+
+- Reference code: `https://github.com/XiaoyuShi97/FlowFormerPlusPlus <https://github.com/XiaoyuShi97/FlowFormerPlusPlus>`_
+
+- Model names: ``flowformer++``
 
 Flownet
 -------
@@ -98,6 +131,17 @@ GMFlow
 - Reference code: `https://github.com/haofeixu/gmflow <https://github.com/haofeixu/gmflow>`_
 
 - Model names: ``gmflow``, ``gmflow_refine``
+
+GMFlow+, UniMatch
+-----------------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/unimatch>`__
+
+- Paper: **Unifying Flow, Stereo and Depth Estimation** - `https://arxiv.org/abs/2211.05783 <https://arxiv.org/abs/2211.05783>`_
+
+- Reference code: `https://github.com/autonomousvision/unimatch <https://github.com/autonomousvision/unimatch>`_
+
+- Model names: ``gmflow+``, ``gmflow+_sc2``, ``gmflow+_sc2_refine6``, ``unimatch``, ``unimatch_sc2``, ``unimatch_sc2_refine6``
 
 GMFlowNet
 ---------
@@ -189,6 +233,28 @@ MaskFlownet
 
 - Model names: ``maskflownet``, ``maskflownet_s``
 
+MatchFlow
+---------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/matchflow>`__
+
+- Paper: **Rethinking Optical Flow from Geometric Matching Consistent Perspective** - `https://arxiv.org/abs/2303.08384 <https://arxiv.org/abs/2303.08384>`_
+
+- Reference code: `https://github.com/DQiaole/MatchFlow <https://github.com/DQiaole/MatchFlow>`_
+
+- Model names: ``matchflow``, ``matchflow_raft``
+
+MS-RAFT+
+--------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/ms_raft_plus>`__
+
+- Paper: **High-Resolution Multi-Scale RAFT** - `https://arxiv.org/abs/2210.16900 <https://arxiv.org/abs/2210.16900>`_
+
+- Reference code: `https://github.com/cv-stuttgart/MS_RAFT_plus <https://github.com/cv-stuttgart/MS_RAFT_plus>`_
+
+- Model names: ``ms_raft+``
+
 PWCNet
 ------
 
@@ -198,7 +264,7 @@ PWCNet
 
 - Reference code: `https://github.com/NVlabs/PWC-Net <https://github.com/NVlabs/PWC-Net>`_
 
-- Model names: ``pwcnet``, ``pwcdcnet``
+- Model names: ``pwcnet``, ``pwcnet_nodc``
 
 RAFT
 ----
@@ -210,6 +276,15 @@ RAFT
 - Reference code: `https://github.com/princeton-vl/RAFT <https://github.com/princeton-vl/RAFT>`_
 
 - Model names: ``raft``, ``raft_small``
+
+RPKNet
+------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/rpknet>`__
+
+- Paper: **Recurrent Partial Kernel Network for Efficient Optical Flow Estimation** - `https://hmorimitsu.com/publication/2024-aaai-rpknet <https://hmorimitsu.com/publication/2024-aaai-rpknet>`_
+
+- Model names: ``rpknet``
 
 ScopeFlow
 ---------
@@ -233,6 +308,28 @@ SCV
 
 - Model names: ``scv4``, ``scv8``
 
+SeparableFlow
+-------------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/separableflow>`__
+
+- Paper: **Separable Flow: Learning Motion Cost Volumes for Optical Flow Estimation** - `https://openaccess.thecvf.com/content/ICCV2021/papers/Zhang_Separable_Flow_Learning_Motion_Cost_Volumes_for_Optical_Flow_Estimation_ICCV_2021_paper.pdf <https://openaccess.thecvf.com/content/ICCV2021/papers/Zhang_Separable_Flow_Learning_Motion_Cost_Volumes_for_Optical_Flow_Estimation_ICCV_2021_paper.pdf>`_
+
+- Reference code: `https://github.com/feihuzhang/SeparableFlow <https://github.com/feihuzhang/SeparableFlow>`_
+
+- Model names: ``separableflow``
+
+SKFlow
+------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/skflow>`__
+
+- Paper: **SKFlow: Learning Optical Flow with Super Kernels** - `https://arxiv.org/abs/2205.14623 <https://arxiv.org/abs/2205.14623>`_
+
+- Reference code: `https://github.com/littlespray/SKFlow <https://github.com/littlespray/SKFlow>`_
+
+- Model names: ``skflow``
+
 STaRFlow
 --------
 
@@ -254,3 +351,14 @@ VCN
 - Reference code: `https://github.com/gengshan-y/VCN <https://github.com/gengshan-y/VCN>`_
 
 - Model names: ``vcn``, ``vcn_small``
+
+VideoFlow
+---------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/videoflow>`__
+
+- Paper: **Videoflow: Exploiting temporal cues for multi-frame optical flow estimation** - `https://arxiv.org/abs/2303.08340 <https://arxiv.org/abs/2303.08340>`_
+
+- Reference code: `https://github.com/XiaoyuShi97/VideoFlow <hhttps://github.com/XiaoyuShi97/VideoFlow>`_
+
+- Model names: ``videoflow_bof``, ``videoflow_mof``

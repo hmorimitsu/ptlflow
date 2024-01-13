@@ -9,14 +9,28 @@ import logging
 def conv(in_planes, out_planes, kernel_size=3, stride=1, dilation=1, isReLU=True):
     if isReLU:
         return nn.Sequential(
-            nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, dilation=dilation,
-                      padding=((kernel_size - 1) * dilation) // 2, bias=True),
-            nn.LeakyReLU(0.1, inplace=True)
+            nn.Conv2d(
+                in_planes,
+                out_planes,
+                kernel_size=kernel_size,
+                stride=stride,
+                dilation=dilation,
+                padding=((kernel_size - 1) * dilation) // 2,
+                bias=True,
+            ),
+            nn.LeakyReLU(0.1, inplace=True),
         )
     else:
         return nn.Sequential(
-            nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, dilation=dilation,
-                      padding=((kernel_size - 1) * dilation) // 2, bias=True)
+            nn.Conv2d(
+                in_planes,
+                out_planes,
+                kernel_size=kernel_size,
+                stride=stride,
+                dilation=dilation,
+                padding=((kernel_size - 1) * dilation) // 2,
+                bias=True,
+            )
         )
 
 
@@ -67,10 +81,7 @@ class FeatureExtractor(nn.Module):
         self.convs = nn.ModuleList()
 
         for l, (ch_in, ch_out) in enumerate(zip(num_chs[:-1], num_chs[1:])):
-            layer = nn.Sequential(
-                conv(ch_in, ch_out, stride=2),
-                conv(ch_out, ch_out)
-            )
+            layer = nn.Sequential(conv(ch_in, ch_out, stride=2), conv(ch_out, ch_out))
             self.convs.append(layer)
 
     def forward(self, x):
@@ -83,8 +94,16 @@ class FeatureExtractor(nn.Module):
 
 
 def get_grid(x):
-    grid_H = torch.linspace(-1.0, 1.0, x.size(3)).view(1, 1, 1, x.size(3)).expand(x.size(0), 1, x.size(2), x.size(3))
-    grid_V = torch.linspace(-1.0, 1.0, x.size(2)).view(1, 1, x.size(2), 1).expand(x.size(0), 1, x.size(2), x.size(3))
+    grid_H = (
+        torch.linspace(-1.0, 1.0, x.size(3))
+        .view(1, 1, 1, x.size(3))
+        .expand(x.size(0), 1, x.size(2), x.size(3))
+    )
+    grid_V = (
+        torch.linspace(-1.0, 1.0, x.size(2))
+        .view(1, 1, x.size(2), 1)
+        .expand(x.size(0), 1, x.size(2), x.size(3))
+    )
     grid = torch.cat([grid_H, grid_V], 1)
     grids_cuda = grid.requires_grad_(False).to(dtype=x.dtype, device=x.device)
     return grids_cuda
@@ -96,7 +115,7 @@ class WarpingLayer(nn.Module):
 
     def forward(self, x, flow, height_im, width_im, div_flow, cuda=True, debug=False):
         if debug:
-            print('in warping')
+            print("in warping")
             print(x.mean())
             print(flow.mean())
 
@@ -129,8 +148,8 @@ class WarpingLayer(nn.Module):
         if debug:
             print(mask.mean())
 
-        mask[mask < 0.99999] = 0.
-        mask[mask > 0] = 1.
+        mask[mask < 0.99999] = 0.0
+        mask[mask > 0] = 1.0
 
         if debug:
             print(mask.mean())
@@ -147,11 +166,7 @@ class OpticalFlowEstimator(nn.Module):
         super(OpticalFlowEstimator, self).__init__()
 
         self.convs = nn.Sequential(
-            conv(ch_in, 128),
-            conv(128, 128),
-            conv(128, 96),
-            conv(96, 64),
-            conv(64, 32)
+            conv(ch_in, 128), conv(128, 128), conv(128, 96), conv(96, 64), conv(64, 32)
         )
         self.conv_last = conv(32, 2, isReLU=False)
 
@@ -184,11 +199,7 @@ class OcclusionEstimator(nn.Module):
     def __init__(self, ch_in):
         super(OcclusionEstimator, self).__init__()
         self.convs = nn.Sequential(
-            conv(ch_in, 128),
-            conv(128, 128),
-            conv(128, 96),
-            conv(96, 64),
-            conv(64, 32)
+            conv(ch_in, 128), conv(128, 128), conv(128, 96), conv(96, 64), conv(64, 32)
         )
         self.conv_last = conv(32, 1, isReLU=False)
 
@@ -228,7 +239,7 @@ class ContextNetwork(nn.Module):
             conv(128, 96, 3, 1, 8),
             conv(96, 64, 3, 1, 16),
             conv(64, 32, 3, 1, 1),
-            conv(32, 2, isReLU=False)
+            conv(32, 2, isReLU=False),
         )
 
     def forward(self, x):
@@ -246,7 +257,7 @@ class OccContextNetwork(nn.Module):
             conv(128, 96, 3, 1, 8),
             conv(96, 64, 3, 1, 16),
             conv(64, 32, 3, 1, 1),
-            conv(32, 1, isReLU=False)
+            conv(32, 1, isReLU=False),
         )
 
     def forward(self, x):

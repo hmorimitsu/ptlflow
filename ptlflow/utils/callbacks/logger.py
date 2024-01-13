@@ -25,16 +25,16 @@ except ImportError:
     NeptuneFile = None
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from pytorch_lightning.callbacks import Callback
-from pytorch_lightning.loggers.base import LoggerCollection
-from pytorch_lightning.loggers.comet import CometLogger
-from pytorch_lightning.loggers.neptune import NeptuneLogger
-from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
-from pytorch_lightning.loggers.wandb import WandbLogger
-from pytorch_lightning.trainer.trainer import Trainer
+from lightning.pytorch.callbacks import Callback
+from lightning.pytorch.loggers.comet import CometLogger
+from lightning.pytorch.loggers.neptune import NeptuneLogger
+from lightning.pytorch.loggers.tensorboard import TensorBoardLogger
+from lightning.pytorch.loggers.wandb import WandbLogger
+from lightning.pytorch.trainer.trainer import Trainer
 import torch
 import torch.nn.functional as F
 from torchvision.utils import make_grid
+
 try:
     import wandb
 except ImportError:
@@ -60,8 +60,8 @@ class LoggerCallback(Callback):
         self,
         num_images: int = 5,
         image_size: Tuple[int, int] = (200, 400),
-        log_keys: Sequence[str] = ('images', 'flows', 'occs', 'mbs', 'confs'),
-        epe_clip: float = 5.0
+        log_keys: Sequence[str] = ("images", "flows", "occs", "mbs", "confs"),
+        epe_clip: float = 5.0,
     ) -> None:
         """Initialize LoggerCallback.
 
@@ -91,12 +91,7 @@ class LoggerCallback(Callback):
         self.val_collect_image_idx = {}
         self.val_images = {}
 
-    def log_image(
-        self,
-        title: str,
-        image: torch.Tensor,
-        pl_module: BaseModel
-    ) -> None:
+    def log_image(self, title: str, image: torch.Tensor, pl_module: BaseModel) -> None:
         """Log the image in all of the pl_module loggers.
 
         Note, however, that not all loggers may be able to log images.
@@ -112,22 +107,17 @@ class LoggerCallback(Callback):
         """
         image_npy = image.permute(1, 2, 0).numpy()
 
-        logger_collection = pl_module.logger
-        if logger_collection is not None:
-            if not isinstance(logger_collection, LoggerCollection):
-                logger_collection = LoggerCollection([logger_collection])
-
-            for logger in logger_collection:
-                if isinstance(logger, CometLogger):
-                    logger.experiment.log_image(image_npy, name=title)
-                elif isinstance(logger, NeptuneLogger):
-                    logger.experiment[title].log(NeptuneFile.as_image(image))
-                elif isinstance(logger, TensorBoardLogger):
-                    logger.experiment.add_image(title, image, pl_module.global_step)
-                elif isinstance(logger, WandbLogger) and wandb is not None:
-                    title_wb = title.replace('/', '-')
-                    image_wb = wandb.Image(image_npy)
-                    logger.experiment.log({title_wb: image_wb})
+        for logger in pl_module.loggers:
+            if isinstance(logger, CometLogger):
+                logger.experiment.log_image(image_npy, name=title)
+            elif isinstance(logger, NeptuneLogger):
+                logger.experiment[title].log(NeptuneFile.as_image(image))
+            elif isinstance(logger, TensorBoardLogger):
+                logger.experiment.add_image(title, image, pl_module.global_step)
+            elif isinstance(logger, WandbLogger) and wandb is not None:
+                title_wb = title.replace("/", "-")
+                image_wb = wandb.Image(image_npy)
+                logger.experiment.log({title_wb: image_wb})
 
     def on_train_batch_end(
         self,
@@ -136,7 +126,7 @@ class LoggerCallback(Callback):
         outputs: Dict[str, torch.Tensor],
         batch: Dict[str, torch.Tensor],
         batch_idx: int,
-        dataloader_idx: int
+        **kwargs,
     ) -> None:
         """Store one image to be logged, if the current batch_idx is in the log selection group.
 
@@ -152,17 +142,13 @@ class LoggerCallback(Callback):
             The inputs of the current training batch.
         batch_idx : int
             The counter value of the current batch.
-        dataloader_idx : int
-            The index number of the current dataloader.
         """
         if batch_idx in self.train_collect_img_idx:
-            self._append_images(self.train_images, pl_module.last_inputs, pl_module.last_predictions)
+            self._append_images(
+                self.train_images, pl_module.last_inputs, pl_module.last_predictions
+            )
 
-    def on_train_epoch_start(
-        self,
-        trainer: Trainer,
-        pl_module: BaseModel
-    ) -> None:
+    def on_train_epoch_start(self, trainer: Trainer, pl_module: BaseModel) -> None:
         """Reset the training log params and accumulators.
 
         Parameters
@@ -173,17 +159,25 @@ class LoggerCallback(Callback):
             An instance of the optical flow model.
         """
         self.train_images = {}
-        limit_batches = pl_module.args.limit_train_batches if pl_module.args.limit_train_batches is not None else 1.0
-        collect_idx = np.unique(np.linspace(
-            0, self._compute_max_range(pl_module.train_dataloader_length, limit_batches),
-            self.num_images, dtype=np.int32))
+        limit_batches = (
+            pl_module.args.limit_train_batches
+            if pl_module.args.limit_train_batches is not None
+            else 1.0
+        )
+        collect_idx = np.unique(
+            np.linspace(
+                0,
+                self._compute_max_range(
+                    pl_module.train_dataloader_length, limit_batches
+                ),
+                self.num_images,
+                dtype=np.int32,
+            )
+        )
         self.train_collect_img_idx = collect_idx
 
     def on_train_epoch_end(
-        self,
-        trainer: Trainer,
-        pl_module: BaseModel,
-        outputs: Any = None  # This arg does not exist anymore, but it is kept here for compatibility
+        self, trainer: Trainer, pl_module: BaseModel, **kwargs
     ) -> None:
         """Log the images accumulated during the training.
 
@@ -197,7 +191,7 @@ class LoggerCallback(Callback):
             Outputs of the training epoch.
         """
         img_grid = self._make_image_grid(self.train_images)
-        self.log_image('train', img_grid, pl_module)
+        self.log_image("train", img_grid, pl_module)
 
     def on_validation_batch_end(
         self,
@@ -206,7 +200,7 @@ class LoggerCallback(Callback):
         outputs: Dict[str, torch.Tensor],
         batch: Dict[str, torch.Tensor],
         batch_idx: int,
-        dataloader_idx: int
+        dataloader_idx: int,
     ) -> None:
         """Store one image to be logged, if the current batch_idx is in the log selection group.
 
@@ -227,13 +221,13 @@ class LoggerCallback(Callback):
         """
         dl_name = self.val_dataloader_names[dataloader_idx]
         if batch_idx in self.val_collect_image_idx[dl_name]:
-            self._append_images(self.val_images[dl_name], pl_module.last_inputs, pl_module.last_predictions)
+            self._append_images(
+                self.val_images[dl_name],
+                pl_module.last_inputs,
+                pl_module.last_predictions,
+            )
 
-    def on_validation_epoch_start(
-        self,
-        trainer: Trainer,
-        pl_module: BaseModel
-    ) -> None:
+    def on_validation_epoch_start(self, trainer: Trainer, pl_module: BaseModel) -> None:
         """Reset the validation log params and accumulators.
 
         Parameters
@@ -247,17 +241,25 @@ class LoggerCallback(Callback):
         for dl_name in self.val_dataloader_names:
             self.val_images[dl_name] = {}
 
-        limit_batches = pl_module.args.limit_val_batches if pl_module.args.limit_val_batches is not None else 1.0
-        for dname, dlen in zip(pl_module.val_dataloader_names, pl_module.val_dataloader_lengths):
-            collect_idx = np.unique(np.linspace(
-                0, self._compute_max_range(dlen, limit_batches), self.num_images, dtype=np.int32))
+        limit_batches = (
+            pl_module.args.limit_val_batches
+            if pl_module.args.limit_val_batches is not None
+            else 1.0
+        )
+        for dname, dlen in zip(
+            pl_module.val_dataloader_names, pl_module.val_dataloader_lengths
+        ):
+            collect_idx = np.unique(
+                np.linspace(
+                    0,
+                    self._compute_max_range(dlen, limit_batches),
+                    self.num_images,
+                    dtype=np.int32,
+                )
+            )
             self.val_collect_image_idx[dname] = collect_idx
 
-    def on_validation_epoch_end(
-        self,
-        trainer: Trainer,
-        pl_module: BaseModel
-    ) -> None:
+    def on_validation_epoch_end(self, trainer: Trainer, pl_module: BaseModel) -> None:
         """Log the images accumulated during the validation.
 
         Parameters
@@ -269,13 +271,9 @@ class LoggerCallback(Callback):
         """
         for dl_name, dl_images in self.val_images.items():
             img_grid = self._make_image_grid(dl_images)
-            self.log_image(f'val/{dl_name}', img_grid, pl_module)
+            self.log_image(f"val/{dl_name}", img_grid, pl_module)
 
-    def _add_title(
-        self,
-        image: torch.Tensor,
-        img_title: str
-    ) -> torch.Tensor:
+    def _add_title(self, image: torch.Tensor, img_title: str) -> torch.Tensor:
         """Add a title to an image.
 
         Parameters
@@ -291,16 +289,23 @@ class LoggerCallback(Callback):
             The input image with the title superposed on it.
         """
         size = min(image.shape[1:3])
-        image = (255*image.permute(1, 2, 0).numpy()).astype(np.uint8)
+        image = (255 * image.permute(1, 2, 0).numpy()).astype(np.uint8)
         image = Image.fromarray(image)
 
         this_dir = Path(__file__).resolve().parent
-        title_font = ImageFont.truetype(str(this_dir / 'RobotoMono-Regular.ttf'), size//10)
+        title_font = ImageFont.truetype(
+            str(this_dir / "RobotoMono-Regular.ttf"), size // 10
+        )
 
         draw = ImageDraw.Draw(image)
-        bb = (size//25, size//25, size//25+len(img_title)*size//15, size//25+size//8)
-        draw.rectangle(bb, fill='black')
-        draw.text((size//20, size//30), img_title, (237, 230, 211), font=title_font)
+        bb = (
+            size // 25,
+            size // 25,
+            size // 25 + len(img_title) * size // 15,
+            size // 25 + size // 8,
+        )
+        draw.rectangle(bb, fill="black")
+        draw.text((size // 20, size // 30), img_title, (237, 230, 211), font=title_font)
 
         image = np.array(image)
         image = torch.from_numpy(image.transpose(2, 0, 1)).float() / 255
@@ -311,7 +316,7 @@ class LoggerCallback(Callback):
         self,
         images: Dict[str, List[torch.Tensor]],
         inputs: Dict[str, torch.Tensor],
-        preds: Dict[str, torch.Tensor]
+        preds: Dict[str, torch.Tensor],
     ) -> None:
         """Append samples to the images accumulator.
 
@@ -327,28 +332,28 @@ class LoggerCallback(Callback):
         for k in self.log_keys:
             log_names = []
             log_sources = []
-            if k in inputs or (k == 'confs' and k in preds):
-                log_names.append(f'i_{k}')
+            if k in inputs or (k == "confs" and k in preds):
+                log_names.append(f"i_{k}")
                 log_sources.append(inputs)
             if k in preds:
-                log_names.append(f'o_{k}')
+                log_names.append(f"o_{k}")
                 log_sources.append(preds)
 
-                if k == 'flows':
-                    log_names.append(f'epe<{self.epe_clip:.1f}')
+                if k == "flows":
+                    log_names.append(f"epe<{self.epe_clip:.1f}")
                     log_sources.append(None)
 
             for name, source in zip(log_names, log_sources):
                 if images.get(name) is None:
                     images[name] = []
 
-                if name == 'i_confs':
-                    img = self._compute_confidence_gt(preds['flows'], inputs['flows'])
-                elif name.startswith('epe'):
+                if name == "i_confs":
+                    img = self._compute_confidence_gt(preds["flows"], inputs["flows"])
+                elif name.startswith("epe"):
                     epe = torch.norm(preds[k] - inputs[k], p=2, dim=2, keepdim=True)
                     img = torch.clamp(epe, 0, self.epe_clip) / self.epe_clip
-                    if inputs.get('valids') is not None:
-                        img[inputs['valids'] < 0.5] = 0
+                    if inputs.get("valids") is not None:
+                        img[inputs["valids"] < 0.5] = 0
                 else:
                     img = source[k]
 
@@ -356,17 +361,15 @@ class LoggerCallback(Callback):
                 img = F.interpolate(img, self.image_size)
                 img = img[0]
 
-                if 'images' in name:
+                if "images" in name:
                     img = img.flip([0])  # BGR to RGB
-                elif 'flows' in name:
+                elif "flows" in name:
                     img = flow_utils.flow_to_rgb(img)
 
                 images[name].append(img)
 
     def _compute_confidence_gt(
-        self,
-        pred_flows: torch.Tensor,
-        target_flows: torch.Tensor
+        self, pred_flows: torch.Tensor, target_flows: torch.Tensor
     ) -> torch.Tensor:
         """Compute a confidence score for the flow predictions.
 
@@ -384,13 +387,13 @@ class LoggerCallback(Callback):
         torch.Tensor
             The confidence score for each pixel of the input.
         """
-        conf_gt = torch.exp(-torch.pow(pred_flows - target_flows, 2).sum(dim=2, keepdim=True))
+        conf_gt = torch.exp(
+            -torch.pow(pred_flows - target_flows, 2).sum(dim=2, keepdim=True)
+        )
         return conf_gt
 
     def _compute_max_range(
-        self,
-        dataloader_length: int,
-        limit_batches: Union[float, int]
+        self, dataloader_length: int, limit_batches: Union[float, int]
     ) -> int:
         """Find the maximum number of samples that will be drawn from a dataloader.
 
@@ -414,8 +417,7 @@ class LoggerCallback(Callback):
         return max_range
 
     def _make_image_grid(
-        self,
-        dl_images: Dict[str, List[torch.Tensor]]
+        self, dl_images: Dict[str, List[torch.Tensor]]
     ) -> torch.Tensor:
         """Transform a bunch of images into a single one by adding them to a grid.
 
@@ -443,5 +445,7 @@ class LoggerCallback(Callback):
 
                 imgs.append(im)
 
-        grid = make_grid(imgs, len(imgs)//len(dl_images))
+        grid = None
+        if len(dl_images) > 0:
+            grid = make_grid(imgs, len(imgs) // len(dl_images))
         return grid

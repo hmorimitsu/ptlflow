@@ -1,0 +1,38 @@
+# This workflow will install Python dependencies, run tests with a variety of Python versions
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: lightning
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        lightning: [1.9.5]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace lightning
+        uses: jacobtomlinson/gha-find-replace@v3
+        with:
+          find: "lightning<2"
+          replace: "lightning==${{ matrix.lightning }}"
+          regex: false
+          include: "requirements.txt"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+      - name: Test with pytest
+        run: |
+          pip install pytest
+          python -m pytest

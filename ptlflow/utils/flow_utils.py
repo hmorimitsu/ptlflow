@@ -22,15 +22,15 @@ from typing import IO, Optional, Union
 import numpy as np
 import torch
 
-from .external import flowpy, raft, selflow
+from .external import flowpy, raft, selflow, flow_IO
 from . import flowpy_torch
 
 
 def flow_to_rgb(
     flow: Union[np.ndarray, torch.Tensor],
     flow_max_radius: Optional[Union[float, torch.Tensor]] = None,
-    background: str = 'bright',
-    custom_colorwheel: Optional[torch.Tensor] = None
+    background: str = "bright",
+    custom_colorwheel: Optional[torch.Tensor] = None,
 ) -> Union[np.ndarray, torch.Tensor]:
     """Convert flows to RGB images.
 
@@ -63,15 +63,18 @@ def flow_to_rgb(
     ptlflow.utils.flowpy_torch.flow_to_rgb
     """
     if isinstance(flow, np.ndarray):
-        flow_rgb = flowpy.flow_to_rgb(flow, flow_max_radius, background, custom_colorwheel)
+        flow_rgb = flowpy.flow_to_rgb(
+            flow, flow_max_radius, background, custom_colorwheel
+        )
     else:
-        flow_rgb = flowpy_torch.flow_to_rgb(flow, flow_max_radius, background, custom_colorwheel)
+        flow_rgb = flowpy_torch.flow_to_rgb(
+            flow, flow_max_radius, background, custom_colorwheel
+        )
     return flow_rgb
 
 
 def flow_read(
-    input_file: Union[str, pathlib.Path, IO],
-    format: str = None
+    input_file: Union[str, pathlib.Path, IO], format: str = None
 ) -> np.ndarray:
     """Read optical flow from file.
 
@@ -82,7 +85,7 @@ def flow_read(
     input_file: str, pathlib.Path or IO
         Path of the file to read or file object.
     format: str, optional
-        Specify in what format the flow is read, accepted formats: "png", "flo", or "pfm".
+        Specify in what format the flow is read, accepted formats: "png", "flo", "pfm", or "flo5".
         If None, it is guessed on the file extension.
 
     Returns
@@ -96,18 +99,19 @@ def flow_read(
     --------
     ptlflow.utils.external.flowpy.flow_read
     ptlflow.utils.external.raft.read_pfm
+    ptlflow.utils.external.flow_IO.readFlo5Flow
     write_pfm
     """
-    if (format is not None and format == 'pfm') or str(input_file).endswith('pfm'):
+    if (format is not None and format == "pfm") or str(input_file).endswith("pfm"):
         return raft.read_pfm(input_file)
+    elif (format is not None and format == "flo5") or str(input_file).endswith("flo5"):
+        return flow_IO.readFlo5Flow(input_file)
     else:
         return flowpy.flow_read(input_file, format)
 
 
 def flow_write(
-    output_file: Union[str, pathlib.Path, IO],
-    flow: np.ndarray,
-    format: str = None
+    output_file: Union[str, pathlib.Path, IO], flow: np.ndarray, format: str = None
 ) -> None:
     """Write optical flow to file.
 
@@ -129,7 +133,9 @@ def flow_write(
     --------
     ptlflow.utils.external.flowpy.flow_write
     """
-    if (format is not None and format == 'pfm') or str(output_file).endswith('pfm'):
+    if (format is not None and format == "pfm") or str(output_file).endswith("pfm"):
         selflow.write_pfm(output_file, flow)
+    elif (format is not None and format == "flo5") or str(output_file).endswith("flo5"):
+        flow_IO.writeFlo5File(flow, output_file)
     else:
         flowpy.flow_write(output_file, flow, format)

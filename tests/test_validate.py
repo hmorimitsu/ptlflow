@@ -21,7 +21,7 @@ import ptlflow
 import validate
 from ptlflow.utils.dummy_datasets import write_kitti, write_sintel
 
-TEST_MODEL = 'raft_small'
+TEST_MODEL = "raft_small"
 
 
 def test_validate(tmp_path: Path) -> None:
@@ -35,31 +35,31 @@ def test_validate(tmp_path: Path) -> None:
     args.output_path = tmp_path
     args.write_outputs = True
     args.max_samples = 1
-    args.mpi_sintel_root_dir = tmp_path / 'MPI-Sintel'
-    args.kitti_2012_root_dir = tmp_path / 'KITTI/2012'
-    args.kitti_2015_root_dir = tmp_path / 'KITTI/2015'
+    args.mpi_sintel_root_dir = tmp_path / "MPI-Sintel"
+    args.kitti_2012_root_dir = tmp_path / "KITTI/2012"
+    args.kitti_2015_root_dir = tmp_path / "KITTI/2015"
 
     write_kitti(tmp_path)
     write_sintel(tmp_path)
 
-    args.flow_format = 'flo'
+    args.flow_format = "flo"
     model = ptlflow.get_model(TEST_MODEL, None, args)
     metrics_df = validate.validate(args, model)
     assert min(metrics_df.shape) > 0
 
     dataset_name_path = [
-        ('kitti-2012-trainval', '000000_10'),
-        ('kitti-2015-trainval', '000000_10'),
-        ('sintel-clean-trainval-occ', 'sequence_1/frame_0001'),
-        ('sintel-final-trainval-occ', 'sequence_1/frame_0001')]
+        ("kitti-2015", "000000_10"),
+        ("sintel-clean", "sequence_1/frame_0001"),
+        ("sintel-final", "sequence_1/frame_0001"),
+    ]
     for dname, dpath in dataset_name_path:
-        assert (tmp_path / dname / 'flows' / (dpath+'.flo')).exists()
-        assert (tmp_path / dname / 'flows_viz' / (dpath+'.png')).exists()
+        assert (tmp_path / dname / "flows" / (dpath + ".flo")).exists()
+        assert (tmp_path / dname / "flows_viz" / (dpath + ".png")).exists()
 
-    args.flow_format = 'png'
+    args.flow_format = "png"
     model = ptlflow.get_model(TEST_MODEL, None, args)
     validate.validate(args, model)
     for dname, dpath in dataset_name_path:
-        assert (tmp_path / dname / 'flows' / (dpath+'.png')).exists()
+        assert (tmp_path / dname / "flows" / (dpath + ".png")).exists()
 
     shutil.rmtree(tmp_path)

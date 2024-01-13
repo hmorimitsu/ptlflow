@@ -17,6 +17,7 @@
 # =============================================================================
 
 import logging
+import math
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -70,14 +71,14 @@ class BaseFlowDataset(Dataset):
     def __init__(
         self,
         dataset_name: str,
-        split_name: str = '',
+        split_name: str = "",
         transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
         get_occlusion_mask: bool = True,
         get_motion_boundary_mask: bool = True,
         get_backward: bool = True,
-        get_meta: bool = True
+        get_meta: bool = True,
     ) -> None:
         """Initialize BaseFlowDataset.
 
@@ -122,10 +123,7 @@ class BaseFlowDataset(Dataset):
         self.mb_b_paths = []
         self.metadata = []
 
-    def __getitem__(  # noqa: C901
-        self,
-        index: int
-    ) -> Dict[str, torch.Tensor]:
+    def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:  # noqa: C901
         """Retrieve and return one input.
 
         Parameters
@@ -144,35 +142,59 @@ class BaseFlowDataset(Dataset):
         """
         inputs = {}
 
-        inputs['images'] = [cv2.imread(str(path)) for path in self.img_paths[index]]
+        inputs["images"] = [cv2.imread(str(path)) for path in self.img_paths[index]]
 
         if index < len(self.flow_paths):
-            inputs['flows'], valids = self._get_flows_and_valids(self.flow_paths, index)
+            inputs["flows"], valids = self._get_flows_and_valids(self.flow_paths[index])
             if self.get_valid_mask:
-                inputs['valids'] = valids
+                inputs["valids"] = valids
 
-        if self.get_occlusion_mask and index < len(self.occ_paths):
-            inputs['occs'] = [cv2.imread(str(path), 0)[:, :, None] for path in self.occ_paths[index]]
+        if self.get_occlusion_mask:
+            if index < len(self.occ_paths):
+                inputs["occs"] = [
+                    cv2.imread(str(path), 0)[:, :, None]
+                    for path in self.occ_paths[index]
+                ]
+            elif self.dataset_name.startswith("KITTI"):
+                noc_paths = [
+                    str(p).replace("flow_occ", "flow_noc")
+                    for p in self.flow_paths[index]
+                ]
+                _, valids_noc = self._get_flows_and_valids(noc_paths)
+                inputs["occs"] = [valids[i] - valids_noc[i] for i in range(len(valids))]
         if self.get_motion_boundary_mask and index < len(self.mb_paths):
-            inputs['mbs'] = [cv2.imread(str(path), 0)[:, :, None] for path in self.mb_paths[index]]
+            inputs["mbs"] = [
+                cv2.imread(str(path), 0)[:, :, None] for path in self.mb_paths[index]
+            ]
 
         if self.get_backward:
             if index < len(self.flow_b_paths):
-                inputs['flows_b'], valids_b = self._get_flows_and_valids(self.flow_b_paths, index)
+                inputs["flows_b"], valids_b = self._get_flows_and_valids(
+                    self.flow_b_paths[index]
+                )
                 if self.get_valid_mask:
-                    inputs['valids_b'] = valids_b
+                    inputs["valids_b"] = valids_b
             if self.get_occlusion_mask and index < len(self.occ_b_paths):
-                inputs['occs_b'] = [cv2.imread(str(path), 0)[:, :, None] for path in self.occ_b_paths[index]]
+                inputs["occs_b"] = [
+                    cv2.imread(str(path), 0)[:, :, None]
+                    for path in self.occ_b_paths[index]
+                ]
             if self.get_motion_boundary_mask and index < len(self.mb_b_paths):
-                inputs['mbs_b'] = [cv2.imread(str(path), 0)[:, :, None] for path in self.mb_b_paths[index]]
+                inputs["mbs_b"] = [
+                    cv2.imread(str(path), 0)[:, :, None]
+                    for path in self.mb_b_paths[index]
+                ]
 
         if self.transform is not None:
             inputs = self.transform(inputs)
 
         if self.get_meta:
-            inputs['meta'] = {'dataset_name': self.dataset_name, 'split_name': self.split_name}
+            inputs["meta"] = {
+                "dataset_name": self.dataset_name,
+                "split_name": self.split_name,
+            }
             if index < len(self.metadata):
-                inputs['meta'].update(self.metadata[index])
+                inputs["meta"].update(self.metadata[index])
 
         return inputs
 
@@ -180,20 +202,18 @@ class BaseFlowDataset(Dataset):
         return len(self.img_paths)
 
     def _get_flows_and_valids(
-        self,
-        flow_paths: Sequence[str],
-        index: int
+        self, flow_paths: Sequence[str]
     ) -> Tuple[List[np.ndarray], List[Optional[np.ndarray]]]:
         flows = []
         valids = []
-        for path in flow_paths[index]:
+        for path in flow_paths:
             flow = flow_utils.flow_read(path)
 
             nan_mask = np.isnan(flow)
             flow[nan_mask] = self.max_flow + 1
 
             if self.get_valid_mask:
-                valid = (np.abs(flow) < self.max_flow).astype(np.uint8)*255
+                valid = (np.abs(flow) < self.max_flow).astype(np.uint8) * 255
                 valid = np.minimum(valid[:, :, 0], valid[:, :, 1])
                 valids.append(valid[:, :, None])
 
@@ -206,10 +226,39 @@ class BaseFlowDataset(Dataset):
     def _log_status(self) -> None:
         if self.__len__() == 0:
             logging.warning(
-                'No samples were found for %s dataset. Be sure to update the dataset path in datasets.yml, '
-                'or provide the path by the argument --[dataset_name]_root_dir.', self.dataset_name)
+                "No samples were found for %s dataset. Be sure to update the dataset path in datasets.yml, "
+                "or provide the path by the argument --[dataset_name]_root_dir.",
+                self.dataset_name,
+            )
         else:
-            logging.info('Loading %d samples from %s dataset.', self.__len__(), self.dataset_name)
+            logging.info(
+                "Loading %d samples from %s dataset.", self.__len__(), self.dataset_name
+            )
+
+    def _extend_paths_list(
+        self,
+        paths_list: List[Union[str, Path]],
+        sequence_length: int,
+        sequence_position: str,
+    ):
+        if sequence_position == "first":
+            begin_pad = 0
+            end_pad = sequence_length - 2
+        elif sequence_position == "middle":
+            begin_pad = sequence_length // 2
+            end_pad = int(math.ceil(sequence_length / 2.0)) - 2
+        elif sequence_position == "last":
+            begin_pad = sequence_length - 2
+            end_pad = 0
+        else:
+            raise ValueError(
+                f"Invalid sequence_position. Must be one of ('first', 'middle', 'last'). Received: {sequence_position}"
+            )
+        for _ in range(begin_pad):
+            paths_list.insert(0, paths_list[0])
+        for _ in range(end_pad):
+            paths_list.append(paths_list[-1])
+        return paths_list
 
 
 class AutoFlowDataset(BaseFlowDataset):
@@ -218,11 +267,11 @@ class AutoFlowDataset(BaseFlowDataset):
     def __init__(
         self,
         root_dir: str,
-        split: str = 'train',
+        split: str = "train",
         transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
-        get_meta: bool = True
+        get_meta: bool = True,
     ) -> None:
         """Initialize AutoFlowDataset.
 
@@ -243,7 +292,7 @@ class AutoFlowDataset(BaseFlowDataset):
             Whether to get metadata.
         """
         super().__init__(
-            dataset_name='AutoFlow',
+            dataset_name="AutoFlow",
             split_name=split,
             transform=transform,
             max_flow=max_flow,
@@ -251,37 +300,51 @@ class AutoFlowDataset(BaseFlowDataset):
             get_occlusion_mask=False,
             get_motion_boundary_mask=False,
             get_backward=False,
-            get_meta=get_meta)
+            get_meta=get_meta,
+        )
         self.root_dir = root_dir
-        self.split_file = THIS_DIR / 'AutoFlow_val.txt'
+        self.split_file = THIS_DIR / "AutoFlow_val.txt"
 
         # Read data from disk
-        parts_dirs = [f'static_40k_png_{i+1}_of_4' for i in range(4)]
+        parts_dirs = [f"static_40k_png_{i+1}_of_4" for i in range(4)]
         sample_paths = []
         for pdir in parts_dirs:
-            sample_paths.extend([p for p in (Path(root_dir) / pdir).glob('*') if p.is_dir()])
+            sample_paths.extend(
+                [p for p in (Path(root_dir) / pdir).glob("*") if p.is_dir()]
+            )
 
-        with open(self.split_file, 'r') as f:
+        with open(self.split_file, "r") as f:
             val_names = f.read().strip().splitlines()
 
-        if split == 'trainval':
+        if split == "trainval":
             remove_names = []
-        elif split == 'train':
+        elif split == "train":
             remove_names = val_names
-        elif split == 'val':
+        elif split == "val":
             remove_names = [p.stem for p in sample_paths if p.stem not in val_names]
 
         # Keep only data from the correct split
         self.img_paths = [
-            [p / 'im0.png', p / 'im1.png']
-            for p in sample_paths if p.stem not in remove_names]
+            [p / "im0.png", p / "im1.png"]
+            for p in sample_paths
+            if p.stem not in remove_names
+        ]
         self.flow_paths = [
-            [p / 'forward.flo'] for p in sample_paths if p.stem not in remove_names]
-        assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
+            [p / "forward.flo"] for p in sample_paths if p.stem not in remove_names
+        ]
+        assert len(self.img_paths) == len(
+            self.flow_paths
+        ), f"{len(self.img_paths)} vs {len(self.flow_paths)}"
 
         self.metadata = [
-            {'image_paths': [str(p) for p in paths], 'is_val': paths[0].stem in val_names, 'misc': ''}
-            for paths in self.img_paths]
+            {
+                "image_paths": [str(p) for p in paths],
+                "is_val": paths[0].stem in val_names,
+                "misc": "",
+                "is_seq_start": True,
+            }
+            for paths in self.img_paths
+        ]
 
         self._log_status()
 
@@ -292,11 +355,11 @@ class FlyingChairsDataset(BaseFlowDataset):
     def __init__(
         self,
         root_dir: str,
-        split: str = 'train',
+        split: str = "train",
         transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
-        get_meta: bool = True
+        get_meta: bool = True,
     ) -> None:
         """Initialize FlyingChairsDataset.
 
@@ -317,7 +380,7 @@ class FlyingChairsDataset(BaseFlowDataset):
             Whether to get metadata.
         """
         super().__init__(
-            dataset_name='FlyingChairs',
+            dataset_name="FlyingChairs",
             split_name=split,
             transform=transform,
             max_flow=max_flow,
@@ -325,40 +388,62 @@ class FlyingChairsDataset(BaseFlowDataset):
             get_occlusion_mask=False,
             get_motion_boundary_mask=False,
             get_backward=False,
-            get_meta=get_meta)
+            get_meta=get_meta,
+        )
         self.root_dir = root_dir
-        self.split_file = THIS_DIR / 'FlyingChairs_val.txt'
+        self.split_file = THIS_DIR / "FlyingChairs_val.txt"
 
         # Read data from disk
-        img1_paths = sorted((Path(self.root_dir) / 'data').glob('*img1.ppm'))
-        img2_paths = sorted((Path(self.root_dir) / 'data').glob('*img2.ppm'))
-        flow_paths = sorted((Path(self.root_dir) / 'data').glob('*flow.flo'))
+        img1_paths = sorted((Path(self.root_dir) / "data").glob("*img1.ppm"))
+        img2_paths = sorted((Path(self.root_dir) / "data").glob("*img2.ppm"))
+        flow_paths = sorted((Path(self.root_dir) / "data").glob("*flow.flo"))
 
         # Sanity check
-        assert len(img1_paths) == len(img2_paths), f'{len(img1_paths)} vs {len(img2_paths)}'
-        assert len(img1_paths) == len(flow_paths), f'{len(img1_paths)} vs {len(flow_paths)}'
+        assert len(img1_paths) == len(
+            img2_paths
+        ), f"{len(img1_paths)} vs {len(img2_paths)}"
+        assert len(img1_paths) == len(
+            flow_paths
+        ), f"{len(img1_paths)} vs {len(flow_paths)}"
 
-        with open(self.split_file, 'r') as f:
+        with open(self.split_file, "r") as f:
             val_names = f.read().strip().splitlines()
 
-        if split == 'trainval':
+        if split == "trainval":
             remove_names = []
-        elif split == 'train':
+        elif split == "train":
             remove_names = val_names
-        elif split == 'val':
-            remove_names = [p.stem.split('_')[0] for p in img1_paths if p.stem.split('_')[0] not in val_names]
+        elif split == "val":
+            remove_names = [
+                p.stem.split("_")[0]
+                for p in img1_paths
+                if p.stem.split("_")[0] not in val_names
+            ]
 
         # Keep only data from the correct split
         self.img_paths = [
             [img1_paths[i], img2_paths[i]]
-            for i in range(len(img1_paths)) if img1_paths[i].stem.split('_')[0] not in remove_names]
+            for i in range(len(img1_paths))
+            if img1_paths[i].stem.split("_")[0] not in remove_names
+        ]
         self.flow_paths = [
-            [flow_paths[i]] for i in range(len(flow_paths)) if flow_paths[i].stem.split('_')[0] not in remove_names]
-        assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
+            [flow_paths[i]]
+            for i in range(len(flow_paths))
+            if flow_paths[i].stem.split("_")[0] not in remove_names
+        ]
+        assert len(self.img_paths) == len(
+            self.flow_paths
+        ), f"{len(self.img_paths)} vs {len(self.flow_paths)}"
 
         self.metadata = [
-            {'image_paths': [str(p) for p in paths], 'is_val': paths[0].stem in val_names, 'misc': ''}
-            for paths in self.img_paths]
+            {
+                "image_paths": [str(p) for p in paths],
+                "is_val": paths[0].stem in val_names,
+                "misc": "",
+                "is_seq_start": True,
+            }
+            for paths in self.img_paths
+        ]
 
         self._log_status()
 
@@ -369,7 +454,7 @@ class FlyingChairs2Dataset(BaseFlowDataset):
     def __init__(
         self,
         root_dir: str,
-        split: str = 'train',
+        split: str = "train",
         add_reverse: bool = True,
         transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
         max_flow: float = 1000.0,
@@ -377,7 +462,7 @@ class FlyingChairs2Dataset(BaseFlowDataset):
         get_occlusion_mask: bool = True,
         get_motion_boundary_mask: bool = True,
         get_backward: bool = True,
-        get_meta: bool = True
+        get_meta: bool = True,
     ) -> None:
         """Initialize FlyingChairs2Dataset.
 
@@ -406,7 +491,7 @@ class FlyingChairs2Dataset(BaseFlowDataset):
             Whether to get metadata.
         """
         super().__init__(
-            dataset_name='FlyingChairs2',
+            dataset_name="FlyingChairs2",
             split_name=split,
             transform=transform,
             max_flow=max_flow,
@@ -414,50 +499,149 @@ class FlyingChairs2Dataset(BaseFlowDataset):
             get_occlusion_mask=get_occlusion_mask,
             get_motion_boundary_mask=get_motion_boundary_mask,
             get_backward=get_backward,
-            get_meta=get_meta)
+            get_meta=get_meta,
+        )
         self.root_dir = root_dir
         self.add_reverse = add_reverse
 
-        if split == 'train':
-            dir_names = ['train']
-        elif split == 'val':
-            dir_names = ['val']
+        if split == "train":
+            dir_names = ["train"]
+        elif split == "val":
+            dir_names = ["val"]
         else:
-            dir_names = ['train', 'val']
+            dir_names = ["train", "val"]
 
         for dname in dir_names:
             # Read data from disk
-            img1_paths = sorted((Path(self.root_dir) / dname).glob('*img_0.png'))
-            img2_paths = sorted((Path(self.root_dir) / dname).glob('*img_1.png'))
-            self.img_paths.extend([[img1_paths[i], img2_paths[i]] for i in range(len(img1_paths))])
-            self.flow_paths.extend([[x] for x in sorted((Path(self.root_dir) / dname).glob('*flow_01.flo'))])
-            self.occ_paths.extend([[x] for x in sorted((Path(self.root_dir) / dname).glob('*occ_01.png'))])
-            self.mb_paths.extend([[x] for x in sorted((Path(self.root_dir) / dname).glob('*mb_01.png'))])
+            img1_paths = sorted((Path(self.root_dir) / dname).glob("*img_0.png"))
+            img2_paths = sorted((Path(self.root_dir) / dname).glob("*img_1.png"))
+            self.img_paths.extend(
+                [[img1_paths[i], img2_paths[i]] for i in range(len(img1_paths))]
+            )
+            self.flow_paths.extend(
+                [
+                    [x]
+                    for x in sorted((Path(self.root_dir) / dname).glob("*flow_01.flo"))
+                ]
+            )
+            self.occ_paths.extend(
+                [[x] for x in sorted((Path(self.root_dir) / dname).glob("*occ_01.png"))]
+            )
+            self.mb_paths.extend(
+                [[x] for x in sorted((Path(self.root_dir) / dname).glob("*mb_01.png"))]
+            )
             if self.get_backward:
-                self.flow_b_paths.extend([[x] for x in sorted((Path(self.root_dir) / dname).glob('*flow_10.flo'))])
-                self.occ_b_paths.extend([[x] for x in sorted((Path(self.root_dir) / dname).glob('*occ_10.png'))])
-                self.mb_b_paths.extend([[x] for x in sorted((Path(self.root_dir) / dname).glob('*mb_10.png'))])
+                self.flow_b_paths.extend(
+                    [
+                        [x]
+                        for x in sorted(
+                            (Path(self.root_dir) / dname).glob("*flow_10.flo")
+                        )
+                    ]
+                )
+                self.occ_b_paths.extend(
+                    [
+                        [x]
+                        for x in sorted(
+                            (Path(self.root_dir) / dname).glob("*occ_10.png")
+                        )
+                    ]
+                )
+                self.mb_b_paths.extend(
+                    [
+                        [x]
+                        for x in sorted(
+                            (Path(self.root_dir) / dname).glob("*mb_10.png")
+                        )
+                    ]
+                )
             if self.add_reverse:
-                self.img_paths.extend([[img2_paths[i], img1_paths[i]] for i in range(len(img1_paths))])
-                self.flow_paths.extend([[x] for x in sorted((Path(self.root_dir) / dname).glob('*flow_10.flo'))])
-                self.occ_paths.extend([[x] for x in sorted((Path(self.root_dir) / dname).glob('*occ_10.png'))])
-                self.mb_paths.extend([[x] for x in sorted((Path(self.root_dir) / dname).glob('*mb_10.png'))])
+                self.img_paths.extend(
+                    [[img2_paths[i], img1_paths[i]] for i in range(len(img1_paths))]
+                )
+                self.flow_paths.extend(
+                    [
+                        [x]
+                        for x in sorted(
+                            (Path(self.root_dir) / dname).glob("*flow_10.flo")
+                        )
+                    ]
+                )
+                self.occ_paths.extend(
+                    [
+                        [x]
+                        for x in sorted(
+                            (Path(self.root_dir) / dname).glob("*occ_10.png")
+                        )
+                    ]
+                )
+                self.mb_paths.extend(
+                    [
+                        [x]
+                        for x in sorted(
+                            (Path(self.root_dir) / dname).glob("*mb_10.png")
+                        )
+                    ]
+                )
                 if self.get_backward:
-                    self.flow_b_paths.extend([[x] for x in sorted((Path(self.root_dir) / dname).glob('*flow_01.flo'))])
-                    self.occ_b_paths.extend([[x] for x in sorted((Path(self.root_dir) / dname).glob('*occ_01.png'))])
-                    self.mb_b_paths.extend([[x] for x in sorted((Path(self.root_dir) / dname).glob('*mb_01.png'))])
+                    self.flow_b_paths.extend(
+                        [
+                            [x]
+                            for x in sorted(
+                                (Path(self.root_dir) / dname).glob("*flow_01.flo")
+                            )
+                        ]
+                    )
+                    self.occ_b_paths.extend(
+                        [
+                            [x]
+                            for x in sorted(
+                                (Path(self.root_dir) / dname).glob("*occ_01.png")
+                            )
+                        ]
+                    )
+                    self.mb_b_paths.extend(
+                        [
+                            [x]
+                            for x in sorted(
+                                (Path(self.root_dir) / dname).glob("*mb_01.png")
+                            )
+                        ]
+                    )
 
-        self.metadata = [{'image_paths': [str(p) for p in paths], 'is_val': False, 'misc': ''} for paths in self.img_paths]
+        self.metadata = [
+            {
+                "image_paths": [str(p) for p in paths],
+                "is_val": False,
+                "misc": "",
+                "is_seq_start": True,
+            }
+            for paths in self.img_paths
+        ]
 
         # Sanity check
-        assert len(img1_paths) == len(img2_paths), f'{len(img1_paths)} vs {len(img2_paths)}'
-        assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
-        assert len(self.img_paths) == len(self.occ_paths), f'{len(self.img_paths)} vs {len(self.occ_paths)}'
-        assert len(self.img_paths) == len(self.mb_paths), f'{len(self.img_paths)} vs {len(self.mb_paths)}'
+        assert len(img1_paths) == len(
+            img2_paths
+        ), f"{len(img1_paths)} vs {len(img2_paths)}"
+        assert len(self.img_paths) == len(
+            self.flow_paths
+        ), f"{len(self.img_paths)} vs {len(self.flow_paths)}"
+        assert len(self.img_paths) == len(
+            self.occ_paths
+        ), f"{len(self.img_paths)} vs {len(self.occ_paths)}"
+        assert len(self.img_paths) == len(
+            self.mb_paths
+        ), f"{len(self.img_paths)} vs {len(self.mb_paths)}"
         if self.get_backward:
-            assert len(self.img_paths) == len(self.flow_b_paths), f'{len(self.img_paths)} vs {len(self.flow_b_paths)}'
-            assert len(self.img_paths) == len(self.occ_b_paths), f'{len(self.img_paths)} vs {len(self.occ_b_paths)}'
-            assert len(self.img_paths) == len(self.mb_b_paths), f'{len(self.img_paths)} vs {len(self.mb_b_paths)}'
+            assert len(self.img_paths) == len(
+                self.flow_b_paths
+            ), f"{len(self.img_paths)} vs {len(self.flow_b_paths)}"
+            assert len(self.img_paths) == len(
+                self.occ_b_paths
+            ), f"{len(self.img_paths)} vs {len(self.occ_b_paths)}"
+            assert len(self.img_paths) == len(
+                self.mb_b_paths
+            ), f"{len(self.img_paths)} vs {len(self.mb_b_paths)}"
 
         self._log_status()
 
@@ -471,9 +655,9 @@ class FlyingThings3DDataset(BaseFlowDataset):
     def __init__(  # noqa: C901
         self,
         root_dir: str,
-        split: str = 'train',
-        pass_names: Union[str, List[str]] = 'clean',
-        side_names: Union[str, List[str]] = 'left',
+        split: str = "train",
+        pass_names: Union[str, List[str]] = "clean",
+        side_names: Union[str, List[str]] = "left",
         add_reverse: bool = True,
         transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
         max_flow: float = 1000.0,
@@ -482,7 +666,8 @@ class FlyingThings3DDataset(BaseFlowDataset):
         get_motion_boundary_mask: bool = True,
         get_backward: bool = True,
         get_meta: bool = True,
-        sequence_length: int = 2
+        sequence_length: int = 2,
+        sequence_position: str = "first",
     ) -> None:
         """Initialize FlyingThings3DDataset.
 
@@ -510,15 +695,21 @@ class FlyingThings3DDataset(BaseFlowDataset):
         get_motion_boundary_mask : bool, default True
             Whether to get motion boundary masks.
         get_backward : bool, default True
-            Whether to get the occluded version of the inputs.
+            Whether to get the backward version of the inputs.
         get_meta : bool, default True
             Whether to get metadata.
         sequence_length : int, default 2
             How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
             temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
         """
         super().__init__(
-            dataset_name='FlyingThings3D',
+            dataset_name="FlyingThings3D",
             split_name=split,
             transform=transform,
             max_flow=max_flow,
@@ -526,107 +717,225 @@ class FlyingThings3DDataset(BaseFlowDataset):
             get_occlusion_mask=get_occlusion_mask,
             get_motion_boundary_mask=get_motion_boundary_mask,
             get_backward=get_backward,
-            get_meta=get_meta)
+            get_meta=get_meta,
+        )
         self.root_dir = root_dir
         self.add_reverse = add_reverse
         self.pass_names = pass_names
         self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
         if isinstance(self.pass_names, str):
             self.pass_names = [self.pass_names]
         self.side_names = side_names
         if isinstance(self.side_names, str):
             self.side_names = [self.side_names]
 
-        if split == 'val':
-            split_dir_names = ['TEST']
-        elif split == 'train':
-            split_dir_names = ['TRAIN']
+        if split == "val":
+            split_dir_names = ["TEST"]
+        elif split == "train":
+            split_dir_names = ["TRAIN"]
         else:
-            split_dir_names = ['TRAIN', 'TEST']
+            split_dir_names = ["TRAIN", "TEST"]
 
-        pass_dirs = [f'frames_{p}pass' for p in self.pass_names]
+        pass_dirs = [f"frames_{p}pass" for p in self.pass_names]
 
-        directions = [('into_future', 'into_past')]
+        directions = [("into_future", "into_past")]
         reverts = [False]
         if self.add_reverse:
-            directions.append(('into_past', 'into_future'))
+            directions.append(("into_past", "into_future"))
             reverts.append(True)
 
         # Read paths from disk
         for passd in pass_dirs:
             for split in split_dir_names:
                 split_path = Path(self.root_dir) / passd / split
-                for letter_path in split_path.glob('*'):
-                    for seq_path in letter_path.glob('*'):
+                for letter_path in split_path.glob("*"):
+                    for seq_path in letter_path.glob("*"):
                         for direcs, rev in zip(directions, reverts):
                             for side in self.side_names:
-                                image_paths = sorted((seq_path / side).glob('*.png'), reverse=rev)
+                                image_paths = sorted(
+                                    (seq_path / side).glob("*.png"), reverse=rev
+                                )
+                                image_paths = self._extend_paths_list(
+                                    image_paths, sequence_length, sequence_position
+                                )
                                 flow_paths = sorted(
-                                    (Path(str(seq_path).replace(passd, 'optical_flow')) / direcs[0] / side).glob('*.pfm'),
-                                    reverse=rev)
+                                    (
+                                        Path(
+                                            str(seq_path).replace(passd, "optical_flow")
+                                        )
+                                        / direcs[0]
+                                        / side
+                                    ).glob("*.pfm"),
+                                    reverse=rev,
+                                )
+                                flow_paths = self._extend_paths_list(
+                                    flow_paths, sequence_length, sequence_position
+                                )
 
                                 occ_paths = []
-                                if (Path(self.root_dir) / 'occlusions').exists():
+                                if (Path(self.root_dir) / "occlusions").exists():
                                     occ_paths = sorted(
-                                        (Path(str(seq_path).replace(passd, 'occlusions')) / direcs[0] / side).glob('*.png'),
-                                        reverse=rev)
+                                        (
+                                            Path(
+                                                str(seq_path).replace(
+                                                    passd, "occlusions"
+                                                )
+                                            )
+                                            / direcs[0]
+                                            / side
+                                        ).glob("*.png"),
+                                        reverse=rev,
+                                    )
+                                    occ_paths = self._extend_paths_list(
+                                        occ_paths, sequence_length, sequence_position
+                                    )
                                 mb_paths = []
-                                if (Path(self.root_dir) / 'motion_boundaries').exists():
+                                if (Path(self.root_dir) / "motion_boundaries").exists():
                                     mb_paths = sorted(
-                                        (Path(str(seq_path).replace(passd, 'motion_boundaries')) / direcs[0] / side).glob(
-                                            '*.png'),
-                                        reverse=rev)
+                                        (
+                                            Path(
+                                                str(seq_path).replace(
+                                                    passd, "motion_boundaries"
+                                                )
+                                            )
+                                            / direcs[0]
+                                            / side
+                                        ).glob("*.png"),
+                                        reverse=rev,
+                                    )
+                                    mb_paths = self._extend_paths_list(
+                                        mb_paths, sequence_length, sequence_position
+                                    )
 
                                 flow_b_paths = []
                                 occ_b_paths = []
                                 mb_b_paths = []
                                 if self.get_backward:
                                     flow_b_paths = sorted(
-                                        (Path(str(seq_path).replace(passd, 'optical_flow')) / direcs[1] / side).glob('*.pfm'),
-                                        reverse=rev)
-                                    if (Path(self.root_dir) / 'occlusions').exists():
+                                        (
+                                            Path(
+                                                str(seq_path).replace(
+                                                    passd, "optical_flow"
+                                                )
+                                            )
+                                            / direcs[1]
+                                            / side
+                                        ).glob("*.pfm"),
+                                        reverse=rev,
+                                    )
+                                    flow_b_paths = self._extend_paths_list(
+                                        flow_b_paths, sequence_length, sequence_position
+                                    )
+                                    if (Path(self.root_dir) / "occlusions").exists():
                                         occ_b_paths = sorted(
-                                            (Path(str(seq_path).replace(passd, 'occlusions')) / direcs[1] / side).glob(
-                                                '*.png'),
-                                            reverse=rev)
-                                    if (Path(self.root_dir) / 'motion_boundaries').exists():
+                                            (
+                                                Path(
+                                                    str(seq_path).replace(
+                                                        passd, "occlusions"
+                                                    )
+                                                )
+                                                / direcs[1]
+                                                / side
+                                            ).glob("*.png"),
+                                            reverse=rev,
+                                        )
+                                        occ_b_paths = self._extend_paths_list(
+                                            occ_b_paths,
+                                            sequence_length,
+                                            sequence_position,
+                                        )
+                                    if (
+                                        Path(self.root_dir) / "motion_boundaries"
+                                    ).exists():
                                         mb_b_paths = sorted(
-                                            (Path(str(seq_path).replace(passd, 'motion_boundaries')) / direcs[1] / side).glob(
-                                                '*.png'),
-                                            reverse=rev)
+                                            (
+                                                Path(
+                                                    str(seq_path).replace(
+                                                        passd, "motion_boundaries"
+                                                    )
+                                                )
+                                                / direcs[1]
+                                                / side
+                                            ).glob("*.png"),
+                                            reverse=rev,
+                                        )
+                                        mb_b_paths = self._extend_paths_list(
+                                            mb_b_paths,
+                                            sequence_length,
+                                            sequence_position,
+                                        )
 
-                                for i in range(len(image_paths)-self.sequence_length+1):
-                                    self.img_paths.append(image_paths[i:i+self.sequence_length])
+                                for i in range(
+                                    len(image_paths) - self.sequence_length + 1
+                                ):
+                                    self.img_paths.append(
+                                        image_paths[i : i + self.sequence_length]
+                                    )
                                     if len(flow_paths) > 0:
-                                        self.flow_paths.append(flow_paths[i:i+self.sequence_length-1])
+                                        self.flow_paths.append(
+                                            flow_paths[i : i + self.sequence_length - 1]
+                                        )
                                     if len(occ_paths) > 0:
-                                        self.occ_paths.append(occ_paths[i:i+self.sequence_length-1])
+                                        self.occ_paths.append(
+                                            occ_paths[i : i + self.sequence_length - 1]
+                                        )
                                     if len(mb_paths) > 0:
-                                        self.mb_paths.append(mb_paths[i:i+self.sequence_length-1])
-                                    self.metadata.append({
-                                        'image_paths': [str(p) for p in image_paths[i:i+self.sequence_length]],
-                                        'is_val': False,
-                                        'misc': ''
-                                    })
+                                        self.mb_paths.append(
+                                            mb_paths[i : i + self.sequence_length - 1]
+                                        )
+                                    self.metadata.append(
+                                        {
+                                            "image_paths": [
+                                                str(p)
+                                                for p in image_paths[
+                                                    i : i + self.sequence_length
+                                                ]
+                                            ],
+                                            "is_val": False,
+                                            "misc": "",
+                                            "is_seq_start": i == 0,
+                                        }
+                                    )
                                     if self.get_backward:
                                         if len(flow_b_paths) > 0:
-                                            self.flow_b_paths.append(flow_b_paths[i+1:i+self.sequence_length])
+                                            self.flow_b_paths.append(
+                                                flow_b_paths[
+                                                    i + 1 : i + self.sequence_length
+                                                ]
+                                            )
                                         if len(occ_b_paths) > 0:
-                                            self.occ_b_paths.append(occ_b_paths[i+1:i+self.sequence_length])
+                                            self.occ_b_paths.append(
+                                                occ_b_paths[
+                                                    i + 1 : i + self.sequence_length
+                                                ]
+                                            )
                                         if len(mb_b_paths) > 0:
-                                            self.mb_b_paths.append(mb_b_paths[i+1:i+self.sequence_length])
+                                            self.mb_b_paths.append(
+                                                mb_b_paths[
+                                                    i + 1 : i + self.sequence_length
+                                                ]
+                                            )
 
-        assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
-        assert len(self.occ_paths) == 0 or len(self.img_paths) == len(self.occ_paths), (
-            f'{len(self.img_paths)} vs {len(self.occ_paths)}')
-        assert len(self.mb_paths) == 0 or len(self.img_paths) == len(self.mb_paths), (
-            f'{len(self.img_paths)} vs {len(self.mb_paths)}')
+        assert len(self.img_paths) == len(
+            self.flow_paths
+        ), f"{len(self.img_paths)} vs {len(self.flow_paths)}"
+        assert len(self.occ_paths) == 0 or len(self.img_paths) == len(
+            self.occ_paths
+        ), f"{len(self.img_paths)} vs {len(self.occ_paths)}"
+        assert len(self.mb_paths) == 0 or len(self.img_paths) == len(
+            self.mb_paths
+        ), f"{len(self.img_paths)} vs {len(self.mb_paths)}"
         if self.get_backward:
-            assert len(self.img_paths) == len(self.flow_b_paths), f'{len(self.img_paths)} vs {len(self.flow_b_paths)}'
-            assert len(self.occ_b_paths) == 0 or len(self.img_paths) == len(self.occ_b_paths), (
-                f'{len(self.img_paths)} vs {len(self.occ_b_paths)}')
-            assert len(self.mb_b_paths) == 0 or len(self.img_paths) == len(self.mb_b_paths), (
-                f'{len(self.img_paths)} vs {len(self.mb_b_paths)}')
+            assert len(self.img_paths) == len(
+                self.flow_b_paths
+            ), f"{len(self.img_paths)} vs {len(self.flow_b_paths)}"
+            assert len(self.occ_b_paths) == 0 or len(self.img_paths) == len(
+                self.occ_b_paths
+            ), f"{len(self.img_paths)} vs {len(self.occ_b_paths)}"
+            assert len(self.mb_b_paths) == 0 or len(self.img_paths) == len(
+                self.mb_b_paths
+            ), f"{len(self.img_paths)} vs {len(self.mb_b_paths)}"
 
         self._log_status()
 
@@ -640,9 +949,9 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
     def __init__(  # noqa: C901
         self,
         root_dir: str,
-        split: str = 'train',
-        pass_names: Union[str, List[str]] = 'clean',
-        side_names: Union[str, List[str]] = 'left',
+        split: str = "train",
+        pass_names: Union[str, List[str]] = "clean",
+        side_names: Union[str, List[str]] = "left",
         add_reverse: bool = True,
         transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
         max_flow: float = 1000.0,
@@ -651,7 +960,8 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
         get_motion_boundary_mask: bool = True,
         get_backward: bool = True,
         get_meta: bool = True,
-        sequence_length: int = 2
+        sequence_length: int = 2,
+        sequence_position: str = "first",
     ) -> None:
         """Initialize FlyingThings3DSubsetDataset.
 
@@ -685,9 +995,15 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
         sequence_length : int, default 2
             How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
             temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
         """
         super().__init__(
-            dataset_name='FlyingThings3DSubset',
+            dataset_name="FlyingThings3DSubset",
             split_name=split,
             transform=transform,
             max_flow=max_flow,
@@ -695,26 +1011,28 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
             get_occlusion_mask=get_occlusion_mask,
             get_motion_boundary_mask=get_motion_boundary_mask,
             get_backward=get_backward,
-            get_meta=get_meta)
+            get_meta=get_meta,
+        )
         self.root_dir = root_dir
         self.add_reverse = add_reverse
         self.pass_names = pass_names
         self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
         if isinstance(self.pass_names, str):
             self.pass_names = [self.pass_names]
         self.side_names = side_names
         if isinstance(self.side_names, str):
             self.side_names = [self.side_names]
 
-        if split == 'train' or split == 'val':
+        if split == "train" or split == "val":
             split_dir_names = [split]
         else:
-            split_dir_names = ['train', 'val']
+            split_dir_names = ["train", "val"]
 
-        directions = [('into_future', 'into_past')]
+        directions = [("into_future", "into_past")]
         reverts = [False]
         if self.add_reverse:
-            directions.append(('into_past', 'into_future'))
+            directions.append(("into_past", "into_future"))
             reverts.append(True)
 
         # Read paths from disk
@@ -722,8 +1040,10 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
             for pass_name in self.pass_names:
                 for side in self.side_names:
                     for direcs, rev in zip(directions, reverts):
-                        flow_dir = Path(self.root_dir) / split / 'flow' / side / direcs[0]
-                        flow_paths = sorted(flow_dir.glob('*.flo'), reverse=rev)
+                        flow_dir = (
+                            Path(self.root_dir) / split / "flow" / side / direcs[0]
+                        )
+                        flow_paths = sorted(flow_dir.glob("*.flo"), reverse=rev)
 
                         # Create groups to separate different sequences
                         flow_groups_paths = [[flow_paths[0]]]
@@ -737,39 +1057,70 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
                             prev_idx = idx
 
                         for flow_group in flow_groups_paths:
-                            for i in range(len(flow_group)-self.sequence_length+2):
-                                flow_paths = flow_group[i:i+self.sequence_length-1]
+                            flow_group = self._extend_paths_list(
+                                flow_group, sequence_length, sequence_position
+                            )
+                            for i in range(len(flow_group) - self.sequence_length + 2):
+                                flow_paths = flow_group[
+                                    i : i + self.sequence_length - 1
+                                ]
                                 self.flow_paths.append(flow_paths)
 
-                                img_dir = Path(self.root_dir) / split / f'image_{pass_name}' / side
-                                img_paths = [img_dir / (fp.stem+'.png') for fp in flow_paths]
+                                img_dir = (
+                                    Path(self.root_dir)
+                                    / split
+                                    / f"image_{pass_name}"
+                                    / side
+                                )
+                                img_paths = [
+                                    img_dir / (fp.stem + ".png") for fp in flow_paths
+                                ]
                                 if rev:
                                     idx = int(img_paths[0].stem) - 1
                                 else:
                                     idx = int(img_paths[-1].stem) + 1
-                                img_paths.append(img_dir / f'{idx:07d}.png')
+                                img_paths.append(img_dir / f"{idx:07d}.png")
                                 self.img_paths.append(img_paths)
 
-                                if (Path(self.root_dir) / split / 'flow_occlusions').exists():
+                                if (
+                                    Path(self.root_dir) / split / "flow_occlusions"
+                                ).exists():
                                     occ_paths = [
-                                        Path(str(fp).replace('flow', 'flow_occlusions').replace('.flo', '.png'))
-                                        for fp in flow_paths]
+                                        Path(
+                                            str(fp)
+                                            .replace("flow", "flow_occlusions")
+                                            .replace(".flo", ".png")
+                                        )
+                                        for fp in flow_paths
+                                    ]
                                     self.occ_paths.append(occ_paths)
-                                if (Path(self.root_dir) / split / 'motion_boundaries').exists():
+                                if (
+                                    Path(self.root_dir) / split / "motion_boundaries"
+                                ).exists():
                                     mb_paths = [
-                                        Path(str(fp).replace('flow', 'motion_boundaries').replace('.flo', '.png'))
-                                        for fp in flow_paths]
+                                        Path(
+                                            str(fp)
+                                            .replace("flow", "motion_boundaries")
+                                            .replace(".flo", ".png")
+                                        )
+                                        for fp in flow_paths
+                                    ]
                                     self.mb_paths.append(mb_paths)
 
-                                self.metadata.append({
-                                    'image_paths': [str(p) for p in img_paths],
-                                    'is_val': False,
-                                    'misc': ''
-                                })
+                                self.metadata.append(
+                                    {
+                                        "image_paths": [str(p) for p in img_paths],
+                                        "is_val": False,
+                                        "misc": "",
+                                        "is_seq_start": i == 0,
+                                    }
+                                )
 
                         if self.get_backward:
-                            flow_dir = Path(self.root_dir) / split / 'flow' / side / direcs[1]
-                            flow_paths = sorted(flow_dir.glob('*.flo'), reverse=rev)
+                            flow_dir = (
+                                Path(self.root_dir) / split / "flow" / side / direcs[1]
+                            )
+                            flow_paths = sorted(flow_dir.glob("*.flo"), reverse=rev)
 
                             # Create groups to separate different sequences
                             flow_groups_paths = [[flow_paths[0]]]
@@ -783,32 +1134,63 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
                                 prev_idx = idx
 
                             for flow_group in flow_groups_paths:
-                                for i in range(len(flow_group)-self.sequence_length+2):
-                                    flow_paths = flow_group[i:i+self.sequence_length-1]
+                                flow_group = self._extend_paths_list(
+                                    flow_group, sequence_length, sequence_position
+                                )
+                                for i in range(
+                                    len(flow_group) - self.sequence_length + 2
+                                ):
+                                    flow_paths = flow_group[
+                                        i : i + self.sequence_length - 1
+                                    ]
                                     self.flow_b_paths.append(flow_paths)
 
-                                    if (Path(self.root_dir) / split / 'flow_occlusions').exists():
+                                    if (
+                                        Path(self.root_dir) / split / "flow_occlusions"
+                                    ).exists():
                                         occ_paths = [
-                                            Path(str(fp).replace('flow', 'flow_occlusions').replace('.flo', '.png'))
-                                            for fp in flow_paths]
+                                            Path(
+                                                str(fp)
+                                                .replace("flow", "flow_occlusions")
+                                                .replace(".flo", ".png")
+                                            )
+                                            for fp in flow_paths
+                                        ]
                                         self.occ_b_paths.append(occ_paths)
-                                    if (Path(self.root_dir) / split / 'motion_boundaries').exists():
+                                    if (
+                                        Path(self.root_dir)
+                                        / split
+                                        / "motion_boundaries"
+                                    ).exists():
                                         mb_paths = [
-                                            Path(str(fp).replace('flow', 'motion_boundaries').replace('.flo', '.png'))
-                                            for fp in flow_paths]
+                                            Path(
+                                                str(fp)
+                                                .replace("flow", "motion_boundaries")
+                                                .replace(".flo", ".png")
+                                            )
+                                            for fp in flow_paths
+                                        ]
                                         self.mb_b_paths.append(mb_paths)
 
-        assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs  {len(self.flow_paths)}'
-        assert len(self.occ_paths) == 0 or len(self.img_paths) == len(self.occ_paths), (
-            f'{len(self.img_paths)} vs {len(self.occ_paths)}')
-        assert len(self.mb_paths) == 0 or len(self.img_paths) == len(self.mb_paths), (
-            f'{len(self.img_paths)} vs {len(self.mb_paths)}')
+        assert len(self.img_paths) == len(
+            self.flow_paths
+        ), f"{len(self.img_paths)} vs  {len(self.flow_paths)}"
+        assert len(self.occ_paths) == 0 or len(self.img_paths) == len(
+            self.occ_paths
+        ), f"{len(self.img_paths)} vs {len(self.occ_paths)}"
+        assert len(self.mb_paths) == 0 or len(self.img_paths) == len(
+            self.mb_paths
+        ), f"{len(self.img_paths)} vs {len(self.mb_paths)}"
         if self.get_backward:
-            assert len(self.img_paths) == len(self.flow_b_paths), f'{len(self.img_paths)} vs {len(self.flow_b_paths)}'
-            assert len(self.occ_b_paths) == 0 or len(self.img_paths) == len(self.occ_b_paths), (
-                f'{len(self.img_paths)} vs {len(self.occ_b_paths)}')
-            assert len(self.mb_b_paths) == 0 or len(self.img_paths) == len(self.mb_b_paths), (
-                f'{len(self.img_paths)} vs {len(self.mb_b_paths)}')
+            assert len(self.img_paths) == len(
+                self.flow_b_paths
+            ), f"{len(self.img_paths)} vs {len(self.flow_b_paths)}"
+            assert len(self.occ_b_paths) == 0 or len(self.img_paths) == len(
+                self.occ_b_paths
+            ), f"{len(self.img_paths)} vs {len(self.occ_b_paths)}"
+            assert len(self.mb_b_paths) == 0 or len(self.img_paths) == len(
+                self.mb_b_paths
+            ), f"{len(self.img_paths)} vs {len(self.mb_b_paths)}"
 
         self._log_status()
 
@@ -819,12 +1201,13 @@ class Hd1kDataset(BaseFlowDataset):
     def __init__(  # noqa: C901
         self,
         root_dir: str,
-        split: str = 'train',
+        split: str = "train",
         transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
         max_flow: float = 512.0,
         get_valid_mask: bool = True,
         get_meta: bool = True,
-        sequence_length: int = 2
+        sequence_length: int = 2,
+        sequence_position: str = "first",
     ) -> None:
         """Initialize Hd1kDataset.
 
@@ -846,9 +1229,15 @@ class Hd1kDataset(BaseFlowDataset):
         sequence_length : int, default 2
             How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
             temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
         """
         super().__init__(
-            dataset_name='HD1K',
+            dataset_name="HD1K",
             split_name=split,
             transform=transform,
             max_flow=max_flow,
@@ -856,56 +1245,77 @@ class Hd1kDataset(BaseFlowDataset):
             get_occlusion_mask=False,
             get_motion_boundary_mask=False,
             get_backward=False,
-            get_meta=get_meta)
+            get_meta=get_meta,
+        )
         self.root_dir = root_dir
         self.split = split
         self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
 
-        if split == 'test':
-            split_dir = 'hd1k_challenge'
+        if split == "test":
+            split_dir = "hd1k_challenge"
         else:
-            split_dir = 'hd1k_input'
+            split_dir = "hd1k_input"
 
-        img_paths = sorted((Path(root_dir) / split_dir / 'image_2').glob('*.png'))
+        img_paths = sorted((Path(root_dir) / split_dir / "image_2").glob("*.png"))
         img_names = [p.stem for p in img_paths]
 
         # Group paths by sequence
         img_names_grouped = {}
         for n in img_names:
-            seq_name = n.split('_')[0]
+            seq_name = n.split("_")[0]
             if img_names_grouped.get(seq_name) is None:
                 img_names_grouped[seq_name] = []
             img_names_grouped[seq_name].append(n)
 
         val_names = []
-        split_file = THIS_DIR / 'Hd1k_val.txt'
-        with open(split_file, 'r') as f:
+        split_file = THIS_DIR / "Hd1k_val.txt"
+        with open(split_file, "r") as f:
             val_names = f.read().strip().splitlines()
 
         # Remove names that do not belong to the chosen split
         for seq_name, seq_img_names in img_names_grouped.items():
-            if split == 'train':
-                img_names_grouped[seq_name] = [n for n in seq_img_names if n not in val_names]
-            elif split == 'val':
-                img_names_grouped[seq_name] = [n for n in seq_img_names if n in val_names]
+            if split == "train":
+                img_names_grouped[seq_name] = [
+                    n for n in seq_img_names if n not in val_names
+                ]
+            elif split == "val":
+                img_names_grouped[seq_name] = [
+                    n for n in seq_img_names if n in val_names
+                ]
 
         for seq_img_names in img_names_grouped.values():
+            seq_img_names = self._extend_paths_list(
+                seq_img_names, sequence_length, sequence_position
+            )
             for i in range(len(seq_img_names) - self.sequence_length + 1):
                 self.img_paths.append(
-                    [Path(root_dir) / split_dir / 'image_2' / (n+'.png') for n in seq_img_names[i:i+self.sequence_length]])
-                if split != 'test':
+                    [
+                        Path(root_dir) / split_dir / "image_2" / (n + ".png")
+                        for n in seq_img_names[i : i + self.sequence_length]
+                    ]
+                )
+                if split != "test":
                     self.flow_paths.append(
-                        [Path(root_dir) / 'hd1k_flow_gt' / 'flow_occ' / (n+'.png')
-                         for n in seq_img_names[i:i+self.sequence_length-1]])
+                        [
+                            Path(root_dir) / "hd1k_flow_gt" / "flow_occ" / (n + ".png")
+                            for n in seq_img_names[i : i + self.sequence_length - 1]
+                        ]
+                    )
 
-                self.metadata.append({
-                    'image_paths': [str(p) for p in self.img_paths[-1]],
-                    'is_val': (seq_img_names[i] in val_names),
-                    'misc': ''
-                })
+                self.metadata.append(
+                    {
+                        "image_paths": [str(p) for p in self.img_paths[-1]],
+                        "is_val": (seq_img_names[i] in val_names),
+                        "misc": "",
+                        "is_seq_start": True,
+                    }
+                )
 
-        if split != 'test':
-            assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
+        if split != "test":
+            assert len(self.img_paths) == len(
+                self.flow_paths
+            ), f"{len(self.img_paths)} vs {len(self.flow_paths)}"
 
         self._log_status()
 
@@ -917,12 +1327,13 @@ class KittiDataset(BaseFlowDataset):
         self,
         root_dir_2012: Optional[str] = None,
         root_dir_2015: Optional[str] = None,
-        split: str = 'train',
-        versions: Union[str, List[str]] = '2015',
+        split: str = "train",
+        versions: Union[str, List[str]] = "2015",
         transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
         max_flow: float = 512.0,
         get_valid_mask: bool = True,
-        get_meta: bool = True
+        get_occlusion_mask: bool = False,
+        get_meta: bool = True,
     ) -> None:
         """Initialize KittiDataset.
 
@@ -943,6 +1354,8 @@ class KittiDataset(BaseFlowDataset):
             as zero in the valid mask.
         get_valid_mask : bool, default True
             Whether to get or generate valid masks.
+        get_occlusion_mask : bool, default True
+            Whether to get occlusion masks.
         get_meta : bool, default True
             Whether to get metadata.
         """
@@ -954,61 +1367,90 @@ class KittiDataset(BaseFlowDataset):
             transform=transform,
             max_flow=max_flow,
             get_valid_mask=get_valid_mask,
-            get_occlusion_mask=False,
+            get_occlusion_mask=get_occlusion_mask,
             get_motion_boundary_mask=False,
             get_backward=False,
-            get_meta=get_meta)
-        self.root_dir = {'2012': root_dir_2012, '2015': root_dir_2015}
+            get_meta=get_meta,
+        )
+        self.root_dir = {"2012": root_dir_2012, "2015": root_dir_2015}
         self.versions = versions
         self.split = split
 
-        if split == 'test':
-            split_dir = 'testing'
+        if split == "test":
+            split_dir = "testing"
         else:
-            split_dir = 'training'
+            split_dir = "training"
 
         for ver in versions:
             if self.root_dir[ver] is None:
                 continue
 
-            if ver == '2012':
-                image_dir = 'colored_0'
+            if ver == "2012":
+                image_dir = "colored_0"
             else:
-                image_dir = 'image_2'
+                image_dir = "image_2"
 
-            img1_paths = sorted((Path(self.root_dir[ver]) / split_dir / image_dir).glob('*_10.png'))
-            img2_paths = sorted((Path(self.root_dir[ver]) / split_dir / image_dir).glob('*_11.png'))
-            assert len(img1_paths) == len(img2_paths), f'{len(img1_paths)} vs {len(img2_paths)}'
+            img1_paths = sorted(
+                (Path(self.root_dir[ver]) / split_dir / image_dir).glob("*_10.png")
+            )
+            img2_paths = sorted(
+                (Path(self.root_dir[ver]) / split_dir / image_dir).glob("*_11.png")
+            )
+            assert len(img1_paths) == len(
+                img2_paths
+            ), f"{len(img1_paths)} vs {len(img2_paths)}"
             flow_paths = []
-            if split != 'test':
-                flow_paths = sorted((Path(self.root_dir[ver]) / split_dir / 'flow_occ').glob('*_10.png'))
-                assert len(img1_paths) == len(flow_paths), f'{len(img1_paths)} vs {len(flow_paths)}'
+            if split != "test":
+                flow_paths = sorted(
+                    (Path(self.root_dir[ver]) / split_dir / "flow_occ").glob("*_10.png")
+                )
+                assert len(img1_paths) == len(
+                    flow_paths
+                ), f"{len(img1_paths)} vs {len(flow_paths)}"
 
-            split_file = THIS_DIR / f'Kitti{ver}_val.txt'
-            with open(split_file, 'r') as f:
+            split_file = THIS_DIR / f"Kitti{ver}_val.txt"
+            with open(split_file, "r") as f:
                 val_names = f.read().strip().splitlines()
 
-            if split == 'trainval' or split == 'test':
+            if split == "trainval" or split == "test":
                 remove_names = []
-            elif split == 'train':
+            elif split == "train":
                 remove_names = val_names
-            elif split == 'val':
+            elif split == "val":
                 remove_names = [p.stem for p in img1_paths if p.stem not in val_names]
 
-            self.img_paths = [
-                [img1_paths[i], img2_paths[i]] for i in range(len(img1_paths)) if img1_paths[i].stem not in remove_names]
-            if split != 'test':
-                self.flow_paths = [
-                    [flow_paths[i]] for i in range(len(flow_paths)) if flow_paths[i].stem not in remove_names]
-            self.metadata = [
-                {
-                    'image_paths': [str(img1_paths[i]), str(img2_paths[i])],
-                    'is_val': img1_paths[i].stem in val_names,
-                    'misc': ver
-                } for i in range(len(img1_paths)) if img1_paths[i].stem not in remove_names]
+            self.img_paths.extend(
+                [
+                    [img1_paths[i], img2_paths[i]]
+                    for i in range(len(img1_paths))
+                    if img1_paths[i].stem not in remove_names
+                ]
+            )
+            if split != "test":
+                self.flow_paths.extend(
+                    [
+                        [flow_paths[i]]
+                        for i in range(len(flow_paths))
+                        if flow_paths[i].stem not in remove_names
+                    ]
+                )
+            self.metadata.extend(
+                [
+                    {
+                        "image_paths": [str(img1_paths[i]), str(img2_paths[i])],
+                        "is_val": img1_paths[i].stem in val_names,
+                        "misc": ver,
+                        "is_seq_start": True,
+                    }
+                    for i in range(len(img1_paths))
+                    if img1_paths[i].stem not in remove_names
+                ]
+            )
 
-        if split != 'test':
-            assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
+        if split != "test":
+            assert len(self.img_paths) == len(
+                self.flow_paths
+            ), f"{len(self.img_paths)} vs {len(self.flow_paths)}"
 
         self._log_status()
 
@@ -1019,14 +1461,15 @@ class SintelDataset(BaseFlowDataset):
     def __init__(  # noqa: C901
         self,
         root_dir: str,
-        split: str = 'train',
-        pass_names: Union[str, List[str]] = 'clean',
+        split: str = "train",
+        pass_names: Union[str, List[str]] = "clean",
         transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
         get_occlusion_mask: bool = True,
         get_meta: bool = True,
-        sequence_length: int = 2
+        sequence_length: int = 2,
+        sequence_position: str = "first",
     ) -> None:
         """Initialize SintelDataset.
 
@@ -1052,6 +1495,12 @@ class SintelDataset(BaseFlowDataset):
         sequence_length : int, default 2
             How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
             temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
         """
         if isinstance(pass_names, str):
             pass_names = [pass_names]
@@ -1064,25 +1513,29 @@ class SintelDataset(BaseFlowDataset):
             get_occlusion_mask=get_occlusion_mask,
             get_motion_boundary_mask=False,
             get_backward=False,
-            get_meta=get_meta)
+            get_meta=get_meta,
+        )
         self.root_dir = root_dir
         self.split = split
         self.pass_names = pass_names
         self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
 
         # Get sequence names for the given split
-        if split == 'test':
-            split_dir = 'test'
+        if split == "test":
+            split_dir = "test"
         else:
-            split_dir = 'training'
+            split_dir = "training"
 
-        split_file = THIS_DIR / 'Sintel_val.txt'
-        with open(split_file, 'r') as f:
+        split_file = THIS_DIR / "Sintel_val.txt"
+        with open(split_file, "r") as f:
             val_seqs = f.read().strip().splitlines()
 
-        sequence_names = sorted([p.stem for p in (Path(root_dir) / split_dir / 'clean').glob('*')])
-        if split == 'train' or split == 'val':
-            if split == 'train':
+        sequence_names = sorted(
+            [p.stem for p in (Path(root_dir) / split_dir / "clean").glob("*")]
+        )
+        if split == "train" or split == "val":
+            if split == "train":
                 sequence_names = [s for s in sequence_names if s not in val_seqs]
             else:
                 sequence_names = val_seqs
@@ -1090,32 +1543,505 @@ class SintelDataset(BaseFlowDataset):
         # Read paths from disk
         for passd in pass_names:
             for seq_name in sequence_names:
-                image_paths = sorted((Path(self.root_dir) / split_dir / passd / seq_name).glob('*.png'))
+                image_paths = sorted(
+                    (Path(self.root_dir) / split_dir / passd / seq_name).glob("*.png")
+                )
+                image_paths = self._extend_paths_list(
+                    image_paths, sequence_length, sequence_position
+                )
                 flow_paths = []
                 occ_paths = []
-                if split != 'test':
-                    flow_paths = sorted((Path(self.root_dir) / split_dir / 'flow' / seq_name).glob('*.flo'))
-                    assert len(image_paths)-1 == len(flow_paths), (
-                        f'{passd}, {seq_name}: {len(image_paths)-1} vs {len(flow_paths)}')
-                    if (Path(self.root_dir) / split_dir / 'occlusions').exists():
-                        occ_paths = sorted((Path(self.root_dir) / split_dir / 'occlusions' / seq_name).glob('*.png'))
+                if split != "test":
+                    flow_paths = sorted(
+                        (Path(self.root_dir) / split_dir / "flow" / seq_name).glob(
+                            "*.flo"
+                        )
+                    )
+                    flow_paths = self._extend_paths_list(
+                        flow_paths, sequence_length, sequence_position
+                    )
+                    assert len(image_paths) - 1 == len(
+                        flow_paths
+                    ), f"{passd}, {seq_name}: {len(image_paths)-1} vs {len(flow_paths)}"
+                    if (Path(self.root_dir) / split_dir / "occlusions").exists():
+                        occ_paths = sorted(
+                            (
+                                Path(self.root_dir)
+                                / split_dir
+                                / "occlusions"
+                                / seq_name
+                            ).glob("*.png")
+                        )
+                        occ_paths = self._extend_paths_list(
+                            occ_paths, sequence_length, sequence_position
+                        )
                         assert len(occ_paths) == len(flow_paths)
-                for i in range(len(image_paths)-self.sequence_length+1):
-                    self.img_paths.append(image_paths[i:i+self.sequence_length])
+                for i in range(len(image_paths) - self.sequence_length + 1):
+                    self.img_paths.append(image_paths[i : i + self.sequence_length])
                     if len(flow_paths) > 0:
-                        self.flow_paths.append(flow_paths[i:i+self.sequence_length-1])
+                        self.flow_paths.append(
+                            flow_paths[i : i + self.sequence_length - 1]
+                        )
                     if len(occ_paths) > 0:
-                        self.occ_paths.append(occ_paths[i:i+self.sequence_length-1])
-                    self.metadata.append({
-                        'image_paths': [str(p) for p in image_paths[i:i+self.sequence_length]],
-                        'is_val': seq_name in val_seqs,
-                        'misc': seq_name
-                    })
+                        self.occ_paths.append(
+                            occ_paths[i : i + self.sequence_length - 1]
+                        )
+                    self.metadata.append(
+                        {
+                            "image_paths": [
+                                str(p)
+                                for p in image_paths[i : i + self.sequence_length]
+                            ],
+                            "is_val": seq_name in val_seqs,
+                            "misc": seq_name,
+                            "is_seq_start": i == 0,
+                        }
+                    )
 
         # Sanity check
-        if split != 'test':
-            assert len(self.img_paths) == len(self.flow_paths), f'{len(self.img_paths)} vs {len(self.flow_paths)}'
+        if split != "test":
+            assert len(self.img_paths) == len(
+                self.flow_paths
+            ), f"{len(self.img_paths)} vs {len(self.flow_paths)}"
         if len(self.occ_paths) > 0:
-            assert len(self.img_paths) == len(self.occ_paths), f'{len(self.img_paths)} vs {len(self.occ_paths)}'
+            assert len(self.img_paths) == len(
+                self.occ_paths
+            ), f"{len(self.img_paths)} vs {len(self.occ_paths)}"
+
+        self._log_status()
+
+
+class SpringDataset(BaseFlowDataset):
+    """Handle the Spring dataset."""
+
+    def __init__(  # noqa: C901
+        self,
+        root_dir: str,
+        split: str = "train",
+        side_names: Union[str, List[str]] = "left",
+        add_reverse: bool = True,
+        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        max_flow: float = 10000.0,
+        get_valid_mask: bool = True,
+        get_backward: bool = False,
+        get_meta: bool = True,
+        sequence_length: int = 2,
+        sequence_position: str = "first",
+        reverse_only: bool = False,
+    ) -> None:
+        """Initialize SintelDataset.
+
+        Parameters
+        ----------
+        root_dir : str
+            path to the root directory of the MPI Sintel dataset.
+        split : str, default 'train'
+            Which split of the dataset should be loaded. It can be one of {'train', 'val', 'trainval', 'test'}.
+        side_names : Union[str, List[str]], default 'left'
+             Samples from which side view should be loaded. It can be one of {'left', 'right', ['left', 'right']}.
+        add_reverse : bool, default True
+            If True, double the number of samples by appending the backward samples as additional samples.
+        transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
+            Transform to be applied on the inputs.
+        max_flow : float, default 10000.0
+            Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
+            as zero in the valid mask.
+        get_valid_mask : bool, default True
+            Whether to get or generate valid masks.
+        get_backward : bool, default True
+            Whether to get the backward version of the inputs.
+        get_meta : bool, default True
+            Whether to get metadata.
+        sequence_length : int, default 2
+            How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
+            temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
+        reverse_only : bool, default False
+            If True, only uses the backward samples, discarding the forward ones.
+        """
+        if isinstance(side_names, str):
+            side_names = [side_names]
+        super().__init__(
+            dataset_name="Spring",
+            split_name=split,
+            transform=transform,
+            max_flow=max_flow,
+            get_valid_mask=get_valid_mask,
+            get_occlusion_mask=False,
+            get_motion_boundary_mask=False,
+            get_backward=get_backward,
+            get_meta=get_meta,
+        )
+        self.root_dir = root_dir
+        self.split = split
+        self.side_names = side_names
+        self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
+
+        # Get sequence names for the given split
+        if split == "test":
+            split_dir = "test"
+        else:
+            split_dir = "train"
+
+        sequence_names = sorted(
+            [p.stem for p in (Path(root_dir) / split_dir).glob("*")]
+        )
+
+        if reverse_only:
+            directions = [("BW", "FW")]
+        else:
+            directions = [("FW", "BW")]
+            if add_reverse:
+                directions.append(("BW", "FW"))
+
+        # Read paths from disk
+        for seq_name in sequence_names:
+            for side in side_names:
+                for direcs in directions:
+                    rev = direcs[0] == "BW"
+                    image_paths = sorted(
+                        (
+                            Path(self.root_dir) / split_dir / seq_name / f"frame_{side}"
+                        ).glob("*.png"),
+                        reverse=rev,
+                    )
+                    image_paths = self._extend_paths_list(
+                        image_paths, sequence_length, sequence_position
+                    )
+                    flow_paths = []
+                    flow_b_paths = []
+                    if split != "test":
+                        flow_paths = sorted(
+                            (
+                                Path(self.root_dir)
+                                / split_dir
+                                / seq_name
+                                / f"flow_{direcs[0]}_{side}"
+                            ).glob("*.flo5"),
+                            reverse=rev,
+                        )
+                        flow_paths = self._extend_paths_list(
+                            flow_paths, sequence_length, sequence_position
+                        )
+                        assert len(image_paths) - 1 == len(
+                            flow_paths
+                        ), f"{seq_name}, {side}: {len(image_paths)-1} vs {len(flow_paths)}"
+                        if self.get_backward:
+                            flow_b_paths = sorted(
+                                (
+                                    Path(self.root_dir)
+                                    / split_dir
+                                    / seq_name
+                                    / f"flow_{direcs[1]}_{side}"
+                                ).glob("*.flo5"),
+                                reverse=rev,
+                            )
+                            flow_b_paths = self._extend_paths_list(
+                                flow_b_paths, sequence_length, sequence_position
+                            )
+                            assert len(image_paths) - 1 == len(
+                                flow_paths
+                            ), f"{seq_name}, {side}: {len(image_paths)-1} vs {len(flow_paths)}"
+
+                    for i in range(len(image_paths) - self.sequence_length + 1):
+                        self.img_paths.append(image_paths[i : i + self.sequence_length])
+                        if len(flow_paths) > 0:
+                            self.flow_paths.append(
+                                flow_paths[i : i + self.sequence_length - 1]
+                            )
+                        if self.get_backward and len(flow_b_paths) > 0:
+                            self.flow_b_paths.append(
+                                flow_b_paths[i : i + self.sequence_length - 1]
+                            )
+                        self.metadata.append(
+                            {
+                                "image_paths": [
+                                    str(p)
+                                    for p in image_paths[i : i + self.sequence_length]
+                                ],
+                                "is_val": False,
+                                "misc": seq_name,
+                                "is_seq_start": i == 0,
+                            }
+                        )
+
+        # Sanity check
+        if split != "test":
+            assert len(self.img_paths) == len(
+                self.flow_paths
+            ), f"{len(self.img_paths)} vs {len(self.flow_paths)}"
+
+        self._log_status()
+
+
+class MiddleburyDataset(BaseFlowDataset):
+    """Handle the Middlebury dataset."""
+
+    def __init__(  # noqa: C901
+        self,
+        root_dir: str,
+        split: str = "train",
+        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        max_flow: float = 10000.0,
+        get_valid_mask: bool = True,
+        get_meta: bool = True,
+    ) -> None:
+        """Initialize MiddleburyDataset.
+
+        Parameters
+        ----------
+        root_dir : str
+            path to the root directory of the Middlebury dataset.
+        split : str, default 'train'
+            Which split of the dataset should be loaded. It can be one of {'train', 'val', 'trainval', 'test'}.
+        pass_names : Union[str, List[str]], default 'clean'
+            Which passes should be loaded. It can be one of {'clean', 'final', ['clean', 'final']}.
+        transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
+            Transform to be applied on the inputs.
+        max_flow : float, default 10000.0
+            Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
+            as zero in the valid mask.
+        get_valid_mask : bool, default True
+            Whether to get or generate valid masks.
+        get_occlusion_mask : bool, default True
+            Whether to get occlusion masks.
+        get_meta : bool, default True
+            Whether to get metadata.
+        """
+        super().__init__(
+            dataset_name="Middlebury",
+            split_name=split,
+            transform=transform,
+            max_flow=max_flow,
+            get_valid_mask=get_valid_mask,
+            get_occlusion_mask=False,
+            get_motion_boundary_mask=False,
+            get_backward=False,
+            get_meta=get_meta,
+        )
+        self.root_dir = root_dir
+        self.split = split
+        self.sequence_length = 2
+
+        # Get sequence names for the given split
+        if split == "test":
+            split_dir = "eval"
+        else:
+            split_dir = "other"
+
+        sequence_names = sorted(
+            [p.stem for p in (Path(root_dir) / f"{split_dir}-gt-flow").glob("*")]
+        )
+
+        # Read paths from disk
+        for seq_name in sequence_names:
+            image_paths = sorted(
+                (Path(self.root_dir) / f"{split_dir}-data" / seq_name).glob("*.png")
+            )
+            flow_paths = []
+            if split != "test":
+                flow_paths = sorted(
+                    (Path(self.root_dir) / f"{split_dir}-gt-flow" / seq_name).glob(
+                        "*.flo"
+                    )
+                )
+                assert len(image_paths) - 1 == len(
+                    flow_paths
+                ), f"{seq_name}: {len(image_paths)-1} vs {len(flow_paths)}"
+            for i in range(len(image_paths) - self.sequence_length + 1):
+                self.img_paths.append(image_paths[i : i + self.sequence_length])
+                if len(flow_paths) > 0:
+                    self.flow_paths.append(flow_paths[i : i + self.sequence_length - 1])
+                self.metadata.append(
+                    {
+                        "image_paths": [
+                            str(p) for p in image_paths[i : i + self.sequence_length]
+                        ],
+                        "is_val": False,
+                        "misc": seq_name,
+                        "is_seq_start": True,
+                    }
+                )
+
+        # Sanity check
+        if split != "test":
+            assert len(self.img_paths) == len(
+                self.flow_paths
+            ), f"{len(self.img_paths)} vs {len(self.flow_paths)}"
+
+        self._log_status()
+
+
+class MonkaaDataset(BaseFlowDataset):
+    """Handle the Monkaa dataset."""
+
+    def __init__(  # noqa: C901
+        self,
+        root_dir: str,
+        pass_names: Union[str, List[str]] = "clean",
+        side_names: Union[str, List[str]] = "left",
+        add_reverse: bool = True,
+        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        max_flow: float = 1000.0,
+        get_valid_mask: bool = True,
+        get_backward: bool = True,
+        get_meta: bool = True,
+        sequence_length: int = 2,
+        sequence_position: str = "first",
+    ) -> None:
+        """Initialize MonkaaDataset.
+
+        Parameters
+        ----------
+        root_dir : str
+            path to the root directory of the Monkaa dataset.
+        pass_names : Union[str, List[str]], default 'clean'
+            Which passes should be loaded. It can be one of {'clean', 'final', ['clean', 'final']}.
+        side_names : Union[str, List[str]], default 'left'
+             Samples from which side view should be loaded. It can be one of {'left', 'right', ['left', 'right']}.
+        add_reverse : bool, default True
+            If True, double the number of samples by appending the backward samples as additional samples.
+        transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
+            Transform to be applied on the inputs.
+        max_flow : float, default 10000.0
+            Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
+            as zero in the valid mask.
+        get_valid_mask : bool, default True
+            Whether to get or generate valid masks.
+        get_backward : bool, default True
+            Whether to get the occluded version of the inputs.
+        get_meta : bool, default True
+            Whether to get metadata.
+        sequence_length : int, default 2
+            How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
+            temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
+        """
+        super().__init__(
+            dataset_name="Monkaa",
+            split_name="trainval",
+            transform=transform,
+            max_flow=max_flow,
+            get_valid_mask=get_valid_mask,
+            get_occlusion_mask=False,
+            get_motion_boundary_mask=False,
+            get_backward=get_backward,
+            get_semantic_segmentation_labels=False,
+            get_meta=get_meta,
+        )
+        self.root_dir = root_dir
+        self.add_reverse = add_reverse
+        self.pass_names = pass_names
+        self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
+        if isinstance(self.pass_names, str):
+            self.pass_names = [self.pass_names]
+        self.side_names = side_names
+        if isinstance(self.side_names, str):
+            self.side_names = [self.side_names]
+
+        pass_dirs = [f"frames_{p}pass" for p in self.pass_names]
+
+        directions = [("into_future", "into_past")]
+        reverts = [False]
+        if self.add_reverse:
+            directions.append(("into_past", "into_future"))
+            reverts.append(True)
+
+        # Read paths from disk
+        for passd in pass_dirs:
+            pass_path = Path(self.root_dir) / passd
+            for seq_path in pass_path.glob("*"):
+                for direcs, rev in zip(directions, reverts):
+                    for side in self.side_names:
+                        image_paths = sorted(
+                            (seq_path / side).glob("*.png"), reverse=rev
+                        )
+                        image_paths = self._extend_paths_list(
+                            image_paths, sequence_length, sequence_position
+                        )
+                        flow_paths = sorted(
+                            (
+                                Path(str(seq_path).replace(passd, "optical_flow"))
+                                / direcs[0]
+                                / side
+                            ).glob("*.pfm"),
+                            reverse=rev,
+                        )
+                        flow_paths = self._extend_paths_list(
+                            flow_paths, sequence_length, sequence_position
+                        )
+
+                        flow_b_paths = []
+                        if self.get_backward:
+                            flow_b_paths = sorted(
+                                (
+                                    Path(str(seq_path).replace(passd, "optical_flow"))
+                                    / direcs[1]
+                                    / side
+                                ).glob("*.pfm"),
+                                reverse=rev,
+                            )
+                            flow_b_paths = self._extend_paths_list(
+                                flow_b_paths, sequence_length, sequence_position
+                            )
+
+                        for i in range(len(image_paths) - self.sequence_length + 1):
+                            self.img_paths.append(
+                                image_paths[i : i + self.sequence_length]
+                            )
+                            if len(flow_paths) > 0:
+                                self.flow_paths.append(
+                                    flow_paths[i : i + self.sequence_length - 1]
+                                )
+                            self.metadata.append(
+                                {
+                                    "image_paths": [
+                                        str(p)
+                                        for p in image_paths[
+                                            i : i + self.sequence_length
+                                        ]
+                                    ],
+                                    "is_val": False,
+                                    "misc": "",
+                                    "is_seq_start": i == 0,
+                                }
+                            )
+                            if self.get_backward:
+                                if len(flow_b_paths) > 0:
+                                    self.flow_b_paths.append(
+                                        flow_b_paths[i + 1 : i + self.sequence_length]
+                                    )
+
+        assert len(self.img_paths) == len(
+            self.flow_paths
+        ), f"{len(self.img_paths)} vs {len(self.flow_paths)}"
+        assert len(self.occ_paths) == 0 or len(self.img_paths) == len(
+            self.occ_paths
+        ), f"{len(self.img_paths)} vs {len(self.occ_paths)}"
+        assert len(self.mb_paths) == 0 or len(self.img_paths) == len(
+            self.mb_paths
+        ), f"{len(self.img_paths)} vs {len(self.mb_paths)}"
+        if self.get_backward:
+            assert len(self.img_paths) == len(
+                self.flow_b_paths
+            ), f"{len(self.img_paths)} vs {len(self.flow_b_paths)}"
+            assert len(self.occ_b_paths) == 0 or len(self.img_paths) == len(
+                self.occ_b_paths
+            ), f"{len(self.img_paths)} vs {len(self.occ_b_paths)}"
+            assert len(self.mb_b_paths) == 0 or len(self.img_paths) == len(
+                self.mb_b_paths
+            ), f"{len(self.img_paths)} vs {len(self.mb_b_paths)}"
 
         self._log_status()

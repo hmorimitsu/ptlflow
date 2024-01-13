@@ -26,8 +26,11 @@ IMG_MIDDLE = IMG_SIDE // 2 + 1
 
 
 def test_read_write_pfm(tmp_path: Path) -> None:
-    flow = np.stack(np.meshgrid(np.arange(IMG_SIDE)-IMG_MIDDLE, np.arange(IMG_SIDE)-IMG_MIDDLE), axis=2).astype(np.float32)
-    file_path = tmp_path / 'flow.pfm'
+    flow = np.stack(
+        np.meshgrid(np.arange(IMG_SIDE) - IMG_MIDDLE, np.arange(IMG_SIDE) - IMG_MIDDLE),
+        axis=2,
+    ).astype(np.float32)
+    file_path = tmp_path / "flow.pfm"
     flow_utils.flow_write(file_path, flow)
     assert file_path.exists()
 
