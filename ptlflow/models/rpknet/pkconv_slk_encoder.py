@@ -41,6 +41,7 @@ class PKConvSLKEncoder(nn.Module):
         norm_layer=LayerNorm2d,
         mlp_ratio: float = 4,
         depth: int = 2,
+        cache_pkconv_weights: bool = False,
     ):
         super(PKConvSLKEncoder, self).__init__()
 
@@ -55,13 +56,24 @@ class PKConvSLKEncoder(nn.Module):
 
         self.pyr_level_range = [int(math.log2(v)) for v in self.pyr_range]
 
-        self.forward_gru = ConvPartialGRU(hidden_chs[-1], hidden_chs[-1])
+        self.forward_gru = ConvPartialGRU(
+            hidden_chs[-1], hidden_chs[-1], cache_pkconv_weights=cache_pkconv_weights
+        )
         self.down_gru = PKConv2d(
-            hidden_chs[-1], hidden_chs[-1], 3, stride=2, padding=1, bias=True
+            hidden_chs[-1],
+            hidden_chs[-1],
+            3,
+            stride=2,
+            padding=1,
+            bias=True,
+            cache_weights=cache_pkconv_weights,
         )
 
         self.stem = self._make_stem(
-            hidden_chs[0], norm_layer=norm_layer, stem_stride=stem_stride
+            hidden_chs[0],
+            norm_layer=norm_layer,
+            stem_stride=stem_stride,
+            cache_pkconv_weights=cache_pkconv_weights,
         )
 
         self.rec_stage = self._make_stage(
@@ -70,21 +82,39 @@ class PKConvSLKEncoder(nn.Module):
             out_chs=hidden_chs[-1],
             depth=depth,
             mlp_ratio=mlp_ratio,
+            cache_pkconv_weights=cache_pkconv_weights,
         )
 
         if self.out_1x1_abs_chs > 0:
             self.out_1x1 = self._make_out_1x1_layer(
-                hidden_chs[-1], self.out_1x1_abs_chs
+                hidden_chs[-1],
+                self.out_1x1_abs_chs,
+                cache_pkconv_weights=cache_pkconv_weights,
             )
 
         self._init_weights()
 
-    def _make_stem(self, hidden_chs: int, norm_layer, stem_stride):
-        conv = PKConv2d(3, hidden_chs, kernel_size=7, stride=stem_stride, padding=3)
+    def _make_stem(
+        self, hidden_chs: int, norm_layer, stem_stride, cache_pkconv_weights
+    ):
+        conv = PKConv2d(
+            3,
+            hidden_chs,
+            kernel_size=7,
+            stride=stem_stride,
+            padding=3,
+            cache_weights=cache_pkconv_weights,
+        )
         return nn.Sequential(conv, norm_layer(num_channels=hidden_chs))
 
     def _make_stage(
-        self, hidden_chs: int, norm_layer, out_chs=None, depth=2, mlp_ratio=4
+        self,
+        hidden_chs: int,
+        norm_layer,
+        out_chs=None,
+        depth=2,
+        mlp_ratio=4,
+        cache_pkconv_weights=False,
     ):
         if out_chs is None:
             out_chs = hidden_chs
@@ -96,10 +126,15 @@ class PKConvSLKEncoder(nn.Module):
             norm_layer=norm_layer,
             stride=2,
             depth=depth,
+            cache_pkconv_weights=cache_pkconv_weights,
         )
 
-    def _make_out_1x1_layer(self, hidden_chs: int, out_chs: int):
-        return PKConv2d(hidden_chs, out_chs, kernel_size=1)
+    def _make_out_1x1_layer(
+        self, hidden_chs: int, out_chs: int, cache_pkconv_weights: bool
+    ):
+        return PKConv2d(
+            hidden_chs, out_chs, kernel_size=1, cache_weights=cache_pkconv_weights
+        )
 
     def _init_weights(self):
         for m in self.modules():

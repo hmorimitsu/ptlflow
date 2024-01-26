@@ -27,10 +27,14 @@ from .local_timm.norm import LayerNorm2d
 
 
 class FlowHeadPartial(nn.Module):
-    def __init__(self, input_dim=128, hidden_dim=256):
+    def __init__(self, input_dim=128, hidden_dim=256, cache_pkconv_weights=False):
         super(FlowHeadPartial, self).__init__()
-        self.conv1 = PKConv2d(input_dim, hidden_dim, 3, padding=1)
-        self.conv2 = PKConv2d(hidden_dim, 2, 3, padding=1)
+        self.conv1 = PKConv2d(
+            input_dim, hidden_dim, 3, padding=1, cache_weights=cache_pkconv_weights
+        )
+        self.conv2 = PKConv2d(
+            hidden_dim, 2, 3, padding=1, cache_weights=cache_pkconv_weights
+        )
         self.act = nn.ReLU(inplace=True)
 
     def forward(self, x, out_ch=None):
@@ -38,11 +42,29 @@ class FlowHeadPartial(nn.Module):
 
 
 class ConvPartialGRU(nn.Module):
-    def __init__(self, hidden_dim=128, input_dim=192 + 128):
+    def __init__(self, hidden_dim=128, input_dim=192 + 128, cache_pkconv_weights=False):
         super(ConvPartialGRU, self).__init__()
-        self.convz = PKConv2d(hidden_dim + input_dim, hidden_dim, 3, padding=1)
-        self.convr = PKConv2d(hidden_dim + input_dim, hidden_dim, 3, padding=1)
-        self.convq = PKConv2d(hidden_dim + input_dim, hidden_dim, 3, padding=1)
+        self.convz = PKConv2d(
+            hidden_dim + input_dim,
+            hidden_dim,
+            3,
+            padding=1,
+            cache_weights=cache_pkconv_weights,
+        )
+        self.convr = PKConv2d(
+            hidden_dim + input_dim,
+            hidden_dim,
+            3,
+            padding=1,
+            cache_weights=cache_pkconv_weights,
+        )
+        self.convq = PKConv2d(
+            hidden_dim + input_dim,
+            hidden_dim,
+            3,
+            padding=1,
+            cache_weights=cache_pkconv_weights,
+        )
 
     def forward(self, h, x, out_ch):
         hx = torch.cat([h, x], dim=1)
@@ -69,6 +91,7 @@ class PKConvSLKGRU(nn.Module):
         num_groups=8,
         depth=2,
         mlp_ratio=4,
+        cache_pkconv_weights=False,
     ):
         super(PKConvSLKGRU, self).__init__()
         norm_layer = partial(LayerNorm2d, affine=use_norm_affine)
@@ -80,6 +103,7 @@ class PKConvSLKGRU(nn.Module):
             norm_layer=norm_layer,
             stride=1,
             depth=depth,
+            cache_pkconv_weights=cache_pkconv_weights,
         )
         self.convr = PKConvSLK(
             hidden_dim + input_dim,
@@ -88,6 +112,7 @@ class PKConvSLKGRU(nn.Module):
             norm_layer=norm_layer,
             stride=1,
             depth=depth,
+            cache_pkconv_weights=cache_pkconv_weights,
         )
         self.convq = PKConvSLK(
             hidden_dim + input_dim,
@@ -96,6 +121,7 @@ class PKConvSLKGRU(nn.Module):
             norm_layer=norm_layer,
             stride=1,
             depth=depth,
+            cache_pkconv_weights=cache_pkconv_weights,
         )
 
     def forward(self, h, x, out_ch):
@@ -115,11 +141,19 @@ class PKConvSLKGRU(nn.Module):
 
 
 class ConvexMask(nn.Module):
-    def __init__(self, net_chs, pred_stride):
+    def __init__(self, net_chs, pred_stride, cache_pkconv_weights=False):
         super(ConvexMask, self).__init__()
-        self.conv1 = PKConv2d(net_chs, net_chs * 2, 3, padding=1)
+        self.conv1 = PKConv2d(
+            net_chs, net_chs * 2, 3, padding=1, cache_weights=cache_pkconv_weights
+        )
         self.act = nn.ReLU(inplace=True)
-        self.conv2 = PKConv2d(net_chs * 2, pred_stride**2 * 9, 1, padding=0)
+        self.conv2 = PKConv2d(
+            net_chs * 2,
+            pred_stride**2 * 9,
+            1,
+            padding=0,
+            cache_weights=cache_pkconv_weights,
+        )
 
     def forward(self, x):
         in_chs = x.shape[1]
@@ -141,15 +175,25 @@ class MotionEncoderPartial(nn.Module):
         f_out = 64
 
         cor_planes = args.corr_levels * (2 * args.corr_range + 1) ** 2
-        self.convc1 = PKConv2d(cor_planes, c_hidden, 1, padding=0)
-        self.convc2 = nn.Conv2d(c_hidden, c_out, 3, padding=1)
+        self.convc1 = PKConv2d(
+            cor_planes, c_hidden, 1, padding=0, cache_weights=args.cache_pkconv_weights
+        )
+        self.convc2 = PKConv2d(
+            c_hidden, c_out, 3, padding=1, cache_weights=args.cache_pkconv_weights
+        )
 
-        self.convf1 = PKConv2d(2, f_hidden, 7, padding=3)
-        self.convf2 = nn.Conv2d(f_hidden, f_out, 3, padding=1)
+        self.convf1 = PKConv2d(
+            2, f_hidden, 7, padding=3, cache_weights=args.cache_pkconv_weights
+        )
+        self.convf2 = PKConv2d(
+            f_hidden, f_out, 3, padding=1, cache_weights=args.cache_pkconv_weights
+        )
 
         in_ch = f_out + c_out
         out_ch = args.dec_motion_chs - 2
-        self.conv = nn.Conv2d(in_ch, out_ch, 3, padding=1)
+        self.conv = PKConv2d(
+            in_ch, out_ch, 3, padding=1, cache_weights=args.cache_pkconv_weights
+        )
 
         self.act = nn.ReLU()
 
@@ -183,16 +227,25 @@ class UpdatePartialBlock(nn.Module):
                     num_groups=args.group_norm_num_groups,
                     depth=args.dec_gru_depth,
                     mlp_ratio=args.dec_gru_mlp_ratio,
+                    cache_pkconv_weights=args.cache_pkconv_weights,
                 )
                 for _ in range(args.dec_gru_iters)
             ]
         )
 
-        self.flow_head = FlowHeadPartial(args.net_chs_fixed, hidden_dim=256)
+        self.flow_head = FlowHeadPartial(
+            args.net_chs_fixed,
+            hidden_dim=256,
+            cache_pkconv_weights=args.cache_pkconv_weights,
+        )
 
         if self.args.use_upsample_mask:
             pred_stride = min(self.args.pyramid_ranges)
-            self.mask = ConvexMask(args.net_chs_fixed, pred_stride)
+            self.mask = ConvexMask(
+                args.net_chs_fixed,
+                pred_stride,
+                cache_pkconv_weights=args.cache_pkconv_weights,
+            )
 
     def forward(self, net, inp, corr, flow):
         motion_features = self.encoder(flow, corr)
