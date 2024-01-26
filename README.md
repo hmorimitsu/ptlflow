@@ -48,6 +48,7 @@ This is still under development, so some things may not work as intended. I plan
 
 ## Available models
 
+- CCMR [https://arxiv.org/abs/2311.02661](https://arxiv.org/abs/2311.02661)
 - CRAFT [https://arxiv.org/abs/2203.16896](https://arxiv.org/abs/2203.16896)
 - CSFlow [https://arxiv.org/abs/2202.00909](https://arxiv.org/abs/2202.00909)
 - DICL-Flow [https://arxiv.org/abs/2010.14851](https://arxiv.org/abs/2010.14851)
@@ -68,6 +69,7 @@ This is still under development, so some things may not work as intended. I plan
 - LiteFlowNet [https://arxiv.org/abs/1805.07036](https://arxiv.org/abs/1805.07036)
 - LiteFlowNet2 [https://arxiv.org/abs/1903.07414](https://arxiv.org/abs/1903.07414)
 - LiteFlowNet3 [https://arxiv.org/abs/2007.09319](https://arxiv.org/abs/2007.09319)
+- LLA-Flow [https://arxiv.org/abs/2304.08101](https://arxiv.org/abs/2304.08101)
 - MaskFlownet [https://arxiv.org/abs/2003.10955](https://arxiv.org/abs/2003.10955)
 - MatchFlow [https://arxiv.org/abs/2303.08384](https://arxiv.org/abs/2303.08384)
 - MS-RAFT+ [https://arxiv.org/abs/2210.16900](https://arxiv.org/abs/2210.16900)
