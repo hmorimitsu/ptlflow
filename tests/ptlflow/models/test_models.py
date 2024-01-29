@@ -33,6 +33,8 @@ TRAIN_EPOCHS = 1
 DATASET = "overfit"
 
 EXCLUDE_MODELS = [
+    "ccmr",
+    "ccmr+",
     "matchflow",
     "matchflow_raft",
     "ms_raft+",

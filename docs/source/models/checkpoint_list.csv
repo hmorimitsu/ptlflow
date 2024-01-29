@@ -1,4 +1,8 @@
 PTLFlow name,Original name,Source
+ccmr-kitti-612444b9.ckpt,CCMR_kitti.pth,https://github.com/cv-stuttgart/CCMR
+ccmr-sintel-e1760f37.ckpt,CCMR_sintel.pth,
+ccmr+-kitti-c289d5e6.ckpt,CCMR+_kitti.pth,
+ccmr+-sintel-055b44ec.ckpt,CCMR+_sintel.pth,
 craft-kitti-4d99b0c1.ckpt,craft-kitti.pth,https://github.com/askerlee/craft
 craft-sintel-ff8e6563.ckpt,craft-sintel.pth,
 craft-things-5a41930c.ckpt,craft-things.pth,
@@ -78,6 +82,14 @@ liteflownet3-kitti-b5d32443.ckpt,LiteFlowNet3-ft-kitti.caffemodel,https://github
 liteflownet3-sintel-d985929f.ckpt,LiteFlowNet3-ft-sintel.caffemodel,
 liteflownet3s-kitti-5dffb261.ckpt,LiteFlowNet3-S-ft-kitti.caffemodel,
 liteflownet3s-sintel-89793e34.ckpt,LiteFlowNet3-S-ft-sintel.caffemodel,
+llaflow_gma-chairs-c4225e37.ckpt,pre-lla-gma-chairs.pth,https://github.com/mansang127/LLA-Flow
+llaflow_gma-kitti-ac312150.ckpt,pre-lla-gma-kitti.pth,
+llaflow_gma-sintel-4ca6e4a9.ckpt,pre-lla-gma-sintel.pth,
+llaflow_gma-things-1cfce7fe.ckpt,pre-lla-gma-things.pth,
+llaflow_raft-chairs-a720c578.ckpt,pre-lla-raft-chairs.pth,
+llaflow_raft-kitti-b8b43046.ckpt,pre-lla-raft-kitti.pth,
+llaflow_raft-sintel-69c82cea.ckpt,pre-lla-raft-sintel.pth,
+llaflow_raft-things-b6cb5f0e.ckpt,pre-lla-raft-things.pth,
 maskflownet-kitti-d2ccb09b.ckpt,8caNov12-1532_300000.pth,https://github.com/cattaneod/MaskFlownet-Pytorch
 maskflownet-sintel-c52423aa.ckpt,5adNov03-0005_1000000.pth,
 maskflownet_s-sintel-79196ff3.ckpt,dbbSep30-1206_1000000.pth,

@@ -28,6 +28,7 @@ import torch
 from torch import hub
 
 from ptlflow.models.base_model.base_model import BaseModel
+from ptlflow.models.ccmr.ccmr import CCMR, CCMRPlus
 from ptlflow.models.craft.craft import CRAFT
 from ptlflow.models.csflow.csflow import CSFlow
 from ptlflow.models.dicl.dicl import DICL
@@ -58,6 +59,7 @@ from ptlflow.models.liteflownet.liteflownet3 import (
     LiteFlowNet3SPseudoReg,
 )
 from ptlflow.models.liteflownet.liteflownet2 import LiteFlowNet2, LiteFlowNet2PseudoReg
+from ptlflow.models.llaflow.llaflow import LLAFlow, LLAFlowRAFT
 from ptlflow.models.maskflownet.maskflownet import MaskFlownet, MaskFlownet_S
 from ptlflow.models.matchflow.matchflow import MatchFlow, MatchFlowRAFT
 from ptlflow.models.ms_raft_plus.ms_raft_plus import MSRAFTPlus
@@ -89,6 +91,8 @@ config_logging()
 
 
 models_dict = {
+    "ccmr": CCMR,
+    "ccmr+": CCMRPlus,
     "craft": CRAFT,
     "csflow": CSFlow,
     "dicl": DICL,
@@ -125,6 +129,8 @@ models_dict = {
     "liteflownet3_pseudoreg": LiteFlowNet3PseudoReg,
     "liteflownet3s": LiteFlowNet3S,
     "liteflownet3s_pseudoreg": LiteFlowNet3SPseudoReg,
+    "llaflow": LLAFlow,
+    "llaflow_raft": LLAFlowRAFT,
     "maskflownet": MaskFlownet,
     "maskflownet_s": MaskFlownet_S,
     "matchflow": MatchFlow,

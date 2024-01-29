@@ -7,6 +7,17 @@ Below is a list and a brief explanation about the models currently available on 
 List of models
 ==============
 
+CCMR
+----
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/ccmr>`__
+
+- Paper: **CCMR: High Resolution Optical Flow Estimation via Coarse-to-Fine Context-Guided Motion Reasoning** - `https://arxiv.org/abs/2311.02661 <https://arxiv.org/abs/2311.02661>`_
+
+- Reference code: `https://github.com/cv-stuttgart/CCMR <https://github.com/cv-stuttgart/CCMR>`_
+
+- Model names: ``ccmr``, ``ccmr+``
+
 CRAFT
 -----
 
@@ -221,6 +232,17 @@ LiteFlowNet3
 - Reference code: `https://github.com/twhui/LiteFlowNet3 <https://github.com/twhui/LiteFlowNet3>`__
 
 - Model names: ``liteflownet3``, ``liteflownet3_pseudoreg``, ``liteflownet3s``, ``liteflownet3s_pseudoreg``
+
+LLA-Flow
+--------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/llaflow>`__
+
+- Paper: **LLA-Flow: A Lightweight Local Aggregation on Cost Volume for Optical Flow Estimation** - `https://arxiv.org/abs/2304.08101 <https://arxiv.org/abs/2304.08101>`_
+
+- Reference code: `https://github.com/mansang127/LLA-Flow <https://github.com/mansang127/LLA-Flow>`_
+
+- Model names: ``llaflow``, ``llaflow_raft``
 
 MaskFlownet
 -----------
