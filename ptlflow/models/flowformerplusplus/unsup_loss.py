@@ -1,14 +1,17 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 
 MAX_FLOW = 400
 
 
-def coords_grid(batch, ht, wd):
-    coords = torch.meshgrid(torch.arange(ht), torch.arange(wd), indexing="ij")
-    coords = torch.stack(coords[::-1], dim=0).float()
+def coords_grid(batch, ht, wd, dtype, device):
+    coords = torch.meshgrid(
+        torch.arange(ht, dtype=dtype, device=device),
+        torch.arange(wd, dtype=dtype, device=device),
+        indexing="ij",
+    )
+    coords = torch.stack(coords[::-1], dim=0)
     return coords[None].repeat(batch, 1, 1, 1)
 
 
@@ -22,7 +25,7 @@ def flow_to_warp(flow):
     """
     flow = flow.permute(0, 2, 3, 1)
     B, H, W, _ = flow.size()
-    grid = coords_grid(B, H, W)
+    grid = coords_grid(B, H, W, dtype=flow.dtype, device=flow.device)
     if flow.is_cuda:
         grid = grid.cuda()
     grid = grid.permute(0, 2, 3, 1)
@@ -69,7 +72,7 @@ def mask_invalid(coords, pad_h=0, pad_w=0):
             coords[:, :, :, 1] >= pad_h, coords[:, :, :, 1] <= max_height
         ),
     )
-    mask = mask.float()[:, None, :, :]
+    mask = mask.to(dtype=coords.dtype)[:, None, :, :]
     return mask
 
 
@@ -182,9 +185,9 @@ def compute_occlusion(
             B, 1, H, W, dtype=flow_ij.dtype, device=flow_ij.device
         )
     elif occlusion_estimation == "brox":
-        occlusion_mask = (fb_sq_diff > 0.01 * fb_sum_sq + 0.5).float()
+        occlusion_mask = (fb_sq_diff > 0.01 * fb_sum_sq + 0.5).to(dtype=flow_ij.dtype)
     elif occlusion_estimation == "fb_abs":
-        occlusion_mask = (fb_sq_diff**0.5 > 1.5).float()
+        occlusion_mask = (fb_sq_diff**0.5 > 1.5).to(dtype=flow_ij.dtype)
     elif occlusion_estimation == "wang":
         range_map = compute_range_map(flow_ji)
         occlusion_mask = 1 - torch.clamp(range_map, min=0.0, max=1.0)

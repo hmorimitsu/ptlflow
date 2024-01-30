@@ -15,24 +15,26 @@ def initialize_flow(img):
     return mean, mean_init
 
 
-def generate_window_grid(h_min, h_max, w_min, w_max, len_h, len_w, device=None):
+def generate_window_grid(h_min, h_max, w_min, w_max, len_h, len_w, dtype, device):
     assert device is not None
 
     x, y = torch.meshgrid(
         [
-            torch.linspace(w_min, w_max, len_w, device=device),
-            torch.linspace(h_min, h_max, len_h, device=device),
+            torch.linspace(w_min, w_max, len_w, dtype=dtype, device=device),
+            torch.linspace(h_min, h_max, len_h, dtype=dtype, device=device),
         ],
         indexing="ij",
     )
-    grid = torch.stack((x, y), -1).transpose(0, 1).float()  # [H, W, 2]
+    grid = torch.stack((x, y), -1).transpose(0, 1)  # [H, W, 2]
 
     return grid
 
 
 def normalize_coords(coords, h, w):
     # coords: [B, H, W, 2]
-    c = torch.Tensor([(w - 1) / 2.0, (h - 1) / 2.0]).float().to(coords.device)
+    c = torch.Tensor([(w - 1) / 2.0, (h - 1) / 2.0]).to(
+        dtype=coords.dtype, device=coords.device
+    )
     return (coords - c) / c  # [-1, 1]
 
 
