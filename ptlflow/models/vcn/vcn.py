@@ -104,8 +104,10 @@ class VCNLoss(nn.Module):
         return out-of-range loss
         """
         oor3_gt = (flowl0.abs() > maxdisp).detach()  #  (8*self.md[3])
-        oor3_gt = (((oor3_gt.sum(1) > 0) + occ_mask) > 0).float()  # oor, or occluded
-        weights = oor3_gt.sum().float() / (
+        oor3_gt = (((oor3_gt.sum(1) > 0) + occ_mask) > 0).to(
+            dtype=flowl0.dtype
+        )  # oor, or occluded
+        weights = oor3_gt.sum().to(dtype=flowl0.dtype) / (
             oor3_gt.shape[0] * oor3_gt.shape[1] * oor3_gt.shape[2]
         )
         weights = oor3_gt * (1 - weights) + (1 - oor3_gt) * weights
@@ -194,8 +196,16 @@ class flow_reg(nn.Module):
 
         b, u, v, h, w = x.shape
         x = F.softmax(x.view(b, -1, h, w), 1).view(b, u, v, h, w)
-        outx = torch.sum(torch.sum(x * self.flowx.to(x.device), 1), 1, keepdim=True)
-        outy = torch.sum(torch.sum(x * self.flowy.to(x.device), 1), 1, keepdim=True)
+        outx = torch.sum(
+            torch.sum(x * self.flowx.to(dtype=x.dtype, device=x.device), 1),
+            1,
+            keepdim=True,
+        )
+        outy = torch.sum(
+            torch.sum(x * self.flowy.to(dtype=x.dtype, device=x.device), 1),
+            1,
+            keepdim=True,
+        )
 
         if self.ent:
             # local
@@ -254,7 +264,7 @@ class WarpModule(nn.Module):
         ):
             self.create_grid((B, W, H))
 
-        vgrid = self.grid.to(flo.device) + flo
+        vgrid = self.grid.to(dtype=flo.dtype, device=flo.device) + flo
 
         # scale grid to [-1,1]
         vgrid[:, 0, :, :] = 2.0 * vgrid[:, 0, :, :] / max(W - 1, 1) - 1.0
@@ -263,7 +273,7 @@ class WarpModule(nn.Module):
         vgrid = vgrid.permute(0, 2, 3, 1)
         output = nn.functional.grid_sample(x, vgrid, align_corners=True)
         mask = ((vgrid[:, :, :, 0].abs() < 1) * (vgrid[:, :, :, 1].abs() < 1)) > 0
-        return output * mask.unsqueeze(1).float(), mask
+        return output * mask.unsqueeze(1), mask
 
 
 class VCNSmall(BaseModel):
@@ -477,22 +487,18 @@ class VCNSmall(BaseModel):
         supports backwards
         """
         b, c, height, width = refimg_fea.shape
-        if refimg_fea.is_cuda:
-            cost = Variable(
-                torch.cuda.FloatTensor(
+        tensor_func = (
+            torch.FloatTensor if refimg_fea.dtype == torch.float32 else torch.HalfTensor
+        )
+        cost = (
+            Variable(
+                tensor_func(
                     b, c, 2 * maxdisp + 1, 2 * int(maxdisp // fac) + 1, height, width
                 )
-            ).fill_(
-                0.0
-            )  # b,c,u,v,h,w
-        else:
-            cost = Variable(
-                torch.FloatTensor(
-                    b, c, 2 * maxdisp + 1, 2 * int(maxdisp // fac) + 1, height, width
-                )
-            ).fill_(
-                0.0
-            )  # b,c,u,v,h,w
+            )
+            .fill_(0.0)
+            .to(refimg_fea.device)
+        )  # b,c,u,v,h,w
         for i in range(2 * maxdisp + 1):
             ind = i - maxdisp
             for j in range(2 * int(maxdisp // fac) + 1):
@@ -520,8 +526,10 @@ class VCNSmall(BaseModel):
         return out-of-range loss
         """
         oor3_gt = (flowl0.abs() > maxdisp).detach()  #  (8*self.md[3])
-        oor3_gt = (((oor3_gt.sum(1) > 0) + occ_mask) > 0).float()  # oor, or occluded
-        weights = oor3_gt.sum().float() / (
+        oor3_gt = (((oor3_gt.sum(1) > 0) + occ_mask) > 0).to(
+            dtype=flowl0.dtype
+        )  # oor, or occluded
+        weights = oor3_gt.sum().to(dtype=flowl0.dtype) / (
             oor3_gt.shape[0] * oor3_gt.shape[1] * oor3_gt.shape[2]
         )
         weights = oor3_gt * (1 - weights) + (1 - oor3_gt) * weights
