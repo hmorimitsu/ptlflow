@@ -88,7 +88,7 @@ class DIP(BaseModel):
             torch.manual_seed(init_seed)
             torch.cuda.manual_seed(init_seed)
         flow = (torch.rand(N, 2, H, W) - 0.5) * 2
-        flow = flow.to(fmap.device) * max_offset
+        flow = flow.to(dtype=fmap.dtype, device=fmap.device) * max_offset
         return flow
 
     def upsample_flow(self, flow, mask, rate=4):
@@ -153,8 +153,6 @@ class DIP(BaseModel):
         fmap1, fmap2 = self.fnet([image1, image2])
         new_size = (image1.shape[2], image1.shape[3])
 
-        fmap1 = fmap1.float()
-        fmap2 = fmap2.float()
         # build layers
         min_width = 40
         py_fmap1, py_fmap2, py_cnet = self.build_pyramid(
@@ -256,9 +254,6 @@ class DIP(BaseModel):
 
         # run the feature network
         fmap1, fmap2 = self.fnet([image1, image2])
-
-        fmap1 = fmap1.float()
-        fmap2 = fmap2.float()
 
         # run the context network
         net, inp = torch.split(fmap1, [self.hidden_dim, self.context_dim], dim=1)
