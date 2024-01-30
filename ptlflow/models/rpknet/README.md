@@ -4,7 +4,7 @@
 
 Follow the [PTLFlow installation instructions](https://ptlflow.readthedocs.io/en/latest/starting/installation.html).
 
-This model can be used using the name `rpknet`.
+This model can be called using the name `rpknet`.
 
 The exact versions of the packages we used for our tests are listed in [requirements.txt](requirements.txt).
 
@@ -36,23 +36,23 @@ We train our model in four stages as follows.
 ### Stage 1: FlyingChairs
 
 ```bash
-python train.py rpknet --random_seed 1234 --gradient_clip_val 1.0 --lr 2.5e-4 --wdecay 1e-4 --gamma 0.8 --train_dataset chairs --train_batch_size 8 --max_epochs 35 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs
+python train.py rpknet --random_seed 1234 --gradient_clip_val 1.0 --lr 2.5e-4 --wdecay 1e-4 --gamma 0.8 --train_dataset chairs --train_batch_size 8 --max_epochs 35 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs --not_cache_pkconv_weights
 ```
 
 ### Stage 2: FlyingThings3D
 
 ```bash
-python train.py rpknet --pretrained path_to_stage1_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-4 --gamma 0.8 --train_dataset things --train_batch_size 4 --max_epochs 10 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs
+python train.py rpknet --pretrained path_to_stage1_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-4 --gamma 0.8 --train_dataset things --train_batch_size 4 --max_epochs 10 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs --not_cache_pkconv_weights
 ```
 
 ### Stage 3: FlyingThings3D+Sintel+KITTI+HD1K
 ```bash
-python train.py rpknet --pretrained path_to_stage2_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-5 --gamma 0.85 --train_dataset 200*sintel+400*kitti-2015+10*hd1k+things-train-sinteltransform --train_batch_size 6 --max_epochs 4 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs
+python train.py rpknet --pretrained path_to_stage2_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-5 --gamma 0.85 --train_dataset 200*sintel+400*kitti-2015+10*hd1k+things-train-sinteltransform --train_batch_size 6 --max_epochs 4 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs --not_cache_pkconv_weights
 ```
 
 ### Stage 4: KITTI 2015
 ```bash
-python train.py rpknet --pretrained path_to_stage3_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-5 --gamma 0.85 --train_dataset kitti-2015 --train_batch_size 6 --max_epochs 150 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs
+python train.py rpknet --pretrained path_to_stage3_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-5 --gamma 0.85 --train_dataset kitti-2015 --train_batch_size 6 --max_epochs 150 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs --not_cache_pkconv_weights
 ```
 
 ## Validation

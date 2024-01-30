@@ -33,46 +33,53 @@ def pkconv2d(
     groups: int = 1,
     is_transpose: bool = False,
     out_ch: Optional[int] = None,
+    return_weights: bool = False,
+    skip_slicing: bool = False,
 ) -> torch.Tensor:
-    if out_ch is None:
-        out_ch = weight.shape[0]
-
     bounded_groups = min(groups, x.shape[1])
-    b = None
-    if groups == 1:
-        if is_transpose:
-            w = weight[: x.shape[1], :out_ch]
-        else:
-            w = weight[:out_ch, : x.shape[1]]
 
-        if bias is not None:
-            b = bias[:out_ch]
+    if skip_slicing:
+        w = weight
+        b = bias
     else:
-        int_size = out_ch // groups
-        collect_group_sizes = [int_size] * groups
-        remainder = out_ch - groups * int_size
-        collect_group_sizes = [
-            collect_group_sizes[i] + 1 if i < remainder else collect_group_sizes[i]
-            for i in range(len(collect_group_sizes))
-        ]
+        if out_ch is None:
+            out_ch = weight.shape[0]
 
-        total_out_ch = weight.shape[1] if is_transpose else weight.shape[0]
-        group_size = total_out_ch // groups
-        group_init_idx = np.arange(0, total_out_ch, group_size)
+        b = None
+        if groups == 1:
+            if is_transpose:
+                w = weight[: x.shape[1], :out_ch]
+            else:
+                w = weight[:out_ch, : x.shape[1]]
 
-        slice_idx = [
-            group_init_idx[i] + j
-            for i in range(groups)
-            for j in range(collect_group_sizes[i])
-        ]
-
-        if is_transpose:
-            w = weight[: x.shape[1] // bounded_groups, slice_idx]
+            if bias is not None:
+                b = bias[:out_ch]
         else:
-            w = weight[slice_idx, : x.shape[1] // bounded_groups]
+            int_size = out_ch // groups
+            collect_group_sizes = [int_size] * groups
+            remainder = out_ch - groups * int_size
+            collect_group_sizes = [
+                collect_group_sizes[i] + 1 if i < remainder else collect_group_sizes[i]
+                for i in range(len(collect_group_sizes))
+            ]
 
-        if bias is not None:
-            b = bias[slice_idx]
+            total_out_ch = weight.shape[1] if is_transpose else weight.shape[0]
+            group_size = total_out_ch // groups
+            group_init_idx = np.arange(0, total_out_ch, group_size)
+
+            slice_idx = [
+                group_init_idx[i] + j
+                for i in range(groups)
+                for j in range(collect_group_sizes[i])
+            ]
+
+            if is_transpose:
+                w = weight[: x.shape[1] // bounded_groups, slice_idx]
+            else:
+                w = weight[slice_idx, : x.shape[1] // bounded_groups]
+
+            if bias is not None:
+                b = bias[slice_idx]
 
     if is_transpose:
         x = F.conv_transpose2d(
@@ -95,7 +102,10 @@ def pkconv2d(
             groups=bounded_groups,
         )
 
-    return x
+    if return_weights:
+        return x, w, b
+    else:
+        return x
 
 
 class PKConvBase(nn.Module):
@@ -113,6 +123,7 @@ class PKConvBase(nn.Module):
         padding_mode="zeros",
         device=None,
         dtype=None,
+        cache_weights=False,
     ) -> None:
         super().__init__()
         self.is_transpose = is_transpose
@@ -128,6 +139,7 @@ class PKConvBase(nn.Module):
         self.padding_mode = padding_mode
         self.device = device
         self.dtype = dtype
+        self.cache_weights = cache_weights
 
         if self.is_transpose:
             self.register_parameter(
@@ -168,6 +180,9 @@ class PKConvBase(nn.Module):
 
         self.reset_parameters()
 
+        if self.cache_weights:
+            self.cache = {}
+
     def reset_parameters(self) -> None:
         # Setting a=sqrt(5) in kaiming_uniform is the same as initializing with
         # uniform(-1/sqrt(k), 1/sqrt(k)), where k = weight.size(1) * prod(*kernel_size)
@@ -180,17 +195,37 @@ class PKConvBase(nn.Module):
                 nn.init.uniform_(self.bias, -bound, bound)
 
     def forward(self, x: torch.Tensor, out_ch: Optional[int] = None) -> torch.Tensor:
-        return pkconv2d(
+        cache_key = (x.shape[1], out_ch)
+        if self.cache_weights and cache_key in self.cache:
+            w, b = self.cache[cache_key]
+            skip_slicing = True
+            return_weights = False
+        else:
+            w = self.weight
+            b = self.bias
+            skip_slicing = False
+            return_weights = self.cache_weights
+        res = pkconv2d(
             x=x,
-            weight=self.weight,
-            bias=self.bias,
+            weight=w,
+            bias=b,
             stride=self.stride,
             padding=self.padding,
             dilation=self.dilation,
             groups=self.groups,
             is_transpose=self.is_transpose,
             out_ch=out_ch,
+            skip_slicing=skip_slicing,
+            return_weights=return_weights,
         )
+
+        if return_weights:
+            x = res[0]
+            self.cache[cache_key] = res[1:3]
+        else:
+            x = res
+
+        return x
 
 
 class PKConv2d(PKConvBase):
@@ -207,6 +242,7 @@ class PKConv2d(PKConvBase):
         padding_mode="zeros",
         device=None,
         dtype=None,
+        cache_weights=False,
     ) -> None:
         super().__init__(
             is_transpose=False,
@@ -221,6 +257,7 @@ class PKConv2d(PKConvBase):
             padding_mode=padding_mode,
             device=device,
             dtype=dtype,
+            cache_weights=cache_weights,
         )
 
 
@@ -238,6 +275,7 @@ class PKConvTranspose2d(PKConvBase):
         padding_mode="zeros",
         device=None,
         dtype=None,
+        cache_weights=False,
     ) -> None:
         super().__init__(
             is_transpose=True,
@@ -252,4 +290,5 @@ class PKConvTranspose2d(PKConvBase):
             padding_mode=padding_mode,
             device=device,
             dtype=dtype,
+            cache_weights=cache_weights,
         )

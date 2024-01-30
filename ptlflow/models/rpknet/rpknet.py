@@ -72,13 +72,23 @@ class UpNetPartial(nn.Module):
     def __init__(self, args) -> None:
         super().__init__()
         self.args = args
-        self.conv = PKConv2d(2 * self.args.net_chs_fixed, self.args.net_chs_fixed, 1)
+        self.conv = PKConv2d(
+            2 * self.args.net_chs_fixed,
+            self.args.net_chs_fixed,
+            1,
+            cache_weights=args.cache_pkconv_weights,
+        )
         self.act = nn.ReLU(inplace=True)
         self.res = ResidualPartialBlock(
             self.args.net_chs_fixed,
             self.args.net_chs_fixed,
-            norm_layer=get_norm_layer(self.args.enc_norm_type, affine=self.args.use_norm_affine, num_groups=self.args.group_norm_num_groups),
+            norm_layer=get_norm_layer(
+                self.args.enc_norm_type,
+                affine=self.args.use_norm_affine,
+                num_groups=self.args.group_norm_num_groups,
+            ),
             use_out_activation=False,
+            cache_pkconv_weights=args.cache_pkconv_weights,
         )
 
     def forward(self, x):
@@ -170,8 +180,13 @@ class RPKNet(BaseModel):
             out_1x1_factor=self.args.out_1x1_factor,
             mlp_ratio=self.args.enc_mlp_ratio,
             depth=self.args.enc_depth,
-            norm_layer=get_norm_layer(self.args.enc_norm_type, affine=self.args.use_norm_affine, num_groups=self.args.group_norm_num_groups),
+            norm_layer=get_norm_layer(
+                self.args.enc_norm_type,
+                affine=self.args.use_norm_affine,
+                num_groups=self.args.group_norm_num_groups,
+            ),
             stem_stride=self.args.enc_stem_stride,
+            cache_pkconv_weights=self.args.cache_pkconv_weights,
         )
 
         self.dim_corr = (self.args.corr_range * 2 + 1) ** 2 * self.args.corr_levels
@@ -237,6 +252,11 @@ class RPKNet(BaseModel):
             "--not_use_upsample_mask", action="store_false", dest="use_upsample_mask"
         )
         parser.add_argument("--upmask_gradient_scale", type=float, default=1.0)
+        parser.add_argument(
+            "--not_cache_pkconv_weights",
+            action="store_false",
+            dest="cache_pkconv_weights",
+        )
 
         parser.add_argument("--gamma", type=float, default=0.8)
         parser.add_argument("--max_flow", type=float, default=400.0)

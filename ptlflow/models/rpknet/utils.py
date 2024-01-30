@@ -78,7 +78,13 @@ class ResidualPartialBlock(nn.Module):
     """ResNet block with PKConv layers"""
 
     def __init__(
-        self, in_planes, planes, norm_layer=None, stride=1, use_out_activation=True
+        self,
+        in_planes,
+        planes,
+        norm_layer=None,
+        stride=1,
+        use_out_activation=True,
+        cache_pkconv_weights=False,
     ):
         super(ResidualPartialBlock, self).__init__()
 
@@ -89,13 +95,20 @@ class ResidualPartialBlock(nn.Module):
             kernel_size=3,
             padding=1,
             stride=stride,
+            cache_weights=cache_pkconv_weights,
         )
         self.norm1 = (
             norm_layer(num_channels=planes)
             if norm_layer is not None
             else nn.Sequential()
         )
-        self.conv2 = PKConv2d(planes, planes, kernel_size=3, padding=1)
+        self.conv2 = PKConv2d(
+            planes,
+            planes,
+            kernel_size=3,
+            padding=1,
+            cache_weights=cache_pkconv_weights,
+        )
         self.norm2 = (
             norm_layer(num_channels=planes)
             if norm_layer is not None
@@ -106,7 +119,13 @@ class ResidualPartialBlock(nn.Module):
         if stride == 1:
             self.downsample = None
         else:
-            self.downsample = PKConv2d(in_planes, planes, kernel_size=1, stride=stride)
+            self.downsample = PKConv2d(
+                in_planes,
+                planes,
+                kernel_size=1,
+                stride=stride,
+                cache_weights=cache_pkconv_weights,
+            )
             self.norm3 = (
                 norm_layer(num_channels=planes)
                 if norm_layer is not None

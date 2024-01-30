@@ -37,16 +37,23 @@ class Mlp(nn.Module):
         act_layer=nn.GELU,
         drop=0.0,
         skip_dw=False,
+        cache_pkconv_weights=False,
     ):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
-        self.fc1 = PKConv2d(in_features, hidden_features, 1)
+        self.fc1 = PKConv2d(
+            in_features, hidden_features, 1, cache_weights=cache_pkconv_weights
+        )
         self.dwconv = None
         if not skip_dw:
-            self.dwconv = DWConv(hidden_features)
+            self.dwconv = DWConv(
+                hidden_features, cache_pkconv_weights=cache_pkconv_weights
+            )
         self.act = act_layer()
-        self.fc2 = PKConv2d(hidden_features, out_features, 1)
+        self.fc2 = PKConv2d(
+            hidden_features, out_features, 1, cache_weights=cache_pkconv_weights
+        )
         self.drop = nn.Dropout(drop)
 
         self.in_hid_factor = float(hidden_features) / in_features
@@ -85,17 +92,36 @@ class Mlp(nn.Module):
 
 
 class SLKUnitCore(nn.Module):
-    def __init__(self, dim, ksize=23):
+    def __init__(
+        self,
+        dim,
+        ksize=23,
+        cache_pkconv_weights=False,
+    ):
         super().__init__()
         self.conv1_branches = nn.ModuleList()
         self.conv1_branches.append(
-            PKConv2d(dim, dim, (ksize, 1), padding=(ksize // 2, 0), groups=dim)
+            PKConv2d(
+                dim,
+                dim,
+                (ksize, 1),
+                padding=(ksize // 2, 0),
+                groups=dim,
+                cache_weights=cache_pkconv_weights,
+            )
         )
         self.conv2_branches = nn.ModuleList()
         self.conv2_branches.append(
-            PKConv2d(dim, dim, (1, ksize), padding=(0, ksize // 2), groups=dim)
+            PKConv2d(
+                dim,
+                dim,
+                (1, ksize),
+                padding=(0, ksize // 2),
+                groups=dim,
+                cache_weights=cache_pkconv_weights,
+            )
         )
-        self.conv_out = PKConv2d(dim, dim, 1)
+        self.conv_out = PKConv2d(dim, dim, 1, cache_weights=cache_pkconv_weights)
 
     def forward(self, x, out_ch=None):
         y = x
@@ -107,13 +133,20 @@ class SLKUnitCore(nn.Module):
 
 
 class SLKUnit(nn.Module):
-    def __init__(self, dim):
+    def __init__(
+        self,
+        dim,
+        cache_pkconv_weights=False,
+    ):
         super().__init__()
 
-        self.proj_1 = PKConv2d(dim, dim, 1)
+        self.proj_1 = PKConv2d(dim, dim, 1, cache_weights=cache_pkconv_weights)
         self.activation = nn.GELU()
-        self.spatial_gating_unit = SLKUnitCore(dim)
-        self.proj_2 = PKConv2d(dim, dim, 1)
+        self.spatial_gating_unit = SLKUnitCore(
+            dim,
+            cache_pkconv_weights=cache_pkconv_weights,
+        )
+        self.proj_2 = PKConv2d(dim, dim, 1, cache_weights=cache_pkconv_weights)
 
     def forward(self, x):
         out_ch = x.shape[1]
@@ -135,10 +168,14 @@ class SLK(nn.Module):
         drop_path=0.0,
         act_layer=nn.GELU,
         norm_layer=GroupNorm,
+        cache_pkconv_weights=False,
     ):
         super().__init__()
         self.norm1 = norm_layer(num_channels=dim)
-        self.attn = SLKUnit(dim)
+        self.attn = SLKUnit(
+            dim,
+            cache_pkconv_weights=cache_pkconv_weights,
+        )
         self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
 
         self.norm2 = norm_layer(num_channels=dim)
@@ -148,6 +185,7 @@ class SLK(nn.Module):
             hidden_features=mlp_hidden_dim,
             act_layer=act_layer,
             drop=drop,
+            cache_pkconv_weights=cache_pkconv_weights,
         )
         layer_scale_init_value = 1e-2
         self.layer_scale_1 = nn.Parameter(
@@ -192,7 +230,13 @@ class LayerTransition(nn.Module):
     """Image to Patch Embedding"""
 
     def __init__(
-        self, patch_size=3, stride=2, in_chans=64, embed_dim=64, norm_layer=GroupNorm
+        self,
+        patch_size=3,
+        stride=2,
+        in_chans=64,
+        embed_dim=64,
+        norm_layer=GroupNorm,
+        cache_pkconv_weights=False,
     ):
         super().__init__()
         patch_size = to_2tuple(patch_size)
@@ -202,6 +246,7 @@ class LayerTransition(nn.Module):
             kernel_size=patch_size,
             stride=stride,
             padding=(patch_size[0] // 2, patch_size[1] // 2),
+            cache_weights=cache_pkconv_weights,
         )
         self.norm = norm_layer(num_channels=embed_dim)
 
@@ -231,9 +276,15 @@ class LayerTransition(nn.Module):
 
 
 class DWConv(nn.Module):
-    def __init__(self, dim=768):
+    def __init__(
+        self,
+        dim=768,
+        cache_pkconv_weights=False,
+    ):
         super(DWConv, self).__init__()
-        self.dwconv = PKConv2d(dim, dim, 3, 1, 1, bias=True, groups=dim)
+        self.dwconv = PKConv2d(
+            dim, dim, 3, 1, 1, bias=True, groups=dim, cache_weights=cache_pkconv_weights
+        )
 
     def forward(self, x, out_ch=None):
         x = self.dwconv(x, out_ch=out_ch)
@@ -252,6 +303,7 @@ class PKConvSLK(nn.Module):
         norm_layer=GroupNorm,
         stride=1,
         depth=2,
+        cache_pkconv_weights=False,
     ):
         super(PKConvSLK, self).__init__()
         self.down = None
@@ -265,6 +317,7 @@ class PKConvSLK(nn.Module):
                 in_chans=in_chs,
                 embed_dim=out_chs,
                 norm_layer=norm_layer,
+                cache_pkconv_weights=cache_pkconv_weights,
             )
 
         self.blocks = nn.ModuleList()
@@ -277,6 +330,7 @@ class PKConvSLK(nn.Module):
                     drop_path=drop_path,
                     act_layer=act_layer,
                     norm_layer=norm_layer,
+                    cache_pkconv_weights=cache_pkconv_weights,
                 )
             )
         self.norm = norm_layer(num_channels=out_chs)
