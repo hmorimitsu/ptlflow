@@ -668,9 +668,9 @@ class SelfAttVisPosTrans(nn.Module):
         if self.attn_mask_radius > 0:
             coords2 = coords.reshape(-1, 2)
             coords_diff = coords2.unsqueeze(0) - coords2.unsqueeze(1)
-            attn_mask = (
-                coords_diff.abs().max(dim=2)[0] > self.attn_mask_radius
-            ).to(dtype=x.dtype)
+            attn_mask = (coords_diff.abs().max(dim=2)[0] > self.attn_mask_radius).to(
+                dtype=x.dtype
+            )
             attn_mask = (attn_mask * -1e9).unsqueeze(0).unsqueeze(0)
         else:
             attn_mask = None

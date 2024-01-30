@@ -123,7 +123,9 @@ class CCMR(BaseModel):
     def get_grid(self, img, scale):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         N, C, H, W = img.shape
-        coords0 = coords_grid(N, H // scale, W // scale, dtype=img.dtype, device=img.device)
+        coords0 = coords_grid(
+            N, H // scale, W // scale, dtype=img.dtype, device=img.device
+        )
         return coords0
 
     def upsample_flow(self, flow, mask, scale=8):

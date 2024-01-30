@@ -406,7 +406,9 @@ class XCiT(nn.Module):
         B, C, H, W = x.shape
         x = x.flatten(2).transpose(1, 2)
         pos_encoding = (
-            self.pos_embeder(B, H, W, x.dtype).reshape(B, -1, x.shape[1]).permute(0, 2, 1)
+            self.pos_embeder(B, H, W, x.dtype)
+            .reshape(B, -1, x.shape[1])
+            .permute(0, 2, 1)
         )
         if self.separate:
             x_v = x_v.flatten(2).transpose(1, 2)
