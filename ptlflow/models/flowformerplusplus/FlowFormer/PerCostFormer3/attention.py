@@ -181,7 +181,9 @@ def LinearPositionEmbeddingSine(x, dim=128, NORMALIZE_FACOR=1 / 200):
     # 200 should be enough for a 8x downsampled image
     # assume x to be [_, _, 2]
     # print(NORMALIZE_FACOR)
-    freq_bands = torch.linspace(0, dim // 4 - 1, dim // 4).to(x.device)
+    freq_bands = torch.linspace(
+        0, dim // 4 - 1, dim // 4, dtype=x.dtype, device=x.device
+    )
     return torch.cat(
         [
             torch.sin(3.14 * x[..., -2:-1] * freq_bands * NORMALIZE_FACOR),
@@ -196,7 +198,9 @@ def LinearPositionEmbeddingSine(x, dim=128, NORMALIZE_FACOR=1 / 200):
 def ExpPositionEmbeddingSine(x, dim=128, NORMALIZE_FACOR=1 / 200):
     # 200 should be enough for a 8x downsampled image
     # assume x to be [_, _, 2]
-    freq_bands = torch.linspace(0, dim // 4 - 1, dim // 4).to(x.device)
+    freq_bands = torch.linspace(
+        0, dim // 4 - 1, dim // 4, dtype=x.dtype, device=x.device
+    )
     return torch.cat(
         [
             torch.sin(x[..., -2:-1] * (NORMALIZE_FACOR * 2**freq_bands)),

@@ -248,8 +248,8 @@ class CRAFT(BaseModel):
     def initialize_flow(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         N, C, H, W = img.shape
-        coords0 = coords_grid(N, H // 8, W // 8).to(img.device)
-        coords1 = coords_grid(N, H // 8, W // 8).to(img.device)
+        coords0 = coords_grid(N, H // 8, W // 8, dtype=img.dtype, device=img.device)
+        coords1 = coords_grid(N, H // 8, W // 8, dtype=img.dtype, device=img.device)
 
         # optical flow computed as difference: flow = coords1 - coords0
         return coords0, coords1
@@ -286,6 +286,8 @@ class CRAFT(BaseModel):
         cdim = self.context_dim
 
         # run the feature network
+        # fmap1, fmap2: [1, 256, 55, 128]. 1/8 size of the original image.
+        # correlation matrix: 7040*7040 (55*128=7040).
         fmap1, fmap2 = self.fnet([image1, image2])
         fmap1o, fmap2o = None, None
         if self.args.f1trans != "none":
@@ -294,11 +296,6 @@ class CRAFT(BaseModel):
         if self.args.f2trans != "none":
             fmap2o = fmap2
             fmap2 = self.f2_trans(fmap2)
-
-        # fmap1, fmap2: [1, 256, 55, 128]. 1/8 size of the original image.
-        # correlation matrix: 7040*7040 (55*128=7040).
-        fmap1 = fmap1.float()
-        fmap2 = fmap2.float()
 
         # If not craft, the correlation volume is computed in the ctor.
         # If craft, the correlation volume is computed in corr_fn.update().

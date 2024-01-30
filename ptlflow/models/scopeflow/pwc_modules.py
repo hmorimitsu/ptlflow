@@ -144,7 +144,7 @@ class WarpingLayer(nn.Module):
         if debug:
             print(mask.mean())
 
-        mask = tf.grid_sample(mask.float(), grid.float(), align_corners=True)
+        mask = tf.grid_sample(mask, grid, align_corners=True)
         if debug:
             print(mask.mean())
 
@@ -154,7 +154,7 @@ class WarpingLayer(nn.Module):
         if debug:
             print(mask.mean())
 
-        warped = x_warp * mask.float()
+        warped = x_warp * mask
         if debug:
             print(warped.mean())
             print(warped.shape)

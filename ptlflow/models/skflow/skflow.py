@@ -129,7 +129,7 @@ class SKFlow(BaseModel):
             torch.arange(wd, dtype=self.dtype, device=self.device),
             indexing="ij",
         )
-        coords = torch.stack(coords[::-1], dim=0).float()
+        coords = torch.stack(coords[::-1], dim=0)
         return coords[None].repeat(batch, 1, 1, 1)
 
     def initialize_flow(self, img):
@@ -179,8 +179,6 @@ class SKFlow(BaseModel):
         # run the feature network
         fmap1, fmap2 = self.fnet([image1, image2])
 
-        fmap1 = fmap1.float()
-        fmap2 = fmap2.float()
         corr_fn = get_corr_block(
             fmap1=fmap1,
             fmap2=fmap2,

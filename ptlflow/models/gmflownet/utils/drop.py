@@ -79,7 +79,7 @@ def drop_block_2d(
             x = x * block_mask + normal_noise * (1 - block_mask)
     else:
         normalize_scale = (
-            block_mask.numel() / block_mask.to(dtype=torch.float32).sum().add(1e-7)
+            block_mask.numel() / block_mask.to(dtype=x.dtype).sum().add(1e-7)
         ).to(x.dtype)
         if inplace:
             x.mul_(block_mask * normalize_scale)
@@ -129,7 +129,7 @@ def drop_block_fast_2d(
     else:
         block_mask = 1 - block_mask
         normalize_scale = (
-            block_mask.numel() / block_mask.to(dtype=torch.float32).sum().add(1e-6)
+            block_mask.numel() / block_mask.to(dtype=x.dtype).sum().add(1e-6)
         ).to(dtype=x.dtype)
         if inplace:
             x.mul_(block_mask * normalize_scale)

@@ -15,7 +15,9 @@ class PathMatch:
         self.map2 = fmap2
         self.N, self.C, self.H, self.W = fmap1.shape
         self.single_planes = self.C // 2
-        self.coords = coords_grid(self.N, self.H, self.W).to(fmap1.device)
+        self.coords = coords_grid(
+            self.N, self.H, self.W, dtype=fmap1.dtype, device=fmap1.device
+        )
         self.shift_map2 = self.get_inv_patch_map(fmap2)
         self.view_map1 = fmap1.view(self.N, self.C // 2, 2, 1, self.H, self.W)
 

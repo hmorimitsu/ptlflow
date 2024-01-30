@@ -24,11 +24,11 @@ def flow_warp(x, flo, mul=True):
     """
     B, C, H, W = x.size()
     # mesh grid
-    xx = torch.arange(0, W).view(1, -1).repeat(H, 1).to(x.device)
-    yy = torch.arange(0, H).view(-1, 1).repeat(1, W).to(x.device)
+    xx = torch.arange(0, W, dtype=x.dtype, device=x.device).view(1, -1).repeat(H, 1)
+    yy = torch.arange(0, H, dtype=x.dtype, device=x.device).view(-1, 1).repeat(1, W)
     xx = xx.view(1, 1, H, W).repeat(B, 1, 1, 1)
     yy = yy.view(1, 1, H, W).repeat(B, 1, 1, 1)
-    grid = torch.cat((xx, yy), 1).float()
+    grid = torch.cat((xx, yy), 1)
 
     vgrid = grid + flo
 
@@ -43,7 +43,7 @@ def flow_warp(x, flo, mul=True):
 
     vgrid = vgrid.permute(0, 2, 3, 1)
     output = F.grid_sample(x, vgrid, padding_mode="border", align_corners=True)
-    mask = torch.ones(x.size(), device=x.device)
+    mask = torch.ones(x.size(), dtype=x.dtype, device=x.device)
     mask = F.grid_sample(mask, vgrid, padding_mode="zeros", align_corners=True)
 
     mask[mask < 0.9999] = 0
@@ -105,7 +105,7 @@ def prob_gather(prob, normalize=True, dim=2, return_indices=False):
 
 def disp2flow(disp):
     assert disp.size(1) == 1
-    padder = torch.zeros(disp.size(), device=disp.device)
+    padder = torch.zeros(disp.size(), dtype=disp.dtype, device=disp.device)
     return torch.cat([disp, padder], dim=1)
 
 
@@ -121,13 +121,13 @@ def downsample_flow(flo, scale_factor):
         )
         mask = torch.ones(
             (B, 1, int(H * scale_factor), int(W * scale_factor)),
-            dtype=torch.float,
+            dtype=flo.dtype,
             device=flo.device,
         )
     else:
         # sparse format
         flo = F.avg_pool2d(flo, int(1 / scale_factor))
-        mask = (flo[:, 2, :, :].unsqueeze(1) > 0).float()
+        mask = (flo[:, 2, :, :].unsqueeze(1) > 0).to(dtype=flo.dtype)
         flo = flo[:, :2, :, :] / (flo[:, 2, :, :].unsqueeze(1) + 1e-9)
     return flo, mask
 
@@ -164,20 +164,20 @@ def _flow2distribution(flo, c):
     x1_safe = torch.clamp(x1, min=-c, max=c)
     y1_safe = torch.clamp(y1, min=-c, max=c)
 
-    wt_x0 = (x1 - x) * torch.eq(x0, x0_safe).float()
-    wt_x1 = (x - x0) * torch.eq(x1, x1_safe).float()
-    wt_y0 = (y1 - y) * torch.eq(y0, y0_safe).float()
-    wt_y1 = (y - y0) * torch.eq(y1, y1_safe).float()
+    wt_x0 = (x1 - x) * torch.eq(x0, x0_safe)
+    wt_x1 = (x - x0) * torch.eq(x1, x1_safe)
+    wt_y0 = (y1 - y) * torch.eq(y0, y0_safe)
+    wt_y1 = (y - y0) * torch.eq(y1, y1_safe)
 
     wt_tl = wt_x0 * wt_y0
     wt_tr = wt_x1 * wt_y0
     wt_bl = wt_x0 * wt_y1
     wt_br = wt_x1 * wt_y1
 
-    mask_tl = torch.eq(x0, x0_safe).float() * torch.eq(y0, y0_safe).float()
-    mask_tr = torch.eq(x1, x1_safe).float() * torch.eq(y0, y0_safe).float()
-    mask_bl = torch.eq(x0, x0_safe).float() * torch.eq(y1, y1_safe).float()
-    mask_br = torch.eq(x1, x1_safe).float() * torch.eq(y1, y1_safe).float()
+    mask_tl = torch.eq(x0, x0_safe) * torch.eq(y0, y0_safe)
+    mask_tr = torch.eq(x1, x1_safe) * torch.eq(y0, y0_safe)
+    mask_bl = torch.eq(x0, x0_safe) * torch.eq(y1, y1_safe)
+    mask_br = torch.eq(x1, x1_safe) * torch.eq(y1, y1_safe)
 
     wt_tl *= mask_tl
     wt_tr *= mask_tr
@@ -232,13 +232,13 @@ def _prob2cornerflow(prob, normalize=True):
         indice += indice // (d - 1)
     indice = indice.squeeze().reshape(B, H, W).unsqueeze(1)
     lt_prob = torch.gather(prob, 1, indice)
-    lt_flow = indice2flow(indice, d).float()
+    lt_flow = indice2flow(indice, d).to(dtype=prob.dtype)
     rt_prob = torch.gather(prob, 1, indice + 1)
-    rt_flow = indice2flow(indice + 1, d).float()
+    rt_flow = indice2flow(indice + 1, d).to(dtype=prob.dtype)
     lb_prob = torch.gather(prob, 1, indice + d)
-    lb_flow = indice2flow(indice + d, d).float()
+    lb_flow = indice2flow(indice + d, d).to(dtype=prob.dtype)
     rb_prob = torch.gather(prob, 1, indice + d + 1)
-    rb_flow = indice2flow(indice + d + 1, d).float()
+    rb_flow = indice2flow(indice + d + 1, d).to(dtype=prob.dtype)
     return [lt_prob, rt_prob, lb_prob, rb_prob], [lt_flow, rt_flow, lb_flow, rb_flow]
 
 

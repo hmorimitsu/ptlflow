@@ -8,7 +8,7 @@ from .backbone import CNNEncoder
 from .transformer import FeatureTransformer, FeatureFlowAttention
 from .matching import global_correlation_softmax, local_correlation_softmax
 from .geometry import flow_warp
-from .utils import normalize_img, feature_add_position
+from .utils import feature_add_position
 from ..base_model.base_model import BaseModel
 
 

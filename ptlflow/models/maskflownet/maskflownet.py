@@ -76,19 +76,16 @@ def deformable_conv(
     )
 
 
-def upsample_kernel2d(w, device):
+def upsample_kernel2d(w, dtype, device):
     c = w // 2
-    kernel = 1 - torch.abs(c - torch.arange(w, dtype=torch.float32, device=device)) / (
-        c + 1
-    )
+    kernel = 1 - torch.abs(c - torch.arange(w, dtype=dtype, device=device)) / (c + 1)
     kernel = kernel.repeat(w).view(w, -1) * kernel.unsqueeze(1)
     return kernel.view(1, 1, w, w)
 
 
 def downsample_kernel2d(w, device):
     kernel = (
-        (w + 1)
-        - torch.abs(w - torch.arange(w * 2 + 1, dtype=torch.float32, device=device))
+        (w + 1) - torch.abs(w - torch.arange(w * 2 + 1, dtype=dtype, device=device))
     ) / (2 * w + 1)
     kernel = kernel.repeat(w).view(w, -1) * kernel.unsqueeze(1)
     return kernel.view(1, 1, w * 2 + 1, w * 2 + 1)
@@ -100,7 +97,7 @@ def Upsample(img, factor):
     B, C, H, W = img.shape
     batch_img = img.view(B * C, 1, H, W)
     batch_img = F.pad(batch_img, [0, 1, 0, 1], mode="replicate")
-    kernel = upsample_kernel2d(factor * 2 - 1, img.device)
+    kernel = upsample_kernel2d(factor * 2 - 1, img.dtype, img.device)
     upsamp_img = F.conv_transpose2d(
         batch_img, kernel, stride=factor, padding=(factor - 1)
     )
@@ -114,7 +111,7 @@ def Downsample(img, factor):
         return img
     B, C, H, W = img.shape
     batch_img = img.view(B * C, 1, H, W)
-    kernel = downsample_kernel2d(factor // 2, img.device)
+    kernel = downsample_kernel2d(factor // 2, img.dtype, img.device)
     upsamp_img = F.conv2d(batch_img, kernel, stride=factor, padding=factor // 2)
     upsamp_nom = F.conv2d(
         torch.ones_like(batch_img), kernel, stride=factor, padding=factor // 2
@@ -323,11 +320,11 @@ class MaskFlownet_S(BaseModel):
         """
         B, C, H, W = x.size()
         # mesh grid
-        xx = torch.arange(0, W).view(1, -1).repeat(H, 1)
-        yy = torch.arange(0, H).view(-1, 1).repeat(1, W)
+        xx = torch.arange(0, W, dtype=x.dtype, device=x.device).view(1, -1).repeat(H, 1)
+        yy = torch.arange(0, H, dtype=x.dtype, device=x.device).view(-1, 1).repeat(1, W)
         xx = xx.view(1, 1, H, W).repeat(B, 1, 1, 1)
         yy = yy.view(1, 1, H, W).repeat(B, 1, 1, 1)
-        grid = torch.cat((xx, yy), 1).float()
+        grid = torch.cat((xx, yy), 1)
 
         device = x.device
         grid = grid.to(device)
@@ -341,7 +338,9 @@ class MaskFlownet_S(BaseModel):
         vgrid = vgrid.permute(0, 2, 3, 1)
         # vgrid = vgrid.permute(0,2,3,1).clamp(-1.1, 1.1)
         output = nn.functional.grid_sample(x, vgrid, align_corners=True)
-        mask = torch.autograd.Variable(torch.ones(x.size())).to(device)
+        mask = torch.autograd.Variable(
+            torch.ones(x.size(), dtype=x.dtype, device=device)
+        )
         mask = nn.functional.grid_sample(mask, vgrid, align_corners=True)
 
         # if W==128:
@@ -709,11 +708,11 @@ class MaskFlownet(BaseModel):
         """
         B, C, H, W = x.size()
         # mesh grid
-        xx = torch.arange(0, W).view(1, -1).repeat(H, 1)
-        yy = torch.arange(0, H).view(-1, 1).repeat(1, W)
+        xx = torch.arange(0, W, dtype=x.dtype, device=x.device).view(1, -1).repeat(H, 1)
+        yy = torch.arange(0, H, dtype=x.dtype, device=x.device).view(-1, 1).repeat(1, W)
         xx = xx.view(1, 1, H, W).repeat(B, 1, 1, 1)
         yy = yy.view(1, 1, H, W).repeat(B, 1, 1, 1)
-        grid = torch.cat((xx, yy), 1).float()
+        grid = torch.cat((xx, yy), 1)
 
         if x.is_cuda:
             grid = grid.cuda()

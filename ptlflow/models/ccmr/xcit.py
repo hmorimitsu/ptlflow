@@ -69,16 +69,16 @@ class PositionalEncodingFourier(nn.Module):
         self.hidden_dim = hidden_dim
         self.dim = dim
 
-    def forward(self, B, H, W):
+    def forward(self, B, H, W, dtype):
         mask = torch.zeros(B, H, W).bool().to(self.token_projection.weight.device)
         not_mask = ~mask
-        y_embed = not_mask.cumsum(1, dtype=torch.float32)
-        x_embed = not_mask.cumsum(2, dtype=torch.float32)
+        y_embed = not_mask.cumsum(1, dtype=dtype)
+        x_embed = not_mask.cumsum(2, dtype=dtype)
         eps = 1e-6
         y_embed = y_embed / (y_embed[:, -1:, :] + eps) * self.scale
         x_embed = x_embed / (x_embed[:, :, -1:] + eps) * self.scale
 
-        dim_t = torch.arange(self.hidden_dim, dtype=torch.float32, device=mask.device)
+        dim_t = torch.arange(self.hidden_dim, dtype=dtype, device=mask.device)
         dim_t = self.temperature ** (2 * (dim_t // 2) / self.hidden_dim)
 
         pos_x = x_embed[:, :, :, None] / dim_t
@@ -406,7 +406,9 @@ class XCiT(nn.Module):
         B, C, H, W = x.shape
         x = x.flatten(2).transpose(1, 2)
         pos_encoding = (
-            self.pos_embeder(B, H, W).reshape(B, -1, x.shape[1]).permute(0, 2, 1)
+            self.pos_embeder(B, H, W, x.dtype)
+            .reshape(B, -1, x.shape[1])
+            .permute(0, 2, 1)
         )
         if self.separate:
             x_v = x_v.flatten(2).transpose(1, 2)

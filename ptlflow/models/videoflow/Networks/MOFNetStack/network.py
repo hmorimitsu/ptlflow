@@ -154,7 +154,6 @@ class MOFNet(nn.Module):
             fmaps = self.fnet(images.reshape(B * N, 3, H, W)).reshape(
                 B, N, -1, H // down_ratio, W // down_ratio
             )
-        fmaps = fmaps.float()
 
         if self.cfg.corr_fn == "default":
             corr_fn = CorrBlock

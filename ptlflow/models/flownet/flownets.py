@@ -113,7 +113,7 @@ class FlowNetS(FlowNetBase):
         concat2 = torch.cat((out_conv2, out_deconv2, flow3_up), 1)
         flow2 = self.predict_flow2(concat2)
 
-        out_flow = self.args.div_flow * self.upsample1(flow2.float())
+        out_flow = self.args.div_flow * self.upsample1(flow2)
         if image_resizer is not None:
             out_flow = self.postprocess_predictions(
                 out_flow, image_resizer, is_flow=True
@@ -123,11 +123,11 @@ class FlowNetS(FlowNetBase):
 
         if self.training:
             outputs["flow_preds"] = [
-                flow2.float(),
-                flow3.float(),
-                flow4.float(),
-                flow5.float(),
-                flow6.float(),
+                flow2,
+                flow3,
+                flow4,
+                flow5,
+                flow6,
             ]
             outputs["flows"] = out_flow[:, None]
         else:

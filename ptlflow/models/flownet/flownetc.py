@@ -139,7 +139,7 @@ class FlowNetC(FlowNetBase):
 
         flow2 = self.predict_flow2(concat2)
 
-        out_flow = self.args.div_flow * self.upsample1(flow2.float())
+        out_flow = self.args.div_flow * self.upsample1(flow2)
         if image_resizer is not None:
             out_flow = self.postprocess_predictions(
                 out_flow, image_resizer, is_flow=True

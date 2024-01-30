@@ -11,7 +11,6 @@ class CorrBlock:
 
         # all pairs correlation
         corr = CorrBlock.corr(fmap1, fmap2)
-        corr = corr.float()
 
         batch, h1, w1, dim, h2, w2 = corr.shape
         corr = corr.reshape(batch * h1 * w1, dim, h2, w2)
@@ -45,7 +44,7 @@ class CorrBlock:
             out_pyramid.append(corr)
 
         out = torch.cat(out_pyramid, dim=-1)
-        return out.permute(0, 3, 1, 2).contiguous().float()
+        return out.permute(0, 3, 1, 2).contiguous()
 
     @staticmethod
     def corr(fmap1, fmap2):
@@ -55,4 +54,4 @@ class CorrBlock:
 
         corr = torch.matmul(fmap1.transpose(1, 2), fmap2)
         corr = corr.view(batch, ht, wd, 1, ht, wd)
-        return corr / torch.sqrt(torch.tensor(dim).float())
+        return corr / torch.sqrt(torch.tensor(dim))

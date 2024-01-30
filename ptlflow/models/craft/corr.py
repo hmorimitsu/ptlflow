@@ -52,11 +52,13 @@ class CorrBlock:
         out_pyramid = []
         for i in range(self.num_levels):
             corr = self.corr_pyramid[i]
-            dx = torch.linspace(-r, r, 2 * r + 1)
-            dy = torch.linspace(-r, r, 2 * r + 1)
-            delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1).to(
-                coords.device
+            dx = torch.linspace(
+                -r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device
             )
+            dy = torch.linspace(
+                -r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device
+            )
+            delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1)
 
             centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2) / 2**i
             delta_lvl = delta.view(1, 2 * r + 1, 2 * r + 1, 2)
@@ -70,7 +72,7 @@ class CorrBlock:
         # and permute the neighbors to the channel dimension.
         out = torch.cat(out_pyramid, dim=-1)
         # [batch, number of neighbors, h1, w1]
-        return out.permute(0, 3, 1, 2).contiguous().float()
+        return out.permute(0, 3, 1, 2).contiguous()
 
     @staticmethod
     def corr(fmap1, fmap2):
@@ -80,7 +82,7 @@ class CorrBlock:
 
         corr = torch.matmul(fmap1.transpose(1, 2), fmap2)
         corr = corr.view(batch, ht, wd, 1, ht, wd)
-        return corr / torch.sqrt(torch.tensor(dim).float())
+        return corr / torch.sqrt(torch.tensor(dim))
 
 
 class CorrBlockSingleScale(nn.Module):
@@ -120,7 +122,7 @@ class CorrBlockSingleScale(nn.Module):
 
         corr = bilinear_sampler(corr, coords_lvl)
         out = corr.view(batch, h1, w1, -1)
-        out = out.permute(0, 3, 1, 2).contiguous().float()
+        out = out.permute(0, 3, 1, 2).contiguous()
         return out
 
     @staticmethod
@@ -131,7 +133,7 @@ class CorrBlockSingleScale(nn.Module):
 
         corr = torch.matmul(fmap1.transpose(1, 2), fmap2)
         corr = corr.view(batch, ht, wd, 1, ht, wd)
-        return corr / torch.sqrt(torch.tensor(dim).float())
+        return corr / torch.sqrt(torch.tensor(dim))
 
 
 # TransCorrBlock instance is created and destroyed in each call of raft.forward().

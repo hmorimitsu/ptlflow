@@ -3,13 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import einsum
 
-from einops.layers.torch import Rearrange
 from einops import rearrange
 
-from utils.utils import coords_grid, bilinear_sampler, indexing
-from loguru import logger
-
-import math
+from utils.utils import bilinear_sampler, indexing
 
 
 def nerf_encoding(x, L=6, NORMALIZE_FACOR=1 / 300):

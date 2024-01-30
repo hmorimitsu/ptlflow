@@ -131,8 +131,8 @@ class GMFlowNet(BaseModel):
     def initialize_flow(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         N, C, H, W = img.shape
-        coords0 = coords_grid(N, H // 8, W // 8).to(img.device)
-        coords1 = coords_grid(N, H // 8, W // 8).to(img.device)
+        coords0 = coords_grid(N, H // 8, W // 8, dtype=img.dtype, device=img.device)
+        coords1 = coords_grid(N, H // 8, W // 8, dtype=img.dtype, device=img.device)
 
         # optical flow computed as difference: flow = coords1 - coords0
         return coords0, coords1
@@ -170,8 +170,6 @@ class GMFlowNet(BaseModel):
 
         # run the feature network
         fmap1, fmap2 = self.fnet([image1, image2])
-        fmap1 = fmap1.float()
-        fmap2 = fmap2.float()
 
         # # Self-attention update
         # fmap1 = self.transEncoder(fmap1)
@@ -224,7 +222,7 @@ class GMFlowNet(BaseModel):
             coords_x = coords_index % fW
             coords_y = coords_index // fW
 
-            coords_xy = torch.stack([coords_x, coords_y], dim=1).float()
+            coords_xy = torch.stack([coords_x, coords_y], dim=1).to(dtype=coords1.dtype)
             coords1 = coords_xy
 
         # Iterative update

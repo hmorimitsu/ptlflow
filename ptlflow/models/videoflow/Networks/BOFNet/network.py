@@ -98,7 +98,6 @@ class BOFNet(nn.Module):
             fmaps = self.fnet(images.reshape(B * N, 3, H, W)).reshape(
                 B, N, -1, H // 8, W // 8
             )
-        fmaps = fmaps.float()
         fmap1 = fmaps[:, 0, ...]
         fmap2 = fmaps[:, 1, ...]
         fmap3 = fmaps[:, 2, ...]

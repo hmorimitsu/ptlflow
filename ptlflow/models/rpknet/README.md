@@ -42,7 +42,7 @@ python train.py rpknet --random_seed 1234 --gradient_clip_val 1.0 --lr 2.5e-4 --
 ### Stage 2: FlyingThings3D
 
 ```bash
-python train.py rpknet --pretrained path_to_stage1_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-4 --gamma 0.8 --train_dataset things --train_batch_size 4 --max_epochs 10 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs --not_cache_pkconv_weights
+python train.py rpknet --pretrained path_to_stage1_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-4 --gamma 0.8 --train_dataset things --train_batch_size 4 --max_epochs 40 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs --not_cache_pkconv_weights
 ```
 
 ### Stage 3: FlyingThings3D+Sintel+KITTI+HD1K
@@ -74,7 +74,7 @@ It should generate the following results:
 
 ## Test
 
-The results submistted to the public benchmarks are generated with the respective commands below.
+The results submitted to the public benchmarks are generated with the respective commands below.
 
 ### MPI-Sintel
 

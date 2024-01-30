@@ -133,16 +133,12 @@ class StarFlow(BaseModel):
         init_device = list_pyramids[0][0].device
         flow_f = torch.zeros(
             b_size, 2, h_x1, w_x1, dtype=init_dtype, device=init_device
-        ).float()
+        )
         flow_b = torch.zeros(
             b_size, 2, h_x1, w_x1, dtype=init_dtype, device=init_device
-        ).float()
-        occ_f = torch.zeros(
-            b_size, 1, h_x1, w_x1, dtype=init_dtype, device=init_device
-        ).float()
-        occ_b = torch.zeros(
-            b_size, 1, h_x1, w_x1, dtype=init_dtype, device=init_device
-        ).float()
+        )
+        occ_f = torch.zeros(b_size, 1, h_x1, w_x1, dtype=init_dtype, device=init_device)
+        occ_b = torch.zeros(b_size, 1, h_x1, w_x1, dtype=init_dtype, device=init_device)
         previous_features = []
 
         for i in range(len(list_imgs) - 1):
@@ -167,7 +163,7 @@ class StarFlow(BaseModel):
                                 w_,
                                 dtype=init_dtype,
                                 device=init_device,
-                            ).float()
+                            )
                         )
 
                     # warping
@@ -391,16 +387,16 @@ class StarFlow(BaseModel):
 
             flow_f = torch.zeros(
                 b_size, 2, h_x1, w_x1, dtype=init_dtype, device=init_device
-            ).float()
+            )
             flow_b = torch.zeros(
                 b_size, 2, h_x1, w_x1, dtype=init_dtype, device=init_device
-            ).float()
+            )
             occ_f = torch.zeros(
                 b_size, 1, h_x1, w_x1, dtype=init_dtype, device=init_device
-            ).float()
+            )
             occ_b = torch.zeros(
                 b_size, 1, h_x1, w_x1, dtype=init_dtype, device=init_device
-            ).float()
+            )
 
         flow_f_up = torch.stack(
             [

@@ -101,11 +101,12 @@ class PatchEmbed(nn.Module):
         out_size = x.shape[2:]
 
         patch_coord = (
-            coords_grid(B, out_size[0], out_size[1]).to(x.device) * self.patch_size
+            coords_grid(B, out_size[0], out_size[1], dtype=x.dtype, device=x.device)
+            * self.patch_size
             + self.patch_size / 2
         )  # in feature coordinate space
         if self.cfg.use_rpe:
-            center_coord = coords_grid(1, H, W).to(x.device)
+            center_coord = coords_grid(1, H, W, dtype=x.dtype, device=x.device)
             center_coord = (
                 center_coord.permute(2, 3, 1, 0)
                 .reshape(H * W, 2, 1, 1)

@@ -108,8 +108,8 @@ class GMA(BaseModel):
     def initialize_flow(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         N, C, H, W = img.shape
-        coords0 = coords_grid(N, H // 8, W // 8).to(img.device)
-        coords1 = coords_grid(N, H // 8, W // 8).to(img.device)
+        coords0 = coords_grid(N, H // 8, W // 8, dtype=img.dtype, device=img.device)
+        coords1 = coords_grid(N, H // 8, W // 8, dtype=img.dtype, device=img.device)
 
         # optical flow computed as difference: flow = coords1 - coords0
         return coords0, coords1
@@ -148,8 +148,6 @@ class GMA(BaseModel):
         # run the feature network
         fmap1, fmap2 = self.fnet([image1, image2])
 
-        fmap1 = fmap1.float()
-        fmap2 = fmap2.float()
         corr_fn = get_corr_block(
             fmap1=fmap1,
             fmap2=fmap2,

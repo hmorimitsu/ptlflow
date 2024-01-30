@@ -75,7 +75,7 @@ class SKMotionEncoder6_Deep_nopool_res(nn.Module):
         self.velocity_update_block = velocity_update_block()
 
     def sample_flo_feat(self, flow, feat):
-        sampled_feat = bilinear_sampler(feat.float(), flow.permute(0, 2, 3, 1))
+        sampled_feat = bilinear_sampler(feat, flow.permute(0, 2, 3, 1))
         return sampled_feat
 
     def forward(

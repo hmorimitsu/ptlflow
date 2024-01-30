@@ -1510,7 +1510,7 @@ class POLAUpdate(nn.Module):
         x = x.flatten(2).transpose(1, 2)  # B L C
 
         # calculate attention mask for ConvAlikeLocalTransBlock
-        img_mask = torch.zeros((1, H, W, 1), device=x.device)  # 1 H W 1
+        img_mask = torch.zeros((1, H, W, 1), dtype=x.dtype, device=x.device)  # 1 H W 1
 
         pad_r = (self.win_size - W % self.win_size) % self.win_size
         pad_b = (self.win_size - H % self.win_size) % self.win_size

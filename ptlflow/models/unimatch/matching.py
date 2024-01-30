@@ -19,7 +19,9 @@ def global_correlation_softmax(
     )  # [B, H, W, H, W]
 
     # flow from softmax
-    init_grid = coords_grid(b, h, w).to(correlation.device)  # [B, 2, H, W]
+    init_grid = coords_grid(
+        b, h, w, dtype=correlation.dtype, device=correlation.device
+    )  # [B, 2, H, W]
     grid = init_grid.view(b, 2, -1).permute(0, 2, 1)  # [B, H*W, 2]
 
     correlation = correlation.view(b, h * w, h * w)  # [B, H*W, H*W]
@@ -51,7 +53,9 @@ def local_correlation_softmax(
     padding_mode="zeros",
 ):
     b, c, h, w = feature0.size()
-    coords_init = coords_grid(b, h, w).to(feature0.device)  # [B, 2, H, W]
+    coords_init = coords_grid(
+        b, h, w, dtype=feature0.dtype, device=feature0.device
+    )  # [B, 2, H, W]
     coords = coords_init.view(b, 2, -1).permute(0, 2, 1)  # [B, H*W, 2]
 
     local_h = 2 * local_radius + 1
@@ -64,6 +68,7 @@ def local_correlation_softmax(
         local_radius,
         local_h,
         local_w,
+        dtype=feature0.dtype,
         device=feature0.device,
     )  # [2R+1, 2R+1, 2]
     window_grid = window_grid.reshape(-1, 2).repeat(b, 1, 1, 1)  # [B, 1, (2R+1)^2, 2]
@@ -97,7 +102,11 @@ def local_correlation_softmax(
     )  # [B, H*W, (2R+1)^2]
 
     # mask invalid locations
-    corr[~valid] = -1e9
+    if feature0.dtype == torch.float16:
+        val = -1e4
+    else:
+        val = -1e9
+    corr[~valid] = val
 
     prob = F.softmax(corr, -1)  # [B, H*W, (2R+1)^2]
 
@@ -123,7 +132,9 @@ def local_correlation_with_flow(
     dilation=1,
 ):
     b, c, h, w = feature0.size()
-    coords_init = coords_grid(b, h, w).to(feature0.device)  # [B, 2, H, W]
+    coords_init = coords_grid(
+        b, h, w, dtype=feature0.dtype, device=feature0.device
+    )  # [B, 2, H, W]
     coords = coords_init.view(b, 2, -1).permute(0, 2, 1)  # [B, H*W, 2]
 
     local_h = 2 * local_radius + 1
@@ -136,6 +147,7 @@ def local_correlation_with_flow(
         local_radius,
         local_h,
         local_w,
+        dtype=feature0.dtype,
         device=feature0.device,
     )  # [2R+1, 2R+1, 2]
     window_grid = window_grid.reshape(-1, 2).repeat(b, 1, 1, 1)  # [B, 1, (2R+1)^2, 2]
@@ -195,7 +207,7 @@ def warp_with_pose_depth_candidates(
     with torch.no_grad():
         # pixel coordinates
         grid = coords_grid(
-            b, h, w, homogeneous=True, device=depth.device
+            b, h, w, homogeneous=True, dtype=depth.dtype, device=depth.device
         )  # [B, 3, H, W]
         # back project to 3D and transform viewpoint
         points = torch.inverse(intrinsics).bmm(grid.view(b, 3, -1))  # [B, 3, H*W]

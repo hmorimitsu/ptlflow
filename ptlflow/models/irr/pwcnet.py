@@ -102,9 +102,7 @@ class IRRPWCNet(BaseModel):
         ) = x1_pyramid[0].size()
         init_dtype = x1_pyramid[0].dtype
         init_device = x1_pyramid[0].device
-        flow = torch.zeros(
-            b_size, 2, h_x1, w_x1, dtype=init_dtype, device=init_device
-        ).float()
+        flow = torch.zeros(b_size, 2, h_x1, w_x1, dtype=init_dtype, device=init_device)
 
         for l, (x1, x2) in enumerate(zip(x1_pyramid, x2_pyramid)):
             # warping

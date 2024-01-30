@@ -114,8 +114,8 @@ class CCMR(BaseModel):
     def initialize_flow16(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         N, C, H, W = img.shape
-        coords0 = coords_grid(N, H // 16, W // 16).to(img.device)
-        coords1 = coords_grid(N, H // 16, W // 16).to(img.device)
+        coords0 = coords_grid(N, H // 16, W // 16, dtype=img.dtype, device=img.device)
+        coords1 = coords_grid(N, H // 16, W // 16, dtype=img.dtype, device=img.device)
 
         # optical flow computed as difference: flow = coords1 - coords0
         return coords0, coords1
@@ -123,7 +123,9 @@ class CCMR(BaseModel):
     def get_grid(self, img, scale):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         N, C, H, W = img.shape
-        coords0 = coords_grid(N, H // scale, W // scale).to(img.device)
+        coords0 = coords_grid(
+            N, H // scale, W // scale, dtype=img.dtype, device=img.device
+        )
         return coords0
 
     def upsample_flow(self, flow, mask, scale=8):
@@ -180,9 +182,6 @@ class CCMR(BaseModel):
             else self.args.num_scales
         )
         for index, (fmap1, fmap2) in enumerate(fnet_pyramid):
-            fmap1 = fmap1.float()
-            fmap2 = fmap2.float()
-
             corr_fn = CudaBroadCorrBlock(
                 fmap1, fmap2, self.args.correlation_depth
             )  # This could be replaced with MS-RAFT's Corrblock for faster performance - But then it requires 12.5 GB for inference and 3 A100 GPUs (40GB each) for training.

@@ -40,6 +40,6 @@ class WarpingLayer(nn.Module):
             dtype=x.dtype, device=x.device
         )
         mask = F.grid_sample(mask, grid, align_corners=True)
-        mask = (mask >= 1.0).float()
+        mask = (mask >= 1.0).to(dtype=x.dtype)
 
         return x_warp * mask

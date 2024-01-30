@@ -64,6 +64,6 @@ class CudaBroadCorrBlock:
 
         corrs = torch.stack(corr_list, dim=1)
         corrs = corrs.reshape(self.b, self.corr_depth, self.h, self.w)
-        corrs = corrs / torch.sqrt(torch.tensor(self.feature_dim).float())
+        corrs = corrs / torch.sqrt(torch.tensor(self.feature_dim))
 
         return corrs

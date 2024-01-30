@@ -72,7 +72,7 @@ class FlowNetFusion(FlowNetBase):
         outputs = {}
 
         if self.training:
-            outputs["flow_preds"] = [flow0.float(), flow1.float(), flow2.float()]
+            outputs["flow_preds"] = [flow0, flow1, flow2]
             outputs["flows"] = flow0[:, None]
         else:
             outputs["flows"] = flow0[:, None]
