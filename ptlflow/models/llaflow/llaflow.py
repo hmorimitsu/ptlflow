@@ -113,8 +113,8 @@ class LLAFlow(BaseModel):
     def initialize_flow(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         N, C, H, W = img.shape
-        coords0 = coords_grid(N, H // 8, W // 8, device=img.device)
-        coords1 = coords_grid(N, H // 8, W // 8, device=img.device)
+        coords0 = coords_grid(N, H // 8, W // 8, dtype=img.dtype, device=img.device)
+        coords1 = coords_grid(N, H // 8, W // 8, dtype=img.dtype, device=img.device)
 
         # optical flow computed as difference: flow = coords1 - coords0
         return coords0, coords1
@@ -169,8 +169,6 @@ class LLAFlow(BaseModel):
         fmap2 = self.lsa(ls2, fmap2)
         corr2 = self.s_lsa(ls1, fmap1, fmap2)
 
-        fmap1 = fmap1.float()
-        fmap2 = fmap2.float()
         corr_fn = CorrBlock(
             fmap1, fmap2, self.gamma, corr2, radius=self.args.corr_radius
         )
