@@ -93,17 +93,17 @@ class FeatureExtractor(nn.Module):
 
 def get_grid(x):
     grid_H = (
-        torch.linspace(-1.0, 1.0, x.size(3))
+        torch.linspace(-1.0, 1.0, x.size(3), dtype=x.dtype, device=x.device)
         .view(1, 1, 1, x.size(3))
         .expand(x.size(0), 1, x.size(2), x.size(3))
     )
     grid_V = (
-        torch.linspace(-1.0, 1.0, x.size(2))
+        torch.linspace(-1.0, 1.0, x.size(2), dtype=x.dtype, device=x.device)
         .view(1, 1, x.size(2), 1)
         .expand(x.size(0), 1, x.size(2), x.size(3))
     )
     grid = torch.cat([grid_H, grid_V], 1)
-    grids_cuda = grid.float().requires_grad_(False)
+    grids_cuda = grid.requires_grad_(False)
     if x.is_cuda:
         grids_cuda = grids_cuda.cuda()
     return grids_cuda
@@ -123,11 +123,11 @@ class WarpingLayer(nn.Module):
         grid = torch.add(get_grid(x), flow_for_grid).transpose(1, 2).transpose(2, 3)
         x_warp = tf.grid_sample(x, grid, align_corners=True)
 
-        mask = torch.ones(x.size(), requires_grad=False)
+        mask = torch.ones(x.size(), requires_grad=False, dtype=x.dtype)
         if x.is_cuda:
             mask = mask.cuda()
         mask = tf.grid_sample(mask, grid, align_corners=True)
-        mask = (mask >= 1.0).float()
+        mask = (mask >= 1.0).to(dtype=x.dtype)
 
         return x_warp * mask
 
