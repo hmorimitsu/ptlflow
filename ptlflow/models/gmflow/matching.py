@@ -19,7 +19,9 @@ def global_correlation_softmax(
     )  # [B, H, W, H, W]
 
     # flow from softmax
-    init_grid = coords_grid(b, h, w).to(correlation.device)  # [B, 2, H, W]
+    init_grid = coords_grid(
+        b, h, w, dtype=correlation.dtype, device=correlation.device
+    )  # [B, 2, H, W]
     grid = init_grid.view(b, 2, -1).permute(0, 2, 1)  # [B, H*W, 2]
 
     correlation = correlation.view(b, h * w, h * w)  # [B, H*W, H*W]
@@ -51,7 +53,9 @@ def local_correlation_softmax(
     padding_mode="zeros",
 ):
     b, c, h, w = feature0.size()
-    coords_init = coords_grid(b, h, w).to(feature0.device)  # [B, 2, H, W]
+    coords_init = coords_grid(
+        b, h, w, dtype=feature0.dtype, device=feature0.device
+    )  # [B, 2, H, W]
     coords = coords_init.view(b, 2, -1).permute(0, 2, 1)  # [B, H*W, 2]
 
     local_h = 2 * local_radius + 1

@@ -28,14 +28,14 @@ class PositionEmbeddingSine(nn.Module):
         # mask = tensor_list.mask  # [B, H, W], input with padding, valid as 0
         b, c, h, w = x.size()
         mask = torch.ones((b, h, w), device=x.device)  # [B, H, W]
-        y_embed = mask.cumsum(1, dtype=torch.float32)
-        x_embed = mask.cumsum(2, dtype=torch.float32)
+        y_embed = mask.cumsum(1, dtype=x.dtype)
+        x_embed = mask.cumsum(2, dtype=x.dtype)
         if self.normalize:
             eps = 1e-6
             y_embed = y_embed / (y_embed[:, -1:, :] + eps) * self.scale
             x_embed = x_embed / (x_embed[:, :, -1:] + eps) * self.scale
 
-        dim_t = torch.arange(self.num_pos_feats, dtype=torch.float32, device=x.device)
+        dim_t = torch.arange(self.num_pos_feats, dtype=x.dtype, device=x.device)
         dim_t = self.temperature ** (2 * (dim_t // 2) / self.num_pos_feats)
 
         pos_x = x_embed[:, :, :, None] / dim_t
