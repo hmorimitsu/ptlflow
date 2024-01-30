@@ -670,7 +670,7 @@ class SelfAttVisPosTrans(nn.Module):
             coords_diff = coords2.unsqueeze(0) - coords2.unsqueeze(1)
             attn_mask = (
                 coords_diff.abs().max(dim=2)[0] > self.attn_mask_radius
-            ).float()
+            ).to(dtype=x.dtype)
             attn_mask = (attn_mask * -1e9).unsqueeze(0).unsqueeze(0)
         else:
             attn_mask = None
@@ -790,14 +790,14 @@ class SlidingPosBiases2D(nn.Module):
         self.register_buffer("all_w2s", all_w2s, persistent=False)
         print0(f"Sliding-window Positional Biases, r: {R}, max size: {max_pos_size}")
 
-    def forward(self, feat_shape, device):
+    def forward(self, feat_shape, dtype, device):
         R = self.R
         spatial_shape = feat_shape[-self.pos_dim :]
         # [H, W, H, W] => [H+2R, W+2R, H+2R, W+2R].
         padded_pos_shape = list(spatial_shape) + [
             2 * R + spatial_shape[i] for i in range(self.pos_dim)
         ]
-        padded_pos_biases = torch.zeros(padded_pos_shape, device=device)
+        padded_pos_biases = torch.zeros(padded_pos_shape, dtype=dtype, device=device)
 
         if self.pos_dim == 2:
             H, W = spatial_shape
@@ -856,7 +856,7 @@ class SETransInputFeatEncoder(nn.Module):
     # Cache the pos_code and feat_shape to avoid unnecessary generation time.
     # This is only used during inference. During training, pos_code is always generated each time it's used.
     # Otherwise the cached pos_code cannot receive proper gradients.
-    def pos_code_lookup_cache(self, vis_feat_shape, device, voxels_pos_normed):
+    def pos_code_lookup_cache(self, vis_feat_shape, dtype, device, voxels_pos_normed):
         if self.pos_code_type == "bias":
             # Cache miss for 'bias' type of positional codes.
             if (
@@ -864,7 +864,7 @@ class SETransInputFeatEncoder(nn.Module):
                 or self.cached_pos_code is None
                 or self.cached_feat_shape != vis_feat_shape
             ):
-                self.cached_pos_code = self.pos_coder(vis_feat_shape, device)
+                self.cached_pos_code = self.pos_coder(vis_feat_shape, dtype, device)
                 self.cached_feat_shape = vis_feat_shape  # else: self.cached_pos_code exists, and self.cached_feat_shape == vis_feat_shape.
             # Just return the cached pos_code.
         else:
@@ -892,7 +892,7 @@ class SETransInputFeatEncoder(nn.Module):
             # pos_embed:         [B0, num_voxels, 256]
             voxels_pos_normed = voxels_pos_normed.view(batch, ht * wd, -1)
             pos_embed = self.pos_code_lookup_cache(
-                vis_feat.shape, vis_feat.device, voxels_pos_normed
+                vis_feat.shape, vis_feat.dtype, vis_feat.device, voxels_pos_normed
             )
             pos_biases = None
         else:
@@ -901,7 +901,7 @@ class SETransInputFeatEncoder(nn.Module):
             if return_pos_biases:
                 # pos_biases: [1, 1, H, W, H, W]
                 pos_biases = self.pos_code_lookup_cache(
-                    vis_feat.shape, vis_feat.device, None
+                    vis_feat.shape, vis_feat.dtype, vis_feat.device, None
                 )
                 # pos_biases: [1, 1, H*W, H*W]
                 pos_biases = pos_biases.reshape(1, 1, ht * wd, ht * wd)
