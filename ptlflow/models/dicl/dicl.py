@@ -72,7 +72,7 @@ class FlowRegression(nn.Module):
 
         # displacement along u
         dispU = torch.reshape(
-            torch.arange(-self.maxU, self.maxU + 1, dtype=torch.float32),
+            torch.arange(-self.maxU, self.maxU + 1, dtype=x.dtype),
             [1, sizeU, 1, 1, 1],
         ).to(x.device)
         dispU = dispU.expand(B, -1, sizeV, H, W).contiguous()
@@ -80,7 +80,7 @@ class FlowRegression(nn.Module):
 
         # displacement along v
         dispV = torch.reshape(
-            torch.arange(-self.maxV, self.maxV + 1, dtype=torch.float32),
+            torch.arange(-self.maxV, self.maxV + 1, dtype=x.dtype),
             [1, 1, sizeV, 1, 1],
         ).to(x.device)
         dispV = dispV.expand(B, sizeU, -1, H, W).contiguous()
@@ -330,11 +330,11 @@ class DICLBase(BaseModel):
         """
         B, C, H, W = x.size()
         # mesh grid
-        xx = torch.arange(0, W).view(1, -1).repeat(H, 1)
-        yy = torch.arange(0, H).view(-1, 1).repeat(1, W)
+        xx = torch.arange(0, W, dtype=x.dtype, device=x.device).view(1, -1).repeat(H, 1)
+        yy = torch.arange(0, H, dtype=x.dtype, device=x.device).view(-1, 1).repeat(1, W)
         xx = xx.view(1, 1, H, W).repeat(B, 1, 1, 1)
         yy = yy.view(1, 1, H, W).repeat(B, 1, 1, 1)
-        grid = torch.cat((xx, yy), 1).float()
+        grid = torch.cat((xx, yy), 1)
 
         if x.is_cuda:
             grid = grid.cuda()
@@ -346,7 +346,9 @@ class DICLBase(BaseModel):
 
         vgrid = vgrid.permute(0, 2, 3, 1)
         output = nn.functional.grid_sample(x, vgrid, align_corners=True)
-        mask = torch.autograd.Variable(torch.ones(x.size())).to(x.device)
+        mask = torch.autograd.Variable(
+            torch.ones(x.size(), dtype=x.dtype, device=x.device)
+        )
         mask = nn.functional.grid_sample(mask, vgrid, align_corners=True)
 
         mask[mask < 0.9999] = 0
@@ -596,7 +598,7 @@ class DICLBase(BaseModel):
             # mitigate the effect of holes (may be raised by occ)
             valid_mask = cost[:, c:, ...].sum(dim=1) != 0
             valid_mask = valid_mask.detach()
-            cost = cost * valid_mask.unsqueeze(1).float()
+            cost = cost * valid_mask.unsqueeze(1)
 
         # (B, 2C, U, V, H, W) -> (B, U, V, 2C, H, W)
         cost = cost.permute([0, 2, 3, 1, 4, 5]).contiguous()
