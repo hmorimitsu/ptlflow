@@ -68,6 +68,7 @@ def local_correlation_softmax(
         local_radius,
         local_h,
         local_w,
+        dtype=feature0.dtype,
         device=feature0.device,
     )  # [2R+1, 2R+1, 2]
     window_grid = window_grid.reshape(-1, 2).repeat(b, 1, 1, 1)  # [B, 1, (2R+1)^2, 2]
@@ -101,7 +102,11 @@ def local_correlation_softmax(
     )  # [B, H*W, (2R+1)^2]
 
     # mask invalid locations
-    corr[~valid] = -1e9
+    if corr.dtype == torch.float32:
+        val = -1e9
+    else:
+        val = -1e-4
+    corr[~valid] = val
 
     prob = F.softmax(corr, -1)  # [B, H*W, (2R+1)^2]
 
