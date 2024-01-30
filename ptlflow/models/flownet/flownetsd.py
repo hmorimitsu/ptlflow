@@ -127,7 +127,7 @@ class FlowNetSD(FlowNetBase):
 
         # Results are noticeably better if dividing here, rather than multiplying
         # Maybe it was trained with the inverse divisor?
-        out_flow = self.upsample1(flow2.float()) / self.args.div_flow
+        out_flow = self.upsample1(flow2) / self.args.div_flow
         if image_resizer is not None:
             out_flow = self.postprocess_predictions(
                 out_flow, image_resizer, is_flow=True
@@ -137,11 +137,11 @@ class FlowNetSD(FlowNetBase):
 
         if self.training:
             outputs["flow_preds"] = [
-                flow2.float(),
-                flow3.float(),
-                flow4.float(),
-                flow5.float(),
-                flow6.float(),
+                flow2,
+                flow3,
+                flow4,
+                flow5,
+                flow6,
             ]
             outputs["flows"] = out_flow[:, None]
         else:

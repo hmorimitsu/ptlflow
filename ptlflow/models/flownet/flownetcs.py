@@ -53,7 +53,7 @@ class FlowNetCS(FlowNetBase):
         yy = torch.arange(0, H).view(-1, 1).repeat(1, W)
         xx = xx.view(1, 1, H, W).repeat(B, 1, 1, 1)
         yy = yy.view(1, 1, H, W).repeat(B, 1, 1, 1)
-        grid = torch.cat((xx, yy), 1).float()
+        grid = torch.cat((xx, yy), 1)
 
         if x.is_cuda:
             grid = grid.to(dtype=x.dtype, device=x.device)
