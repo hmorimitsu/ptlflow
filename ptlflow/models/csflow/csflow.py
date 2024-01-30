@@ -89,8 +89,8 @@ class CSFlow(BaseModel):
         """
         N, C, H, W = img.shape
 
-        coords0 = coords_grid(N, H // 8, W // 8, device=img.device)
-        coords1 = coords_grid(N, H // 8, W // 8, device=img.device)
+        coords0 = coords_grid(N, H // 8, W // 8, dtype=img.dtype, device=img.device)
+        coords1 = coords_grid(N, H // 8, W // 8, dtype=img.dtype, device=img.device)
 
         # optical flow computed as difference: flow = coords1 - coords0
         return coords0, coords1
@@ -127,9 +127,6 @@ class CSFlow(BaseModel):
         if not self.args.skip_encode:
             # run the feature network
             fmap1, fmap2 = self.fnet([image1, image2])
-
-            fmap1 = fmap1.float()
-            fmap2 = fmap2.float()
         else:
             fmap1 = (image1 + 1) * 127.5
             fmap2 = (image2 + 1) * 127.5
@@ -562,8 +559,12 @@ class CorrBlock_v2:
         out_pyramid = []
         for i in range(self.num_levels):
             corr = self.corr_pyramid[i]
-            dx = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
-            dy = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
+            dx = torch.linspace(
+                -r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device
+            )
+            dy = torch.linspace(
+                -r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device
+            )
             delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1)
 
             centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2) / 2**i
@@ -575,7 +576,7 @@ class CorrBlock_v2:
             out_pyramid.append(corr)
 
         out = torch.cat(out_pyramid, dim=-1)
-        return out.permute(0, 3, 1, 2).contiguous().float()
+        return out.permute(0, 3, 1, 2).contiguous()
 
     @staticmethod
     def corr(fmap1, fmap2):
@@ -585,7 +586,7 @@ class CorrBlock_v2:
 
         corr = torch.matmul(fmap1.transpose(1, 2), fmap2)
         corr = corr.view(batch, ht, wd, 1, ht, wd)
-        return corr / torch.sqrt(torch.tensor(dim).float())
+        return corr / torch.sqrt(torch.tensor(dim))
 
 
 def bilinear_sampler(img, coords, mode="bilinear", mask=False):
@@ -600,16 +601,18 @@ def bilinear_sampler(img, coords, mode="bilinear", mask=False):
 
     if mask:
         mask = (xgrid > -1) & (ygrid > -1) & (xgrid < 1) & (ygrid < 1)
-        return img, mask.float()
+        return img, mask.to(dtype=coords.dtype)
 
     return img
 
 
-def coords_grid(batch, ht, wd, device):
+def coords_grid(batch, ht, wd, dtype, device):
     coords = torch.meshgrid(
-        torch.arange(ht, device=device), torch.arange(wd, device=device), indexing="ij"
+        torch.arange(ht, dtype=dtype, device=device),
+        torch.arange(wd, dtype=dtype, device=device),
+        indexing="ij",
     )
-    coords = torch.stack(coords[::-1], dim=0).float()
+    coords = torch.stack(coords[::-1], dim=0)
     return coords[None].repeat(batch, 1, 1, 1)
 
 
