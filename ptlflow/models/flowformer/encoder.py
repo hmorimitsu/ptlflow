@@ -73,7 +73,8 @@ class PatchEmbed(nn.Module):
         out_size = x.shape[2:]
 
         patch_coord = (
-            coords_grid(B, out_size[0], out_size[1]).to(x.device) * self.patch_size
+            coords_grid(B, out_size[0], out_size[1], dtype=x.dtype, device=x.device)
+            * self.patch_size
             + self.patch_size / 2
         )  # in feature coordinate space
         patch_coord = patch_coord.view(B, 2, -1).permute(0, 2, 1)
@@ -412,8 +413,12 @@ class CostPerceiverEncoder(nn.Module):
         data["cost_maps"] = cost_maps
 
         if self.cost_scale_aug is not None:
+            if cost_volume.dtype == torch.float32:
+                tensor_function = torch.FloatTensor
+            else:
+                tensor_function = torch.HalfTensor
             scale_factor = (
-                torch.FloatTensor(B * H1 * W1, self.cfg.cost_heads_num, H2, W2)
+                tensor_function(B * H1 * W1, self.cfg.cost_heads_num, H2, W2)
                 .uniform_(self.cost_scale_aug[0], self.cost_scale_aug[1])
                 .cuda()
             )
