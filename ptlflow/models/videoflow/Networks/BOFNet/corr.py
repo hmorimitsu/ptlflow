@@ -52,11 +52,13 @@ class OLCorrBlock:
         out_pyramid = []
         for i in range(self.num_levels):
             fmap2 = self.fmap2_pyramid[i]
-            dx = torch.linspace(-r, r, 2 * r + 1)
-            dy = torch.linspace(-r, r, 2 * r + 1)
-            delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1).to(
-                coords.device
+            dx = torch.linspace(
+                -r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device
             )
+            dy = torch.linspace(
+                -r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device
+            )
+            delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1)
 
             centroid_lvl = coords.reshape(batch, h1 * w1, 1, 2) / 2**i
             delta_lvl = delta.view(1, 1, (2 * r + 1) ** 2, 2)
@@ -67,13 +69,13 @@ class OLCorrBlock:
                 batch * h1 * w1, dim, (2 * r + 1) ** 2
             )
             # print(self.fmap1.shape, fmap2.shape)
-            corr = torch.bmm(self.fmap1, fmap2) / torch.sqrt(torch.tensor(dim).float())
+            corr = torch.bmm(self.fmap1, fmap2) / torch.sqrt(torch.tensor(dim))
 
             corr = corr.view(batch, h1, w1, -1)
             out_pyramid.append(corr)
 
         out = torch.cat(out_pyramid, dim=-1)
-        return out.permute(0, 3, 1, 2).float()
+        return out.permute(0, 3, 1, 2)
 
 
 class CorrBlock:
@@ -101,11 +103,13 @@ class CorrBlock:
         out_pyramid = []
         for i in range(self.num_levels):
             corr = self.corr_pyramid[i]
-            dx = torch.linspace(-r, r, 2 * r + 1)
-            dy = torch.linspace(-r, r, 2 * r + 1)
-            delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1).to(
-                coords.device
+            dx = torch.linspace(
+                -r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device
             )
+            dy = torch.linspace(
+                -r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device
+            )
+            delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1)
 
             centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2) / 2**i
             delta_lvl = delta.view(1, 2 * r + 1, 2 * r + 1, 2)
@@ -116,7 +120,7 @@ class CorrBlock:
             out_pyramid.append(corr)
 
         out = torch.cat(out_pyramid, dim=-1)
-        return out.permute(0, 3, 1, 2).contiguous().float()
+        return out.permute(0, 3, 1, 2).contiguous()
 
     @staticmethod
     def corr(fmap1, fmap2):
@@ -126,7 +130,7 @@ class CorrBlock:
 
         corr = torch.matmul(fmap1.transpose(1, 2), fmap2)
         corr = corr.view(batch, ht, wd, 1, ht, wd)
-        return corr / torch.sqrt(torch.tensor(dim).float())
+        return corr / torch.sqrt(torch.tensor(dim))
 
 
 class CorrBlockSingleScale(nn.Module):
@@ -145,11 +149,9 @@ class CorrBlockSingleScale(nn.Module):
         batch, h1, w1, _ = coords.shape
 
         corr = self.corr
-        dx = torch.linspace(-r, r, 2 * r + 1)
-        dy = torch.linspace(-r, r, 2 * r + 1)
-        delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1).to(
-            coords.device
-        )
+        dx = torch.linspace(-r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device)
+        dy = torch.linspace(-r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device)
+        delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1)
 
         centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2)
         delta_lvl = delta.view(1, 2 * r + 1, 2 * r + 1, 2)
@@ -157,7 +159,7 @@ class CorrBlockSingleScale(nn.Module):
 
         corr = bilinear_sampler(corr, coords_lvl)
         out = corr.view(batch, h1, w1, -1)
-        out = out.permute(0, 3, 1, 2).contiguous().float()
+        out = out.permute(0, 3, 1, 2).contiguous()
         return out
 
     @staticmethod
@@ -168,7 +170,7 @@ class CorrBlockSingleScale(nn.Module):
 
         corr = torch.matmul(fmap1.transpose(1, 2), fmap2)
         corr = corr.view(batch, ht, wd, 1, ht, wd)
-        return corr / torch.sqrt(torch.tensor(dim).float())
+        return corr / torch.sqrt(torch.tensor(dim))
 
 
 class AlternateCorrBlock:
@@ -190,8 +192,8 @@ class AlternateCorrBlock:
         corr_list = []
         for i in range(self.num_levels):
             r = self.radius
-            fmap1_i = self.pyramid[0][0].permute(0, 2, 3, 1).contiguous().float()
-            fmap2_i = self.pyramid[i][1].permute(0, 2, 3, 1).contiguous().float()
+            fmap1_i = self.pyramid[0][0].permute(0, 2, 3, 1).contiguous()
+            fmap2_i = self.pyramid[i][1].permute(0, 2, 3, 1).contiguous()
 
             coords_i = (coords / 2**i).reshape(B, 1, H, W, 2).contiguous()
             (corr,) = DirectCorr.apply(fmap1_i, fmap2_i, coords_i)
@@ -199,4 +201,4 @@ class AlternateCorrBlock:
 
         corr = torch.stack(corr_list, dim=1)
         corr = corr.reshape(B, -1, H, W)
-        return corr / torch.sqrt(torch.tensor(dim).float())
+        return corr / torch.sqrt(torch.tensor(dim))

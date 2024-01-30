@@ -75,7 +75,7 @@ class SKMotionEncoder6_Deep_nopool_res(nn.Module):
         self.velocity_update_block = velocity_update_block()
 
     def sample_flo_feat(self, flow, feat):
-        sampled_feat = bilinear_sampler(feat.float(), flow.permute(0, 2, 3, 1))
+        sampled_feat = bilinear_sampler(feat, flow.permute(0, 2, 3, 1))
         return sampled_feat
 
     def forward(
@@ -104,7 +104,9 @@ class SKMotionEncoder6_Deep_nopool_res(nn.Module):
         forward_motion_hidden_state = torch.cat(
             [
                 motion_hidden_state[:, 1:, ...],
-                torch.zeros(bs, 1, 48, H, W).to(motion_hidden_state.device),
+                torch.zeros(bs, 1, 48, H, W).to(
+                    dtype=motion_hidden_state.dtype, device=motion_hidden_state.device
+                ),
             ],
             dim=1,
         ).reshape(BN, -1, H, W)
@@ -113,7 +115,9 @@ class SKMotionEncoder6_Deep_nopool_res(nn.Module):
         )
         backward_motion_hidden_state = torch.cat(
             [
-                torch.zeros(bs, 1, 48, H, W).to(motion_hidden_state.device),
+                torch.zeros(bs, 1, 48, H, W).to(
+                    dtype=motion_hidden_state.dtype, device=motion_hidden_state.device
+                ),
                 motion_hidden_state[:, : N - 1, ...],
             ],
             dim=1,

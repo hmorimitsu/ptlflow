@@ -4,11 +4,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .Networks.MOFNetStack.update import GMAUpdateBlock
 from .Networks.encoders import twins_svt_large, convnext_Xlarge_4x, convnext_base_2x
-from .Networks.MOFNetStack.corr import CorrBlock, OLCorrBlock, AlternateCorrBlock
-from .utils import bilinear_sampler, coords_grid, upflow8
-from .Networks.MOFNetStack.gma import Attention, Aggregate
+from .Networks.MOFNetStack.corr import CorrBlock, AlternateCorrBlock
+from .utils import coords_grid
+from .Networks.MOFNetStack.gma import Attention
 from ..base_model.base_model import BaseModel
 
 
@@ -123,8 +122,12 @@ class VideoFlowMOF(BaseModel):
     def initialize_flow(self, img, bs, down_ratio):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         N, C, H, W = img.shape
-        coords0 = coords_grid(bs, H // down_ratio, W // down_ratio).to(img.device)
-        coords1 = coords_grid(bs, H // down_ratio, W // down_ratio).to(img.device)
+        coords0 = coords_grid(
+            bs, H // down_ratio, W // down_ratio, dtype=img.dtype, device=img.device
+        )
+        coords1 = coords_grid(
+            bs, H // down_ratio, W // down_ratio, dtype=img.dtype, device=img.device
+        )
 
         # optical flow computed as difference: flow = coords1 - coords0
         return coords0, coords1
@@ -211,7 +214,6 @@ class VideoFlowMOF(BaseModel):
         fmaps = self.fnet(images.reshape(B * N, 3, H, W)).reshape(
             B, N, -1, H // down_ratio, W // down_ratio
         )
-        fmaps = fmaps.float()
 
         if self.args.corr_fn == "default":
             corr_fn = CorrBlock
