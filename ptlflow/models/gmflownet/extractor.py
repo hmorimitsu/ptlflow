@@ -966,6 +966,8 @@ class PositionalEncoding(nn.Module):
 
             self._update_PE_table(self.max_len, self.d_model // 2)
 
+        if self.PE_table.dtype != x.dtype:
+            self.PE_table = self.PE_table.to(dtype=x.dtype)
         if self.PE_table.device != x.device:
             self.PE_table = self.PE_table.to(x.device)
 
