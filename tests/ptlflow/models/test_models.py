@@ -43,9 +43,28 @@ EXCLUDE_MODELS = [
     "separableflow",
 ]  # Has additional requirements
 
+EXCLUDE_MODELS_FP16 = [
+    "ccmr",
+    "ccmr+",
+    "lcv_raft",
+    "lcv_raft_small",
+    "matchflow",
+    "matchflow_raft",
+    "ms_raft+",
+    "scv4",
+    "scv8",
+    "separableflow",
+]  # Some operations do not support fp16
+
 MODEL_ARGS = {
     "flowformer": {"use_tile_input": False},
     "flowformer++": {"use_tile_input": False},
+}
+
+MODEL_ARGS_FP16 = {
+    "flowformer": {"use_tile_input": False},
+    "flowformer++": {"use_tile_input": False},
+    "rpknet": {"corr_mode": "allpairs"},
 }
 
 
@@ -76,6 +95,38 @@ def test_forward() -> None:
         if torch.cuda.is_available():
             model = model.cuda()
             inputs["images"] = inputs["images"].cuda()
+
+        model(inputs)
+
+
+def test_forward_fp16() -> None:
+    model_names = ptlflow.models_dict.keys()
+    for mname in model_names:
+        if mname in EXCLUDE_MODELS_FP16:
+            continue
+
+        print(mname)
+        model_ref = ptlflow.get_model_reference(mname)
+        parser = model_ref.add_model_specific_args()
+        args = parser.parse_args([])
+
+        if mname in MODEL_ARGS_FP16:
+            for name, val in MODEL_ARGS_FP16[mname].items():
+                setattr(args, name, val)
+
+        model = ptlflow.get_model(mname, args=args)
+        model = model.eval()
+        model = model.half()
+
+        s = make_divisible(256, model.output_stride)
+        num_images = 2
+        if mname in ["videoflow_bof", "videoflow_mof"]:
+            num_images = 3
+        inputs = {"images": torch.rand(1, num_images, 3, s, s)}
+
+        if torch.cuda.is_available():
+            model = model.cuda()
+            inputs["images"] = inputs["images"].cuda().half()
 
         model(inputs)
 
