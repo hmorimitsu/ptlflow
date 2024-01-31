@@ -88,6 +88,8 @@ class MatchFlow(BaseModel):
                 "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
             )
 
+        self.showed_warning = False
+
     @property
     def train_size(self):
         return self._train_size
@@ -160,8 +162,17 @@ class MatchFlow(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
-        if self.args.use_tile_input:
-            return self.forward_tile(inputs)
+        if self.args.train_size is not None:
+            train_size = self.args.train_size
+        else:
+            train_size = self.train_size
+
+        if self.args.use_tile_input and train_size is None and not self.showed_warning:
+            print("WARNING: --train_size is not provided and it cannot be loaded from the checkpoint either. Matchflow will run without input tile.")
+            self.showed_warning = True
+
+        if self.args.use_tile_input and train_size is not None:
+            return self.forward_tile(inputs, train_size)
         else:
             return self.forward_resize(inputs)
 
@@ -205,13 +216,7 @@ class MatchFlow(BaseModel):
 
         return outputs
 
-    def forward_tile(self, inputs):
-        assert not self.training
-        if self.args.train_size is not None:
-            train_size = self.args.train_size
-        else:
-            train_size = self.train_size
-        assert train_size is not None
+    def forward_tile(self, inputs, train_size):
         input_size = inputs["images"].shape[-2:]
         image_size = (max(self.args.tile_height, input_size[-2]), input_size[-1])
         hws = compute_grid_indices(image_size, train_size)
