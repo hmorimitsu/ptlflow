@@ -175,7 +175,6 @@ class LocalFeatureTransformer(nn.Module):
             mask0 (torch.Tensor): [N, L] (optional)
             mask1 (torch.Tensor): [N, S] (optional)
         """
-
         assert self.d_model == feat0.size(
             2
         ), "the feature number of src and transformer must be equal"
@@ -235,6 +234,9 @@ class PositionEncodingSineNorm(nn.Module):
         Args:
             x: [N, C, H, W]
         """
+        if self.pe.dtype != x.dtype:
+            self.pe.to(dtype=x.dtype)
+
         if train_reso is None and eval_reso is None:
             return (
                 x + self.pe[:, :, : x.size(2), : x.size(3)],
@@ -242,20 +244,26 @@ class PositionEncodingSineNorm(nn.Module):
             )
         elif eval_reso != self.eval_reso:
             self.eval_reso = eval_reso
-            pe = torch.zeros((self.d_model, *self.max_shape))
+            pe = torch.zeros(
+                (self.d_model, *self.max_shape), dtype=x.dtype, device=x.device
+            )
             y_position = (
-                torch.ones(self.max_shape).cumsum(0).float().unsqueeze(0)
+                torch.ones(self.max_shape, dtype=x.dtype, device=x.device)
+                .cumsum(0)
+                .unsqueeze(0)
                 * train_reso[0]
                 / eval_reso[0]
             )
             x_position = (
-                torch.ones(self.max_shape).cumsum(1).float().unsqueeze(0)
+                torch.ones(self.max_shape, dtype=x.dtype, device=x.device)
+                .cumsum(1)
+                .unsqueeze(0)
                 * train_reso[1]
                 / eval_reso[1]
             )
 
             div_term = torch.exp(
-                torch.arange(0, self.d_model // 2, 2).float()
+                torch.arange(0, self.d_model // 2, 2, dtype=x.dtype, device=x.device)
                 * (-math.log(10000.0) / (self.d_model // 2))
             )
             div_term = div_term[:, None, None]  # [C//4, 1, 1]
@@ -271,6 +279,9 @@ class PositionEncodingSineNorm(nn.Module):
                 pe[:, :, : x.size(2), : x.size(3)],
             )
         else:
+            if self.eval_pe.dtype != x.dtype:
+                self.eval_pe.to(dtype=x.dtype)
+
             return (
                 x + self.eval_pe[:, :, : x.size(2), : x.size(3)],
                 self.eval_pe[:, :, : x.size(2), : x.size(3)],
