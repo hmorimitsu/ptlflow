@@ -33,37 +33,29 @@ TRAIN_EPOCHS = 1
 DATASET = "overfit"
 
 EXCLUDE_MODELS = [
-    "ccmr",
-    "ccmr+",
     "matchflow",
     "matchflow_raft",
-    "ms_raft+",
     "scv4",
     "scv8",
     "separableflow",
 ]  # Has additional requirements
 
 EXCLUDE_MODELS_FP16 = [
-    "ccmr",
-    "ccmr+",
     "lcv_raft",
     "lcv_raft_small",
     "matchflow",
     "matchflow_raft",
-    "ms_raft+",
     "scv4",
     "scv8",
     "separableflow",
 ]  # Some operations do not support fp16
 
 MODEL_ARGS = {
+    "ccmr": {"alternate_corr": False},
+    "ccmr+": {"alternate_corr": False},
     "flowformer": {"use_tile_input": False},
     "flowformer++": {"use_tile_input": False},
-}
-
-MODEL_ARGS_FP16 = {
-    "flowformer": {"use_tile_input": False},
-    "flowformer++": {"use_tile_input": False},
+    "ms_raft+": {"alternate_corr": False},
     "rpknet": {"corr_mode": "allpairs"},
 }
 
@@ -111,8 +103,8 @@ def test_forward_fp16() -> None:
             parser = model_ref.add_model_specific_args()
             args = parser.parse_args([])
 
-            if mname in MODEL_ARGS_FP16:
-                for name, val in MODEL_ARGS_FP16[mname].items():
+            if mname in MODEL_ARGS:
+                for name, val in MODEL_ARGS[mname].items():
                     setattr(args, name, val)
 
             model = ptlflow.get_model(mname, args=args)
