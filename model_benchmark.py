@@ -139,7 +139,7 @@ def _init_parser() -> argparse.ArgumentParser:
         "--final_speed_mode",
         type=str,
         choices=("avg", "median", "perc1", "perc5", "perc10"),
-        default="perc10",
+        default="median",
         help=(
             "How to obtain the final speed results."
             "percX represents reporting the value at the X-th percentile."
