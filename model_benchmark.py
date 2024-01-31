@@ -383,6 +383,7 @@ def benchmark(args: argparse.Namespace, device_handle) -> pd.DataFrame:
                     args.plot_axes,
                     args.plot_log_x,
                     args.plot_log_y,
+                    args.datatypes[0],
                 )
     return df
 
@@ -458,6 +459,7 @@ def save_plot(
     plot_axes: Optional[Tuple[str, str]],
     log_x: bool,
     log_y: bool,
+    datatype: str,
 ) -> None:
     """Create a plot of the results and save to disk.
 
@@ -475,6 +477,8 @@ def save_plot(
         If set, the X-axis is plot in log scale.
     log_y : bool
         If set, the Y-axis is plot in log scale.
+    datatype : str
+        Name of the datatype.
     """
     if plot_axes is not None:
         assert len(plot_axes) == 2
@@ -485,22 +489,29 @@ def save_plot(
         df_tmp = df.copy()
         df_tmp = df_tmp.dropna()
 
+        xlegend = TABLE_KEYS_LEGENDS[xkey]
+        if xkey in ("memory", "time"):
+            xlegend += f"-{datatype}"
+        ylegend = TABLE_KEYS_LEGENDS[ykey]
+        if ykey in ("memory", "time"):
+            ylegend += f"-{datatype}"
+
         if log_x:
-            log10_col = TABLE_KEYS_LEGENDS[xkey] + "(Log10)"
-            df_tmp[log10_col] = np.log10(df[TABLE_KEYS_LEGENDS[xkey]])
+            log10_col = f"{xlegend}(Log10)"
+            df_tmp[log10_col] = np.log10(df[xlegend])
         if log_y:
-            log10_col = TABLE_KEYS_LEGENDS[ykey] + "(Log10)"
-            df_tmp[log10_col] = np.log10(df[TABLE_KEYS_LEGENDS[ykey]])
+            log10_col = f"{ylegend}(Log10)"
+            df_tmp[log10_col] = np.log10(df[ylegend])
 
         fig = px.scatter(
-            df,
-            x=TABLE_KEYS_LEGENDS[xkey],
-            y=TABLE_KEYS_LEGENDS[ykey],
+            df_tmp,
+            x=xlegend,
+            y=ylegend,
             color=TABLE_LEGENDS[0],
             symbol=TABLE_LEGENDS[0],
             log_x=log_x,
             log_y=log_y,
-            title=f"{TABLE_KEYS_LEGENDS[xkey]} x {TABLE_KEYS_LEGENDS[ykey]}",
+            title=f"{xlegend} x {ylegend}",
         )
         fig.update_traces(
             marker={"size": 20, "line": {"width": 2, "color": "DarkSlateGrey"}},
@@ -549,6 +560,7 @@ if __name__ == "__main__":
             args.plot_axes,
             args.plot_log_x,
             args.plot_log_y,
+            args.datatypes[0],
         )
     print(f"Results saved to {str(args.output_path)}.")
     print(df)
