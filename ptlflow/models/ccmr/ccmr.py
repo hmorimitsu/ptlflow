@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from .update import BasicUpdateBlock
 from .extractor import BasicEncoder_resconv, Basic_Context_Encoder_resconv
-from .broad_corr import CudaBroadCorrBlock
+from .corr import get_corr_block
 from .utils import coords_grid, upflow2
 from .update import BasicUpdateBlock
 from .xcit import XCiT
@@ -53,7 +53,8 @@ class CCMR(BaseModel):
         )
         self.update_block = BasicUpdateBlock(
             self.args,
-            self.args.correlation_depth,
+            correlation_depth=(2 * self.args.lookup_radius + 1) ** 2
+            * self.args.lookup_pyramid_levels,
             hidden_dim=128,
             scale=2,
             num_heads=8,
@@ -86,11 +87,14 @@ class CCMR(BaseModel):
         parser.add_argument("--gamma", type=float, default=0.8)
         parser.add_argument("--max_flow", type=float, default=1000.0)
         parser.add_argument("--iters", type=int, default=(8, 10, 15))
-        parser.add_argument("--alternate_corr", action="store_true")
+        parser.add_argument("--lookup_pyramid_levels", type=int, default=2)
+        parser.add_argument("--lookup_radius", default=4)
+        parser.add_argument(
+            "--no_alternate_corr", action="store_false", dest="alternate_corr"
+        )
         parser.add_argument(
             "--model_type", type=str, choices=("CCMR", "CCMR+"), default="CCMR"
         )
-        parser.add_argument("--correlation_depth", type=int, default=162)
         parser.add_argument(
             "--cnet_norm",
             type=str,
@@ -182,9 +186,13 @@ class CCMR(BaseModel):
             else self.args.num_scales
         )
         for index, (fmap1, fmap2) in enumerate(fnet_pyramid):
-            corr_fn = CudaBroadCorrBlock(
-                fmap1, fmap2, self.args.correlation_depth
-            )  # This could be replaced with MS-RAFT's Corrblock for faster performance - But then it requires 12.5 GB for inference and 3 A100 GPUs (40GB each) for training.
+            corr_fn = get_corr_block(
+                fmap1=fmap1,
+                fmap2=fmap2,
+                radius=self.args.lookup_radius,
+                num_levels=self.args.lookup_pyramid_levels,
+                alternate_corr=self.args.alternate_corr,
+            )
 
             net, inp = torch.split(cnet_pyramid[index], [128, 128], dim=1)
             net = torch.tanh(net)
