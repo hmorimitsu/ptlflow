@@ -45,6 +45,7 @@ use the its original code.
    starting/validation
    starting/training
    starting/testing
+   starting/benchmark
 
 .. toctree::
    :maxdepth: 1
