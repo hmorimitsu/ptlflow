@@ -356,7 +356,12 @@ class RPKNet(BaseModel):
             flow = forward_interpolate_batch(flow_init)
         else:
             flow = torch.zeros(
-                b_size, 2, h_x1, w_x1, dtype=pass_pyramid1[0].dtype, device=pass_pyramid1[0].device
+                b_size,
+                2,
+                h_x1,
+                w_x1,
+                dtype=pass_pyramid1[0].dtype,
+                device=pass_pyramid1[0].device,
             )
 
         net = None

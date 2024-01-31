@@ -5,7 +5,7 @@ Predict optical flow with a pretrained model
 infer.py
 ========
 
-`[source code] <https://github.com/hmorimitsu/ptlflow/tree/master/infer.py>`__
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/infer.py>`__
 
 We provide a script for making it easier to perform inference on different inputs.
 Read :ref:`initial-scripts` to know how to download it.

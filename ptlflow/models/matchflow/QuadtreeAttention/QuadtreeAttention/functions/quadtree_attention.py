@@ -1,4 +1,5 @@
 from einops.einops import rearrange
+import torch
 from torch.autograd import Function
 
 import score_computation_cuda
@@ -8,8 +9,15 @@ import value_aggregation_cuda
 class ScoreComputation(Function):
     @staticmethod
     def forward(ctx, query, key, index):
+        is_fp16 = query.dtype == torch.float16
+        if is_fp16:
+            query = query.float()
+            key = key.float()
         x = score_computation_cuda.score_forward(query, key, index)
         ctx.save_for_backward(query, key, index)
+
+        if is_fp16:
+            x[0] = x[0].half()
         return x[0]
 
     @staticmethod
@@ -38,8 +46,16 @@ class value_aggregation(Function):
         D = value.shape[-1]
         # value [b, M, H, D]
         output = score.new_zeros([b, N, H, D]).contiguous()  # b, 4N, H, D
+
+        is_fp16 = score.dtype == torch.float16
+        if is_fp16:
+            score = score.float()
+            value = value.float()
+            output = output.float()
         value_aggregation_cuda.value_aggregation_forward(score, value, index, output)
         output = rearrange(output, "b (n f) h d -> b n f h d", f=f)
+        if is_fp16:
+            output = output.half()
         return output
 
     @staticmethod

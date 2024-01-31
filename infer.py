@@ -120,6 +120,9 @@ def _init_parser() -> ArgumentParser:
             "before showing it on the screen."
         ),
     )
+    parser.add_argument(
+        "--fp16", action="store_true", help="If set, use half floating point precision."
+    )
     return parser
 
 
@@ -141,6 +144,8 @@ def infer(args: Namespace, model: BaseModel) -> None:
     model.eval()
     if torch.cuda.is_available():
         model = model.cuda()
+        if args.fp16:
+            model = model.half()
 
     cap, img_paths, num_imgs, prev_img = init_input(args.input_path)
     flow_gt = None
@@ -154,10 +159,15 @@ def infer(args: Namespace, model: BaseModel) -> None:
             prev_img.shape[:2],
             target_scale_factor=args.scale_factor,
             cuda=torch.cuda.is_available(),
+            fp16=args.fp16,
         )
     else:
         io_adapter = IOAdapter(
-            model, prev_img.shape[:2], args.input_size, cuda=torch.cuda.is_available()
+            model,
+            prev_img.shape[:2],
+            args.input_size,
+            cuda=torch.cuda.is_available(),
+            fp16=args.fp16,
         )
 
     prev_dir_name = None

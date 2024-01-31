@@ -41,6 +41,7 @@ from ptlflow.utils.utils import (
     make_divisible,
 )
 
+NUM_COMMON_COLUMNS = 6
 TABLE_KEYS_LEGENDS = {
     "model": "Model",
     "params": "Params",
@@ -138,7 +139,7 @@ def _init_parser() -> argparse.ArgumentParser:
         "--final_speed_mode",
         type=str,
         choices=("avg", "median", "perc1", "perc5", "perc10"),
-        default="perc10",
+        default="median",
         help=(
             "How to obtain the final speed results."
             "percX represents reporting the value at the X-th percentile."
@@ -173,7 +174,12 @@ def _init_parser() -> argparse.ArgumentParser:
         help="If set, the Y-axis of the plot will be in log-scale.",
     )
     parser.add_argument(
-        "--fp16", action="store_true", help="If set, use half floating point precision."
+        "--datatypes",
+        type=str,
+        nargs="+",
+        choices=("fp16", "fp32"),
+        default=("fp32",),
+        help="Datatypes to use during benchmark.",
     )
 
     return parser
@@ -192,18 +198,19 @@ def benchmark(args: argparse.Namespace, device_handle) -> pd.DataFrame:
     pd.DataFrame
         A DataFrame with the benchmark results.
     """
-    df = pd.DataFrame(
-        {
-            TABLE_LEGENDS[0]: pd.Series([], dtype="str"),
-            TABLE_LEGENDS[1]: pd.Series([], dtype="float"),
-            TABLE_LEGENDS[2]: pd.Series([], dtype="float"),
-            TABLE_LEGENDS[3]: pd.Series([], dtype="int"),
-            TABLE_LEGENDS[4]: pd.Series([], dtype="int"),
-            TABLE_LEGENDS[5]: pd.Series([], dtype="int"),
-            TABLE_LEGENDS[6]: pd.Series([], dtype="float"),
-            TABLE_LEGENDS[7]: pd.Series([], dtype="float"),
-        }
-    )
+    df_dict = {
+        TABLE_LEGENDS[0]: pd.Series([], dtype="str"),
+        TABLE_LEGENDS[1]: pd.Series([], dtype="float"),
+        TABLE_LEGENDS[2]: pd.Series([], dtype="float"),
+        TABLE_LEGENDS[3]: pd.Series([], dtype="int"),
+        TABLE_LEGENDS[4]: pd.Series([], dtype="int"),
+        TABLE_LEGENDS[5]: pd.Series([], dtype="int"),
+    }
+    for dtype_str in args.datatypes:
+        df_dict[f"{TABLE_LEGENDS[6]}-{dtype_str}"] = pd.Series([], dtype="float")
+        df_dict[f"{TABLE_LEGENDS[7]}-{dtype_str}"] = pd.Series([], dtype="float")
+
+    df = pd.DataFrame(df_dict)
 
     output_path = Path(args.output_path)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -238,91 +245,132 @@ def benchmark(args: argparse.Namespace, device_handle) -> pd.DataFrame:
         for mname in tqdm(model_names):
             if mname in exclude:
                 continue
-            try:
-                all_times = []
-                all_memories = []
-                first_memory_used = 0
-                for irep in range(args.num_trials + 1):
-                    torch.cuda.empty_cache()
-                    time.sleep(args.sleep_interval)
-                    if pynvml is not None and device_handle is not None:
-                        device_info = pynvml.nvmlDeviceGetMemoryInfo(device_handle)
-                        device_start_rep_used = device_info.used
+
+            new_df_dict = {}
+            for idtype, dtype_str in enumerate(args.datatypes):
+                try:
+                    all_times = []
+                    all_memories = []
+                    first_memory_used = 0
+                    for irep in range(args.num_trials + 1):
+                        torch.cuda.empty_cache()
+                        time.sleep(args.sleep_interval)
+                        if pynvml is not None and device_handle is not None:
+                            device_info = pynvml.nvmlDeviceGetMemoryInfo(device_handle)
+                            device_start_rep_used = device_info.used
+                        model = ptlflow.get_model(mname, args=model_args)
+                        model = model.eval()
+                        if torch.cuda.is_available():
+                            model = model.cuda()
+                            if dtype_str == "fp16":
+                                model = model.half()
+                        model_params = count_parameters(model)
+                        repetition_times = estimate_inference_time(
+                            args, model, input_size, dtype_str
+                        )
+                        if irep > 0:
+                            all_times.extend(repetition_times)
+
+                        if device_handle is not None:
+                            device_info = pynvml.nvmlDeviceGetMemoryInfo(device_handle)
+                            model_memory_used = device_info.used - device_start_rep_used
+                            if irep > 0:
+                                all_memories.extend(
+                                    [model_memory_used] * args.num_samples
+                                )
+                            else:
+                                first_memory_used = (
+                                    device_info.used - device_initial_used
+                                )
+                        model = model.cpu()
+                        model = None
+
                     model = ptlflow.get_model(mname, args=model_args)
                     model = model.eval()
+
+                    inputs = {
+                        "images": torch.rand(
+                            1,
+                            2,
+                            3,
+                            make_divisible(input_size[0], model.output_stride),
+                            make_divisible(input_size[1], model.output_stride),
+                        )
+                    }
+
                     if torch.cuda.is_available():
                         model = model.cuda()
-                        if args.fp16:
+                        inputs["images"] = inputs["images"].cuda()
+                        if dtype_str == "fp16":
                             model = model.half()
-                    model_params = count_parameters(model)
-                    repetition_times = estimate_inference_time(args, model, input_size)
-                    if irep > 0:
-                        all_times.extend(repetition_times)
+                            inputs["images"] = inputs["images"].half()
 
-                    if device_handle is not None:
-                        device_info = pynvml.nvmlDeviceGetMemoryInfo(device_handle)
-                        model_memory_used = device_info.used - device_start_rep_used
-                        if irep > 0:
-                            all_memories.extend([model_memory_used] * args.num_samples)
-                        else:
-                            first_memory_used = device_info.used - device_initial_used
-                    model = model.cpu()
-                    model = None
+                    flops = count_flops(model, inputs)
 
-                model = ptlflow.get_model(mname, args=model_args)
-                model = model.eval()
+                    all_times.sort()
+                    final_times = {
+                        "avg": np.array(all_times).mean(),
+                        "median": all_times[len(all_times) // 2],
+                        "perc1": all_times[len(all_times) // 100],
+                        "perc5": all_times[len(all_times) // 20],
+                        "perc10": all_times[len(all_times) // 10],
+                    }
 
-                inputs = {
-                    "images": torch.rand(
-                        1,
-                        2,
-                        3,
-                        make_divisible(input_size[0], model.output_stride),
-                        make_divisible(input_size[1], model.output_stride),
+                    if len(all_memories) == 0:
+                        all_memories = [0]
+                    all_memories.sort()
+                    final_memories = {
+                        "avg": np.array(all_memories).mean(),
+                        "median": all_memories[len(all_memories) // 2],
+                        "perc1": all_memories[len(all_memories) // 100],
+                        "perc5": all_memories[len(all_memories) // 20],
+                        "perc10": all_memories[len(all_memories) // 10],
+                        "first": first_memory_used,
+                    }
+
+                    if len(new_df_dict) == 0:
+                        values = [
+                            mname,
+                            float(model_params) / 1e6,
+                            flops / 1e9,
+                            input_size[0],
+                            input_size[1],
+                            input_size[0] * input_size[1],
+                        ]
+                        new_df_dict.update(
+                            {
+                                c: [v]
+                                for c, v in zip(df.columns[:NUM_COMMON_COLUMNS], values)
+                            }
+                        )
+
+                    values = [
+                        final_times[args.final_speed_mode] * 1000,
+                        final_memories[args.final_memory_mode] / 1024**3,
+                    ]
+                    new_df_dict.update(
+                        {
+                            c: [v]
+                            for c, v in zip(
+                                df.columns[
+                                    NUM_COMMON_COLUMNS
+                                    + 2 * idtype : NUM_COMMON_COLUMNS
+                                    + 2 * (idtype + 1)
+                                ],
+                                values,
+                            )
+                        }
                     )
-                }
+                except Exception as e:  # noqa: B902
+                    logging.warning(
+                        "Skipping model %s with datatype %s due to exception %s",
+                        mname,
+                        dtype_str,
+                        e,
+                    )
 
-                if torch.cuda.is_available():
-                    model = model.cuda()
-                    inputs["images"] = inputs["images"].cuda()
-                    if args.fp16:
-                        model = model.half()
-                        inputs["images"] = inputs["images"].half()
-
-                flops = count_flops(model, inputs)
-
-                all_times.sort()
-                final_times = {
-                    "avg": np.array(all_times).mean(),
-                    "median": all_times[len(all_times) // 2],
-                    "perc1": all_times[len(all_times) // 100],
-                    "perc5": all_times[len(all_times) // 20],
-                    "perc10": all_times[len(all_times) // 10],
-                }
-
-                if len(all_memories) == 0:
-                    all_memories = [0]
-                all_memories.sort()
-                final_memories = {
-                    "avg": np.array(all_memories).mean(),
-                    "median": all_memories[len(all_memories) // 2],
-                    "perc1": all_memories[len(all_memories) // 100],
-                    "perc5": all_memories[len(all_memories) // 20],
-                    "perc10": all_memories[len(all_memories) // 10],
-                    "first": first_memory_used,
-                }
-
-                values = [
-                    mname,
-                    float(model_params) / 1e6,
-                    flops / 1e9,
-                    input_size[0],
-                    input_size[1],
-                    input_size[0] * input_size[1],
-                    final_times[args.final_speed_mode] * 1000,
-                    final_memories[args.final_memory_mode] / 1024**3,
-                ]
-                new_df = pd.DataFrame({c: [v] for c, v in zip(df.columns, values)})
+            if len(new_df_dict) > 0:
+                new_df = pd.DataFrame(new_df_dict)
                 df = pd.concat([df, new_df], ignore_index=True)
                 df = df.round(3)
                 df.to_csv(
@@ -335,9 +383,8 @@ def benchmark(args: argparse.Namespace, device_handle) -> pd.DataFrame:
                     args.plot_axes,
                     args.plot_log_x,
                     args.plot_log_y,
+                    args.datatypes[0],
                 )
-            except Exception as e:  # noqa: B902
-                logging.warning("Skipping model %s due to exception %s", mname, e)
     return df
 
 
@@ -359,7 +406,10 @@ def count_flops(model, inputs):
 
 @torch.no_grad()
 def estimate_inference_time(
-    args: argparse.Namespace, model: BaseModel, input_size: Tuple[int, int]
+    args: argparse.Namespace,
+    model: BaseModel,
+    input_size: Tuple[int, int],
+    dtype_str: str,
 ) -> float:
     """Compute the average forward time for one model.
 
@@ -389,7 +439,7 @@ def estimate_inference_time(
         }
         if torch.cuda.is_available():
             inputs["images"] = inputs["images"].cuda()
-            if args.fp16:
+            if dtype_str == "fp16":
                 inputs["images"] = inputs["images"].half()
         if i > 0:
             # Skip first time, it is slow due to memory allocation
@@ -409,6 +459,7 @@ def save_plot(
     plot_axes: Optional[Tuple[str, str]],
     log_x: bool,
     log_y: bool,
+    datatype: str,
 ) -> None:
     """Create a plot of the results and save to disk.
 
@@ -426,6 +477,8 @@ def save_plot(
         If set, the X-axis is plot in log scale.
     log_y : bool
         If set, the Y-axis is plot in log scale.
+    datatype : str
+        Name of the datatype.
     """
     if plot_axes is not None:
         assert len(plot_axes) == 2
@@ -436,22 +489,29 @@ def save_plot(
         df_tmp = df.copy()
         df_tmp = df_tmp.dropna()
 
+        xlegend = TABLE_KEYS_LEGENDS[xkey]
+        if xkey in ("memory", "time"):
+            xlegend += f"-{datatype}"
+        ylegend = TABLE_KEYS_LEGENDS[ykey]
+        if ykey in ("memory", "time"):
+            ylegend += f"-{datatype}"
+
         if log_x:
-            log10_col = TABLE_KEYS_LEGENDS[xkey] + "(Log10)"
-            df_tmp[log10_col] = np.log10(df[TABLE_KEYS_LEGENDS[xkey]])
+            log10_col = f"{xlegend}(Log10)"
+            df_tmp[log10_col] = np.log10(df[xlegend])
         if log_y:
-            log10_col = TABLE_KEYS_LEGENDS[ykey] + "(Log10)"
-            df_tmp[log10_col] = np.log10(df[TABLE_KEYS_LEGENDS[ykey]])
+            log10_col = f"{ylegend}(Log10)"
+            df_tmp[log10_col] = np.log10(df[ylegend])
 
         fig = px.scatter(
-            df,
-            x=TABLE_KEYS_LEGENDS[xkey],
-            y=TABLE_KEYS_LEGENDS[ykey],
+            df_tmp,
+            x=xlegend,
+            y=ylegend,
             color=TABLE_LEGENDS[0],
             symbol=TABLE_LEGENDS[0],
             log_x=log_x,
             log_y=log_y,
-            title=f"{TABLE_KEYS_LEGENDS[xkey]} x {TABLE_KEYS_LEGENDS[ykey]}",
+            title=f"{xlegend} x {ylegend}",
         )
         fig.update_traces(
             marker={"size": 20, "line": {"width": 2, "color": "DarkSlateGrey"}},
@@ -500,6 +560,7 @@ if __name__ == "__main__":
             args.plot_axes,
             args.plot_log_x,
             args.plot_log_y,
+            args.datatypes[0],
         )
     print(f"Results saved to {str(args.output_path)}.")
     print(df)

@@ -6,7 +6,7 @@ Predicting optical flow on test datasets
 
 Some datasets, such as MPI-Sintel and KITTI, provide a test split of the dataset, which is to be used
 for submitting results for the official rankings. PTLFlow provides a script
-`test.py <https://github.com/hmorimitsu/ptlflow/tree/master/test.py>`__ that can be used to generate
+`test.py <https://github.com/hmorimitsu/ptlflow/tree/main/test.py>`__ that can be used to generate
 predictions for the test split of some benchmarks. Read :ref:`initial-scripts` to know how to download it.
 
     At the moment, ``test.py`` only supports MPI-Sintel, KITTI 2012, and KITTI 2015 datasets by default.

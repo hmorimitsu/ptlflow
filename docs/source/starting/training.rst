@@ -23,11 +23,11 @@ trained some model inside PTLFlow, please feel free to contribute your results b
 How to train a model
 ====================
 
-You can use the script `train.py <https://github.com/hmorimitsu/ptlflow/tree/master/train.py>`_
+You can use the script `train.py <https://github.com/hmorimitsu/ptlflow/tree/main/train.py>`_
 Read :ref:`initial-scripts` to know how to download it.
 
 In order to train a model, you should also keep a copy of
-`datasets.yml <https://github.com/hmorimitsu/ptlflow/tree/master/datasets.yml>`_
+`datasets.yml <https://github.com/hmorimitsu/ptlflow/tree/main/datasets.yml>`_
 in the same directory as ``train.py``. Then you should update the paths inside ``datasets.yml``
 to point to the dataset root folders in your machine.
 

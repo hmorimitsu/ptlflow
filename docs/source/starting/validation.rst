@@ -4,7 +4,7 @@
 Run validation on a model
 =========================
 
-You can use the script `validate.py <https://github.com/hmorimitsu/ptlflow/tree/master/validate.py>`__
+You can use the script `validate.py <https://github.com/hmorimitsu/ptlflow/tree/main/validate.py>`__
 to validate one of the available models. Read :ref:`initial-scripts` to know how to download it.
 
 Once you have the script, you can run a validation as follows:
@@ -39,7 +39,7 @@ would use the following two datasets for the validation:
 
 You can check the :ref:`train-val-dataset` page for more details about the ``val_dataset`` string options.
 If you want to know about the train/val splits of each dataset, check the validation text files at
-`https://github.com/hmorimitsu/ptlflow/tree/master/ptlflow/data <https://github.com/hmorimitsu/ptlflow/tree/master/ptlflow/data>`__.
+`https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/data <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/data>`__.
 
 Using a local checkpoint
 ========================

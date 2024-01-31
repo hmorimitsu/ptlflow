@@ -60,6 +60,8 @@ class FlowFormer(BaseModel):
         elif args.cnet == "basicencoder":
             self.context_encoder = BasicEncoder(output_dim=256, norm_fn="instance")
 
+        self.showed_warning = False
+
     @staticmethod
     def add_model_specific_args(parent_parser=None):
         parent_parser = BaseModel.add_model_specific_args(parent_parser)
@@ -115,8 +117,19 @@ class FlowFormer(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
-        if self.args.use_tile_input:
-            return self.forward_tile(inputs)
+        if self.args.train_size is not None:
+            train_size = self.args.train_size
+        else:
+            train_size = self.train_size
+
+        if self.args.use_tile_input and train_size is None and not self.showed_warning:
+            print(
+                "WARNING: --train_size is not provided and it cannot be loaded from the checkpoint either. Flowformer will run without input tile."
+            )
+            self.showed_warning = True
+
+        if self.args.use_tile_input and train_size is not None:
+            return self.forward_tile(inputs, train_size)
         else:
             return self.forward_pad(inputs)
 
@@ -160,13 +173,7 @@ class FlowFormer(BaseModel):
 
         return outputs
 
-    def forward_tile(self, inputs):
-        assert not self.training
-        if self.args.train_size is not None:
-            train_size = self.args.train_size
-        else:
-            train_size = self.train_size
-        assert train_size is not None
+    def forward_tile(self, inputs, train_size):
         input_size = inputs["images"].shape[-2:]
         image_size = (max(self.args.tile_height, input_size[-2]), input_size[-1])
         hws = compute_grid_indices(image_size, train_size)
