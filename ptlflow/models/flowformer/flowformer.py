@@ -123,7 +123,9 @@ class FlowFormer(BaseModel):
             train_size = self.train_size
 
         if self.args.use_tile_input and train_size is None and not self.showed_warning:
-            print("WARNING: --train_size is not provided and it cannot be loaded from the checkpoint either. Flowformer will run without input tile.")
+            print(
+                "WARNING: --train_size is not provided and it cannot be loaded from the checkpoint either. Flowformer will run without input tile."
+            )
             self.showed_warning = True
 
         if self.args.use_tile_input and train_size is not None:

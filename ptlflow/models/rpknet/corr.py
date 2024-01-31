@@ -52,8 +52,12 @@ class CorrBlock:
         out_pyramid = []
         for i in range(self.num_levels):
             corr = self.corr_pyramid[i]
-            dx = torch.linspace(-r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device)
-            dy = torch.linspace(-r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device)
+            dx = torch.linspace(
+                -r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device
+            )
+            dy = torch.linspace(
+                -r, r, 2 * r + 1, dtype=coords.dtype, device=coords.device
+            )
             delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1)
 
             centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2) / 2**i
