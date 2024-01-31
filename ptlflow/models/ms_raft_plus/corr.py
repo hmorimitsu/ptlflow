@@ -93,7 +93,13 @@ class AlternateCorrBlock:
             fmap2_i = self.pyramid[i][1].permute(0, 2, 3, 1).contiguous()
 
             coords_i = (coords / 2**i).reshape(B, 1, H, W, 2).contiguous()
+            if coords.dtype == torch.float16:
+                fmap1_i = fmap1_i.float()
+                fmap2_i = fmap2_i.float()
+                coords_i = coords_i.float()
             corr = alt_cuda_corr.forward(fmap1_i, fmap2_i, coords_i, r)
+            if coords.dtype == torch.float16:
+                corr[0] = corr[0].half()
             corr_list.append(corr[0].squeeze(1))
 
         corr = torch.stack(corr_list, dim=1)
@@ -104,7 +110,7 @@ class AlternateCorrBlock:
 def get_corr_block(
     fmap1: torch.Tensor,
     fmap2: torch.Tensor,
-    num_levels: int = 4,
+    num_levels: int = 2,
     radius: int = 4,
     alternate_corr: bool = False,
 ):

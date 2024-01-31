@@ -113,10 +113,14 @@ def bilinear_sample(
     return img
 
 
-def coords_grid(batch, ht, wd):
-    coords = torch.meshgrid(torch.arange(ht), torch.arange(wd), indexing="ij")
-    coords = torch.stack(coords[::-1], dim=0).float()
-    return coords[None].expand(batch, -1, -1, -1)
+def coords_grid(batch, ht, wd, dtype, device):
+    coords = torch.meshgrid(
+        torch.arange(ht, dtype=dtype, device=device),
+        torch.arange(wd, dtype=dtype, device=device),
+        indexing="ij",
+    )
+    coords = torch.stack(coords[::-1], dim=0)
+    return coords[None].repeat(batch, 1, 1, 1)
 
 
 def flow_warp(image, flow, mask=False, padding_mode="zeros"):
