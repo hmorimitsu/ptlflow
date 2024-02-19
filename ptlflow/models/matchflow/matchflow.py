@@ -222,7 +222,8 @@ class MatchFlow(BaseModel):
         input_size = inputs["images"].shape[-2:]
         image_size = (max(self.args.tile_height, input_size[-2]), input_size[-1])
         hws = compute_grid_indices(image_size, train_size)
-        weights = compute_weight(hws, image_size, train_size, self.args.tile_sigma)
+        device = inputs["images"].device
+        weights = compute_weight(hws, image_size, train_size, self.args.tile_sigma, device=device)
 
         images, image_resizer = self.preprocess_images(
             inputs["images"],
