@@ -140,6 +140,7 @@ def compute_weight(hws, image_shape, patch_size, sigma=1.0, wtype="gaussian", de
     h, w = torch.meshgrid(
         torch.arange(patch_size[0], device=device),
         torch.arange(patch_size[1], device=device),
+        indexing='ij',
     )
     h, w = h / float(patch_size[0]), w / float(patch_size[1])
     c_h, c_w = 0.5, 0.5
