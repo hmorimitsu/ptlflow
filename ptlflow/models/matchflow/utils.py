@@ -263,24 +263,27 @@ def compute_grid_indices(image_shape, patch_size, min_overlap=20):
     return [(h, w) for h in hs for w in ws]
 
 
-def compute_weight(hws, image_shape, patch_size, sigma=1.0, wtype="gaussian"):
+def compute_weight(hws, image_shape, patch_size, sigma=1.0, wtype="gaussian", device: torch.device = torch.device("cpu")):
     patch_num = len(hws)
-    h, w = torch.meshgrid(torch.arange(patch_size[0]), torch.arange(patch_size[1]))
+    h, w = torch.meshgrid(
+        torch.arange(patch_size[0], device=device),
+        torch.arange(patch_size[1], device=device),
+        indexing='ij',
+    )
     h, w = h / float(patch_size[0]), w / float(patch_size[1])
     c_h, c_w = 0.5, 0.5
     h, w = h - c_h, w - c_w
-    weights_hw = (h**2 + w**2) ** 0.5 / sigma
+    weights_hw = (h ** 2 + w ** 2) ** 0.5 / sigma
     denorm = 1 / (sigma * math.sqrt(2 * math.pi))
     weights_hw = denorm * torch.exp(-0.5 * (weights_hw) ** 2)
 
-    weights = torch.zeros(1, patch_num, *image_shape)
+    weights = torch.zeros(1, patch_num, *image_shape, device=device)
     for idx, (h, w) in enumerate(hws):
-        weights[:, idx, h : h + patch_size[0], w : w + patch_size[1]] = weights_hw
-    weights = weights.cuda()
+        weights[:, idx, h: h + patch_size[0], w: w + patch_size[1]] = weights_hw
     patch_weights = []
     for idx, (h, w) in enumerate(hws):
         patch_weights.append(
-            weights[:, idx : idx + 1, h : h + patch_size[0], w : w + patch_size[1]]
+            weights[:, idx: idx + 1, h: h + patch_size[0], w: w + patch_size[1]]
         )
 
     return patch_weights

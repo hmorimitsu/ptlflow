@@ -127,6 +127,8 @@ class IOAdapter(object):
                 del inputs[k]
             inputs = self.transform(inputs)
 
+        inputs = self._to_cuda(inputs)
+
         for k, v in inputs.items():
             if image_only and k != "images":
                 continue
@@ -137,8 +139,6 @@ class IOAdapter(object):
                 if self.scaler is not None:
                     v = self.scaler.fill(v, is_flow=k.startswith("flow"))
                 inputs[k] = v
-
-        inputs = self._to_cuda(inputs)
 
         return inputs
 
