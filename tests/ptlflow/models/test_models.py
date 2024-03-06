@@ -56,6 +56,12 @@ MODEL_ARGS = {
     "flowformer": {"use_tile_input": False},
     "flowformer++": {"use_tile_input": False},
     "ms_raft+": {"alternate_corr": False},
+    "rapidflow": {"corr_mode": "allpairs"},
+    "rapidflow_it1": {"corr_mode": "allpairs"},
+    "rapidflow_it2": {"corr_mode": "allpairs"},
+    "rapidflow_it3": {"corr_mode": "allpairs"},
+    "rapidflow_it6": {"corr_mode": "allpairs"},
+    "rapidflow_it12": {"corr_mode": "allpairs"},
     "rpknet": {"corr_mode": "allpairs"},
 }
 
