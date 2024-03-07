@@ -299,6 +299,15 @@ RAFT
 
 - Model names: ``raft``, ``raft_small``
 
+RAPIDFlow
+---------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/rapidflow>`__
+
+- Paper: **RAPIDFlow: Recurrent Adaptable Pyramids with Iterative Decoding for Efficient Optical Flow Estimation** - `https://hmorimitsu.com/publication/2024-icra-rapidflow/ <https://hmorimitsu.com/publication/2024-icra-rapidflow/>`_
+
+- Model names: ``rapidflow``, ``rapidflow_it1``, ``rapidflow_it2``, ``rapidflow_it3``, ``rapidflow_it6``, ``rapidflow_it12``
+
 RPKNet
 ------
 
