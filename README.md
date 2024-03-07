@@ -24,6 +24,18 @@ This is still under development, so some things may not work as intended. I plan
 
 ## What's new
 
+###  - v0.3.1
+
+- Added new models:
+  - CCMR [https://arxiv.org/abs/2311.02661](https://arxiv.org/abs/2311.02661)
+  - LLA-Flow [https://arxiv.org/abs/2304.08101](https://arxiv.org/abs/2304.08101)
+  - RAPIDFlow [https://hmorimitsu.com/publication/2024-icra-rapidflow/](https://hmorimitsu.com/publication/2024-icra-rapidflow/)
+- Enable FP16 in most models.
+  - Except the following models, since they have operations that cannot run in FP16: lcv_raft, matchflow, and separableflow
+- Add FP16 mode in infer, model_benchmark, and validate scripts
+- Create [plot_results.py](plot_results.py) script
+- Move resize operations to CUDA (thanks to coca-huang)
+
 ###  - v0.3.0
 
 - Added new models:
@@ -75,6 +87,7 @@ This is still under development, so some things may not work as intended. I plan
 - MS-RAFT+ [https://arxiv.org/abs/2210.16900](https://arxiv.org/abs/2210.16900)
 - PWCNet [https://arxiv.org/abs/1709.02371](https://arxiv.org/abs/1709.02371)
 - RAFT [https://arxiv.org/abs/2003.12039](https://arxiv.org/abs/2003.12039)
+- RAPIDFlow [https://hmorimitsu.com/publication/2024-icra-rapidflow/](https://hmorimitsu.com/publication/2024-icra-rapidflow/)
 - RPKNet [https://hmorimitsu.com/publication/2024-aaai-rpknet](https://hmorimitsu.com/publication/2024-aaai-rpknet)
 - ScopeFlow [https://arxiv.org/abs/2002.10770](https://arxiv.org/abs/2002.10770)
 - SCV [https://arxiv.org/abs/2104.02166](https://arxiv.org/abs/2104.02166)

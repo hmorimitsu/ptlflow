@@ -109,6 +109,10 @@ raft-kitti-3a831a4b.ckpt,raft-kitti.pth,
 raft-sintel-fb44381e.ckpt,raft-sintel.pth,
 raft-things-802bbcfd.ckpt,raft-things.pth,
 raft_small-things-b7d9f997.ckpt,raft-small.pth,
+rapidflow-chairs-9c8c182a.ckpt,Original,PTLFlow
+rapidflow-kitti-2561329f.ckpt,Original,
+rapidflow-sintel-89a21262.ckpt,Original,
+rapidflow-things-0377c8fa.ckpt,Original,
 rpknet-chairs-a705b345.ckpt,Original,PTLFlow
 rpknet-kitti-39504eb4.ckpt,Original,
 rpknet-sintel-e7cc969e.ckpt,Original,

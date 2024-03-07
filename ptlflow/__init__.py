@@ -16,7 +16,7 @@
 # limitations under the License.
 # =============================================================================
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 import logging
 from argparse import Namespace
@@ -65,6 +65,14 @@ from ptlflow.models.matchflow.matchflow import MatchFlow, MatchFlowRAFT
 from ptlflow.models.ms_raft_plus.ms_raft_plus import MSRAFTPlus
 from ptlflow.models.pwcnet.pwcnet import PWCNet, PWCDCNet
 from ptlflow.models.raft.raft import RAFT, RAFTSmall
+from ptlflow.models.rapidflow.rapidflow import (
+    RAPIDFlow,
+    RAPIDFlow_it1,
+    RAPIDFlow_it2,
+    RAPIDFlow_it3,
+    RAPIDFlow_it6,
+    RAPIDFlow_it12,
+)
 from ptlflow.models.rpknet.rpknet import RPKNet
 from ptlflow.models.scopeflow.irr_pwc_v2 import ScopeFlow
 from ptlflow.models.separableflow.separableflow import SeparableFlow
@@ -140,6 +148,12 @@ models_dict = {
     "pwcnet_nodc": PWCNet,
     "raft": RAFT,
     "raft_small": RAFTSmall,
+    "rapidflow": RAPIDFlow,
+    "rapidflow_it1": RAPIDFlow_it1,
+    "rapidflow_it2": RAPIDFlow_it2,
+    "rapidflow_it3": RAPIDFlow_it3,
+    "rapidflow_it6": RAPIDFlow_it6,
+    "rapidflow_it12": RAPIDFlow_it12,
     "rpknet": RPKNet,
     "scopeflow": ScopeFlow,
     "scv4": SCVQuarter,

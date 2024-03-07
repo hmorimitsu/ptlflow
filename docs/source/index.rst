@@ -66,9 +66,8 @@ use the its original code.
 
    results/accuracy_epe
    results/accuracy_epe_outlier
-   results/accuracy_plot
+   results/result_plots
    results/model_benchmark
-   results/speed_plot
 
 .. toctree::
    :maxdepth: 1
