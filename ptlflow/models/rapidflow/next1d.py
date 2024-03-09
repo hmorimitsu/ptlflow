@@ -108,6 +108,7 @@ class FusedConv1d(pl.LightningModule):
                 self.dilation,
                 self.groups,
             )
+            self.weight = None
         else:
             if self.weight is None:
                 self.weight = torch.einsum(
