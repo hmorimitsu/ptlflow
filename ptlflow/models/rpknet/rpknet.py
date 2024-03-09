@@ -207,6 +207,7 @@ class RPKNet(BaseModel):
         parser.add_argument("--pyramid_ranges", type=int, nargs="+", default=(32, 8))
         parser.add_argument("--iters", type=int, default=12)
         parser.add_argument("--input_pad_one_side", action="store_true")
+        parser.add_argument("--input_bgr_to_rgb", action="store_true")
 
         parser.add_argument(
             "--not_detach_flow", action="store_false", dest="detach_flow"
@@ -290,7 +291,7 @@ class RPKNet(BaseModel):
             inputs["images"],
             bgr_add=-0.5,
             bgr_mult=2.0,
-            bgr_to_rgb=False,
+            bgr_to_rgb=self.args.input_bgr_to_rgb,
             resize_mode="pad",
             pad_mode="replicate",
             pad_two_side=(not self.args.input_pad_one_side),
