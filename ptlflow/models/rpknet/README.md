@@ -91,8 +91,9 @@ python test.py rpknet --iters 32 --pretrained_ckpt kitti --test_dataset kitti-20
 ### Spring
 
 ```bash
-python test.py rpknet --iters 32 --pretrained_ckpt sintel --test_dataset spring --warm_start
+python test.py rpknet --iters 32 --pretrained_ckpt sintel --test_dataset spring --warm_start  --input_bgr_to_rgb
 ```
+*There is no special reason to convert to RGB here. But this mode was used by accident when submitting our results. 
 
 ## Code license
 
