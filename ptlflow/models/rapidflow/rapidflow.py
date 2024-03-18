@@ -108,6 +108,7 @@ class RAPIDFlow(BaseModel):
             mlp_ratio=self.args.enc_mlp_ratio,
             norm_layer=LayerNorm2d,
             depth=self.args.enc_depth,
+            fuse_next1d_weights=self.args.fuse_next1d_weights,
         )
 
         self.cnet = NeXt1DEncoder(
@@ -119,6 +120,7 @@ class RAPIDFlow(BaseModel):
             mlp_ratio=self.args.enc_mlp_ratio,
             norm_layer=LayerNorm2d,
             depth=self.args.enc_depth,
+            fuse_next1d_weights=self.args.fuse_next1d_weights,
         )
 
         self.dim_corr = (self.args.corr_range * 2 + 1) ** 2 * self.args.corr_levels
@@ -135,6 +137,7 @@ class RAPIDFlow(BaseModel):
                 depth=2,
                 mlp_ratio=args.dec_mlp_ratio,
                 norm_layer=LayerNorm2d,
+                fuse_next1d_weights=self.args.fuse_next1d_weights,
             ),
         )
 
@@ -249,6 +252,16 @@ class RAPIDFlow(BaseModel):
             dest="use_upsample_mask",
             help="If set, does not use convex upsampling.",
         )
+        parser.add_argument(
+            "--fuse_next1d_weights",
+            action="store_true",
+            help="If set, the NeXt1D conv layers will be fused into a single 2D layer. This requires to adapt the pretrained checkpoints before loading.",
+        )
+        parser.add_argument(
+            "--simple_io",
+            action="store_true",
+            help="If set, the inputs and outputs will be simplified from dict to single torch.Tensor. This option should be used when exporting the model to ONNX. This will make the model incompatible with the PTLFlow framework.",
+        )
 
         parser.add_argument(
             "--gamma",
@@ -288,8 +301,12 @@ class RAPIDFlow(BaseModel):
         return up_flow.reshape(N, 2, factor * H, factor * W)
 
     def forward(self, inputs):
+        if self.args.simple_io:
+            images = inputs
+        else:
+            images = inputs["images"]
         images, image_resizer = self.preprocess_images(
-            inputs["images"],
+            images,
             bgr_add=-0.5,
             bgr_mult=2.0,
             bgr_to_rgb=False,
@@ -331,7 +348,11 @@ class RAPIDFlow(BaseModel):
         ) = pass_pyramid1[0].size()
         init_device = pass_pyramid1[0].device
 
-        if "prev_flows" in inputs and inputs["prev_flows"] is not None:
+        if (
+            not self.args.simple_io
+            and "prev_flows" in inputs
+            and inputs["prev_flows"] is not None
+        ):
             flow = upsample2d_as(
                 inputs["prev_flows"][:, 0], pass_pyramid1[0], mode="bilinear"
             )
@@ -408,11 +429,14 @@ class RAPIDFlow(BaseModel):
                 )
                 flows.append(out_flow)
 
-        outputs = {}
-        outputs["flows"] = flows[-1][:, None]
-        if self.training:
-            outputs["flow_preds"] = flows
-        return outputs
+        if self.args.simple_io:
+            return flows[-1]
+        else:
+            outputs = {}
+            outputs["flows"] = flows[-1][:, None]
+            if self.training:
+                outputs["flow_preds"] = flows
+            return outputs
 
 
 class RAPIDFlow_it1(RAPIDFlow):

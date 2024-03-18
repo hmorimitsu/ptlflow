@@ -47,6 +47,7 @@ class FusedConv1d(pl.LightningModule):
         bias: bool = True,
         device=None,
         dtype=None,
+        fuse_weights=False,
     ) -> None:
         super().__init__()
 
@@ -54,34 +55,51 @@ class FusedConv1d(pl.LightningModule):
         self.padding = padding
         self.dilation = dilation
         self.groups = groups
+        self.fuse_weights = fuse_weights
 
-        self.register_parameter(
-            "weight_h",
-            nn.Parameter(
-                torch.zeros(
-                    out_channels,
-                    in_channels // groups,
-                    1,
-                    kernel_size,
-                    device=device,
-                    dtype=dtype,
-                )
-            ),
-        )
-        self.register_parameter(
-            "weight_v",
-            nn.Parameter(
-                torch.zeros(
-                    out_channels,
-                    in_channels // groups,
-                    kernel_size,
-                    1,
-                    device=device,
-                    dtype=dtype,
-                )
-            ),
-        )
-        self.weight = None
+        if fuse_weights:
+            self.register_parameter(
+                "weight",
+                nn.Parameter(
+                    torch.zeros(
+                        out_channels,
+                        in_channels // groups,
+                        kernel_size,
+                        kernel_size,
+                        device=device,
+                        dtype=dtype,
+                    )
+                ),
+            )
+        else:
+            self.register_parameter(
+                "weight_h",
+                nn.Parameter(
+                    torch.zeros(
+                        out_channels,
+                        in_channels // groups,
+                        1,
+                        kernel_size,
+                        device=device,
+                        dtype=dtype,
+                    )
+                ),
+            )
+            self.register_parameter(
+                "weight_v",
+                nn.Parameter(
+                    torch.zeros(
+                        out_channels,
+                        in_channels // groups,
+                        kernel_size,
+                        1,
+                        device=device,
+                        dtype=dtype,
+                    )
+                ),
+            )
+            self.weight = None
+
         if bias:
             self.register_parameter(
                 "bias",
@@ -89,7 +107,7 @@ class FusedConv1d(pl.LightningModule):
             )
 
     def forward(self, input):
-        if self.training:
+        if self.training and not self.fuse_weights:
             x = F.conv2d(
                 input,
                 self.weight_h,
@@ -139,6 +157,7 @@ class NeXt1DBlock(pl.LightningModule):
         ls_init_value=1e-6,
         norm_layer=None,
         drop_path=0.0,
+        fuse_next1d_weights=False,
     ):
         super().__init__()
         out_chs = out_chs or in_chs
@@ -152,6 +171,7 @@ class NeXt1DBlock(pl.LightningModule):
             dilation=dilation,
             groups=in_chs,
             bias=conv_bias,
+            fuse_weights=fuse_next1d_weights,
         )
 
         self.norm = norm_layer(out_chs)
@@ -188,6 +208,7 @@ class NeXt1DStage(nn.Module):
         conv_bias=True,
         norm_layer=None,
         mlp_ratio=4,
+        fuse_next1d_weights=False,
     ):
         super().__init__()
         self.grad_checkpointing = False
@@ -227,6 +248,7 @@ class NeXt1DStage(nn.Module):
                     conv_bias=conv_bias,
                     norm_layer=norm_layer,
                     mlp_ratio=mlp_ratio,
+                    fuse_next1d_weights=fuse_next1d_weights,
                 )
             )
             in_chs = out_chs

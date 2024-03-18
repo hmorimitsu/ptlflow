@@ -21,7 +21,7 @@ __version__ = "0.3.1"
 import logging
 from argparse import Namespace
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 import torch
@@ -250,32 +250,7 @@ def get_model(
         pretrained_ckpt = args.pretrained_ckpt
 
     if pretrained_ckpt is not None:
-        if Path(pretrained_ckpt).exists():
-            ckpt_path = pretrained_ckpt
-        elif hasattr(model_ref, "pretrained_checkpoints"):
-            ckpt_path = model_ref.pretrained_checkpoints.get(pretrained_ckpt)
-            if ckpt_path is None:
-                raise ValueError(
-                    f"Invalid checkpoint name {pretrained_ckpt}. "
-                    f'Choose one from {{{",".join(model.pretrained_checkpoints.keys())}}}'
-                )
-        else:
-            raise ValueError(
-                f"Cannot find checkpoint {pretrained_ckpt} for model {model_name}"
-            )
-
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        if Path(ckpt_path).exists():
-            ckpt = torch.load(ckpt_path, map_location=torch.device(device))
-        else:
-            model_dir = Path(hub.get_dir()) / "ptlflow" / "checkpoints"
-            ckpt = hub.load_state_dict_from_url(
-                ckpt_path,
-                model_dir=model_dir,
-                map_location=torch.device(device),
-                check_hash=True,
-            )
+        ckpt = load_checkpoint(pretrained_ckpt, model_ref, model_name)
 
         state_dict = ckpt["state_dict"]
         if "hyper_parameters" in ckpt:
@@ -330,10 +305,62 @@ def get_trainable_model_names() -> List[str]:
     This function return the names of the model that have a loss function defined.
 
     Returns
-    =======
+    -------
     List[str]
         The list of the model names that can be trained.
     """
     return [
         mname for mname in models_dict.keys() if get_model(mname).loss_fn is not None
     ]
+
+
+def load_checkpoint(
+    pretrained_ckpt: str, model_ref: BaseModel, model_name: str
+) -> Dict[str, Any]:
+    """Try to load the checkpoint specified in pretrained_ckpt.
+
+    Parameters
+    ----------
+    pretrained_ckpt : str
+        Path to a local file or name of a pretrained checkpoint.
+    model_ref : BaseModel
+        A reference to the model class. See the function get_model_reference() for more details.
+    model_name : str
+        A string representing the name of the model, just for debugging purposes.
+
+    Returns
+    -------
+    Dict[str, Any]
+        A dictionary of the loaded checkpoint. The output of torch.load().
+
+    See Also
+    --------
+    get_model_reference : To get a reference to the class of a model.
+    """
+    if Path(pretrained_ckpt).exists():
+        ckpt_path = pretrained_ckpt
+    elif hasattr(model_ref, "pretrained_checkpoints"):
+        ckpt_path = model_ref.pretrained_checkpoints.get(pretrained_ckpt)
+        if ckpt_path is None:
+            raise ValueError(
+                f"Invalid checkpoint name {pretrained_ckpt}. "
+                f'Choose one from {{{",".join(model_ref.pretrained_checkpoints.keys())}}}'
+            )
+    else:
+        raise ValueError(
+            f"Cannot find checkpoint {pretrained_ckpt} for model {model_name}"
+        )
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    if Path(ckpt_path).exists():
+        ckpt = torch.load(ckpt_path, map_location=torch.device(device))
+    else:
+        model_dir = Path(hub.get_dir()) / "ptlflow" / "checkpoints"
+        ckpt = hub.load_state_dict_from_url(
+            ckpt_path,
+            model_dir=model_dir,
+            map_location=torch.device(device),
+            check_hash=True,
+        )
+    return ckpt

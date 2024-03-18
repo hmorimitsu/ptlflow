@@ -49,6 +49,7 @@ class NeXT1DDecoder(nn.Module):
         depth=1,
         mlp_ratio=4.0,
         norm_layer=None,
+        fuse_next1d_weights=False,
     ):
         super(NeXT1DDecoder, self).__init__()
         self.conv = NeXt1DStage(
@@ -59,6 +60,7 @@ class NeXT1DDecoder(nn.Module):
             depth=depth,
             mlp_ratio=mlp_ratio,
             norm_layer=norm_layer,
+            fuse_next1d_weights=fuse_next1d_weights,
         )
 
     def forward(self, h, x):
@@ -108,6 +110,7 @@ class UpdateBlock(nn.Module):
             depth=args.dec_depth,
             mlp_ratio=args.dec_mlp_ratio,
             norm_layer=LayerNorm2d,
+            fuse_next1d_weights=args.fuse_next1d_weights,
         )
 
         self.flow_head = FlowHead(args.dec_net_chs, hidden_dim=256)
