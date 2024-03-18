@@ -87,6 +87,31 @@ python test.py rapidflow --iters 12 --pretrained_ckpt sintel --test_dataset sint
 python test.py rapidflow --iters 12 --pretrained_ckpt kitti --test_dataset kitti-2015 --input_pad_one_side
 ```
 
+## Converting model to ONNX
+
+The script [convert_to_onnx.py](convert_to_onnx.py) provides a simple example of how to convert RAPIDFlow models to ONNX format.
+For example, to convert the 12 iterations version with the checkpoint trained on the Sintel dataset, you can run:
+```bash
+python convert_to_onnx.py rapidflow_it12 --checkpoint sintel
+```
+
+We also provide the script [onnx_infer.py](onnx_infer.py) to quickly test the converted ONNX model.
+To test the model converted above, just run:
+```bash
+python onnx_infer.py rapidflow_it12.onnx
+```
+
+You can also provide your own images to test by providing an additional argument:
+```bash
+python onnx_infer.py rapidflow_it12.onnx --image_paths /path/to/first/image /path/to/second/image
+```
+
+### ONNX example limitations
+
+Directly converting the model to ONNX as shown in this example will work, but it is not optimal.
+To obtain the best convertion, it would be necessary to rewrite some parts of the code to remove conditions and operations that may change according to the input size.
+Also, ONNX convertion only supports `--corr_mode allpairs`, which is not suitable for large images.
+
 ## Code license
 
 The source code is released under the [Apache 2.0 LICENSE](LICENSE).

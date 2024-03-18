@@ -35,6 +35,7 @@ class NeXt1DEncoder(nn.Module):
         norm_layer=LayerNorm2d,
         mlp_ratio: float = 4,
         depth: int = 2,
+        fuse_next1d_weights: bool = False,
     ):
         super(NeXt1DEncoder, self).__init__()
         self.max_pyr_range = max_pyr_range
@@ -43,7 +44,11 @@ class NeXt1DEncoder(nn.Module):
 
         self.stem = self._make_stem(hidden_chs, stem_stride, norm_layer=norm_layer)
         self.rec_stage = self._make_stage(
-            hidden_chs, mlp_ratio=mlp_ratio, norm_layer=norm_layer, depth=depth
+            hidden_chs,
+            mlp_ratio=mlp_ratio,
+            norm_layer=norm_layer,
+            depth=depth,
+            fuse_next1d_weights=fuse_next1d_weights,
         )
         self.out_layer = self._make_out_layer(hidden_chs, out_chs)
 
@@ -51,7 +56,9 @@ class NeXt1DEncoder(nn.Module):
         conv = nn.Conv2d(3, hidden_chs, kernel_size=7, stride=stem_stride, padding=3)
         return nn.Sequential(conv, norm_layer(hidden_chs))
 
-    def _make_stage(self, hidden_chs: int, norm_layer, mlp_ratio, depth):
+    def _make_stage(
+        self, hidden_chs: int, norm_layer, mlp_ratio, depth, fuse_next1d_weights
+    ):
         return NeXt1DStage(
             hidden_chs,
             hidden_chs,
@@ -59,6 +66,7 @@ class NeXt1DEncoder(nn.Module):
             depth=depth,
             norm_layer=norm_layer,
             mlp_ratio=mlp_ratio,
+            fuse_next1d_weights=fuse_next1d_weights,
         )
 
     def _make_out_layer(self, hidden_chs: int, out_chs: int):

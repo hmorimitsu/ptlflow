@@ -16,6 +16,8 @@
 # Code adapted from RAFT: https://github.com/princeton-vl/RAFT/blob/master/core/corr.py
 # =============================================================================
 
+import math
+
 import torch
 import torch.nn.functional as F
 from .utils import bilinear_sampler
@@ -79,7 +81,7 @@ class CorrBlock:
 
         corr = torch.matmul(fmap1.transpose(1, 2), fmap2)
         corr = corr.view(batch, ht, wd, 1, ht, wd)
-        return corr / torch.sqrt(torch.tensor(dim))
+        return corr / math.sqrt(dim)
 
 
 class AlternateCorrBlock:
@@ -116,7 +118,7 @@ class AlternateCorrBlock:
 
         corr = torch.stack(corr_list, dim=1)
         corr = corr.reshape(B, -1, H, W)
-        return corr / torch.sqrt(torch.tensor(dim))
+        return corr / math.sqrt(dim)
 
 
 def get_corr_block(
@@ -127,7 +129,7 @@ def get_corr_block(
     alternate_corr: bool = False,
 ):
     if alternate_corr:
-        if alt_cuda_corr is None:
+        if alt_cuda_corr is None or fmap1.device == torch.device("cpu"):
             corr_fn = IterativeCorrBlock
         else:
             corr_fn = AlternateCorrBlock
