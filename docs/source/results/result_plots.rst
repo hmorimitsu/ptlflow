@@ -16,7 +16,7 @@ Memory usage x Sintel Final EPE
 
 .. raw:: html
 
-  <iframe src="../_static/plot-memory(gb)-fp32-sintel-final-occ-val_outlier.html" height="600px" width="100%"></iframe>
+  <iframe src="../_static/plot-memory(gb)-fp32-sintel-final-occ-val_epe.html" height="600px" width="100%"></iframe>
 
 Sintel Final EPE x KITTI 2015 Fl-All
 ====================================

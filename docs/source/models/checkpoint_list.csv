@@ -100,6 +100,8 @@ matchflow_gma-sintel-683422f4.ckpt,matchflow-g-sintel.pth,
 matchflow_gma-things-49295bd8.ckpt,matchflow-g-things.pth,
 matchflow_raft-things-bf560032.ckpt,matchflow-r-things.pth,
 ms_raft_plus-mixed-2bb01f62.ckpt,mixed.pth,https://github.com/cv-stuttgart/MS_RAFT_plus
+neuflow-things-c402aa7a.ckpt,neuflow_things.pth,https://github.com/neufieldrobotics/neuflow
+neuflow-sintel-0d969ea2.ckpt,neuflow_sintel.pth,
 pwcdcnet-sintel-c7d08a46.ckpt,pwc_net.pth.tar,https://github.com/NVlabs/PWC-Net/tree/master/PyTorch
 pwcdcnet-things-cc223701.ckpt,pwc_net_chairs.pth.tar,
 pwcnet-sintel-533815e5.ckpt,pwc_net.pth.tar,

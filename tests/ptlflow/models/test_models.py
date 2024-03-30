@@ -35,6 +35,7 @@ DATASET = "overfit"
 EXCLUDE_MODELS = [
     "matchflow",
     "matchflow_raft",
+    "neuflow",  # requires torch 2.X
     "scv4",
     "scv8",
     "separableflow",
@@ -45,6 +46,7 @@ EXCLUDE_MODELS_FP16 = [
     "lcv_raft_small",
     "matchflow",
     "matchflow_raft",
+    "neuflow",  # requires torch 2.X
     "scv4",
     "scv8",
     "separableflow",

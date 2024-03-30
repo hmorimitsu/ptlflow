@@ -85,6 +85,7 @@ This is still under development, so some things may not work as intended. I plan
 - MaskFlownet [https://arxiv.org/abs/2003.10955](https://arxiv.org/abs/2003.10955)
 - MatchFlow [https://arxiv.org/abs/2303.08384](https://arxiv.org/abs/2303.08384)
 - MS-RAFT+ [https://arxiv.org/abs/2210.16900](https://arxiv.org/abs/2210.16900)
+- NeuFlow [https://arxiv.org/abs/2403.10425](https://arxiv.org/abs/2403.10425)
 - PWCNet [https://arxiv.org/abs/1709.02371](https://arxiv.org/abs/1709.02371)
 - RAFT [https://arxiv.org/abs/2003.12039](https://arxiv.org/abs/2003.12039)
 - RAPIDFlow [https://hmorimitsu.com/publication/2024-icra-rapidflow/](https://hmorimitsu.com/publication/2024-icra-rapidflow/)

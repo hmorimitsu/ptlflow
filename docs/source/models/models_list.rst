@@ -277,6 +277,17 @@ MS-RAFT+
 
 - Model names: ``ms_raft+``
 
+NeuFlow
+-------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/neuflow>`__
+
+- Paper: **NeuFlow: Real-time, High-accuracy Optical Flow Estimation on Robots Using Edge Devices** - `https://arxiv.org/abs/2403.10425 <https://arxiv.org/abs/2403.10425>`_
+
+- Reference code: `https://github.com/neufieldrobotics/neuflow <https://github.com/neufieldrobotics/neuflow>`_
+
+- Model names: ``neuflow``
+
 PWCNet
 ------
 
