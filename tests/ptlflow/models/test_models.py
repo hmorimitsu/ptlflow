@@ -39,6 +39,7 @@ EXCLUDE_MODELS = [
     "scv4",
     "scv8",
     "separableflow",
+    "splatflow",
 ]  # Has additional requirements
 
 EXCLUDE_MODELS_FP16 = [
@@ -50,6 +51,7 @@ EXCLUDE_MODELS_FP16 = [
     "scv4",
     "scv8",
     "separableflow",
+    "splatflow",
 ]  # Some operations do not support fp16
 
 MODEL_ARGS = {

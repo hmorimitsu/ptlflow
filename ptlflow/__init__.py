@@ -78,6 +78,7 @@ from ptlflow.models.rpknet.rpknet import RPKNet
 from ptlflow.models.scopeflow.irr_pwc_v2 import ScopeFlow
 from ptlflow.models.separableflow.separableflow import SeparableFlow
 from ptlflow.models.skflow.skflow import SKFlow
+from ptlflow.models.splatflow.splatflow import SplatFlow
 from ptlflow.models.starflow.starflow import StarFlow
 from ptlflow.models.unimatch.unimatch import (
     UniMatch,
@@ -162,6 +163,7 @@ models_dict = {
     "scv8": SCVEighth,
     "separableflow": SeparableFlow,
     "skflow": SKFlow,
+    "splatflow": SplatFlow,
     "starflow": StarFlow,
     "unimatch": UniMatch,
     "unimatch_sc2": UniMatchScale2,
