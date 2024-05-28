@@ -106,11 +106,19 @@ You can also provide your own images to test by providing an additional argument
 python onnx_infer.py rapidflow_it12.onnx --image_paths /path/to/first/image /path/to/second/image
 ```
 
-### ONNX example limitations
+## Compiling model to TensorRT
 
-Directly converting the model to ONNX as shown in this example will work, but it is not optimal.
+The script [tensorrt_test.py](tensorrt_test.py) provides a simple example of how to compile RAPIDFlow models to TensorRT.
+Run it by typing:
+```bash
+python tensorrt_test.py rapidflow_it12 --checkpoint things
+```
+
+### ONNX and TensorRT example limitations
+
+Directly converting the model to ONNX and TensorRT as shown in this example will work, but it is not optimal.
 To obtain the best convertion, it would be necessary to rewrite some parts of the code to remove conditions and operations that may change according to the input size.
-Also, ONNX convertion only supports `--corr_mode allpairs`, which is not suitable for large images.
+Also, these convertions only supports `--corr_mode allpairs`, which is not suitable for large images.
 
 ## Code license
 

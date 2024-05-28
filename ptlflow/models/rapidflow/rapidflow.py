@@ -24,7 +24,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ptlflow.utils.utils import forward_interpolate_batch
-from .pwc_modules import rescale_flow, upsample2d_as
+from .pwc_modules import rescale_flow
 from .update import UpdateBlock
 from .corr import get_corr_block
 from .local_timm.norm import LayerNorm2d
@@ -353,8 +353,11 @@ class RAPIDFlow(BaseModel):
             and "prev_flows" in inputs
             and inputs["prev_flows"] is not None
         ):
-            flow = upsample2d_as(
-                inputs["prev_flows"][:, 0], pass_pyramid1[0], mode="bilinear"
+            flow = F.interpolate(
+                inputs["prev_flows"][:, 0],
+                [pass_pyramid1[0].shape[-2], pass_pyramid1[0].shape[-1]],
+                mode="bilinear",
+                align_corners=True,
             )
             flow = rescale_flow(flow, width_im, height_im, to_local=True)
             flow = forward_interpolate_batch(flow)
@@ -385,7 +388,12 @@ class RAPIDFlow(BaseModel):
             if net is None:
                 net = torch.tanh(net_tmp)
             else:
-                net = upsample2d_as(net, x1, mode="bilinear")
+                net = F.interpolate(
+                    net,
+                    [x1.shape[-2], x1.shape[-1]],
+                    mode="bilinear",
+                    align_corners=True,
+                )
 
                 net_skip = torch.tanh(net_tmp)
                 gate = torch.sigmoid(
@@ -395,7 +403,12 @@ class RAPIDFlow(BaseModel):
 
             if l > 0:
                 flow = rescale_flow(flow, x1.shape[-1], x1.shape[-2], to_local=False)
-                flow = upsample2d_as(flow, x1, mode="bilinear")
+                flow = F.interpolate(
+                    flow,
+                    [x1.shape[-2], x1.shape[-1]],
+                    mode="bilinear",
+                    align_corners=True,
+                )
 
             for k in range(iters_per_level[l]):
                 flow = flow.detach()
@@ -414,16 +427,60 @@ class RAPIDFlow(BaseModel):
                 out_flow = rescale_flow(flow, width_im, height_im, to_local=False)
                 if self.training:
                     if mask is not None and l == (output_level - start_level):
-                        out_flow = self.upsample_flow(out_flow, mask, pred_stride)
+                        if self.args.simple_io:
+                            # Just copied the code from self.upsample_flow to here.
+                            # For some reason, TensorRT backend does not compile when calling the function
+                            N, _, H, W = out_flow.shape
+                            mask = mask.view(N, 1, 9, pred_stride, pred_stride, H, W)
+                            mask = torch.softmax(mask, dim=2)
+
+                            up_flow = F.unfold(flow, [3, 3], padding=1)
+                            up_flow = up_flow.view(N, 2, 9, 1, 1, H, W)
+
+                            up_flow = torch.sum(mask * up_flow, dim=2)
+                            up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
+                            up_flow = up_flow.reshape(
+                                N, 2, pred_stride * H, pred_stride * W
+                            )
+                            out_flow = up_flow
+                        else:
+                            out_flow = self.upsample_flow(out_flow, mask, pred_stride)
                     else:
-                        out_flow = upsample2d_as(out_flow, x1_raw, mode="bilinear")
+                        out_flow = F.interpolate(
+                            out_flow,
+                            [x1_raw.shape[-2], x1_raw.shape[-1]],
+                            mode="bilinear",
+                            align_corners=True,
+                        )
                 elif l == (output_level - start_level) and k == (
                     iters_per_level[l] - 1
                 ):
                     if mask is not None:
-                        out_flow = self.upsample_flow(out_flow, mask, pred_stride)
+                        if self.args.simple_io:
+                            # Just copied the code from self.upsample_flow to here.
+                            # For some reason, TensorRT backend does not compile when calling the function
+                            N, _, H, W = out_flow.shape
+                            mask = mask.view(N, 1, 9, pred_stride, pred_stride, H, W)
+                            mask = torch.softmax(mask, dim=2)
+
+                            up_flow = F.unfold(flow, [3, 3], padding=1)
+                            up_flow = up_flow.view(N, 2, 9, 1, 1, H, W)
+
+                            up_flow = torch.sum(mask * up_flow, dim=2)
+                            up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
+                            up_flow = up_flow.reshape(
+                                N, 2, pred_stride * H, pred_stride * W
+                            )
+                            out_flow = up_flow
+                        else:
+                            out_flow = self.upsample_flow(out_flow, mask, pred_stride)
                     else:
-                        out_flow = upsample2d_as(out_flow, x1_raw, mode="bilinear")
+                        out_flow = F.interpolate(
+                            out_flow,
+                            [x1_raw.shape[-2], x1_raw.shape[-1]],
+                            mode="bilinear",
+                            align_corners=True,
+                        )
                 out_flow = self.postprocess_predictions(
                     out_flow, image_resizer, is_flow=True
                 )
