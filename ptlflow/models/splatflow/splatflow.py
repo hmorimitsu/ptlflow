@@ -7,9 +7,13 @@ from .attention import Attention
 from .extractor import BasicEncoder
 from .corr import CorrBlock
 
-from .softsplat import FunctionSoftsplat as forward_warping
 from .update import Update
 from ..base_model.base_model import BaseModel
+
+try:
+    from .softsplat import FunctionSoftsplat as forward_warping
+except ModuleNotFoundError:
+    forward_warping = None
 
 
 class SplatFlow(BaseModel):
@@ -27,6 +31,9 @@ class SplatFlow(BaseModel):
         self.update = Update(hidden_dim=self.hdim)
 
         self.has_shown_warning = False
+
+        if forward_warping is None:
+            raise ModuleNotFoundError("No module named 'cupy'")
 
     @staticmethod
     def add_model_specific_args(parent_parser=None):
