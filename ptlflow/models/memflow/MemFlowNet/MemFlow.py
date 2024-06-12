@@ -13,10 +13,9 @@ from .sk2 import SKUpdateBlock6_Deep_nopoolres_AllDecoder2_Mem_skflow
 from .memory_util import *
 
 try:
-    from flash_attn import flash_attn_qkvpacked_func, flash_attn_func
+    from flash_attn import flash_attn_func
 except:
-    print("no flash attention installed")
-autocast = torch.cuda.amp.autocast
+    pass
 
 
 class MemFlowNet(nn.Module):
