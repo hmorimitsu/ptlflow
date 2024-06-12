@@ -157,11 +157,18 @@ class FlowMetrics(Metric):
         if occlusion_target is not None:
             occlusion_target = self._fix_shape(occlusion_target, batch_size)
 
-        epe = torch.norm(flow_pred - flow_target, p=2, dim=1)
+        if len(flow_target.shape) == 5:
+            epe = torch.norm(flow_pred[:, None] - flow_target, p=2, dim=2)
+            epe, min_idx = epe.min(dim=1)
+            target_norm = torch.norm(flow_target, p=2, dim=2)
+            target_norm = target_norm.gather(1, min_idx[:, None])[:, 0]
+        else:
+            epe = torch.norm(flow_pred - flow_target, p=2, dim=1)
+            target_norm = torch.norm(flow_target, p=2, dim=1)
+
         px1_mask = (epe < 1).float()
         px3_mask = (epe < 3).float()
         px5_mask = (epe < 5).float()
-        target_norm = torch.norm(flow_target, p=2, dim=1)
         outlier_mask = ((epe > 3) & (epe > (0.05 * target_norm))).float() * 100
         self.used_keys = [
             ("epe", "epe", "valid_target"),
@@ -339,10 +346,22 @@ class FlowMetrics(Metric):
                 tensor.shape[3],
                 tensor.shape[4],
             )
+        elif len(tensor.shape) == 6:
+            tensor = tensor.view(
+                tensor.shape[0] * tensor.shape[1],
+                tensor.shape[2],
+                tensor.shape[3],
+                tensor.shape[4],
+                tensor.shape[5],
+            )
         return tensor
 
     def _get_batch_size(self, flow_tensor: torch.Tensor) -> int:
         if len(flow_tensor.shape) < 4:
             return 1
-        else:
-            return flow_tensor.view(-1, *flow_tensor.shape[-3:]).shape[0]
+        elif len(flow_tensor.shape) == 4:
+            return flow_tensor.shape[0]
+        elif len(flow_tensor.shape) == 5:
+            return flow_tensor.shape[0] * flow_tensor.shape[1]
+        elif len(flow_tensor.shape) == 6:
+            return flow_tensor.shape[0]

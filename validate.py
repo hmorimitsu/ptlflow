@@ -403,6 +403,10 @@ def validate_one_dataloader(
             filename = ""
             if "sintel" in inputs["meta"]["dataset_name"][0].lower():
                 filename = f'{Path(inputs["meta"]["image_paths"][0][0]).parent.name}/'
+            elif "spring" in inputs["meta"]["dataset_name"][0].lower():
+                filename = (
+                    f'{Path(inputs["meta"]["image_paths"][0][0]).parent.parent.name}/'
+                )
             filename += Path(inputs["meta"]["image_paths"][0][0]).stem
 
             if metrics_individual is not None:
@@ -483,6 +487,9 @@ def _write_to_file(
         image_name = img_path.stem
         if "sintel" in dataloader_name:
             seq_name = img_path.parts[-2]
+            extra_dirs = seq_name
+        elif "spring" in dataloader_name:
+            seq_name = img_path.parts[-3]
             extra_dirs = seq_name
     else:
         image_name = f"{batch_idx:08d}"

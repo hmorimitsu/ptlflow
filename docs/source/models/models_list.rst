@@ -266,6 +266,17 @@ MatchFlow
 
 - Model names: ``matchflow``, ``matchflow_raft``
 
+MemFlow
+-------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/memflow>`__
+
+- Paper: **MemFlow: Optical Flow Estimation and Prediction with Memory** - `https://arxiv.org/abs/2404.04808 <https://arxiv.org/abs/2404.04808>`_
+
+- Reference code: `https://github.com/DQiaole/MemFlow <https://github.com/DQiaole/MemFlow>`_
+
+- Model names: ``memflow``, ``memflow_t``
+
 MS-RAFT+
 --------
 
@@ -350,6 +361,17 @@ SCV
 
 - Model names: ``scv4``, ``scv8``
 
+SEA-RAFT
+--------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/sea_raft>`__
+
+- Paper: **SEA-RAFT: Simple, Efficient, Accurate RAFT for Optical Flow** - `https://arxiv.org/abs/2405.14793 <https://arxiv.org/abs/2405.14793>`_
+
+- Reference code: `https://github.com/princeton-vl/SEA-RAFT <https://github.com/princeton-vl/SEA-RAFT>`_
+
+- Model names: ``sea_raft``, ``sea_raft_s``, ``sea_raft_m``, ``sea_raft_l``
+
 SeparableFlow
 -------------
 
@@ -371,6 +393,17 @@ SKFlow
 - Reference code: `https://github.com/littlespray/SKFlow <https://github.com/littlespray/SKFlow>`_
 
 - Model names: ``skflow``
+
+SplatFlow
+---------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/splatflow>`__
+
+- Paper: **SplatFlow: Learning Multi-frame Optical Flow via Splatting** - `https://arxiv.org/abs/2306.08887 <https://arxiv.org/abs/2306.08887>`_
+
+- Reference code: `https://github.com/wwsource/SplatFLow <https://github.com/wwsource/SplatFLow>`_
+
+- Model names: ``splatflow``
 
 STaRFlow
 --------

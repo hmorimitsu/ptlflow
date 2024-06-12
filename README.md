@@ -24,6 +24,19 @@ This is still under development, so some things may not work as intended. I plan
 
 ## What's new
 
+###  - v0.3.2
+
+- Added new models:
+  - MemFlow [https://arxiv.org/abs/2404.04808](https://arxiv.org/abs/2404.04808)
+  - NeuFlow [https://arxiv.org/abs/2403.10425](https://arxiv.org/abs/2403.10425)
+  - SEA-RAFT [https://arxiv.org/abs/2405.14793](https://arxiv.org/abs/2405.14793)
+  - SplatFlow [https://arxiv.org/abs/2306.08887](https://arxiv.org/abs/2306.08887)
+- Add support for more datasets:
+  - TartanAir [https://theairlab.org/tartanair-dataset/](https://theairlab.org/tartanair-dataset/)
+  - Kubric [https://github.com/google-research/kubric](https://github.com/google-research/kubric)
+- Add ONNX and TensorRT conversion to RAPIDFlow
+- Fix LR scheduler when accumulating gradients
+
 ###  - v0.3.1
 
 - Added new models:
@@ -84,6 +97,7 @@ This is still under development, so some things may not work as intended. I plan
 - LLA-Flow [https://arxiv.org/abs/2304.08101](https://arxiv.org/abs/2304.08101)
 - MaskFlownet [https://arxiv.org/abs/2003.10955](https://arxiv.org/abs/2003.10955)
 - MatchFlow [https://arxiv.org/abs/2303.08384](https://arxiv.org/abs/2303.08384)
+- MemFlow [https://arxiv.org/abs/2404.04808](https://arxiv.org/abs/2404.04808)
 - MS-RAFT+ [https://arxiv.org/abs/2210.16900](https://arxiv.org/abs/2210.16900)
 - NeuFlow [https://arxiv.org/abs/2403.10425](https://arxiv.org/abs/2403.10425)
 - PWCNet [https://arxiv.org/abs/1709.02371](https://arxiv.org/abs/1709.02371)
@@ -92,8 +106,10 @@ This is still under development, so some things may not work as intended. I plan
 - RPKNet [https://hmorimitsu.com/publication/2024-aaai-rpknet](https://hmorimitsu.com/publication/2024-aaai-rpknet)
 - ScopeFlow [https://arxiv.org/abs/2002.10770](https://arxiv.org/abs/2002.10770)
 - SCV [https://arxiv.org/abs/2104.02166](https://arxiv.org/abs/2104.02166)
+- SEA-RAFT [https://arxiv.org/abs/2405.14793](https://arxiv.org/abs/2405.14793)
 - SeparableFlow [https://openaccess.thecvf.com/content/ICCV2021/papers/Zhang_Separable_Flow_Learning_Motion_Cost_Volumes_for_Optical_Flow_Estimation_ICCV_2021_paper.pdf](https://openaccess.thecvf.com/content/ICCV2021/papers/Zhang_Separable_Flow_Learning_Motion_Cost_Volumes_for_Optical_Flow_Estimation_ICCV_2021_paper.pdf)
 - SKFlow [https://arxiv.org/abs/2205.14623](https://arxiv.org/abs/2205.14623)
+- SplatFlow [https://arxiv.org/abs/2306.08887](https://arxiv.org/abs/2306.08887)
 - STaRFlow [https://arxiv.org/abs/2007.05481](https://arxiv.org/abs/2007.05481)
 - VCN [https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf](https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf)
 - VideoFlow [https://arxiv.org/abs/2303.08340](https://arxiv.org/abs/2303.08340)

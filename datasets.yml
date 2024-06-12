@@ -7,3 +7,6 @@ mpi_sintel: /path/to/MPI-Sintel
 kitti_2012: /path/to/KITTI/2012
 kitti_2015: /path/to/KITTI/2015
 hd1k: /path/to/HD1K
+tartanair: /path/to/tartanair
+spring: /path/to/spring
+kubric: /path/to/kubric

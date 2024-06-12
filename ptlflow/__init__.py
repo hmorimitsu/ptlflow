@@ -16,7 +16,7 @@
 # limitations under the License.
 # =============================================================================
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 
 import logging
 from argparse import Namespace
@@ -62,6 +62,7 @@ from ptlflow.models.liteflownet.liteflownet2 import LiteFlowNet2, LiteFlowNet2Ps
 from ptlflow.models.llaflow.llaflow import LLAFlow, LLAFlowRAFT
 from ptlflow.models.maskflownet.maskflownet import MaskFlownet, MaskFlownet_S
 from ptlflow.models.matchflow.matchflow import MatchFlow, MatchFlowRAFT
+from ptlflow.models.memflow.memflow import MemFlow, MemFlowT
 from ptlflow.models.ms_raft_plus.ms_raft_plus import MSRAFTPlus
 from ptlflow.models.neuflow.neuflow import NeuFlow
 from ptlflow.models.pwcnet.pwcnet import PWCNet, PWCDCNet
@@ -75,9 +76,11 @@ from ptlflow.models.rapidflow.rapidflow import (
     RAPIDFlow_it12,
 )
 from ptlflow.models.rpknet.rpknet import RPKNet
+from ptlflow.models.sea_raft.sea_raft import SEARAFT, SEARAFT_S, SEARAFT_M, SEARAFT_L
 from ptlflow.models.scopeflow.irr_pwc_v2 import ScopeFlow
 from ptlflow.models.separableflow.separableflow import SeparableFlow
 from ptlflow.models.skflow.skflow import SKFlow
+from ptlflow.models.splatflow.splatflow import SplatFlow
 from ptlflow.models.starflow.starflow import StarFlow
 from ptlflow.models.unimatch.unimatch import (
     UniMatch,
@@ -144,6 +147,8 @@ models_dict = {
     "maskflownet_s": MaskFlownet_S,
     "matchflow": MatchFlow,
     "matchflow_raft": MatchFlowRAFT,
+    "memflow": MemFlow,
+    "memflow_t": MemFlowT,
     "ms_raft+": MSRAFTPlus,
     "neuflow": NeuFlow,
     "pwcnet": PWCDCNet,
@@ -157,11 +162,16 @@ models_dict = {
     "rapidflow_it6": RAPIDFlow_it6,
     "rapidflow_it12": RAPIDFlow_it12,
     "rpknet": RPKNet,
+    "sea_raft": SEARAFT,
+    "sea_raft_s": SEARAFT_S,
+    "sea_raft_m": SEARAFT_M,
+    "sea_raft_l": SEARAFT_L,
     "scopeflow": ScopeFlow,
     "scv4": SCVQuarter,
     "scv8": SCVEighth,
     "separableflow": SeparableFlow,
     "skflow": SKFlow,
+    "splatflow": SplatFlow,
     "starflow": StarFlow,
     "unimatch": UniMatch,
     "unimatch_sc2": UniMatchScale2,
@@ -258,6 +268,8 @@ def get_model(
         if "hyper_parameters" in ckpt:
             if "train_size" in ckpt["hyper_parameters"]:
                 model.train_size = ckpt["hyper_parameters"]["train_size"]
+            if "train_avg_length" in ckpt["hyper_parameters"]:
+                model.train_avg_length = ckpt["hyper_parameters"]["train_avg_length"]
             if "extra_params" in ckpt["hyper_parameters"]:
                 extra_params = ckpt["hyper_parameters"]["extra_params"]
                 for name, value in extra_params.items():
