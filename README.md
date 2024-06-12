@@ -24,6 +24,19 @@ This is still under development, so some things may not work as intended. I plan
 
 ## What's new
 
+###  - v0.3.2
+
+- Added new models:
+  - MemFlow [https://arxiv.org/abs/2404.04808](https://arxiv.org/abs/2404.04808)
+  - NeuFlow [https://arxiv.org/abs/2403.10425](https://arxiv.org/abs/2403.10425)
+  - SEA-RAFT [https://arxiv.org/abs/2405.14793](https://arxiv.org/abs/2405.14793)
+  - SplatFlow [https://arxiv.org/abs/2306.08887](https://arxiv.org/abs/2306.08887)
+- Add support for more datasets:
+  - TartanAir [https://theairlab.org/tartanair-dataset/](https://theairlab.org/tartanair-dataset/)
+  - Kubric [https://github.com/google-research/kubric](https://github.com/google-research/kubric)
+- Add ONNX and TensorRT conversion to RAPIDFlow
+- Fix LR scheduler when accumulating gradients
+
 ###  - v0.3.1
 
 - Added new models:
