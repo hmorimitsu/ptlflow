@@ -552,10 +552,16 @@ class BaseModel(pl.LightningModule):
         optimizer = optim.AdamW(
             self.parameters(), lr=self.args.lr, weight_decay=self.args.wdecay
         )
+
+        accumulate_grad_batches = (
+            1
+            if self.args.accumulate_grad_batches is None
+            else self.args.accumulate_grad_batches
+        )
         lr_scheduler = optim.lr_scheduler.OneCycleLR(
             optimizer,
             self.args.lr,
-            total_steps=self.args.max_steps,
+            total_steps=self.args.max_steps // accumulate_grad_batches,
             pct_start=0.05,
             cycle_momentum=False,
             anneal_strategy="linear",
