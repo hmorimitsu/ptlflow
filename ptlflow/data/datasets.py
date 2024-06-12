@@ -342,6 +342,7 @@ class AutoFlowDataset(BaseFlowDataset):
                 "is_val": paths[0].stem in val_names,
                 "misc": "",
                 "is_seq_start": True,
+                "is_seq_end": True,
             }
             for paths in self.img_paths
         ]
@@ -441,6 +442,7 @@ class FlyingChairsDataset(BaseFlowDataset):
                 "is_val": paths[0].stem in val_names,
                 "misc": "",
                 "is_seq_start": True,
+                "is_seq_end": True,
             }
             for paths in self.img_paths
         ]
@@ -615,6 +617,7 @@ class FlyingChairs2Dataset(BaseFlowDataset):
                 "is_val": False,
                 "misc": "",
                 "is_seq_start": True,
+                "is_seq_end": True,
             }
             for paths in self.img_paths
         ]
@@ -895,6 +898,10 @@ class FlyingThings3DDataset(BaseFlowDataset):
                                             "is_val": False,
                                             "misc": "",
                                             "is_seq_start": i == 0,
+                                            "is_seq_end": i
+                                            == (
+                                                len(image_paths) - self.sequence_length
+                                            ),
                                         }
                                     )
                                     if self.get_backward:
@@ -1113,6 +1120,8 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
                                         "is_val": False,
                                         "misc": "",
                                         "is_seq_start": i == 0,
+                                        "is_seq_end": i
+                                        == (len(flow_group) - self.sequence_length + 1),
                                     }
                                 )
 
@@ -1309,6 +1318,7 @@ class Hd1kDataset(BaseFlowDataset):
                         "is_val": (seq_img_names[i] in val_names),
                         "misc": "",
                         "is_seq_start": True,
+                        "is_seq_end": True,
                     }
                 )
 
@@ -1441,6 +1451,7 @@ class KittiDataset(BaseFlowDataset):
                         "is_val": img1_paths[i].stem in val_names,
                         "misc": ver,
                         "is_seq_start": True,
+                        "is_seq_end": True,
                     }
                     for i in range(len(img1_paths))
                     if img1_paths[i].stem not in remove_names
@@ -1595,6 +1606,8 @@ class SintelDataset(BaseFlowDataset):
                             "is_val": seq_name in val_seqs,
                             "misc": seq_name,
                             "is_seq_start": i == 0,
+                            "is_seq_end": i
+                            == (len(image_paths) - self.sequence_length),
                         }
                     )
 
@@ -1768,6 +1781,8 @@ class SpringDataset(BaseFlowDataset):
                                 "is_val": False,
                                 "misc": seq_name,
                                 "is_seq_start": i == 0,
+                                "is_seq_end": i
+                                == (len(image_paths) - self.sequence_length),
                             }
                         )
 
@@ -1866,6 +1881,7 @@ class MiddleburyDataset(BaseFlowDataset):
                         "is_val": False,
                         "misc": seq_name,
                         "is_seq_start": True,
+                        "is_seq_end": True,
                     }
                 )
 
@@ -2016,6 +2032,8 @@ class MonkaaDataset(BaseFlowDataset):
                                     "is_val": False,
                                     "misc": "",
                                     "is_seq_start": i == 0,
+                                    "is_seq_end": i
+                                    == (len(image_paths) - self.sequence_length),
                                 }
                             )
                             if self.get_backward:
