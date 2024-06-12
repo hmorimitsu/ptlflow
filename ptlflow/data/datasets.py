@@ -16,12 +16,14 @@
 # limitations under the License.
 # =============================================================================
 
+import json
 import logging
 import math
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import cv2
+from einops import rearrange
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -123,6 +125,12 @@ class BaseFlowDataset(Dataset):
         self.mb_b_paths = []
         self.metadata = []
 
+        self.flow_format = None
+        self.flow_read_mins = None
+        self.flow_read_maxs = None
+        self.flow_b_read_mins = None
+        self.flow_b_read_maxs = None
+
     def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:  # noqa: C901
         """Retrieve and return one input.
 
@@ -145,7 +153,20 @@ class BaseFlowDataset(Dataset):
         inputs["images"] = [cv2.imread(str(path)) for path in self.img_paths[index]]
 
         if index < len(self.flow_paths):
-            inputs["flows"], valids = self._get_flows_and_valids(self.flow_paths[index])
+            inputs["flows"], valids = self._get_flows_and_valids(
+                self.flow_paths[index],
+                flow_format=self.flow_format,
+                flow_min=self.flow_read_mins[index]
+                if (
+                    self.flow_read_mins is not None and len(self.flow_read_mins) > index
+                )
+                else None,
+                flow_max=self.flow_read_maxs[index]
+                if (
+                    self.flow_read_maxs is not None and len(self.flow_read_maxs) > index
+                )
+                else None,
+            )
             if self.get_valid_mask:
                 inputs["valids"] = valids
 
@@ -160,7 +181,22 @@ class BaseFlowDataset(Dataset):
                     str(p).replace("flow_occ", "flow_noc")
                     for p in self.flow_paths[index]
                 ]
-                _, valids_noc = self._get_flows_and_valids(noc_paths)
+                _, valids_noc = self._get_flows_and_valids(
+                    noc_paths,
+                    flow_format=self.flow_format,
+                    flow_min=self.flow_read_mins[index]
+                    if (
+                        self.flow_read_mins is not None
+                        and len(self.flow_read_mins) > index
+                    )
+                    else None,
+                    flow_max=self.flow_read_maxs[index]
+                    if (
+                        self.flow_read_maxs is not None
+                        and len(self.flow_read_maxs) > index
+                    )
+                    else None,
+                )
                 inputs["occs"] = [valids[i] - valids_noc[i] for i in range(len(valids))]
         if self.get_motion_boundary_mask and index < len(self.mb_paths):
             inputs["mbs"] = [
@@ -170,7 +206,20 @@ class BaseFlowDataset(Dataset):
         if self.get_backward:
             if index < len(self.flow_b_paths):
                 inputs["flows_b"], valids_b = self._get_flows_and_valids(
-                    self.flow_b_paths[index]
+                    self.flow_b_paths[index],
+                    flow_format=self.flow_format,
+                    flow_min=self.flow_b_read_mins[index]
+                    if (
+                        self.flow_b_read_mins is not None
+                        and len(self.flow_b_read_mins) > index
+                    )
+                    else None,
+                    flow_max=self.flow_b_read_maxs[index]
+                    if (
+                        self.flow_b_read_maxs is not None
+                        and len(self.flow_b_read_maxs) > index
+                    )
+                    else None,
                 )
                 if self.get_valid_mask:
                     inputs["valids_b"] = valids_b
@@ -202,12 +251,18 @@ class BaseFlowDataset(Dataset):
         return len(self.img_paths)
 
     def _get_flows_and_valids(
-        self, flow_paths: Sequence[str]
+        self,
+        flow_paths: Sequence[str],
+        flow_format: Optional[str] = None,
+        flow_min: Optional[float] = None,
+        flow_max: Optional[float] = None,
     ) -> Tuple[List[np.ndarray], List[Optional[np.ndarray]]]:
         flows = []
         valids = []
         for path in flow_paths:
-            flow = flow_utils.flow_read(path)
+            flow = flow_utils.flow_read(
+                path, format=flow_format, flow_min=flow_min, flow_max=flow_max
+            )
 
             nan_mask = np.isnan(flow)
             flow[nan_mask] = self.max_flow + 1
@@ -1410,7 +1465,11 @@ class KittiDataset(BaseFlowDataset):
                 img2_paths
             ), f"{len(img1_paths)} vs {len(img2_paths)}"
             flow_paths = []
-            if split != "test":
+
+            if (
+                split != "test"
+                or (Path(self.root_dir[ver]) / split_dir / "flow_occ").exists()
+            ):
                 flow_paths = sorted(
                     (Path(self.root_dir[ver]) / split_dir / "flow_occ").glob("*_10.png")
                 )
@@ -1436,7 +1495,10 @@ class KittiDataset(BaseFlowDataset):
                     if img1_paths[i].stem not in remove_names
                 ]
             )
-            if split != "test":
+            if (
+                split != "test"
+                or (Path(self.root_dir[ver]) / split_dir / "flow_occ").exists()
+            ):
                 self.flow_paths.extend(
                     [
                         [flow_paths[i]]
@@ -1562,7 +1624,10 @@ class SintelDataset(BaseFlowDataset):
                 )
                 flow_paths = []
                 occ_paths = []
-                if split != "test":
+                if (
+                    split != "test"
+                    or (Path(self.root_dir) / split_dir / "flow").exists()
+                ):
                     flow_paths = sorted(
                         (Path(self.root_dir) / split_dir / "flow" / seq_name).glob(
                             "*.flo"
@@ -1661,7 +1726,7 @@ class SpringDataset(BaseFlowDataset):
             as zero in the valid mask.
         get_valid_mask : bool, default True
             Whether to get or generate valid masks.
-        get_backward : bool, default True
+        get_backward : bool, default False
             Whether to get the backward version of the inputs.
         get_meta : bool, default True
             Whether to get metadata.
@@ -1720,7 +1785,10 @@ class SpringDataset(BaseFlowDataset):
                     rev = direcs[0] == "BW"
                     image_paths = sorted(
                         (
-                            Path(self.root_dir) / split_dir / seq_name / f"frame_{side}"
+                            Path(self.root_dir)
+                            / split_dir
+                            / seq_name
+                            / f"frame_{side}"
                         ).glob("*.png"),
                         reverse=rev,
                     )
@@ -1791,6 +1859,186 @@ class SpringDataset(BaseFlowDataset):
             assert len(self.img_paths) == len(
                 self.flow_paths
             ), f"{len(self.img_paths)} vs {len(self.flow_paths)}"
+
+        self._log_status()
+
+    def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:  # noqa: C901
+        """Retrieve and return one input.
+
+        Parameters
+        ----------
+        index : int
+            The index of the entry on the input lists.
+
+        Returns
+        -------
+        Dict[str, torch.Tensor]
+            The retrieved input. This dict may contain the following keys, depending on the initialization choices:
+            ['images', 'flows', 'mbs', 'occs', 'valids', 'flows_b', 'mbs_b', 'occs_b', 'valids_b', 'meta'].
+            Except for 'meta', all the values are 4D tensors with shape NCHW. Notice that N does not correspond to the batch
+            size, but rather to the number of images of a given key. For example, typically 'images' will have N=2, and
+            'flows' will have N=1, and so on. Therefore, a batch of these inputs will be a 5D tensor BNCHW.
+        """
+        inputs = {}
+
+        inputs["images"] = [cv2.imread(str(path)) for path in self.img_paths[index]]
+
+        if index < len(self.flow_paths):
+            inputs["flows"], valids = self._get_flows_and_valids(self.flow_paths[index])
+            if self.get_valid_mask:
+                inputs["valids"] = valids
+
+        if self.get_backward:
+            if index < len(self.flow_b_paths):
+                inputs["flows_b"], valids_b = self._get_flows_and_valids(
+                    self.flow_b_paths[index]
+                )
+                if self.get_valid_mask:
+                    inputs["valids_b"] = valids_b
+
+        if self.transform is not None:
+            inputs = self.transform(inputs)
+
+        inputs["flows"] = rearrange(
+            inputs["flows"], "b c (h nh) (w nw) -> b (nh nw) c h w", nh=2, nw=2
+        )
+        inputs["valids"] = inputs["valids"][:, :, ::2, ::2]
+
+        if self.get_meta:
+            inputs["meta"] = {
+                "dataset_name": self.dataset_name,
+                "split_name": self.split_name,
+            }
+            if index < len(self.metadata):
+                inputs["meta"].update(self.metadata[index])
+
+        return inputs
+
+
+class TartanAirDataset(BaseFlowDataset):
+    """Handle the TartanAir dataset."""
+
+    def __init__(  # noqa: C901
+        self,
+        root_dir: str,
+        difficulties: Union[str, List[str]] = "easy",
+        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        max_flow: float = 10000.0,
+        get_valid_mask: bool = True,
+        get_occlusion_mask: bool = True,
+        get_meta: bool = True,
+        sequence_length: int = 2,
+        sequence_position: str = "first",
+    ) -> None:
+        """Initialize SintelDataset.
+
+        Parameters
+        ----------
+        root_dir : str
+            path to the root directory of the MPI Sintel dataset.
+        split : str, default 'train'
+            Which split of the dataset should be loaded. It can be one of {'train', 'val', 'trainval', 'test'}.
+        difficulties : Union[str, List[str]], default 'easy'
+            Which difficulties should be loaded. It can be one of {'easy', 'hard', ['easy', 'hard']}.
+        transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
+            Transform to be applied on the inputs.
+        max_flow : float, default 10000.0
+            Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
+            as zero in the valid mask.
+        get_valid_mask : bool, default True
+            Whether to get or generate valid masks.
+        get_occlusion_mask : bool, default True
+            Whether to get occlusion masks.
+        get_meta : bool, default True
+            Whether to get metadata.
+        sequence_length : int, default 2
+            How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
+            temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
+        """
+        if isinstance(difficulties, str):
+            difficulties = [difficulties]
+        difficulties = [d.capitalize() for d in difficulties]
+        super().__init__(
+            dataset_name=f'TartanAir_{"_".join(difficulties)}',
+            split_name="trainval",
+            transform=transform,
+            max_flow=max_flow,
+            get_valid_mask=get_valid_mask,
+            get_occlusion_mask=get_occlusion_mask,
+            get_motion_boundary_mask=False,
+            get_backward=False,
+            get_meta=get_meta,
+        )
+        self.root_dir = root_dir
+        self.difficulties = difficulties
+        self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
+
+        sequence_paths = sorted([p for p in Path(root_dir).glob("*") if p.is_dir()])
+
+        # Read paths from disk
+        for seq_path in sequence_paths:
+            for diff in difficulties:
+                trajectory_paths = sorted(
+                    [p for p in (seq_path / diff).glob("*") if p.is_dir()]
+                )
+                for traj_path in trajectory_paths:
+                    image_paths = sorted((traj_path / "image_left").glob("*.png"))
+                    image_paths = self._extend_paths_list(
+                        image_paths, sequence_length, sequence_position
+                    )
+
+                    flow_paths = sorted((traj_path / "flow").glob("*_flow.npy"))
+                    flow_paths = self._extend_paths_list(
+                        flow_paths, sequence_length, sequence_position
+                    )
+                    assert len(image_paths) - 1 == len(
+                        flow_paths
+                    ), f"{seq_path.name}, {traj_path.name}: {len(image_paths)-1} vs {len(flow_paths)}"
+
+                    occ_paths = []
+                    if get_occlusion_mask:
+                        occ_paths = sorted((traj_path / "flow").glob("*_mask.npy"))
+                        occ_paths = self._extend_paths_list(
+                            occ_paths, sequence_length, sequence_position
+                        )
+                        assert len(occ_paths) == len(flow_paths)
+                    for i in range(len(image_paths) - self.sequence_length + 1):
+                        self.img_paths.append(image_paths[i : i + self.sequence_length])
+                        if len(flow_paths) > 0:
+                            self.flow_paths.append(
+                                flow_paths[i : i + self.sequence_length - 1]
+                            )
+                        if len(occ_paths) > 0:
+                            self.occ_paths.append(
+                                occ_paths[i : i + self.sequence_length - 1]
+                            )
+                        self.metadata.append(
+                            {
+                                "image_paths": [
+                                    str(p)
+                                    for p in image_paths[i : i + self.sequence_length]
+                                ],
+                                "is_val": False,
+                                "misc": seq_path.name,
+                                "is_seq_start": i == 0,
+                            }
+                        )
+
+        # Sanity check
+        assert len(self.img_paths) == len(
+            self.flow_paths
+        ), f"{len(self.img_paths)} vs {len(self.flow_paths)}"
+        if len(self.occ_paths) > 0:
+            assert len(self.img_paths) == len(
+                self.occ_paths
+            ), f"{len(self.img_paths)} vs {len(self.occ_paths)}"
 
         self._log_status()
 
@@ -2061,5 +2309,123 @@ class MonkaaDataset(BaseFlowDataset):
             assert len(self.mb_b_paths) == 0 or len(self.img_paths) == len(
                 self.mb_b_paths
             ), f"{len(self.img_paths)} vs {len(self.mb_b_paths)}"
+
+        self._log_status()
+
+
+class KubricDataset(BaseFlowDataset):
+    """Handle datasets generated by Kubric."""
+
+    def __init__(  # noqa: C901
+        self,
+        root_dir: str,
+        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        max_flow: float = 10000.0,
+        get_valid_mask: bool = True,
+        get_backward: bool = True,
+        get_meta: bool = True,
+        sequence_length: int = 2,
+        sequence_position: str = "first",
+    ) -> None:
+        """Initialize KubricDataset.
+
+        Parameters
+        ----------
+        root_dir : str
+            path to the root directory of the MPI Sintel dataset.
+        transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
+            Transform to be applied on the inputs.
+        max_flow : float, default 10000.0
+            Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
+            as zero in the valid mask.
+        get_valid_mask : bool, default True
+            Whether to get or generate valid masks.
+        get_backward : bool, default True
+            Whether to get the occluded version of the inputs.
+        get_meta : bool, default True
+            Whether to get metadata.
+        sequence_length : int, default 2
+            How many consecutive images are loaded per sample. More than two images can be used for model which exploit more
+            temporal information.
+        sequence_position : str, default "first"
+            Only used when sequence_length > 2.
+            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            - "first": the main frame will be the first one of the sequence,
+            - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
+            - "last": the main frame will be the penultimate in the sequence.
+        """
+        super().__init__(
+            dataset_name=f"Kubric",
+            split_name="trainval",
+            transform=transform,
+            max_flow=max_flow,
+            get_valid_mask=get_valid_mask,
+            get_motion_boundary_mask=False,
+            get_backward=get_backward,
+            get_meta=get_meta,
+        )
+        self.root_dir = root_dir
+        self.sequence_length = sequence_length
+        self.sequence_position = sequence_position
+
+        self.flow_format = "kubric_png"
+
+        sequence_dirs = sorted([p for p in (Path(root_dir)).glob("*") if p.is_dir()])
+
+        self.flow_read_mins = []
+        self.flow_read_maxs = []
+
+        for seq_dir in sequence_dirs:
+            seq_name = seq_dir.name
+            image_paths = sorted(seq_dir.glob("rgba_*.png"))
+            image_paths = self._extend_paths_list(
+                image_paths, sequence_length, sequence_position
+            )
+            flow_paths = sorted(seq_dir.glob("forward_flow_*.png"))[:-1]
+            flow_paths = self._extend_paths_list(
+                flow_paths, sequence_length, sequence_position
+            )
+            assert len(image_paths) - 1 == len(
+                flow_paths
+            ), f"{seq_name}: {len(image_paths)-1} vs {len(flow_paths)}"
+
+            with open(seq_dir / "data_ranges.json", "r") as f:
+                data_ranges = json.load(f)
+
+            if get_backward:
+                back_flow_paths = sorted(seq_dir.glob("backward_flow_*.png"))[1:]
+                back_flow_paths = self._extend_paths_list(
+                    back_flow_paths, sequence_length, sequence_position
+                )
+                assert len(image_paths) - 1 == len(
+                    back_flow_paths
+                ), f"{seq_name}: {len(image_paths)-1} vs {len(back_flow_paths)}"
+                self.flow_b_read_mins = []
+                self.flow_b_read_maxs = []
+
+            for i in range(len(image_paths) - self.sequence_length + 1):
+                self.img_paths.append(image_paths[i : i + self.sequence_length])
+                if len(flow_paths) > 0:
+                    self.flow_paths.append(flow_paths[i : i + self.sequence_length - 1])
+                self.flow_read_mins.append(data_ranges["forward_flow"]["min"])
+                self.flow_read_maxs.append(data_ranges["forward_flow"]["max"])
+
+                if get_backward:
+                    self.flow_b_paths.append(
+                        back_flow_paths[i : i + self.sequence_length - 1]
+                    )
+                    self.flow_b_read_mins.append(data_ranges["backward_flow"]["min"])
+                    self.flow_b_read_maxs.append(data_ranges["backward_flow"]["max"])
+
+                self.metadata.append(
+                    {
+                        "image_paths": [
+                            str(p) for p in image_paths[i : i + self.sequence_length]
+                        ],
+                        "is_val": False,
+                        "misc": seq_name,
+                        "is_seq_start": i == 0,
+                    }
+                )
 
         self._log_status()

@@ -41,6 +41,8 @@ def bilinear_sample(img, sample_coords):
 def flow_warp(feature, flow):
     b, c, h, w = feature.size()
 
-    grid = coords_grid(b, h, w, dtype=flow.dtype, device=flow.device) + flow  # [B, 2, H, W]
+    grid = (
+        coords_grid(b, h, w, dtype=flow.dtype, device=flow.device) + flow
+    )  # [B, 2, H, W]
 
     return bilinear_sample(feature, grid)

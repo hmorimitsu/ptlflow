@@ -41,10 +41,12 @@ from ptlflow.data.datasets import (
     FlyingChairs2Dataset,
     Hd1kDataset,
     KittiDataset,
+    KubricDataset,
     SintelDataset,
     FlyingThings3DDataset,
     FlyingThings3DSubsetDataset,
     SpringDataset,
+    TartanAirDataset,
 )
 from ptlflow.utils.utils import InputPadder, InputScaler
 from ptlflow.utils.utils import config_logging, make_divisible, bgr_val_as_tensor
@@ -76,7 +78,6 @@ class BaseModel(pl.LightningModule):
         self.output_stride = output_stride
 
         self.train_size = None
-        self.train_avg_length = None
 
         self.extra_params = None
 
@@ -997,6 +998,8 @@ class BaseModel(pl.LightningModule):
                 get_motion_boundary_mask = True
             elif v == "back":
                 get_backward = True
+            else:
+                raise ValueError(f"Invalid arg: {v}")
 
         dataset = FlyingChairs2Dataset(
             self.args.flying_chairs2_root_dir,
@@ -1054,6 +1057,8 @@ class BaseModel(pl.LightningModule):
                 sequence_length = int(v.split("_")[1])
             elif v.startswith("seqpos"):
                 sequence_position = v.split("_")[1]
+            else:
+                raise ValueError(f"Invalid arg: {v}")
 
         dataset = Hd1kDataset(
             self.args.hd1k_root_dir,
@@ -1100,18 +1105,50 @@ class BaseModel(pl.LightningModule):
 
         versions = ["2012", "2015"]
         split = "trainval"
+        get_occlusion_mask = False
         for v in args:
             if v in ["2012", "2015"]:
                 versions = [v]
             elif v in ["train", "val", "trainval", "test"]:
                 split = v
+            elif v == "occ":
+                get_occlusion_mask = True
+            else:
+                raise ValueError(f"Invalid arg: {v}")
 
         dataset = KittiDataset(
             self.args.kitti_2012_root_dir,
             self.args.kitti_2015_root_dir,
+            get_occlusion_mask=get_occlusion_mask,
             versions=versions,
             split=split,
             transform=transform,
+        )
+        return dataset
+
+    def _get_kubric_dataset(self, is_train: bool, *args: str) -> Dataset:
+        if is_train:
+            raise NotImplementedError()
+        else:
+            transform = ft.ToTensor()
+
+        get_backward = False
+        sequence_length = 2
+        sequence_position = "first"
+        for v in args:
+            if v == "back":
+                get_backward = True
+            elif v.startswith("seqlen"):
+                sequence_length = int(v.split("_")[1])
+            elif v.startswith("seqpos"):
+                sequence_position = v.split("_")[1]
+
+        dataset = KubricDataset(
+            self.args.kubric_root_dir,
+            transform=transform,
+            get_backward=get_backward,
+            sequence_length=sequence_length,
+            sequence_position=sequence_position,
         )
         return dataset
 
@@ -1164,6 +1201,8 @@ class BaseModel(pl.LightningModule):
                 sequence_length = int(v.split("_")[1])
             elif v.startswith("seqpos"):
                 sequence_position = v.split("_")[1]
+            else:
+                raise ValueError(f"Invalid arg: {v}")
 
         dataset = SintelDataset(
             self.args.mpi_sintel_root_dir,
@@ -1216,6 +1255,7 @@ class BaseModel(pl.LightningModule):
         sequence_length = 2
         sequence_position = "first"
         reverse_only = False
+        side_names = []
         for v in args:
             if v in ["train", "val", "trainval", "test"]:
                 split = v
@@ -1229,17 +1269,88 @@ class BaseModel(pl.LightningModule):
                 sequence_length = int(v.split("_")[1])
             elif v.startswith("seqpos"):
                 sequence_position = v.split("_")[1]
+            elif v == "left":
+                side_names.append("left")
+            elif v == "right":
+                side_names.append("right")
+            else:
+                raise ValueError(f"Invalid arg: {v}")
+
+        if len(side_names) == 0:
+            side_names = ["left", "right"]
 
         dataset = SpringDataset(
             self.args.spring_root_dir,
             split=split,
-            side_names=["left", "right"],
+            side_names=side_names,
             add_reverse=add_reverse,
             transform=transform,
             get_backward=get_backward,
             sequence_length=sequence_length,
             sequence_position=sequence_position,
             reverse_only=reverse_only,
+        )
+        return dataset
+
+    def _get_tartanair_dataset(self, is_train: bool, *args: str) -> Dataset:
+        device = "cuda" if self.args.train_transform_cuda else "cpu"
+        md = make_divisible
+
+        get_occlusion_mask = False
+        sequence_length = 2
+        sequence_position = "first"
+        difficulties = []
+        for v in args:
+            if v in ["easy", "hard"]:
+                difficulties.append(v)
+            elif v == "occ":
+                get_occlusion_mask = True
+            elif v.startswith("seqlen"):
+                sequence_length = int(v.split("_")[1])
+            elif v.startswith("seqpos"):
+                sequence_position = v.split("_")[1]
+            else:
+                raise ValueError(f"Invalid arg: {v}")
+
+        if len(difficulties) == 0:
+            difficulties = ["easy"]
+
+        if is_train:
+            if self.args.train_crop_size is None:
+                cy, cx = (md(360, self.output_stride), md(480, self.output_stride))
+                self.args.train_crop_size = (cy, cx)
+                logging.warning(
+                    "--train_crop_size is not set. It will be set as (%d, %d).", cy, cx
+                )
+            else:
+                cy, cx = (
+                    md(self.args.train_crop_size[0], self.output_stride),
+                    md(self.args.train_crop_size[1], self.output_stride),
+                )
+
+            # These transforms are based on RAFT: https://github.com/princeton-vl/RAFT
+            transform = ft.Compose(
+                [
+                    ft.ToTensor(device=device, fp16=self.args.train_transform_fp16),
+                    ft.RandomScaleAndCrop((cy, cx), (-0.4, 0.8), (-0.2, 0.2)),
+                    ft.ColorJitter(0.4, 0.4, 0.4, 0.5 / 3.14, 0.2),
+                    ft.GaussianNoise(0.02),
+                    ft.RandomPatchEraser(
+                        0.5, (int(1), int(3)), (int(50), int(100)), "mean"
+                    ),
+                    ft.RandomFlip(min(0.5, 0.5), min(0.1, 0.5)),
+                ]
+            )
+        else:
+            transform = ft.ToTensor()
+
+        dataset = TartanAirDataset(
+            self.args.tartanair_root_dir,
+            difficulties=difficulties,
+            transform=transform,
+            get_occlusion_mask=get_occlusion_mask,
+            sequence_length=sequence_length,
+            sequence_position=sequence_position,
         )
         return dataset
 
@@ -1278,6 +1389,8 @@ class BaseModel(pl.LightningModule):
                 sequence_position = v.split("_")[1]
             elif v == "sinteltransform":
                 sintel_transform = True
+            else:
+                raise ValueError(f"Invalid arg: {v}")
 
         if is_train:
             if self.args.train_crop_size is None:
