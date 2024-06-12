@@ -76,6 +76,7 @@ from ptlflow.models.rapidflow.rapidflow import (
     RAPIDFlow_it12,
 )
 from ptlflow.models.rpknet.rpknet import RPKNet
+from ptlflow.models.sea_raft.sea_raft import SEARAFT, SEARAFT_S, SEARAFT_M, SEARAFT_L
 from ptlflow.models.scopeflow.irr_pwc_v2 import ScopeFlow
 from ptlflow.models.separableflow.separableflow import SeparableFlow
 from ptlflow.models.skflow.skflow import SKFlow
@@ -161,6 +162,10 @@ models_dict = {
     "rapidflow_it6": RAPIDFlow_it6,
     "rapidflow_it12": RAPIDFlow_it12,
     "rpknet": RPKNet,
+    "sea_raft": SEARAFT,
+    "sea_raft_s": SEARAFT_S,
+    "sea_raft_m": SEARAFT_M,
+    "sea_raft_l": SEARAFT_L,
     "scopeflow": ScopeFlow,
     "scv4": SCVQuarter,
     "scv8": SCVEighth,
