@@ -76,6 +76,7 @@ class BaseModel(pl.LightningModule):
         self.output_stride = output_stride
 
         self.train_size = None
+        self.train_avg_length = None
 
         self.extra_params = None
 

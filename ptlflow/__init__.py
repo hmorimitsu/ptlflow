@@ -62,6 +62,7 @@ from ptlflow.models.liteflownet.liteflownet2 import LiteFlowNet2, LiteFlowNet2Ps
 from ptlflow.models.llaflow.llaflow import LLAFlow, LLAFlowRAFT
 from ptlflow.models.maskflownet.maskflownet import MaskFlownet, MaskFlownet_S
 from ptlflow.models.matchflow.matchflow import MatchFlow, MatchFlowRAFT
+from ptlflow.models.memflow.memflow import MemFlow, MemFlowT
 from ptlflow.models.ms_raft_plus.ms_raft_plus import MSRAFTPlus
 from ptlflow.models.neuflow.neuflow import NeuFlow
 from ptlflow.models.pwcnet.pwcnet import PWCNet, PWCDCNet
@@ -145,6 +146,8 @@ models_dict = {
     "maskflownet_s": MaskFlownet_S,
     "matchflow": MatchFlow,
     "matchflow_raft": MatchFlowRAFT,
+    "memflow": MemFlow,
+    "memflow_t": MemFlowT,
     "ms_raft+": MSRAFTPlus,
     "neuflow": NeuFlow,
     "pwcnet": PWCDCNet,
@@ -260,6 +263,8 @@ def get_model(
         if "hyper_parameters" in ckpt:
             if "train_size" in ckpt["hyper_parameters"]:
                 model.train_size = ckpt["hyper_parameters"]["train_size"]
+            if "train_avg_length" in ckpt["hyper_parameters"]:
+                model.train_avg_length = ckpt["hyper_parameters"]["train_avg_length"]
             if "extra_params" in ckpt["hyper_parameters"]:
                 extra_params = ckpt["hyper_parameters"]["extra_params"]
                 for name, value in extra_params.items():
