@@ -18,7 +18,7 @@ except ModuleNotFoundError:
 
 class SplatFlow(BaseModel):
     pretrained_checkpoints = {
-        "kitti": "",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/splatflow-kitti-2aa8e145.ckpt",
     }
 
     def __init__(self, args: Namespace) -> None:
@@ -55,8 +55,9 @@ class SplatFlow(BaseModel):
         f_shape = fmap.shape
         H, W = f_shape[-2:]
         y0, x0 = torch.meshgrid(
-            torch.arange(H).to(fmap.device).float(),
-            torch.arange(W).to(fmap.device).float(),
+            torch.arange(H).to(device=fmap.device, dtype=fmap.dtype),
+            torch.arange(W).to(device=fmap.device, dtype=fmap.dtype),
+            indexing="ij",
         )
         coord = torch.stack([x0, y0], dim=0)  # shape: (2, H, W)
         coord = coord.unsqueeze(0).repeat(f_shape[0], 1, 1, 1)
@@ -117,8 +118,6 @@ class SplatFlow(BaseModel):
     def forward_one_pair(self, image1, image2, mf_t=None):
         fmap1, fmap2 = self.fnet([image1, image2])
 
-        fmap1 = fmap1.float()
-        fmap2 = fmap2.float()
         corr_fn = CorrBlock(fmap1, fmap2, radius=4)
 
         coords0, coords1 = self.initialize_flow(fmap1)
