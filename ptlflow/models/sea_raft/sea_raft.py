@@ -34,7 +34,7 @@ class SequenceLoss(nn.Module):
 
         flow_loss = 0.0
         # exlude invalid pixels and extremely large diplacements
-        mag = torch.sum(flow_gt**2, dim=1).sqrt()
+        mag = torch.sum(flow_gt**2, dim=1, keepdim=True).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
         for i in range(n_predictions):
             i_weight = self.gamma ** (n_predictions - i - 1)
@@ -42,7 +42,7 @@ class SequenceLoss(nn.Module):
             final_mask = (
                 (~torch.isnan(loss_i.detach()))
                 & (~torch.isinf(loss_i.detach()))
-                & valid[:, None]
+                & valid
             )
             flow_loss += i_weight * ((final_mask * loss_i).sum() / final_mask.sum())
 
