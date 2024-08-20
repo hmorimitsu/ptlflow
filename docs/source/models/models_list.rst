@@ -288,8 +288,8 @@ MS-RAFT+
 
 - Model names: ``ms_raft+``
 
-NeuFlow
--------
+NeuFlow v1
+----------
 
 `[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/neuflow>`__
 
@@ -298,6 +298,17 @@ NeuFlow
 - Reference code: `https://github.com/neufieldrobotics/neuflow <https://github.com/neufieldrobotics/neuflow>`_
 
 - Model names: ``neuflow``
+
+NeuFlow v2
+----------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/neuflow2>`__
+
+- Paper: **NeuFlow v2: Push High-Efficiency Optical Flow To the Limit** - `https://arxiv.org/abs/2408.10161 <hhttps://arxiv.org/abs/2408.10161>`_
+
+- Reference code: `https://github.com/neufieldrobotics/NeuFlow_v2 <https://github.com/neufieldrobotics/NeuFlow_v2>`_
+
+- Model names: ``neuflow2``
 
 PWCNet
 ------

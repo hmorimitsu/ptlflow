@@ -1,3 +1,4 @@
+#!/bin/bash
 python ../plot_results.py \
     --metrics_csv_path ../docs/source/results/metrics_all.csv \
     --benchmark_csv_path ../docs/source/results/model_benchmark-all.csv \

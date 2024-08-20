@@ -65,6 +65,7 @@ from ptlflow.models.matchflow.matchflow import MatchFlow, MatchFlowRAFT
 from ptlflow.models.memflow.memflow import MemFlow, MemFlowT
 from ptlflow.models.ms_raft_plus.ms_raft_plus import MSRAFTPlus
 from ptlflow.models.neuflow.neuflow import NeuFlow
+from ptlflow.models.neuflow2.neuflow2 import NeuFlow2
 from ptlflow.models.pwcnet.pwcnet import PWCNet, PWCDCNet
 from ptlflow.models.raft.raft import RAFT, RAFTSmall
 from ptlflow.models.rapidflow.rapidflow import (
@@ -151,6 +152,7 @@ models_dict = {
     "memflow_t": MemFlowT,
     "ms_raft+": MSRAFTPlus,
     "neuflow": NeuFlow,
+    "neuflow2": NeuFlow2,
     "pwcnet": PWCDCNet,
     "pwcnet_nodc": PWCNet,
     "raft": RAFT,

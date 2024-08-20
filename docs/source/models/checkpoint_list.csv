@@ -110,6 +110,9 @@ memflow_t-kitti-9eeabb65.ckpt,MemFlowNet_T_kitti.pth,
 ms_raft_plus-mixed-2bb01f62.ckpt,mixed.pth,https://github.com/cv-stuttgart/MS_RAFT_plus
 neuflow-things-c402aa7a.ckpt,neuflow_things.pth,https://github.com/neufieldrobotics/neuflow
 neuflow-sintel-0d969ea2.ckpt,neuflow_sintel.pth,
+neuflow2-mixed-acac1a70.ckpt,neuflow_mixed.pth,https://github.com/neufieldrobotics/NeuFlow_v2
+neuflow2-sintel-15c625f8.ckpt,neuflow_sintel.pth,
+neuflow2-things-6ed47437.ckpt,neuflow_things.pth,
 pwcdcnet-sintel-c7d08a46.ckpt,pwc_net.pth.tar,https://github.com/NVlabs/PWC-Net/tree/master/PyTorch
 pwcdcnet-things-cc223701.ckpt,pwc_net_chairs.pth.tar,
 pwcnet-sintel-533815e5.ckpt,pwc_net.pth.tar,
