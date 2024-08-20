@@ -36,6 +36,7 @@ EXCLUDE_MODELS = [
     "matchflow",
     "matchflow_raft",
     "neuflow",  # requires torch 2.X
+    "neuflow2",  # requires torch 2.X
     "scv4",
     "scv8",
     "separableflow",
@@ -48,6 +49,7 @@ EXCLUDE_MODELS_FP16 = [
     "matchflow",
     "matchflow_raft",
     "neuflow",  # requires torch 2.X
+    "neuflow2",  # requires torch 2.X
     "scv4",
     "scv8",
     "separableflow",
