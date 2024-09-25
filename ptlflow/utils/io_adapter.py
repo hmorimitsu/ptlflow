@@ -189,12 +189,14 @@ class IOAdapter(object):
                 }
                 if self.fp16:
                     inputs = {
-                        k: v.half()
-                        if (
-                            isinstance(v, torch.Tensor)
-                            and ("flow" in k or "image" in k)
+                        k: (
+                            v.half()
+                            if (
+                                isinstance(v, torch.Tensor)
+                                and ("flow" in k or "image" in k)
+                            )
+                            else v
                         )
-                        else v
                         for k, v in inputs.items()
                     }
             else:

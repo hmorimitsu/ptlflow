@@ -156,16 +156,22 @@ class BaseFlowDataset(Dataset):
             inputs["flows"], valids = self._get_flows_and_valids(
                 self.flow_paths[index],
                 flow_format=self.flow_format,
-                flow_min=self.flow_read_mins[index]
-                if (
-                    self.flow_read_mins is not None and len(self.flow_read_mins) > index
-                )
-                else None,
-                flow_max=self.flow_read_maxs[index]
-                if (
-                    self.flow_read_maxs is not None and len(self.flow_read_maxs) > index
-                )
-                else None,
+                flow_min=(
+                    self.flow_read_mins[index]
+                    if (
+                        self.flow_read_mins is not None
+                        and len(self.flow_read_mins) > index
+                    )
+                    else None
+                ),
+                flow_max=(
+                    self.flow_read_maxs[index]
+                    if (
+                        self.flow_read_maxs is not None
+                        and len(self.flow_read_maxs) > index
+                    )
+                    else None
+                ),
             )
             if self.get_valid_mask:
                 inputs["valids"] = valids
@@ -184,18 +190,22 @@ class BaseFlowDataset(Dataset):
                 _, valids_noc = self._get_flows_and_valids(
                     noc_paths,
                     flow_format=self.flow_format,
-                    flow_min=self.flow_read_mins[index]
-                    if (
-                        self.flow_read_mins is not None
-                        and len(self.flow_read_mins) > index
-                    )
-                    else None,
-                    flow_max=self.flow_read_maxs[index]
-                    if (
-                        self.flow_read_maxs is not None
-                        and len(self.flow_read_maxs) > index
-                    )
-                    else None,
+                    flow_min=(
+                        self.flow_read_mins[index]
+                        if (
+                            self.flow_read_mins is not None
+                            and len(self.flow_read_mins) > index
+                        )
+                        else None
+                    ),
+                    flow_max=(
+                        self.flow_read_maxs[index]
+                        if (
+                            self.flow_read_maxs is not None
+                            and len(self.flow_read_maxs) > index
+                        )
+                        else None
+                    ),
                 )
                 inputs["occs"] = [valids[i] - valids_noc[i] for i in range(len(valids))]
         if self.get_motion_boundary_mask and index < len(self.mb_paths):
@@ -208,18 +218,22 @@ class BaseFlowDataset(Dataset):
                 inputs["flows_b"], valids_b = self._get_flows_and_valids(
                     self.flow_b_paths[index],
                     flow_format=self.flow_format,
-                    flow_min=self.flow_b_read_mins[index]
-                    if (
-                        self.flow_b_read_mins is not None
-                        and len(self.flow_b_read_mins) > index
-                    )
-                    else None,
-                    flow_max=self.flow_b_read_maxs[index]
-                    if (
-                        self.flow_b_read_maxs is not None
-                        and len(self.flow_b_read_maxs) > index
-                    )
-                    else None,
+                    flow_min=(
+                        self.flow_b_read_mins[index]
+                        if (
+                            self.flow_b_read_mins is not None
+                            and len(self.flow_b_read_mins) > index
+                        )
+                        else None
+                    ),
+                    flow_max=(
+                        self.flow_b_read_maxs[index]
+                        if (
+                            self.flow_b_read_maxs is not None
+                            and len(self.flow_b_read_maxs) > index
+                        )
+                        else None
+                    ),
                 )
                 if self.get_valid_mask:
                     inputs["valids_b"] = valids_b
@@ -1785,10 +1799,7 @@ class SpringDataset(BaseFlowDataset):
                     rev = direcs[0] == "BW"
                     image_paths = sorted(
                         (
-                            Path(self.root_dir)
-                            / split_dir
-                            / seq_name
-                            / f"frame_{side}"
+                            Path(self.root_dir) / split_dir / seq_name / f"frame_{side}"
                         ).glob("*.png"),
                         reverse=rev,
                     )

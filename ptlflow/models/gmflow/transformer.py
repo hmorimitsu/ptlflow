@@ -306,9 +306,9 @@ class FeatureTransformer(nn.Module):
                     nhead=nhead,
                     attention_type=attention_type,
                     ffn_dim_expansion=ffn_dim_expansion,
-                    with_shift=True
-                    if attention_type == "swin" and i % 2 == 1
-                    else False,
+                    with_shift=(
+                        True if attention_type == "swin" and i % 2 == 1 else False
+                    ),
                 )
                 for i in range(num_layers)
             ]

@@ -5,6 +5,7 @@ A PyTorch impl of : `Twins: Revisiting the Design of Spatial Attention in Vision
 Code/weights from https://github.com/Meituan-AutoML/Twins, original copyright/license info below
 
 """
+
 # --------------------------------------------------------
 # Twins
 # Copyright (c) 2021 Meituan
