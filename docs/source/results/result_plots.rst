@@ -23,7 +23,7 @@ Sintel Final EPE x KITTI 2015 Fl-All
 
 .. raw:: html
 
-  <iframe src="../_static/plot-sintel-final-occ-val_epe-kitti-2015-val_outlier.html" height="600px" width="100%"></iframe>
+  <iframe src="../_static/plot-sintel-final-occ-val_epe-kitti-2015-val_flall.html" height="600px" width="100%"></iframe>
 
 Model parameters x FLOPs
 ========================

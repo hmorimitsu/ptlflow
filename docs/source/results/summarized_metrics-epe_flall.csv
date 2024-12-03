@@ -1,4 +1,4 @@
-model,checkpoint,sintel-clean-epe,sintel-clean-outlier,sintel-final-epe,sintel-final-outlier,kitti-2012-epe,kitti-2012-outlier,kitti-2015-epe,kitti-2015-outlier
+model,checkpoint,sintel-clean-epe,sintel-clean-flall,sintel-final-epe,sintel-final-flall,kitti-2012-epe,kitti-2012-flall,kitti-2015-epe,kitti-2015-flall
 ccmr,kitti,1.444,3.81,2.806,7.617,0.982,2.949,0.747,2.172
 ccmr,sintel,0.49,2.084,0.789,3.568,1.158,3.583,1.096,3.566
 ccmr+,kitti,1.326,3.449,2.721,7.052,0.985,2.927,0.724,1.924

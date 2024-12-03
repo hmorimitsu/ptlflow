@@ -3,15 +3,15 @@ Installation
 ============
 
 It is recommended that you first create a virtual environment.
-For example, you can create one using `miniconda <https://docs.conda.io/projects/miniconda/en/latest/>`__:
+For example, you can create one using `anaconda <https://www.anaconda.com/download/>`__:
 
 .. code-block:: bash
 
-    conda create --name ptlflow python=3.10
+    conda create --name ptlflow python=3.12
     conda activate ptlflow
 
 
-Next, install PyTorch following the official instructions at `https://pytorch.org/ <https://pytorch.org/>`__ (PTLFlow has been tested with PyTorch versions >= 1.13.1 and <= 2.1.2).
+Next, install PyTorch following the official instructions at `https://pytorch.org/ <https://pytorch.org/>`__ (PTLFlow has been tested with Python versions >= 3.10 and <= 3.12 and PyTorch >= 2.2 and <= 2.5.1).
 
 Afterward, you can use PTLFlow in one of two ways:
 
@@ -59,25 +59,38 @@ To know more details about how to use each script, please read the next pages in
 Getting the names of available models
 -------------------------------------
 
-Using one of the initial scripts, you can get the name of the available models by simply running one script
-and providing any invalid model name as the first argument. For example, run:
+You can run the following command to print the list of available models:
 
 .. code-block:: bash
 
-    python validate.py which
+    python -c "import ptlflow; print(ptlflow.get_model_names())"
 
-And you will see an error message showing you a list of valid model names.
+You can also use one of the initial scripts to get the name of the available models by providing the ``--help`` argument to one of the scripts and then checking the ``--model`` instructions.
+For example, you can run:
+
+.. code-block:: bash
+
+    python validate.py --help
+
+Note, however, that the list of models shown in the help will include the full module path to the model.
+For example, the ``raft`` model will be listed as ``ptlflow.models.raft``.
+You do not need to provide the full path to use the model, just the last name is enough.
+For example, to validate using ``raft``, just type:
+
+.. code-block:: bash
+
+    python validate.py --model raft
 
 Getting the names of pretrained checkpoints of a model
 ------------------------------------------------------
 
-Suppose you chose a model, let's say ``raft_small``, but you do not know which pretrained checkpoints
+Suppose you chose a model, let's say ``raft``, but you do not know which pretrained checkpoints
 are available for it. You can find that out by using one of the initial scripts and passing any invalid
-checkpoint name to ``--pretrained_ckpt`` as follows:
+checkpoint name to ``--ckpt_path`` as follows:
 
 .. code-block:: bash
 
-    python validate.py raft_small --pretrained_ckpt which
+    python validate.py --model raft --ckpt_path which
 
 This will show an error message with a list of the available checkpoint names.
 

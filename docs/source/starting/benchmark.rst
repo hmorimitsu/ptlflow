@@ -9,7 +9,7 @@ Once you have the script, you can run a benchmark as follows:
 
 .. code-block:: bash
 
-    python model_benchmark.py raft_small
+    python model_benchmark.py --model raft_small
 
 This command will collect some metrics from the ``raft_small`` model.
 The results are printed in the terminal and also saved to a CSV file at the folder specified by the argument ``--output_path``.
@@ -19,19 +19,19 @@ For example:
 
 .. code-block:: bash
 
-    python model_benchmark.py raft_small --iters 12
+    python model_benchmark.py --model raft_small --model.iters 12
 
-``--iters`` is an argument available inside the ``raft_small`` model.
+``iters`` is an argument available inside the ``raft_small`` model.
 
 Benchmarking multiple models
 ============================
 
-You can also run the benchmark on several models at the same time, by providing ``select`` as the first argument and then a list of model names for the ``--selection`` argument.
+You can also run the benchmark on several models at the same time, by providing a list of model names for the ``--select`` argument.
 For example, the command:
 
 .. code-block:: bash
 
-    python model_benchmark.py select --selection raft_small pwcnet
+    python model_benchmark.py --select raft_small pwcnet
 
 would collect the benchmark results for ``raft_small`` and ``pwcnet`` models.
 
@@ -39,9 +39,9 @@ You can also benchmark all available models with:
 
 .. code-block:: bash
 
-    python model_benchmark.py all
+    python model_benchmark.py --all
 
-IMPORTANT: when benchmarking multiple models with ``select`` or ``all``, it is not possible to provide model-specific argument directly from the command line!
+IMPORTANT: when benchmarking multiple models with ``--select`` or ``--all``, it is not possible to provide model-specific argument directly from the command line!
 
 Reported metrics
 ================
@@ -74,7 +74,7 @@ The command below shows an example with all the above arguments:
 
 .. code-block:: bash
 
-    python model_benchmark.py raft_small --num_trials 2 --num_samples 5 --sleep_interval 1.0 --input_size 384 1280 --final_speed_mode median --final_memory_mode first --datatypes fp16 fp32
+    python model_benchmark.py --model raft_small --num_trials 2 --num_samples 5 --sleep_interval 1.0 --input_size 384 1280 --final_speed_mode median --final_memory_mode first --datatypes fp16 fp32
 
 
 Plotting results
@@ -91,7 +91,7 @@ For example, the command below creates a scatter plot showing time and flops of 
 
 .. code-block:: bash
 
-    python model_benchmark.py select --selection raft_small pwcnet flownets --plot_axes time flops
+    python model_benchmark.py --select raft_small pwcnet flownets --plot_axes time flops
 
 Known issues
 ============
