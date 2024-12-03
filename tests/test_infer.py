@@ -18,6 +18,7 @@ from pathlib import Path
 import shutil
 
 import cv2 as cv
+from jsonargparse import ArgumentParser
 import numpy as np
 
 import infer
@@ -29,14 +30,13 @@ TEST_MODEL = "raft_small"
 def test_infer(tmp_path: Path) -> None:
     _create_images(tmp_path)
 
-    parser = infer._init_parser()
-
     model_ref = ptlflow.get_model_reference(TEST_MODEL)
-    parser = model_ref.add_model_specific_args(parser)
 
-    input_path = [str(tmp_path / "img1.png"), str(tmp_path / "img2.png")]
-    args = parser.parse_args([TEST_MODEL, "--input_path", input_path[0], input_path[1]])
+    parser = ArgumentParser(parents=[infer._init_parser()])
+    parser.add_class_arguments(model_ref, "model")
+    args = parser.parse_args([])
 
+    args.input_path = [str(tmp_path / "img1.png"), str(tmp_path / "img2.png")]
     args.write_outputs = True
     args.output_path = tmp_path
 
