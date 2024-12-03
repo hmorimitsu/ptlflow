@@ -23,7 +23,6 @@ import numpy as np
 import torch
 
 from ptlflow.data.flow_transforms import ToTensor
-from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils.utils import InputScaler
 
 
@@ -32,7 +31,7 @@ class IOAdapter(object):
 
     def __init__(
         self,
-        model: BaseModel,
+        output_stride: int,
         input_size: Tuple[int, int],
         target_size: Optional[Tuple[int, int]] = None,
         target_scale_factor: Optional[float] = None,
@@ -45,8 +44,8 @@ class IOAdapter(object):
 
         Parameters
         ----------
-        model : BaseModel
-            An instance of optical flow mode that will be used for estimation.
+        output_stride : int
+            An integer representing the ratio (input_size / smallest_feature_size).
         input_size : Tuple[int, int]
             The shape of the original inputs, must be a tuple with at least two elements. It is assumed that the last two
             elements are (height, with).
@@ -63,7 +62,7 @@ class IOAdapter(object):
         cuda : bool
             If True, the input tensors are transferred to GPU (if a GPU is available).
         """
-        self.output_stride = model.output_stride
+        self.output_stride = output_stride
         self.target_size = target_size
         self.target_scale_factor = target_scale_factor
         self.interpolation_mode = interpolation_mode

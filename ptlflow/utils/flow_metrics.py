@@ -100,12 +100,20 @@ class FlowMetrics(Metric):
         )
         self.add_state("px5_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum")
 
-        self.add_state("outlier", default=torch.tensor(0).float(), dist_reduce_fx="sum")
+        self.add_state("flall", default=torch.tensor(0).float(), dist_reduce_fx="sum")
         self.add_state(
-            "outlier_non_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum"
+            "flall_non_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum"
         )
         self.add_state(
-            "outlier_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum"
+            "flall_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum"
+        )
+
+        self.add_state("wauc", default=torch.tensor(0).float(), dist_reduce_fx="sum")
+        self.add_state(
+            "wauc_non_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum"
+        )
+        self.add_state(
+            "wauc_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum"
         )
 
         self.add_state("occ_f1", default=torch.tensor(0).float(), dist_reduce_fx="sum")
@@ -169,13 +177,14 @@ class FlowMetrics(Metric):
         px1_mask = (epe < 1).float()
         px3_mask = (epe < 3).float()
         px5_mask = (epe < 5).float()
-        outlier_mask = ((epe > 3) & (epe > (0.05 * target_norm))).float() * 100
+        flall_mask = ((epe > 3) & (epe > (0.05 * target_norm))).float() * 100
         self.used_keys = [
             ("epe", "epe", "valid_target"),
             ("px1", "px1_mask", "valid_target"),
             ("px3", "px3_mask", "valid_target"),
             ("px5", "px5_mask", "valid_target"),
-            ("outlier", "outlier_mask", "valid_target"),
+            ("flall", "flall_mask", "valid_target"),
+            ("wauc", "epe", "valid_target"),
         ]
 
         if occlusion_target is not None:
@@ -191,8 +200,10 @@ class FlowMetrics(Metric):
                     ("px3_non_occ", "px3_mask", "valid_non_occ"),
                     ("px5_occ", "px5_mask", "valid_occ"),
                     ("px5_non_occ", "px5_mask", "valid_non_occ"),
-                    ("outlier_occ", "outlier_mask", "valid_occ"),
-                    ("outlier_non_occ", "outlier_mask", "valid_non_occ"),
+                    ("flall_occ", "flall_mask", "valid_occ"),
+                    ("flall_non_occ", "flall_mask", "valid_non_occ"),
+                    ("wauc_occ", "epe", "valid_occ"),
+                    ("wauc_non_occ", "epe", "valid_non_occ"),
                 ]
             )
             self.include_occlusion = True
@@ -219,11 +230,24 @@ class FlowMetrics(Metric):
             self.used_keys.extend([("conf_f1", "conf_f1", "valid_target")])
 
         for v1, v2, v3 in self.used_keys:
-            setattr(
-                self,
-                v1,
-                prev_weight * getattr(self, v1)
-                + next_weight * self._compute_total(locals()[v2], locals()[v3]),
+            if "wauc" not in v1:
+                setattr(
+                    self,
+                    v1,
+                    prev_weight * getattr(self, v1)
+                    + next_weight * self._compute_total(locals()[v2], locals()[v3]),
+                )
+        self.wauc = prev_weight * self.wauc + next_weight * self._compute_total_wauc(
+            epe, valid_target
+        )
+        if occlusion_target is not None:
+            self.wauc_occ = (
+                prev_weight * self.wauc_occ
+                + next_weight * self._compute_total_wauc(epe, valid_occ)
+            )
+            self.wauc_non_occ = (
+                prev_weight * self.wauc_non_occ
+                + next_weight * self._compute_total_wauc(epe, valid_non_occ)
             )
 
         self.sample_count += batch_size
@@ -365,3 +389,30 @@ class FlowMetrics(Metric):
             return flow_tensor.shape[0] * flow_tensor.shape[1]
         elif len(flow_tensor.shape) == 6:
             return flow_tensor.shape[0]
+
+    def _compute_total_wauc(
+        self, epe: torch.Tensor, valid_mask: torch.Tensor
+    ) -> torch.Tensor:
+        # Code adapted from https://github.com/cv-stuttgart/springwebsite/blob/main/springeval/management/commands/evaluation.py
+        # MIT License
+        epe = epe.clone()
+        epe[valid_mask < 0.5] = 100
+        epe = epe.view(epe.shape[0], -1)
+        N = valid_mask.reshape(valid_mask.shape[0], -1).sum(dim=1)
+
+        wauc = torch.zeros(epe.shape[0], dtype=epe.dtype, device=epe.device)
+        sum_wi = 0
+        for i in range(1, 101):
+            wi = 1 - ((i - 1) / 100.0)
+            deltai = i / 20.0
+            err = (epe <= deltai).sum(dim=1)
+            wauc += wi * err
+            sum_wi += wi
+        wauc = 100 * wauc / (N * sum_wi + 1e-8)
+
+        if self.average_mode == "epoch_mean":
+            wauc = wauc.sum()
+        else:
+            wauc = wauc.mean()
+
+        return wauc
