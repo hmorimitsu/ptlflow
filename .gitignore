@@ -1,6 +1,8 @@
+lightning_logs/
 ptlflow_logs/
 ptlflow_scripts/
 outputs/
+ckpts/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
