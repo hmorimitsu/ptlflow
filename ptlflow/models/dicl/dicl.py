@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+from typing import Sequence
 
 import torch
 import torch.nn as nn
@@ -13,6 +13,7 @@ except ModuleNotFoundError:
         IterSpatialCorrelationSampler as SpatialCorrelationSampler,
     )
 
+from ptlflow.utils.registry import register_model, trainable
 from .loss_functions import MultiScale_UP
 from ..base_model.base_model import BaseModel
 
@@ -128,46 +129,93 @@ class DAP(nn.Module):
         return x.view(bs, du, dv, h, w).unsqueeze(1)
 
 
-class DICLBase(BaseModel):
-    def __init__(self, args):
-        super(DICLBase, self).__init__(
-            args=args,
+class DICL(BaseModel):
+    pretrained_checkpoints = {
+        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dicl-chairs-fdc24e2f.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dicl-kitti-4813ccab.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dicl-sintel-fa9fc259.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dicl-things-20bc573d.ckpt",
+    }
+
+    def __init__(
+        self,
+        ctf_context: bool = True,
+        ctf_context_only_flow2: bool = False,
+        cuda_cost: bool = False,
+        dap_by_temperature: bool = False,
+        dap_layer: bool = True,
+        dap_init_by_id: bool = True,
+        flow_reg_by_max: bool = True,
+        remove_warp_hole: bool = True,
+        scale_context: Sequence[float] = (0.03125, 0.0625, 0.125, 0.25, 0.5),
+        search_range: Sequence[int] = (3, 3, 3, 3, 3),
+        sup_raw_flow: bool = False,
+        loss_removezero: bool = False,
+        loss_type: str = "L1",
+        loss_use_valid_range: bool = False,
+        loss_weight: Sequence[float] = (1.0, 0.75, 0.50, 0.25, 0.25),
+        loss_valid_range: Sequence[tuple[int, int]] = (
+            (372, 372),
+            (360, 360),
+            (336, 336),
+            (288, 288),
+            (192, 192),
+        ),
+        pad_by_cons: bool = False,
+        **kwargs,
+    ):
+        super(DICL, self).__init__(
             loss_fn=MultiScale_UP(
-                loss_type=args.loss_type,
-                weight=args.loss_weight,
-                valid_range=args.loss_valid_range,
-                removezero=args.loss_removezero,
-                use_valid_range=args.loss_use_valid_range,
+                loss_type=loss_type,
+                weight=loss_weight,
+                valid_range=loss_valid_range,
+                removezero=loss_removezero,
+                use_valid_range=loss_use_valid_range,
             ),
             output_stride=128,
+            **kwargs,
         )
+
+        self.ctf_context = ctf_context
+        self.ctf_context_only_flow2 = ctf_context_only_flow2
+        self.cuda_cost = cuda_cost
+        self.dap_by_temperature = dap_by_temperature
+        self.dap_layer = dap_layer
+        self.dap_init_by_id = dap_init_by_id
+        self.flow_reg_by_max = flow_reg_by_max
+        self.remove_warp_hole = remove_warp_hole
+        self.scale_context = scale_context
+        self.search_range = search_range
+        self.sup_raw_flow = sup_raw_flow
+        self.pad_by_cons = pad_by_cons
+
         self.feature = FeatureGA()
 
-        if self.args.dap_layer:
+        if self.dap_layer:
             self.dap_layer6 = DAP(
-                md=self.args.search_range[4],
-                dap_by_temperature=self.args.dap_by_temperature,
+                md=self.search_range[4],
+                dap_by_temperature=self.dap_by_temperature,
             )
             self.dap_layer5 = DAP(
-                md=self.args.search_range[3],
-                dap_by_temperature=self.args.dap_by_temperature,
+                md=self.search_range[3],
+                dap_by_temperature=self.dap_by_temperature,
             )
             self.dap_layer4 = DAP(
-                md=self.args.search_range[2],
-                dap_by_temperature=self.args.dap_by_temperature,
+                md=self.search_range[2],
+                dap_by_temperature=self.dap_by_temperature,
             )
             self.dap_layer3 = DAP(
-                md=self.args.search_range[1],
-                dap_by_temperature=self.args.dap_by_temperature,
+                md=self.search_range[1],
+                dap_by_temperature=self.dap_by_temperature,
             )
             self.dap_layer2 = DAP(
-                md=self.args.search_range[0],
-                dap_by_temperature=self.args.dap_by_temperature,
+                md=self.search_range[0],
+                dap_by_temperature=self.dap_by_temperature,
             )
         else:
-            self.dap_layer6 = (
-                self.dap_layer5
-            ) = self.dap_layer4 = self.dap_layer3 = self.dap_layer2 = None
+            self.dap_layer6 = self.dap_layer5 = self.dap_layer4 = self.dap_layer3 = (
+                self.dap_layer2
+            ) = None
 
         self.entropy = FlowEntropy()
 
@@ -182,32 +230,32 @@ class DICLBase(BaseModel):
         # search range, e.g., [-3,3]
         # the search range for FlowRegression should be aligned with that when computing matching cost
         self.flow6 = FlowRegression(
-            self.args.search_range[4],
-            self.args.search_range[4],
-            self.args.flow_reg_by_max,
+            self.search_range[4],
+            self.search_range[4],
+            self.flow_reg_by_max,
         )
         self.flow5 = FlowRegression(
-            self.args.search_range[3],
-            self.args.search_range[3],
-            self.args.flow_reg_by_max,
+            self.search_range[3],
+            self.search_range[3],
+            self.flow_reg_by_max,
         )
         self.flow4 = FlowRegression(
-            self.args.search_range[2],
-            self.args.search_range[2],
-            self.args.flow_reg_by_max,
+            self.search_range[2],
+            self.search_range[2],
+            self.flow_reg_by_max,
         )
         self.flow3 = FlowRegression(
-            self.args.search_range[1],
-            self.args.search_range[1],
-            self.args.flow_reg_by_max,
+            self.search_range[1],
+            self.search_range[1],
+            self.flow_reg_by_max,
         )
         self.flow2 = FlowRegression(
-            self.args.search_range[0],
-            self.args.search_range[0],
-            self.args.flow_reg_by_max,
+            self.search_range[0],
+            self.search_range[0],
+            self.flow_reg_by_max,
         )
 
-        if args.ctf_context:
+        if ctf_context:
             # If you would use context network as introduced in PWCNet
             self.context_net2 = nn.Sequential(
                 BasicConv(38, 64, kernel_size=3, padding=1, dilation=1),
@@ -258,7 +306,7 @@ class DICLBase(BaseModel):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-        if self.args.dap_init_by_id:
+        if self.dap_init_by_id:
             # init the dap layer kernel by identity matrix
             if self.dap_layer6 is not None:
                 nn.init.eye_(
@@ -280,47 +328,6 @@ class DICLBase(BaseModel):
                 nn.init.eye_(
                     self.dap_layer2.dap_layer.conv.weight.squeeze(-1).squeeze(-1)
                 )
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--ctf_context", action="store_true")
-        parser.add_argument("--ctf_context_only_flow2", action="store_true")
-        parser.add_argument("--cuda_cost", action="store_true")
-        parser.add_argument("--dap_by_temperature", action="store_true")
-        parser.add_argument("--dap_layer", action="store_true")
-        parser.add_argument("--dap_init_by_id", action="store_true")
-        parser.add_argument("--flow_reg_by_max", action="store_true")
-        parser.add_argument("--remove_warp_hole", action="store_true")
-        parser.add_argument(
-            "--scale_context",
-            type=float,
-            nargs="+",
-            default=(0.03125, 0.0625, 0.125, 0.25, 0.5),
-        )
-        parser.add_argument(
-            "--search_range", type=int, nargs="+", default=(3, 3, 3, 3, 3)
-        )
-        parser.add_argument("--sup_raw_flow", action="store_true")
-        parser.add_argument("--loss_removezero", action="store_true")
-        parser.add_argument("--loss_type", type=str, default="L1")
-        parser.add_argument("--loss_use_valid_range", action="store_true")
-        parser.add_argument(
-            "--loss_weight",
-            type=float,
-            nargs="+",
-            default=(1.0, 0.75, 0.50, 0.25, 0.25),
-        )
-        parser.add_argument(
-            "--loss_valid_range",
-            type=float,
-            nargs="+",
-            default=((372, 372), (360, 360), (336, 336), (288, 288), (192, 192)),
-        )
-        parser.add_argument("--pad_by_cons", action="store_true")
-
-        return parser
 
     def warp(self, x, flo):
         """
@@ -358,7 +365,7 @@ class DICLBase(BaseModel):
 
     def forward(self, inputs):
         # left and right images normalized
-        if self.args.pad_by_cons:
+        if self.pad_by_cons:
             pad_mode = "constant"
             pad_value = 1
         else:
@@ -385,7 +392,7 @@ class DICLBase(BaseModel):
 
         # compute flow for level 6
         cost6 = self.compute_cost(
-            x6, y6, self.matching6, self.args.search_range[4], self.args.search_range[4]
+            x6, y6, self.matching6, self.search_range[4], self.search_range[4]
         )
         g6 = F.interpolate(
             x,
@@ -396,14 +403,14 @@ class DICLBase(BaseModel):
         if self.dap_layer6 is not None:
             cost6 = self.dap_layer6(cost6)
         flow6 = self.flow6(cost6)
-        if self.args.ctf_context:
-            if self.args.sup_raw_flow:
+        if self.ctf_context:
+            if self.sup_raw_flow:
                 raw_flow6 = flow6
             entro6 = self.entropy(cost6)
             # input to context network
             # including pred flow, entro, left img feat, left img
             feat6 = torch.cat((flow6.detach(), entro6.detach(), x6, g6), dim=1)
-            flow6 = flow6 + self.context_net6(feat6) * self.args.scale_context[0]
+            flow6 = flow6 + self.context_net6(feat6) * self.scale_context[0]
         up_flow6 = 2.0 * F.interpolate(
             flow6, [x5.shape[2], x5.shape[3]], mode="bilinear", align_corners=True
         )
@@ -415,8 +422,8 @@ class DICLBase(BaseModel):
             x5,
             warp5,
             self.matching5,
-            self.args.search_range[3],
-            self.args.search_range[3],
+            self.search_range[3],
+            self.search_range[3],
         )
         g5 = F.interpolate(
             x,
@@ -427,12 +434,12 @@ class DICLBase(BaseModel):
         if self.dap_layer5 is not None:
             cost5 = self.dap_layer5(cost5)
         flow5 = self.flow5(cost5) + up_flow6
-        if self.args.ctf_context:
-            if self.args.sup_raw_flow:
+        if self.ctf_context:
+            if self.sup_raw_flow:
                 raw_flow5 = flow5
             entro5 = self.entropy(cost5)
             feat5 = torch.cat((flow5.detach(), entro5.detach(), x5, g5), dim=1)
-            flow5 = flow5 + self.context_net5(feat5) * self.args.scale_context[1]
+            flow5 = flow5 + self.context_net5(feat5) * self.scale_context[1]
         up_flow5 = 2.0 * F.interpolate(
             flow5, [x4.shape[2], x4.shape[3]], mode="bilinear", align_corners=True
         )
@@ -444,8 +451,8 @@ class DICLBase(BaseModel):
             x4,
             warp4,
             self.matching4,
-            self.args.search_range[2],
-            self.args.search_range[2],
+            self.search_range[2],
+            self.search_range[2],
         )
         g4 = F.interpolate(
             x,
@@ -456,12 +463,12 @@ class DICLBase(BaseModel):
         if self.dap_layer4 is not None:
             cost4 = self.dap_layer4(cost4)
         flow4 = self.flow4(cost4) + up_flow5
-        if self.args.ctf_context:
-            if self.args.sup_raw_flow:
+        if self.ctf_context:
+            if self.sup_raw_flow:
                 raw_flow4 = flow4
             entro4 = self.entropy(cost4)
             feat4 = torch.cat((flow4.detach(), entro4.detach(), x4, g4), dim=1)
-            flow4 = flow4 + self.context_net4(feat4) * self.args.scale_context[2]
+            flow4 = flow4 + self.context_net4(feat4) * self.scale_context[2]
         up_flow4 = 2.0 * F.interpolate(
             flow4, [x3.shape[2], x3.shape[3]], mode="bilinear", align_corners=True
         )
@@ -473,8 +480,8 @@ class DICLBase(BaseModel):
             x3,
             warp3,
             self.matching3,
-            self.args.search_range[1],
-            self.args.search_range[1],
+            self.search_range[1],
+            self.search_range[1],
         )
         g3 = F.interpolate(
             x, [x.shape[-2] // 8, x.shape[-1] // 8], mode="bilinear", align_corners=True
@@ -482,12 +489,12 @@ class DICLBase(BaseModel):
         if self.dap_layer3 is not None:
             cost3 = self.dap_layer3(cost3)
         flow3 = self.flow3(cost3) + up_flow4
-        if self.args.ctf_context:
-            if self.args.sup_raw_flow:
+        if self.ctf_context:
+            if self.sup_raw_flow:
                 raw_flow3 = flow3
             entro3 = self.entropy(cost3)
             feat3 = torch.cat((flow3.detach(), entro3.detach(), x3, g3), dim=1)
-            flow3 = flow3 + self.context_net3(feat3) * self.args.scale_context[3]
+            flow3 = flow3 + self.context_net3(feat3) * self.scale_context[3]
         up_flow3 = 2.0 * F.interpolate(
             flow3, [x2.shape[2], x2.shape[3]], mode="bilinear", align_corners=True
         )
@@ -499,8 +506,8 @@ class DICLBase(BaseModel):
             x2,
             warp2,
             self.matching2,
-            self.args.search_range[0],
-            self.args.search_range[0],
+            self.search_range[0],
+            self.search_range[0],
         )
         g2 = F.interpolate(
             x, [x.shape[-2] // 4, x.shape[-1] // 4], mode="bilinear", align_corners=True
@@ -509,12 +516,12 @@ class DICLBase(BaseModel):
             cost2 = self.dap_layer2(cost2)
         flow2 = self.flow2(cost2) + up_flow3
 
-        if self.args.ctf_context or self.args.ctf_context_only_flow2:
-            if self.args.sup_raw_flow:
+        if self.ctf_context or self.ctf_context_only_flow2:
+            if self.sup_raw_flow:
                 raw_flow2 = flow2
             entro2 = self.entropy(cost2)
             feat2 = torch.cat((flow2.detach(), entro2.detach(), x2, g2), dim=1)
-            flow2 = flow2 + self.context_net2(feat2) * self.args.scale_context[4]
+            flow2 = flow2 + self.context_net2(feat2) * self.scale_context[4]
         # sds
 
         flow_out = F.interpolate(
@@ -526,7 +533,7 @@ class DICLBase(BaseModel):
 
         output = {"flows": flow_out}
         if self.training:
-            if self.args.sup_raw_flow:
+            if self.sup_raw_flow:
                 output["flow_preds"] = [
                     flow2,
                     raw_flow2,
@@ -556,7 +563,7 @@ class DICLBase(BaseModel):
                 .zero_()
             )
 
-        if self.args.cuda_cost:
+        if self.cuda_cost:
             # CUDA acceleration
             corr = SpatialCorrelationSampler(
                 kernel_size=1,
@@ -594,7 +601,7 @@ class DICLBase(BaseModel):
                         :, :, max(0, +indd) : height + indd, max(0, ind) : width + ind
                     ]
 
-        if self.args.remove_warp_hole:
+        if self.remove_warp_hole:
             # mitigate the effect of holes (may be raised by occ)
             valid_mask = cost[:, c:, ...].sum(dim=1) != 0
             valid_mask = valid_mask.detach()
@@ -865,18 +872,7 @@ class FeatureGA(nn.Module):
         return None, x2, x3, x4, x5, x6
 
 
-class DICL(DICLBase):
-    pretrained_checkpoints = {
-        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dicl-chairs-fdc24e2f.ckpt",
-        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dicl-kitti-4813ccab.ckpt",
-        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dicl-sintel-fa9fc259.ckpt",
-        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dicl-things-20bc573d.ckpt",
-    }
-
-    def __init__(self, args):
-        args.ctf_context = True
-        args.dap_layer = True
-        args.dap_init_by_id = True
-        args.flow_reg_by_max = True
-        args.remove_warp_hole = True
-        super(DICL, self).__init__(args)
+@register_model
+@trainable
+class dicl(DICL):
+    pass

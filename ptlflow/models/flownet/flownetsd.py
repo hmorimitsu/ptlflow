@@ -2,13 +2,12 @@
 Portions of this code copyright 2017, Clement Pinard
 """
 
-from argparse import Namespace
-
 from einops import rearrange
 import torch
 import torch.nn as nn
 from torch.nn import init
 
+from ptlflow.utils.registry import register_model, trainable
 from .submodules import *
 from .flownet_base import FlowNetBase
 
@@ -18,32 +17,51 @@ class FlowNetSD(FlowNetBase):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flownetsd-things-c5f3124e.ckpt"
     }
 
-    def __init__(self, args: Namespace):
-        super(FlowNetSD, self).__init__(args)
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        input_channels: int = 6,
+        batch_norm: bool = False,
+        loss_start_scale: int = 4,
+        loss_num_scales: int = 5,
+        loss_base_weight: float = 0.32,
+        loss_norm: str = "L2",
+        **kwargs,
+    ):
+        super(FlowNetSD, self).__init__(
+            div_flow=div_flow,
+            input_channels=input_channels,
+            batch_norm=batch_norm,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
 
-        self.conv0 = conv(self.args.batch_norm, 6, 64)
-        self.conv1 = conv(self.args.batch_norm, 64, 64, stride=2)
-        self.conv1_1 = conv(self.args.batch_norm, 64, 128)
-        self.conv2 = conv(self.args.batch_norm, 128, 128, stride=2)
-        self.conv2_1 = conv(self.args.batch_norm, 128, 128)
-        self.conv3 = conv(self.args.batch_norm, 128, 256, stride=2)
-        self.conv3_1 = conv(self.args.batch_norm, 256, 256)
-        self.conv4 = conv(self.args.batch_norm, 256, 512, stride=2)
-        self.conv4_1 = conv(self.args.batch_norm, 512, 512)
-        self.conv5 = conv(self.args.batch_norm, 512, 512, stride=2)
-        self.conv5_1 = conv(self.args.batch_norm, 512, 512)
-        self.conv6 = conv(self.args.batch_norm, 512, 1024, stride=2)
-        self.conv6_1 = conv(self.args.batch_norm, 1024, 1024)
+        self.conv0 = conv(self.batch_norm, 6, 64)
+        self.conv1 = conv(self.batch_norm, 64, 64, stride=2)
+        self.conv1_1 = conv(self.batch_norm, 64, 128)
+        self.conv2 = conv(self.batch_norm, 128, 128, stride=2)
+        self.conv2_1 = conv(self.batch_norm, 128, 128)
+        self.conv3 = conv(self.batch_norm, 128, 256, stride=2)
+        self.conv3_1 = conv(self.batch_norm, 256, 256)
+        self.conv4 = conv(self.batch_norm, 256, 512, stride=2)
+        self.conv4_1 = conv(self.batch_norm, 512, 512)
+        self.conv5 = conv(self.batch_norm, 512, 512, stride=2)
+        self.conv5_1 = conv(self.batch_norm, 512, 512)
+        self.conv6 = conv(self.batch_norm, 512, 1024, stride=2)
+        self.conv6_1 = conv(self.batch_norm, 1024, 1024)
 
         self.deconv5 = deconv(1024, 512)
         self.deconv4 = deconv(1026, 256)
         self.deconv3 = deconv(770, 128)
         self.deconv2 = deconv(386, 64)
 
-        self.inter_conv5 = i_conv(self.args.batch_norm, 1026, 512)
-        self.inter_conv4 = i_conv(self.args.batch_norm, 770, 256)
-        self.inter_conv3 = i_conv(self.args.batch_norm, 386, 128)
-        self.inter_conv2 = i_conv(self.args.batch_norm, 194, 64)
+        self.inter_conv5 = i_conv(self.batch_norm, 1026, 512)
+        self.inter_conv4 = i_conv(self.batch_norm, 770, 256)
+        self.inter_conv3 = i_conv(self.batch_norm, 386, 128)
+        self.inter_conv2 = i_conv(self.batch_norm, 194, 64)
 
         self.predict_flow6 = predict_flow(1024)
         self.predict_flow5 = predict_flow(512)
@@ -128,7 +146,7 @@ class FlowNetSD(FlowNetBase):
 
         # Results are noticeably better if dividing here, rather than multiplying
         # Maybe it was trained with the inverse divisor?
-        out_flow = self.upsample1(flow2) / self.args.div_flow
+        out_flow = self.upsample1(flow2) / self.div_flow
         if image_resizer is not None:
             out_flow = self.postprocess_predictions(
                 out_flow, image_resizer, is_flow=True
@@ -149,3 +167,9 @@ class FlowNetSD(FlowNetBase):
             outputs["flows"] = out_flow[:, None]
 
         return outputs
+
+
+@register_model
+@trainable
+class flownetsd(FlowNetSD):
+    pass

@@ -1,9 +1,8 @@
-from argparse import ArgumentParser, Namespace
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable, ptlflow_trained
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock, SmallUpdateBlock
 from .extractor import BasicEncoder, SmallEncoder
@@ -12,10 +11,10 @@ from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -45,39 +44,42 @@ class LCV_RAFT(BaseModel):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/lcv_raft-things-4c7233b8.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=8)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dropout: float = 0.0,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 32,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
+
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.dropout = dropout
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.iters = iters
 
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
 
-        if "dropout" not in self.args:
-            self.args.dropout = 0
-
         # feature network, context network, and update block
-        self.fnet = BasicEncoder(
-            output_dim=256, norm_fn="instance", dropout=args.dropout
-        )
+        self.fnet = BasicEncoder(output_dim=256, norm_fn="instance", dropout=dropout)
         self.cnet = BasicEncoder(
-            output_dim=hdim + cdim, norm_fn="batch", dropout=args.dropout
+            output_dim=hdim + cdim, norm_fn="batch", dropout=dropout
         )
-        self.update_block = BasicUpdateBlock(args, hidden_dim=hdim)
-
-        self.corr_block = LearnableCorrBlock(
-            256, self.args.corr_levels, self.args.corr_radius
+        self.update_block = BasicUpdateBlock(
+            corr_levels=corr_levels, corr_radius=corr_radius, hidden_dim=hdim
         )
 
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--corr_levels", type=int, default=4)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument("--dropout", type=float, default=0.0)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, default=32)
-        return parser
+        self.corr_block = LearnableCorrBlock(256, self.corr_levels, self.corr_radius)
+
+        self.has_trained_on_ptlflow = True
 
     def freeze_bn(self):
         for m in self.modules():
@@ -160,7 +162,7 @@ class LCV_RAFT(BaseModel):
             coords1 = coords1 + forward_flow
 
         flow_predictions = []
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             coords1 = coords1.detach()
             corr = self.corr_block(corr_pyramid, coords1)  # index correlation volume
 
@@ -190,26 +192,44 @@ class LCV_RAFT(BaseModel):
 class LCV_RAFTSmall(LCV_RAFT):
     pretrained_checkpoints = {}
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 3,
+        dropout: float = 0,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 32,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            corr_levels, corr_radius, dropout, gamma, max_flow, iters, **kwargs
+        )
 
         self.hidden_dim = hdim = 96
         self.context_dim = cdim = 64
-        args.corr_levels = 4
-        args.corr_radius = 3
-
-        if "dropout" not in self.args:
-            self.args.dropout = 0
 
         # feature network, context network, and update block
-        self.fnet = SmallEncoder(
-            output_dim=128, norm_fn="instance", dropout=args.dropout
-        )
+        self.fnet = SmallEncoder(output_dim=128, norm_fn="instance", dropout=dropout)
         self.cnet = SmallEncoder(
-            output_dim=hdim + cdim, norm_fn="none", dropout=args.dropout
+            output_dim=hdim + cdim, norm_fn="none", dropout=dropout
         )
-        self.update_block = SmallUpdateBlock(args, hidden_dim=hdim)
+        self.update_block = SmallUpdateBlock(
+            corr_levels=corr_levels, corr_radius=corr_radius, hidden_dim=hdim
+        )
 
-        self.corr_block = LearnableCorrBlock(
-            128, self.args.corr_levels, self.args.corr_radius
-        )
+        self.corr_block = LearnableCorrBlock(128, self.corr_levels, self.corr_radius)
+
+
+@register_model
+@trainable
+@ptlflow_trained
+class lcv_raft(LCV_RAFT):
+    pass
+
+
+@register_model
+@trainable
+@ptlflow_trained
+class lcv_raft_small(LCV_RAFTSmall):
+    pass

@@ -38,16 +38,16 @@ class PCBlock4_Deep_nopool_res(nn.Module):
 
 
 class SKMotionEncoder6_Deep_nopool_res(nn.Module):
-    def __init__(self, args):
+    def __init__(self, corr_levels, corr_radius, k_conv):
         super().__init__()
-        cor_planes = args.corr_levels * (2 * args.corr_radius + 1) ** 2
-        self.convc1 = PCBlock4_Deep_nopool_res(cor_planes, 256, k_conv=args.k_conv)
-        self.convc2 = PCBlock4_Deep_nopool_res(256, 192, k_conv=args.k_conv)
+        cor_planes = corr_levels * (2 * corr_radius + 1) ** 2
+        self.convc1 = PCBlock4_Deep_nopool_res(cor_planes, 256, k_conv=k_conv)
+        self.convc2 = PCBlock4_Deep_nopool_res(256, 192, k_conv=k_conv)
 
         self.convf1 = nn.Conv2d(2, 128, 1, 1, 0)
-        self.convf2 = PCBlock4_Deep_nopool_res(128, 64, k_conv=args.k_conv)
+        self.convf2 = PCBlock4_Deep_nopool_res(128, 64, k_conv=k_conv)
 
-        self.conv = PCBlock4_Deep_nopool_res(64 + 192, 128 - 2, k_conv=args.k_conv)
+        self.conv = PCBlock4_Deep_nopool_res(64 + 192, 128 - 2, k_conv=k_conv)
 
     def forward(self, flow, corr):
         cor = F.gelu(self.convc1(corr))
@@ -64,14 +64,17 @@ class SKMotionEncoder6_Deep_nopool_res(nn.Module):
 
 
 class SKUpdateBlock6_Deep_nopoolres_AllDecoder(nn.Module):
-    def __init__(self, args, hidden_dim):
+    def __init__(
+        self, corr_levels, corr_radius, k_conv, PCUpdater_conv, num_heads, hidden_dim
+    ):
         super().__init__()
-        self.args = args
-        self.encoder = SKMotionEncoder6_Deep_nopool_res(args)
-        self.gru = PCBlock4_Deep_nopool_res(
-            128 + hidden_dim + hidden_dim + 128, 128, k_conv=args.PCUpdater_conv
+        self.encoder = SKMotionEncoder6_Deep_nopool_res(
+            corr_levels, corr_radius, k_conv
         )
-        self.flow_head = PCBlock4_Deep_nopool_res(128, 2, k_conv=args.k_conv)
+        self.gru = PCBlock4_Deep_nopool_res(
+            128 + hidden_dim + hidden_dim + 128, 128, k_conv=PCUpdater_conv
+        )
+        self.flow_head = PCBlock4_Deep_nopool_res(128, 2, k_conv=k_conv)
 
         self.mask = nn.Sequential(
             nn.Conv2d(128, 256, 3, padding=1),
@@ -79,9 +82,7 @@ class SKUpdateBlock6_Deep_nopoolres_AllDecoder(nn.Module):
             nn.Conv2d(256, 64 * 9, 1, padding=0),
         )
 
-        self.aggregator = Aggregate(
-            args=self.args, dim=128, dim_head=128, heads=self.args.num_heads
-        )
+        self.aggregator = Aggregate(dim=128, dim_head=128, heads=num_heads)
 
     def forward(self, net, inp, corr, flow, attention):
         motion_features = self.encoder(flow, corr)

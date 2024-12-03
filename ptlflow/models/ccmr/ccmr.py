@@ -1,5 +1,6 @@
-from argparse import ArgumentParser, Namespace
+from typing import Sequence
 
+from loguru import logger
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,6 +12,7 @@ from .utils import coords_grid, upflow2
 from .update import BasicUpdateBlock
 from .xcit import XCiT
 
+from ptlflow.utils.registry import register_model
 from ptlflow.utils.utils import forward_interpolate_batch
 from ..base_model.base_model import BaseModel
 
@@ -42,73 +44,64 @@ class CCMR(BaseModel):
         "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ccmr-sintel-e1760f37.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=None, output_stride=32)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        iters: Sequence[int] = [8, 10, 15],
+        alternate_corr: bool = True,
+        lookup_pyramid_levels: int = 2,
+        lookup_radius: int = 4,
+        model_type: str = "CCMR",
+        cnet_norm: str = "group",
+        fnet_norm: str = "group",
+        num_scales: int = 3,
+        **kwargs,
+    ) -> None:
+        super().__init__(output_stride=32, loss_fn=None, **kwargs)
+
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.iters = iters
+        self.alternate_corr = alternate_corr
+        self.lookup_pyramid_levels = lookup_pyramid_levels
+        self.lookup_radius = lookup_radius
+        self.model_type = model_type
+        self.cnet_norm = cnet_norm
+        self.fnet_norm = fnet_norm
+        self.num_scales = num_scales
+
         # Initiating the improved multi-scale feature encoders:
         self.fnet = BasicEncoder_resconv(
-            output_dim=256, norm_fn=self.args.fnet_norm, model_type=self.args.model_type
+            output_dim=256, norm_fn=self.fnet_norm, model_type=self.model_type
         )
         self.cnet = Basic_Context_Encoder_resconv(
-            output_dim=256, norm_fn=self.args.cnet_norm, model_type=self.args.model_type
+            output_dim=256, norm_fn=self.cnet_norm, model_type=self.model_type
         )
         self.update_block = BasicUpdateBlock(
-            self.args,
-            correlation_depth=(2 * self.args.lookup_radius + 1) ** 2
-            * self.args.lookup_pyramid_levels,
+            correlation_depth=(2 * self.lookup_radius + 1) ** 2
+            * self.lookup_pyramid_levels,
             hidden_dim=128,
             scale=2,
             num_heads=8,
             depth=1,
             mlp_ratio=1,
-            num_scales=self.args.num_scales,
+            num_scales=self.num_scales,
         )
 
         # Initiate global context grouping modules
         self.xcit = nn.ModuleList(
             [XCiT(embed_dim=128, depth=1, num_heads=8, mlp_ratio=1, separate=False)]
         )
-        for i in range(self.args.num_scales - 1):
+        for i in range(self.num_scales - 1):
             self.xcit.extend(
                 [XCiT(embed_dim=128, depth=1, num_heads=8, mlp_ratio=1, separate=False)]
             )
 
-        if self.args.alternate_corr and alt_cuda_corr is None:
-            print(
+        if self.alternate_corr and alt_cuda_corr is None:
+            logger.warning(
                 "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
             )
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--corr_levels", type=int, default=4)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument("--dropout", type=float, default=0.0)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, default=(8, 10, 15))
-        parser.add_argument("--lookup_pyramid_levels", type=int, default=2)
-        parser.add_argument("--lookup_radius", default=4)
-        parser.add_argument(
-            "--no_alternate_corr", action="store_false", dest="alternate_corr"
-        )
-        parser.add_argument(
-            "--model_type", type=str, choices=("CCMR", "CCMR+"), default="CCMR"
-        )
-        parser.add_argument(
-            "--cnet_norm",
-            type=str,
-            choices=("batch", "group", "instance", "none"),
-            default="group",
-        )
-        parser.add_argument(
-            "--fnet_norm",
-            type=str,
-            choices=("batch", "group", "instance", "none"),
-            default="group",
-        )
-        parser.add_argument("--num_scales", type=int, default=3)
-        return parser
 
     def freeze_bn(self):
         for m in self.modules():
@@ -178,20 +171,18 @@ class CCMR(BaseModel):
             cnet_pyramid
         ), "fnet and cnet pyramid should have the same length."
         assert len(fnet_pyramid) == len(
-            self.args.iters
+            self.iters
         ), "pyramid levels and the length of GRU iteration lists should be the same."
         upsampling_offset = (
-            self.args.num_scales - 1
-            if self.args.num_scales == 4
-            else self.args.num_scales
+            self.num_scales - 1 if self.num_scales == 4 else self.num_scales
         )
         for index, (fmap1, fmap2) in enumerate(fnet_pyramid):
             corr_fn = get_corr_block(
                 fmap1=fmap1,
                 fmap2=fmap2,
-                radius=self.args.lookup_radius,
-                num_levels=self.args.lookup_pyramid_levels,
-                alternate_corr=self.args.alternate_corr,
+                radius=self.lookup_radius,
+                num_levels=self.lookup_pyramid_levels,
+                alternate_corr=self.alternate_corr,
             )
 
             net, inp = torch.split(cnet_pyramid[index], [128, 128], dim=1)
@@ -199,7 +190,7 @@ class CCMR(BaseModel):
             inp = torch.relu(inp)
             global_context = self.xcit[index](inp)
 
-            for itr in range(self.args.iters[index]):
+            for itr in range(self.iters[index]):
                 coords1 = coords1.detach()
                 if index >= 1 and itr == 0:
                     flow = self.upsample_flow(
@@ -245,9 +236,40 @@ class CCMRPlus(CCMR):
         "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ccmr+-sintel-055b44ec.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        args.model_type = "CCMR+"
-        args.num_scales = 4
-        if len(args.iters) == 3:
-            args.iters = (8, 10, 10, 10)
-        super().__init__(args)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        iters: Sequence[int] = [8, 10, 10, 10],
+        alternate_corr: bool = True,
+        lookup_pyramid_levels: int = 2,
+        lookup_radius: int = 4,
+        model_type: str = "CCMR+",
+        cnet_norm: str = "group",
+        fnet_norm: str = "group",
+        num_scales: int = 4,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            corr_levels,
+            corr_radius,
+            iters,
+            alternate_corr,
+            lookup_pyramid_levels,
+            lookup_radius,
+            model_type,
+            cnet_norm,
+            fnet_norm,
+            num_scales,
+            **kwargs,
+        )
+
+
+@register_model
+class ccmr(CCMR):
+    pass
+
+
+@register_model
+class ccmr_p(CCMRPlus):
+    pass

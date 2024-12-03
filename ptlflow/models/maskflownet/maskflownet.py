@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+from typing import Optional, Sequence
 
 from einops import rearrange
 import torch
@@ -15,6 +15,7 @@ except ModuleNotFoundError:
         IterSpatialCorrelationSampler as SpatialCorrelationSampler,
     )
 
+from ptlflow.utils.registry import register_model, trainable
 from ..base_model.base_model import BaseModel
 
 
@@ -132,23 +133,41 @@ class MaskFlownet_S(BaseModel):
     PWC-DC net. add dilation convolution and densenet connections
     """
 
-    def __init__(self, args):
-        """
-        input: md --- maximum displacement (for correlation. default: 4), after warpping
-        """
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        md: int = 4,
+        flow_multiplier: float = 1.0,
+        deform_bias: bool = True,
+        strides: Sequence[int] = (64, 32, 16, 8, 4),
+        upfeat_ch: Sequence[int] = (16, 16, 16, 16),
+        loss_weights: Sequence[float] = (0.005, 0.01, 0.02, 0.08, 0.32),
+        loss_match: str = "upsampling",
+        loss_eps: float = 1e-8,
+        loss_q: Optional[float] = None,
+        **kwargs,
+    ):
         super(MaskFlownet_S, self).__init__(
-            args=args,
             loss_fn=MultiscaleEpe(
-                scales=args.strides,
-                weights=args.loss_weights,
-                match=args.loss_match,
-                eps=args.loss_eps,
-                q=args.loss_q,
+                scales=strides,
+                weights=loss_weights,
+                match=loss_match,
+                eps=loss_eps,
+                q=loss_q,
             ),
             output_stride=64,
+            **kwargs,
         )
-        self.scale = self.args.div_flow * self.args.flow_multiplier
-        self.deform_bias = self.args.deform_bias
+
+        self.div_flow = div_flow
+        self.md = md
+        self.flow_multiplier = flow_multiplier
+        self.deform_bias = deform_bias
+        self.strides = strides
+        self.upfeat_ch = upfeat_ch
+
+        self.scale = self.div_flow * self.flow_multiplier
+        self.deform_bias = self.deform_bias
 
         self.conv1a = conv(3, 16, kernel_size=3, stride=2)
         self.conv1b = conv(16, 16, kernel_size=3, stride=1)
@@ -170,12 +189,12 @@ class MaskFlownet_S(BaseModel):
         self.conv6c = conv(196, 196, kernel_size=3, stride=1)
 
         self.corr_fn = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.args.md + 1, padding=0
+            kernel_size=1, patch_size=2 * self.md + 1, padding=0
         )
         # self.corr    = Correlation(pad_size=md, kernel_size=1, max_displacement=md, stride1=1, stride2=1, corr_multiply=1)
         self.leakyRELU = nn.LeakyReLU(0.1)
 
-        nd = (2 * self.args.md + 1) ** 2
+        nd = (2 * self.md + 1) ** 2
         dd = np.cumsum([128, 128, 96, 64, 32])
 
         od = nd
@@ -187,7 +206,7 @@ class MaskFlownet_S(BaseModel):
         self.pred_flow6 = predict_flow(od + dd[4])
         self.pred_mask6 = predict_mask(od + dd[4])
         self.upfeat5 = deconv(
-            od + dd[4], self.args.upfeat_ch[0], kernel_size=4, stride=2, padding=1
+            od + dd[4], self.upfeat_ch[0], kernel_size=4, stride=2, padding=1
         )
         # self.deconv6 = deconv(2, 2, kernel_size=4, stride=2, padding=1)
         # self.upfeat6 = deconv(od+dd[4], 2, kernel_size=4, stride=2, padding=1)
@@ -202,7 +221,7 @@ class MaskFlownet_S(BaseModel):
         self.pred_flow5 = predict_flow(od + dd[4])
         self.pred_mask5 = predict_mask(od + dd[4])
         self.upfeat4 = deconv(
-            od + dd[4], self.args.upfeat_ch[1], kernel_size=4, stride=2, padding=1
+            od + dd[4], self.upfeat_ch[1], kernel_size=4, stride=2, padding=1
         )
         # self.deconv5 = deconv(2, 2, kernel_size=4, stride=2, padding=1)
         # self.upfeat5 = deconv(od+dd[4], 2, kernel_size=4, stride=2, padding=1)
@@ -217,7 +236,7 @@ class MaskFlownet_S(BaseModel):
         self.pred_flow4 = predict_flow(od + dd[4])
         self.pred_mask4 = predict_mask(od + dd[4])
         self.upfeat3 = deconv(
-            od + dd[4], self.args.upfeat_ch[2], kernel_size=4, stride=2, padding=1
+            od + dd[4], self.upfeat_ch[2], kernel_size=4, stride=2, padding=1
         )
         # self.deconv4 = deconv(2, 2, kernel_size=4, stride=2, padding=1)
         # self.upfeat4 = deconv(od+dd[4], 2, kernel_size=4, stride=2, padding=1)
@@ -232,7 +251,7 @@ class MaskFlownet_S(BaseModel):
         self.pred_flow3 = predict_flow(od + dd[4])
         self.pred_mask3 = predict_mask(od + dd[4])
         self.upfeat2 = deconv(
-            od + dd[4], self.args.upfeat_ch[3], kernel_size=4, stride=2, padding=1
+            od + dd[4], self.upfeat_ch[3], kernel_size=4, stride=2, padding=1
         )
         # self.deconv3 = deconv(2, 2, kernel_size=4, stride=2, padding=1)
         # self.upfeat3 = deconv(od+dd[4], 2, kernel_size=4, stride=2, padding=1)
@@ -275,36 +294,6 @@ class MaskFlownet_S(BaseModel):
                 nn.init.kaiming_normal_(m.weight.data, mode="fan_in")
                 if m.bias is not None:
                     m.bias.data.zero_()
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--div_flow", type=float, default=20.0)
-        parser.add_argument("--md", type=int, default=4)
-        parser.add_argument("--flow_multiplier", type=float, default=1.0)
-        parser.add_argument("--deform_bias", type=bool, default=True)
-        parser.add_argument(
-            "--strides", type=int, nargs="+", default=(64, 32, 16, 8, 4)
-        )
-        parser.add_argument(
-            "--upfeat_ch", type=int, nargs="+", default=(16, 16, 16, 16)
-        )
-        parser.add_argument(
-            "--loss_weights",
-            type=float,
-            nargs="+",
-            default=(0.005, 0.01, 0.02, 0.08, 0.32),
-        )
-        parser.add_argument(
-            "--loss_match",
-            type=str,
-            default="upsampling",
-            choices=("upsampling", "downsampling"),
-        )
-        parser.add_argument("--loss_eps", type=float, default=1e-8)
-        parser.add_argument("--loss_q", type=float, default=None)
-        return parser
 
     def corr(self, f1, f2):
         corr = self.corr_fn(f1, f2)
@@ -397,7 +386,7 @@ class MaskFlownet_S(BaseModel):
         feat5 = self.leakyRELU(self.upfeat5(x))
         flow5 = Upsample(flow6, 2)
         mask5 = Upsample(mask6, 2)
-        warp5 = (flow5 * self.scale / self.args.strides[1]).unsqueeze(1)
+        warp5 = (flow5 * self.scale / self.strides[1]).unsqueeze(1)
         warp5 = torch.repeat_interleave(warp5, 9, 1)
         S1, S2, S3, S4, S5 = warp5.shape
         warp5 = warp5.view(S1, S2 * S3, S4, S5)
@@ -419,7 +408,7 @@ class MaskFlownet_S(BaseModel):
         feat4 = self.leakyRELU(self.upfeat4(x))
         flow4 = Upsample(flow5, 2)
         mask4 = Upsample(mask5, 2)
-        warp4 = (flow4 * self.scale / self.args.strides[2]).unsqueeze(1)
+        warp4 = (flow4 * self.scale / self.strides[2]).unsqueeze(1)
         warp4 = torch.repeat_interleave(warp4, 9, 1)
         S1, S2, S3, S4, S5 = warp4.shape
         warp4 = warp4.view(S1, S2 * S3, S4, S5)
@@ -441,7 +430,7 @@ class MaskFlownet_S(BaseModel):
         feat3 = self.leakyRELU(self.upfeat3(x))
         flow3 = Upsample(flow4, 2)
         mask3 = Upsample(mask4, 2)
-        warp3 = (flow3 * self.scale / self.args.strides[3]).unsqueeze(1)
+        warp3 = (flow3 * self.scale / self.strides[3]).unsqueeze(1)
         warp3 = torch.repeat_interleave(warp3, 9, 1)
         S1, S2, S3, S4, S5 = warp3.shape
         warp3 = warp3.view(S1, S2 * S3, S4, S5)
@@ -463,7 +452,7 @@ class MaskFlownet_S(BaseModel):
         feat2 = self.leakyRELU(self.upfeat2(x))
         flow2 = Upsample(flow3, 2)
         mask2 = Upsample(mask3, 2)
-        warp2 = (flow2 * self.scale / self.args.strides[4]).unsqueeze(1)
+        warp2 = (flow2 * self.scale / self.strides[4]).unsqueeze(1)
         warp2 = torch.repeat_interleave(warp2, 9, 1)
         S1, S2, S3, S4, S5 = warp2.shape
         warp2 = warp2.view(S1, S2 * S3, S4, S5)
@@ -534,22 +523,57 @@ class MaskFlownet(BaseModel):
         "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/maskflownet-sintel-c52423aa.ckpt",
     }
 
-    def __init__(self, args):
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        md: int = 4,
+        md2: int = 2,
+        flow_multiplier: float = 1.0,
+        deform_bias: bool = True,
+        strides: Sequence[int] = (64, 32, 16, 8, 4),
+        upfeat_ch: Sequence[int] = (16, 16, 16, 16),
+        loss_weights: Sequence[float] = (0.005, 0.01, 0.02, 0.08, 0.32),
+        loss_match: str = "upsampling",
+        loss_eps: float = 1e-8,
+        loss_q: Optional[float] = None,
+        **kwargs,
+    ):
         super(MaskFlownet, self).__init__(
-            args=args,
             loss_fn=MultiscaleEpe(
-                scales=args.strides,
-                weights=args.loss_weights,
-                match=args.loss_match,
-                eps=args.loss_eps,
-                q=args.loss_q,
+                scales=strides,
+                weights=loss_weights,
+                match=loss_match,
+                eps=loss_eps,
+                q=loss_q,
             ),
             output_stride=64,
+            **kwargs,
         )
-        self.scale = self.args.div_flow * self.args.flow_multiplier
-        self.deform_bias = self.args.deform_bias
 
-        self.MaskFlownet_S = MaskFlownet_S(args)
+        self.div_flow = div_flow
+        self.md = md
+        self.md2 = md2
+        self.flow_multiplier = flow_multiplier
+        self.deform_bias = deform_bias
+        self.strides = strides
+        self.upfeat_ch = upfeat_ch
+
+        self.scale = self.div_flow * self.flow_multiplier
+        self.deform_bias = self.deform_bias
+
+        self.MaskFlownet_S = MaskFlownet_S(
+            div_flow=div_flow,
+            md=md,
+            flow_multiplier=flow_multiplier,
+            deform_bias=deform_bias,
+            strides=strides,
+            upfeat_ch=upfeat_ch,
+            loss_weights=loss_weights,
+            loss_match=loss_match,
+            loss_eps=loss_eps,
+            loss_q=loss_q,
+            **kwargs,
+        )
         self.activate = nn.LeakyReLU(0.1)
 
         self.conv1x = conv(4, 16, stride=2)
@@ -573,11 +597,11 @@ class MaskFlownet(BaseModel):
 
         self.leakyRELU = nn.LeakyReLU(0.1)
         self.corr_fn = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.args.md2 + 1, padding=0
+            kernel_size=1, patch_size=2 * self.md2 + 1, padding=0
         )
         # self.corr    = Correlation(pad_size=self.md, kernel_size=1, max_displacement=self.md, stride1=1, stride2=1, corr_multiply=1)
 
-        nd = (2 * self.args.md2 + 1) ** 2
+        nd = (2 * self.md2 + 1) ** 2
         dd = np.cumsum([128, 128, 96, 64, 32])
 
         od = nd + nd + 2
@@ -588,7 +612,7 @@ class MaskFlownet(BaseModel):
         self.conv6_4 = conv(od + dd[3], 32, kernel_size=3, stride=1)
         self.pred_flow6 = predict_flow(od + dd[4])
         self.upfeat5 = deconv(
-            od + dd[4], self.args.upfeat_ch[0], kernel_size=4, stride=2, padding=1
+            od + dd[4], self.upfeat_ch[0], kernel_size=4, stride=2, padding=1
         )
 
         # od = nd+128+4
@@ -600,7 +624,7 @@ class MaskFlownet(BaseModel):
         self.conv5_4 = conv(od + dd[3], 32, kernel_size=3, stride=1)
         self.pred_flow5 = predict_flow(od + dd[4])
         self.upfeat4 = deconv(
-            od + dd[4], self.args.upfeat_ch[1], kernel_size=4, stride=2, padding=1
+            od + dd[4], self.upfeat_ch[1], kernel_size=4, stride=2, padding=1
         )
         # self.deconv5 = deconv(2, 2, kernel_size=4, stride=2, padding=1)
         # self.upfeat5 = deconv(od+dd[4], 2, kernel_size=4, stride=2, padding=1)
@@ -615,7 +639,7 @@ class MaskFlownet(BaseModel):
         self.conv4_4 = conv(od + dd[3], 32, kernel_size=3, stride=1)
         self.pred_flow4 = predict_flow(od + dd[4])
         self.upfeat3 = deconv(
-            od + dd[4], self.args.upfeat_ch[2], kernel_size=4, stride=2, padding=1
+            od + dd[4], self.upfeat_ch[2], kernel_size=4, stride=2, padding=1
         )
         # self.deconv4 = deconv(2, 2, kernel_size=4, stride=2, padding=1)
         # self.upfeat4 = deconv(od+dd[4], 2, kernel_size=4, stride=2, padding=1)
@@ -630,7 +654,7 @@ class MaskFlownet(BaseModel):
         self.conv3_4 = conv(od + dd[3], 32, kernel_size=3, stride=1)
         self.pred_flow3 = predict_flow(od + dd[4])
         self.upfeat2 = deconv(
-            od + dd[4], self.args.upfeat_ch[3], kernel_size=4, stride=2, padding=1
+            od + dd[4], self.upfeat_ch[3], kernel_size=4, stride=2, padding=1
         )
         # self.deconv3 = deconv(2, 2, kernel_size=4, stride=2, padding=1)
         # self.upfeat3 = deconv(od+dd[4], 2, kernel_size=4, stride=2, padding=1)
@@ -662,37 +686,6 @@ class MaskFlownet(BaseModel):
         self.deform4 = deformable_conv(96, 96)
         self.deform3 = deformable_conv(64, 64)
         self.deform2 = deformable_conv(32, 32)
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--div_flow", type=float, default=20.0)
-        parser.add_argument("--md", type=int, default=4)
-        parser.add_argument("--md2", type=int, default=2)
-        parser.add_argument("--flow_multiplier", type=float, default=1.0)
-        parser.add_argument("--deform_bias", type=bool, default=True)
-        parser.add_argument(
-            "--strides", type=int, nargs="+", default=(64, 32, 16, 8, 4)
-        )
-        parser.add_argument(
-            "--upfeat_ch", type=int, nargs="+", default=(16, 16, 16, 16)
-        )
-        parser.add_argument(
-            "--loss_weights",
-            type=float,
-            nargs="+",
-            default=(0.005, 0.01, 0.02, 0.08, 0.32),
-        )
-        parser.add_argument(
-            "--loss_match",
-            type=str,
-            default="upsampling",
-            choices=("upsampling", "downsampling"),
-        )
-        parser.add_argument("--loss_eps", type=float, default=1e-8)
-        parser.add_argument("--loss_q", type=float, default=None)
-        return parser
 
     def corr(self, f1, f2):
         corr = self.corr_fn(f1, f2)
@@ -775,7 +768,7 @@ class MaskFlownet(BaseModel):
 
         flow6 = flows[0]
 
-        warp6u = (flow6 * self.scale / self.args.strides[0]).unsqueeze(1)
+        warp6u = (flow6 * self.scale / self.strides[0]).unsqueeze(1)
         warp6u = torch.repeat_interleave(warp6u, 9, 1)
         S1, S2, S3, S4, S5 = warp6u.shape
         warp6u = warp6u.view(S1, S2 * S3, S4, S5)
@@ -794,7 +787,7 @@ class MaskFlownet(BaseModel):
 
         feat5 = self.leakyRELU(self.upfeat5(x))
         flow5 = Upsample(flow6, 2)
-        warp5u = (flow5 * self.scale / self.args.strides[1]).unsqueeze(1)
+        warp5u = (flow5 * self.scale / self.strides[1]).unsqueeze(1)
         warp5u = torch.repeat_interleave(warp5u, 9, 1)
         S1, S2, S3, S4, S5 = warp5u.shape
         warp5u = warp5u.view(S1, S2 * S3, S4, S5)
@@ -813,7 +806,7 @@ class MaskFlownet(BaseModel):
 
         feat4 = self.leakyRELU(self.upfeat4(x))
         flow4 = Upsample(flow5, 2)
-        warp4u = (flow4 * self.scale / self.args.strides[2]).unsqueeze(1)
+        warp4u = (flow4 * self.scale / self.strides[2]).unsqueeze(1)
         warp4u = torch.repeat_interleave(warp4u, 9, 1)
         S1, S2, S3, S4, S5 = warp4u.shape
         warp4u = warp4u.view(S1, S2 * S3, S4, S5)
@@ -832,7 +825,7 @@ class MaskFlownet(BaseModel):
 
         feat3 = self.leakyRELU(self.upfeat3(x))
         flow3 = Upsample(flow4, 2)
-        warp3u = (flow3 * self.scale / self.args.strides[3]).unsqueeze(1)
+        warp3u = (flow3 * self.scale / self.strides[3]).unsqueeze(1)
         warp3u = torch.repeat_interleave(warp3u, 9, 1)
         S1, S2, S3, S4, S5 = warp3u.shape
         warp3u = warp3u.view(S1, S2 * S3, S4, S5)
@@ -851,7 +844,7 @@ class MaskFlownet(BaseModel):
 
         feat2 = self.leakyRELU(self.upfeat2(x))
         flow2 = Upsample(flow3, 2)
-        warp2u = (flow2 * self.scale / self.args.strides[4]).unsqueeze(1)
+        warp2u = (flow2 * self.scale / self.strides[4]).unsqueeze(1)
         warp2u = torch.repeat_interleave(warp2u, 9, 1)
         S1, S2, S3, S4, S5 = warp2u.shape
         warp2u = warp2u.view(S1, S2 * S3, S4, S5)
@@ -955,3 +948,15 @@ class MultiscaleEpe(nn.Module):
         else:
             raise NotImplementedError
         return losses
+
+
+@register_model
+@trainable
+class maskflownet_s(MaskFlownet_S):
+    pass
+
+
+@register_model
+@trainable
+class maskflownet(MaskFlownet):
+    pass

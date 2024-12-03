@@ -1,14 +1,13 @@
-from argparse import ArgumentParser, Namespace
 from ptlflow.models.base_model.base_model import BaseModel
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from ptlflow.utils.utils import forward_interpolate_batch
 from .extractor import BasicEncoder, BasicEncoderQuarter
 from .update import BasicUpdateBlock, BasicUpdateBlockQuarter
 from .utils import (
-    bilinear_sampler,
     coords_grid,
     coords_grid_y_first,
     upflow4,
@@ -19,10 +18,10 @@ from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -111,8 +110,22 @@ class FlowHead(nn.Module):
 
 
 class SCVBase(BaseModel):
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=8)
+    def __init__(
+        self,
+        num_k: int = 32,
+        gamma: float = 0.8,
+        max_flow: float = 400.0,
+        iters: int = 32,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            loss_fn=SequenceLoss(gamma=gamma, max_flow=max_flow),
+            output_stride=8,
+            **kwargs,
+        )
+
+        self.num_k = num_k
+        self.iters = iters
 
         try:
             import torch_scatter
@@ -140,8 +153,17 @@ class SCVQuarter(SCVBase):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/scv-quarter-things-0dac9b66.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args)
+    def __init__(
+        self,
+        num_k: int = 32,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 32,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            num_k=num_k, gamma=gamma, max_flow=max_flow, iters=iters, **kwargs
+        )
 
         # feature network, context network, and update block
         self.fnet = BasicEncoderQuarter(
@@ -150,19 +172,7 @@ class SCVQuarter(SCVBase):
         self.cnet = BasicEncoderQuarter(output_dim=256, norm_fn="batch", dropout=False)
 
         # correlation volume encoder
-        self.update_block = BasicUpdateBlockQuarter(
-            self.args, hidden_dim=128, input_dim=405
-        )
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--num_k", type=int, default=32)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, default=32)
-        return parser
+        self.update_block = BasicUpdateBlockQuarter(hidden_dim=128, input_dim=405)
 
     def initialize_flow(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
@@ -225,7 +235,7 @@ class SCVQuarter(SCVBase):
 
         # Generate sparse cost volume for GRU
         corr_val, coords0_cv, coords1_cv, batch_index_cv = compute_sparse_corr(
-            fmap1, fmap2, k=self.args.num_k
+            fmap1, fmap2, k=self.num_k
         )
 
         delta_flow = torch.zeros_like(coords0)
@@ -235,7 +245,7 @@ class SCVQuarter(SCVBase):
         search_range = 4
         corr_val = corr_val.repeat(1, 4, 1)
 
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             with torch.no_grad():
                 # need to switch order of delta_flow, also note the minus sign
                 coords1_cv = coords1_cv - delta_flow[:, [1, 0], :, :].view(
@@ -321,25 +331,24 @@ class SCVEighth(SCVBase):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/scv-eighth-things-9c893323.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args)
+    def __init__(
+        self,
+        num_k: int = 32,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 32,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            num_k=num_k, gamma=gamma, max_flow=max_flow, iters=iters, **kwargs
+        )
 
         # feature network, context network, and update block
         self.fnet = BasicEncoder(output_dim=256, norm_fn="instance", dropout=False)
         self.cnet = BasicEncoder(output_dim=256, norm_fn="batch", dropout=False)
 
         # correlation volume encoder
-        self.update_block = BasicUpdateBlock(self.args, hidden_dim=128, input_dim=405)
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--num_k", type=int, default=32)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, default=12)
-        return parser
+        self.update_block = BasicUpdateBlock(hidden_dim=128, input_dim=405)
 
     def initialize_flow(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
@@ -402,7 +411,7 @@ class SCVEighth(SCVBase):
 
         # Generate sparse cost volume for GRU
         corr_val, coords0_cv, coords1_cv, batch_index_cv = compute_sparse_corr(
-            fmap1, fmap2, k=self.args.num_k
+            fmap1, fmap2, k=self.num_k
         )
 
         delta_flow = torch.zeros_like(coords0)
@@ -412,7 +421,7 @@ class SCVEighth(SCVBase):
         search_range = 4
         corr_val = corr_val.repeat(1, 4, 1)
 
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             with torch.no_grad():
                 # need to switch order of delta_flow, also note the minus sign
                 coords1_cv = coords1_cv - delta_flow[:, [1, 0], :, :].view(
@@ -489,3 +498,15 @@ class SCVEighth(SCVBase):
             outputs = {"flows": flow_up[:, None], "flow_small": coords1 - coords0}
 
         return outputs
+
+
+@register_model
+@trainable
+class scv4(SCVQuarter):
+    pass
+
+
+@register_model
+@trainable
+class scv8(SCVEighth):
+    pass

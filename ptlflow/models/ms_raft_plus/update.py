@@ -119,7 +119,6 @@ class BasicMotionEncoder(nn.Module):
 class BasicUpdateBlock(nn.Module):
     def __init__(
         self,
-        args,
         correlation_depth,
         stack_coords=False,
         hidden_dim=128,
@@ -127,9 +126,6 @@ class BasicUpdateBlock(nn.Module):
         scale=8,
     ):
         super(BasicUpdateBlock, self).__init__()
-        # hidden_dim = 64
-        # input_dim = 192
-        self.args = args
         self.encoder = BasicMotionEncoder(correlation_depth, stack_coords=stack_coords)
         self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=input_dim + hidden_dim)
         self.flow_head = FlowHead(hidden_dim, hidden_dim=256)
@@ -140,9 +136,7 @@ class BasicUpdateBlock(nn.Module):
             nn.Conv2d(256, scale * scale * 9, 1, padding=0),
         )
 
-    def forward(
-        self, net, inp, corr, flow, coords_x=None, coords_y=None, level_index=0
-    ):
+    def forward(self, net, inp, corr, flow, coords_x=None, coords_y=None):
         # net: 128
         # inp depth: 128
         motion_features = self.encoder(

@@ -1,5 +1,4 @@
-from argparse import ArgumentParser, Namespace
-from pathlib import Path
+from typing import Optional, Sequence
 
 try:
     from spatial_correlation_sampler import SpatialCorrelationSampler
@@ -10,6 +9,7 @@ except ModuleNotFoundError:
 import torch
 import torch.nn as nn
 
+from ptlflow.utils.registry import register_model, trainable
 from .pwc_modules import upsample2d_as, initialize_msra
 from .pwc_modules import (
     WarpingLayer,
@@ -26,19 +26,38 @@ class IRRPWCNet(BaseModel):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/irr_pwcnet-things-3f7fb8ca.ckpt"
     }
 
-    def __init__(self, args):
+    def __init__(
+        self,
+        div_flow: float = 0.05,
+        search_range: int = 4,
+        output_level: int = 4,
+        num_chs: Sequence[int] = (3, 16, 32, 64, 96, 128, 196),
+        train_batch_size: Optional[int] = None,
+        **kwargs,
+    ):
         super(IRRPWCNet, self).__init__(
-            args=args, loss_fn=MultiScaleEPE_PWC(args), output_stride=1
+            output_stride=64,
+            loss_fn=MultiScaleEPE_PWC(
+                train_batch_size=train_batch_size, div_flow=div_flow
+            ),
+            **kwargs,
         )
+
+        self.div_flow = div_flow
+        self.search_range = search_range
+        self.output_level = output_level
+        self.num_chs = num_chs
+        self.train_batch_size = train_batch_size
+
         self.leakyRELU = nn.LeakyReLU(0.1, inplace=True)
 
-        self.feature_pyramid_extractor = FeatureExtractor(self.args.num_chs)
+        self.feature_pyramid_extractor = FeatureExtractor(self.num_chs)
         self.warping_layer = WarpingLayer()
 
         self.flow_estimators = nn.ModuleList()
-        self.dim_corr = (self.args.search_range * 2 + 1) ** 2
-        for l, ch in enumerate(self.args.num_chs[::-1]):
-            if l > self.args.output_level:
+        self.dim_corr = (self.search_range * 2 + 1) ** 2
+        for l, ch in enumerate(self.num_chs[::-1]):
+            if l > self.output_level:
                 break
 
             if l == 0:
@@ -52,23 +71,10 @@ class IRRPWCNet(BaseModel):
         self.context_networks = ContextNetwork(self.dim_corr + 32 + 2 + 448 + 2)
 
         self.corr = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.args.search_range + 1, padding=0
+            kernel_size=1, patch_size=2 * self.search_range + 1, padding=0
         )
 
         initialize_msra(self.modules())
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--div_flow", type=float, default=0.05)
-        parser.add_argument("--search_range", type=int, default=4)
-        parser.add_argument("--output_level", type=int, default=4)
-        parser.add_argument(
-            "--num_chs", type=int, nargs="+", default=[3, 16, 32, 64, 96, 128, 196]
-        )
-        parser.add_argument("--num_iters", type=int, default=1)
-        return parser
 
     def forward(self, inputs):
         images, image_resizer = self.preprocess_images(
@@ -111,7 +117,7 @@ class IRRPWCNet(BaseModel):
             else:
                 flow = upsample2d_as(flow, x1, mode="bilinear")
                 x2_warp = self.warping_layer(
-                    x2, flow, height_im, width_im, self.args.div_flow
+                    x2, flow, height_im, width_im, self.div_flow
                 )
 
             # correlation
@@ -131,7 +137,7 @@ class IRRPWCNet(BaseModel):
                 )
 
             # upsampling or post-processing
-            if l != self.args.output_level:
+            if l != self.output_level:
                 flows.append(flow)
             else:
                 flow_res = self.context_networks(torch.cat([x_intm, flow], dim=1))
@@ -139,9 +145,7 @@ class IRRPWCNet(BaseModel):
                 flows.append(flow)
                 break
 
-        flow_up = upsample2d_as(flow, x1_raw, mode="bilinear") * (
-            1.0 / self.args.div_flow
-        )
+        flow_up = upsample2d_as(flow, x1_raw, mode="bilinear") * (1.0 / self.div_flow)
         flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
 
         outputs = {}
@@ -151,3 +155,9 @@ class IRRPWCNet(BaseModel):
         else:
             outputs["flows"] = flow_up[:, None]
         return outputs
+
+
+@register_model
+@trainable
+class irr_pwcnet(IRRPWCNet):
+    pass

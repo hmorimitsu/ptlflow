@@ -1,5 +1,4 @@
-from argparse import ArgumentParser, Namespace
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 try:
     from spatial_correlation_sampler import SpatialCorrelationSampler
@@ -11,6 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model
 from .warp import WarpingLayer
 from ..base_model.base_model import BaseModel
 
@@ -450,12 +450,26 @@ class LiteFlowNet3(BaseModel):
         "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet3-sintel-d985929f.ckpt"
     }
 
-    def __init__(self, args: Namespace):
-        super(LiteFlowNet3, self).__init__(args=args, loss_fn=None, output_stride=32)
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        use_pseudo_regularization: bool = False,
+        use_s_version: bool = False,
+        **kwargs,
+    ):
+        super(LiteFlowNet3, self).__init__(
+            loss_fn=None,
+            output_stride=32,
+            **kwargs,
+        )
+
+        self.div_flow = div_flow
+        self.use_pseudo_regularization = use_pseudo_regularization
+        self.use_s_version = use_s_version
 
         self.num_levels = 4
 
-        if args.use_s_version:
+        if use_s_version:
             self.min_mod_level = 1
         else:
             self.min_mod_level = 2
@@ -469,34 +483,30 @@ class LiteFlowNet3(BaseModel):
         )
         self.modulation_nets = nn.ModuleList(
             [
-                CostVolumeModulation(i, self.num_levels, self.args.div_flow)
+                CostVolumeModulation(i, self.num_levels, self.div_flow)
                 for i in range(self.min_mod_level, self.num_levels)
             ]
         )
         self.matching_nets = nn.ModuleList(
             [
-                Matching(
-                    i, self.num_levels, self.args.div_flow, self.args.use_s_version
-                )
+                Matching(i, self.num_levels, self.div_flow, self.use_s_version)
                 for i in range(self.num_levels)
             ]
         )
         self.subpixel_nets = nn.ModuleList(
             [
-                SubPixel(i, self.num_levels, self.args.div_flow)
+                SubPixel(i, self.num_levels, self.div_flow)
                 for i in range(self.num_levels)
             ]
         )
         self.regularization_nets = nn.ModuleList(
             [
-                Regularization(
-                    i, self.num_levels, self.args.div_flow, self.args.use_s_version
-                )
+                Regularization(i, self.num_levels, self.div_flow, self.use_s_version)
                 for i in range(self.num_levels)
             ]
         )
 
-        if self.args.use_pseudo_regularization:
+        if self.use_pseudo_regularization:
             self.pseudo_subpixel = PseudoSubpixel()
             self.pseudo_regularization = PseudoRegularization()
             self.up_flow = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False, groups=2)
@@ -553,13 +563,13 @@ class LiteFlowNet3(BaseModel):
             if conf is not None:
                 conf_preds.append(conf)
 
-        if self.args.use_pseudo_regularization:
+        if self.use_pseudo_regularization:
             flow = self.pseudo_subpixel(sub_feat, flow)
             flow = self.pseudo_regularization(reg_feat, flow)
             flow = self.up_flow(flow)
         else:
             flow = self.up_flow(flow)
-        flow = flow * self.args.div_flow
+        flow = flow * self.div_flow
         flow = self.postprocess_predictions(flow, image_resizer, is_flow=True)
 
         conf = F.interpolate(
@@ -601,9 +611,19 @@ class LiteFlowNet3PseudoReg(LiteFlowNet3):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet3-kitti-b5d32443.ckpt"
     }
 
-    def __init__(self, args: Namespace):
-        args.use_pseudo_regularization = True
-        super(LiteFlowNet3PseudoReg, self).__init__(args=args)
+    def __init__(
+        self,
+        div_flow: float = 20,
+        use_pseudo_regularization: bool = True,
+        use_s_version: bool = False,
+        **kwargs,
+    ):
+        super().__init__(
+            div_flow,
+            use_pseudo_regularization,
+            use_s_version,
+            **kwargs,
+        )
 
 
 class LiteFlowNet3S(LiteFlowNet3):
@@ -611,9 +631,19 @@ class LiteFlowNet3S(LiteFlowNet3):
         "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet3s-sintel-89793e34.ckpt"
     }
 
-    def __init__(self, args: Namespace):
-        args.use_s_version = True
-        super(LiteFlowNet3S, self).__init__(args=args)
+    def __init__(
+        self,
+        div_flow: float = 20,
+        use_pseudo_regularization: bool = False,
+        use_s_version: bool = True,
+        **kwargs,
+    ):
+        super().__init__(
+            div_flow,
+            use_pseudo_regularization,
+            use_s_version,
+            **kwargs,
+        )
 
 
 class LiteFlowNet3SPseudoReg(LiteFlowNet3):
@@ -621,7 +651,36 @@ class LiteFlowNet3SPseudoReg(LiteFlowNet3):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet3s-kitti-5dffb261.ckpt"
     }
 
-    def __init__(self, args: Namespace):
-        args.use_s_version = True
-        args.use_pseudo_regularization = True
-        super(LiteFlowNet3SPseudoReg, self).__init__(args=args)
+    def __init__(
+        self,
+        div_flow: float = 20,
+        use_pseudo_regularization: bool = True,
+        use_s_version: bool = True,
+        **kwargs,
+    ):
+        super().__init__(
+            div_flow,
+            use_pseudo_regularization,
+            use_s_version,
+            **kwargs,
+        )
+
+
+@register_model
+class liteflownet3(LiteFlowNet3):
+    pass
+
+
+@register_model
+class liteflownet3_pseudoreg(LiteFlowNet3PseudoReg):
+    pass
+
+
+@register_model
+class liteflownet3s(LiteFlowNet3S):
+    pass
+
+
+@register_model
+class liteflownet3s_pseudoreg(LiteFlowNet3SPseudoReg):
+    pass

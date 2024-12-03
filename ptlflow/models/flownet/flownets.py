@@ -2,13 +2,12 @@
 Portions of this code copyright 2017, Clement Pinard
 """
 
-from argparse import Namespace
-
 from einops import rearrange
 import torch
 import torch.nn as nn
 from torch.nn import init
 
+from ptlflow.utils.registry import register_model, trainable
 from .submodules import *
 from .flownet_base import FlowNetBase
 
@@ -18,21 +17,40 @@ class FlowNetS(FlowNetBase):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flownets-things-98cde14d.ckpt"
     }
 
-    def __init__(self, args: Namespace):
-        super(FlowNetS, self).__init__(args)
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        input_channels: int = 6,
+        batch_norm: bool = False,
+        loss_start_scale: int = 4,
+        loss_num_scales: int = 5,
+        loss_base_weight: float = 0.32,
+        loss_norm: str = "L2",
+        **kwargs,
+    ):
+        super(FlowNetS, self).__init__(
+            div_flow=div_flow,
+            input_channels=input_channels,
+            batch_norm=batch_norm,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
 
         self.conv1 = conv(
-            self.args.batch_norm, self.args.input_channels, 64, kernel_size=7, stride=2
+            self.batch_norm, self.input_channels, 64, kernel_size=7, stride=2
         )
-        self.conv2 = conv(self.args.batch_norm, 64, 128, kernel_size=5, stride=2)
-        self.conv3 = conv(self.args.batch_norm, 128, 256, kernel_size=5, stride=2)
-        self.conv3_1 = conv(self.args.batch_norm, 256, 256)
-        self.conv4 = conv(self.args.batch_norm, 256, 512, stride=2)
-        self.conv4_1 = conv(self.args.batch_norm, 512, 512)
-        self.conv5 = conv(self.args.batch_norm, 512, 512, stride=2)
-        self.conv5_1 = conv(self.args.batch_norm, 512, 512)
-        self.conv6 = conv(self.args.batch_norm, 512, 1024, stride=2)
-        self.conv6_1 = conv(self.args.batch_norm, 1024, 1024)
+        self.conv2 = conv(self.batch_norm, 64, 128, kernel_size=5, stride=2)
+        self.conv3 = conv(self.batch_norm, 128, 256, kernel_size=5, stride=2)
+        self.conv3_1 = conv(self.batch_norm, 256, 256)
+        self.conv4 = conv(self.batch_norm, 256, 512, stride=2)
+        self.conv4_1 = conv(self.batch_norm, 512, 512)
+        self.conv5 = conv(self.batch_norm, 512, 512, stride=2)
+        self.conv5_1 = conv(self.batch_norm, 512, 512)
+        self.conv6 = conv(self.batch_norm, 512, 1024, stride=2)
+        self.conv6_1 = conv(self.batch_norm, 1024, 1024)
 
         self.deconv5 = deconv(1024, 512)
         self.deconv4 = deconv(1026, 256)
@@ -114,7 +132,7 @@ class FlowNetS(FlowNetBase):
         concat2 = torch.cat((out_conv2, out_deconv2, flow3_up), 1)
         flow2 = self.predict_flow2(concat2)
 
-        out_flow = self.args.div_flow * self.upsample1(flow2)
+        out_flow = self.div_flow * self.upsample1(flow2)
         if image_resizer is not None:
             out_flow = self.postprocess_predictions(
                 out_flow, image_resizer, is_flow=True
@@ -135,3 +153,9 @@ class FlowNetS(FlowNetBase):
             outputs["flows"] = out_flow[:, None]
 
         return outputs
+
+
+@register_model
+@trainable
+class flownets(FlowNetS):
+    pass

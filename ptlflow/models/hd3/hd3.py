@@ -1,7 +1,4 @@
-from argparse import ArgumentParser, Namespace
-from pathlib import Path
-
-import numpy as np
+from typing import Sequence
 
 try:
     from spatial_correlation_sampler import SpatialCorrelationSampler
@@ -13,6 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from .hd3_ops import *
 from .dla_up import DLAEncoder as dlaup_encoder
 from .vgg import VGGEncoder as vgg_encoder
@@ -88,41 +86,62 @@ class Decoder(nn.Module):
         return prob, up_feat
 
 
-class BaseHD3(BaseModel):
-    def __init__(self, args, context):
-        super(BaseHD3, self).__init__(
-            args, LossCalculator(args.task), int(2**args.downsample)
+class HD3(BaseModel):
+    pretrained_checkpoints = {
+        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-chairs-0d46c9fd.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-things-afcd2eb4.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-sintel-10689995.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-kitti-6eb77dd3.ckpt",
+    }
+
+    def __init__(
+        self,
+        task: str = "flow",
+        encoder: str = "dlaup",
+        decoder: str = "hda",
+        downsample: int = 6,
+        corr_range: Sequence[int] = (4, 4, 4, 4, 4, 4),
+        context: bool = False,
+        **kwargs,
+    ):
+        super(HD3, self).__init__(
+            loss_fn=LossCalculator(task), output_stride=int(2**downsample), **kwargs
         )
 
+        self.task = task
+        self.encoder = encoder
+        self.decoder = decoder
+        self.downsample = downsample
+        self.corr_range = corr_range
         self.context = context
 
-        if self.args.task == "flow":
-            self.args.corr_range = self.args.corr_range[:5]
-
-        self.task = self.args.task
-        self.dim = 1 if self.args.task == "stereo" else 2
-        self.levels = len(self.args.corr_range)
         if self.task == "flow":
-            self.classes = [(2 * d + 1) ** 2 for d in self.args.corr_range]
-        else:
-            self.classes = [2 * d + 1 for d in self.args.corr_range]
+            self.corr_range = self.corr_range[:5]
 
-        if self.args.encoder == "vgg":
+        self.task = self.task
+        self.dim = 1 if self.task == "stereo" else 2
+        self.levels = len(self.corr_range)
+        if self.task == "flow":
+            self.classes = [(2 * d + 1) ** 2 for d in self.corr_range]
+        else:
+            self.classes = [2 * d + 1 for d in self.corr_range]
+
+        if self.encoder == "vgg":
             pyr_channels = [16, 32, 64, 96, 128, 196]
             assert self.levels <= len(pyr_channels)
             self.encoder = vgg_encoder(pyr_channels)
-        elif self.args.encoder == "dlaup":
+        elif self.encoder == "dlaup":
             pyr_channels = [16, 32, 64, 128, 256, 512, 512]
             self.encoder = dlaup_encoder(pyr_channels)
         else:
-            raise ValueError("Unknown encoder {}".format(self.args.encoder))
+            raise ValueError("Unknown encoder {}".format(self.encoder))
 
-        if self.args.decoder == "resnet":
+        if self.decoder == "resnet":
             dec_block = PreDecoder.ResnetDecoder
-        elif self.args.decoder == "hda":
+        elif self.decoder == "hda":
             dec_block = PreDecoder.HDADecoder
         else:
-            raise ValueError("Unknown decoder {}".format(self.args.decoder))
+            raise ValueError("Unknown decoder {}".format(self.decoder))
 
         feat_d_offset = pyr_channels[::-1]
         feat_d_offset[0] = 0
@@ -157,25 +176,6 @@ class BaseHD3(BaseModel):
             elif classname.find("BatchNorm") != -1:
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument(
-            "--task", type=str, default="flow", choices=["flow", "stereo"]
-        )
-        parser.add_argument(
-            "--encoder", type=str, default="dlaup", choices=["vgg", "dlaup"]
-        )
-        parser.add_argument(
-            "--decoder", type=str, default="hda", choices=["hda", "resnet"]
-        )
-        parser.add_argument("--downsample", type=int, default=6)
-        parser.add_argument(
-            "--corr_range", type=int, nargs="+", default=[4, 4, 4, 4, 4, 4]
-        )
-        return parser
 
     def shift(self, x, vect):
         if vect.size(1) < 2:
@@ -237,9 +237,7 @@ class BaseHD3(BaseModel):
                 curr_vect += up_curr_vect
             if self.task == "stereo":
                 curr_vect = torch.clamp(curr_vect, max=0)
-            ms_pred.append(
-                [prob_map, curr_vect * 2 ** (self.args.downsample - l), up_feat]
-            )
+            ms_pred.append([prob_map, curr_vect * 2 ** (self.downsample - l), up_feat])
 
             if l < self.levels - 1:
                 up_curr_vect = 2 * F.interpolate(
@@ -258,27 +256,15 @@ class BaseHD3(BaseModel):
         if self.training:
             outputs["ms_prob"] = ms_prob
             outputs["ms_pred"] = ms_vect
-            outputs["corr_range"] = self.args.corr_range
-            outputs["downsample"] = self.args.downsample
+            outputs["corr_range"] = self.corr_range
+            outputs["downsample"] = self.downsample
             outputs["flows"] = flow_up[:, None]
         else:
             outputs["flows"] = flow_up[:, None]
         return outputs
 
 
-class HD3(BaseHD3):
-    pretrained_checkpoints = {
-        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-chairs-0d46c9fd.ckpt",
-        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-things-afcd2eb4.ckpt",
-        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-sintel-10689995.ckpt",
-        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3-kitti-6eb77dd3.ckpt",
-    }
-
-    def __init__(self, args):
-        super(HD3, self).__init__(args, context=False)
-
-
-class HD3Context(BaseHD3):
+class HD3Context(HD3):
     pretrained_checkpoints = {
         "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-chairs-d7448468.ckpt",
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-things-f1681f75.ckpt",
@@ -286,5 +272,28 @@ class HD3Context(BaseHD3):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/hd3_ctxt-kitti-e7d69776.ckpt",
     }
 
-    def __init__(self, args):
-        super(HD3Context, self).__init__(args, context=True)
+    def __init__(
+        self,
+        task: str = "flow",
+        encoder: str = "dlaup",
+        decoder: str = "hda",
+        downsample: int = 6,
+        corr_range: Sequence[int] = (4, 4, 4, 4, 4, 4),
+        context: bool = True,
+        **kwargs,
+    ):
+        super().__init__(
+            task, encoder, decoder, downsample, corr_range, context, **kwargs
+        )
+
+
+@register_model
+@trainable
+class hd3(HD3):
+    pass
+
+
+@register_model
+@trainable
+class hd3_ctxt(HD3Context):
+    pass

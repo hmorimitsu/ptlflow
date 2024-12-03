@@ -49,11 +49,9 @@ class ResNetFPN_8_2(nn.Module):
     Each block has 2 layers.
     """
 
-    def __init__(self, cfg):
+    def __init__(self):
         super().__init__()
         # Config
-        self.cfg = cfg
-
         block = BasicBlock
         initial_dim = 128
         block_dims = [128, 196, 256]

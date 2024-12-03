@@ -1,9 +1,9 @@
-from argparse import ArgumentParser, Namespace
-
+from loguru import logger
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock, GMAUpdateBlock
 from .extractor import BasicEncoder
@@ -20,10 +20,10 @@ except:
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -55,55 +55,60 @@ class LLAFlow(BaseModel):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/llaflow_gma-kitti-ac312150.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=8)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dropout: float = 0.0,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 32,
+        alternate_corr: bool = False,
+        gma: bool = True,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
+
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.dropout = dropout
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.iters = iters
+        self.alternate_corr = alternate_corr
+        self.gma = gma
 
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
 
-        if "alternate_corr" not in self.args:
-            self.args.alternate_corr = False
-
         # feature network, context network, and update block
-        self.fnet = BasicEncoder(
-            output_dim=256, norm_fn="instance", dropout=args.dropout
-        )
+        self.fnet = BasicEncoder(output_dim=256, norm_fn="instance", dropout=dropout)
         self.cnet = BasicEncoder(
-            output_dim=hdim + cdim, norm_fn="batch", dropout=args.dropout
+            output_dim=hdim + cdim, norm_fn="batch", dropout=dropout
         )
-        self.ls1 = LocalSimilar(args=self.args, dim=128, heads=1, size=5)
-        self.ls2 = LocalSimilar(args=self.args, dim=128, heads=1, size=5)
-        self.s_lsa = ShiftLSA(args=self.args, dim=256, heads=1, size=5)
-        self.lsa = LSA(args=self.args, dim=256, heads=1, size=5)
+        self.ls1 = LocalSimilar(dim=128, heads=1, size=5)
+        self.ls2 = LocalSimilar(dim=128, heads=1, size=5)
+        self.s_lsa = ShiftLSA(dim=256, heads=1, size=5)
+        self.lsa = LSA(dim=256, heads=1, size=5)
         self.gamma = nn.Parameter(torch.tensor([0.0]))
 
-        if not args.gma:
-            self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)
+        if not gma:
+            self.update_block = BasicUpdateBlock(
+                corr_levels=corr_levels, corr_radius=corr_radius, hidden_dim=hdim
+            )
             self.att = None
         else:
-            self.update_block = GMAUpdateBlock(self.args, hidden_dim=hdim)
-            self.att = Attention(
-                args=self.args, dim=cdim, heads=1, max_pos_size=160, dim_head=cdim
+            self.update_block = GMAUpdateBlock(
+                corr_levels=corr_levels, corr_radius=corr_radius, hidden_dim=hdim
             )
+            self.att = Attention(dim=cdim, heads=1, max_pos_size=160, dim_head=cdim)
 
-        if self.args.alternate_corr and alt_cuda_corr is None:
-            print(
+        if self.alternate_corr and alt_cuda_corr is None:
+            logger.warning(
                 "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
             )
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--corr_levels", type=int, default=4)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument("--dropout", type=float, default=0.0)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, default=32)
-        parser.add_argument("--alternate_corr", action="store_true")
-        parser.add_argument("--no_gma", action="store_false", dest="gma")
-        return parser
 
     def freeze_bn(self):
         for m in self.modules():
@@ -169,9 +174,7 @@ class LLAFlow(BaseModel):
         fmap2 = self.lsa(ls2, fmap2)
         corr2 = self.s_lsa(ls1, fmap1, fmap2)
 
-        corr_fn = CorrBlock(
-            fmap1, fmap2, self.gamma, corr2, radius=self.args.corr_radius
-        )
+        corr_fn = CorrBlock(fmap1, fmap2, self.gamma, corr2, radius=self.corr_radius)
 
         coords0, coords1 = self.initialize_flow(image1)
         if (
@@ -182,7 +185,7 @@ class LLAFlow(BaseModel):
             coords1 = coords1 + forward_flow
 
         flow_predictions = []
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             coords1 = coords1.detach()
             corr = corr_fn(coords1)  # index correlation volume
 
@@ -222,6 +225,38 @@ class LLAFlowRAFT(LLAFlow):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/llaflow_raft-kitti-b8b43046.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        args.gma = False
-        super().__init__(args=args)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dropout: float = 0,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 32,
+        alternate_corr: bool = False,
+        gma: bool = False,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            corr_levels,
+            corr_radius,
+            dropout,
+            gamma,
+            max_flow,
+            iters,
+            alternate_corr,
+            gma,
+            **kwargs,
+        )
+
+
+@register_model
+@trainable
+class llaflow(LLAFlow):
+    pass
+
+
+@register_model
+@trainable
+class llaflow_raft(LLAFlowRAFT):
+    pass

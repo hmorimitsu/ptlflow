@@ -76,13 +76,11 @@ class SepConvGRU(nn.Module):
 
 
 class BasicMotionEncoder(nn.Module):
-    def __init__(self, args):
+    def __init__(self, corr_levels, corr_multiplier, corr_radius):
         super(BasicMotionEncoder, self).__init__()
         # When both f1 and f2 are applied SS-Trans, corr_multiplier = 2.
         # Otherwise corr_multiplier = 1.
-        cor_planes = (
-            args.corr_levels * args.corr_multiplier * (2 * args.corr_radius + 1) ** 2
-        )
+        cor_planes = corr_levels * corr_multiplier * (2 * corr_radius + 1) ** 2
         self.convc1 = nn.Conv2d(cor_planes, 256, 1, padding=0)
         self.convc2 = nn.Conv2d(256, 192, 3, padding=1)
         self.convf1 = nn.Conv2d(2, 128, 7, padding=3)
@@ -101,10 +99,13 @@ class BasicMotionEncoder(nn.Module):
 
 
 class BasicUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=128, input_dim=128):
+    def __init__(self, corr_levels, corr_multiplier, corr_radius, hidden_dim=128):
         super(BasicUpdateBlock, self).__init__()
-        self.args = args
-        self.encoder = BasicMotionEncoder(args)
+        self.encoder = BasicMotionEncoder(
+            corr_levels=corr_levels,
+            corr_multiplier=corr_multiplier,
+            corr_radius=corr_radius,
+        )
         self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=128 + hidden_dim)
         self.flow_head = FlowHead(input_dim=hidden_dim, hidden_dim=256)
 
@@ -128,10 +129,22 @@ class BasicUpdateBlock(nn.Module):
 
 
 class GMAUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=128):
+    def __init__(
+        self,
+        corr_levels,
+        corr_multiplier,
+        corr_radius,
+        use_setrans,
+        intra_trans_config,
+        num_heads,
+        hidden_dim=128,
+    ):
         super().__init__()
-        self.args = args
-        self.encoder = BasicMotionEncoder(args)
+        self.encoder = BasicMotionEncoder(
+            corr_levels=corr_levels,
+            corr_multiplier=corr_multiplier,
+            corr_radius=corr_radius,
+        )
         self.gru = SepConvGRU(
             hidden_dim=hidden_dim, input_dim=128 + hidden_dim + hidden_dim
         )
@@ -143,17 +156,15 @@ class GMAUpdateBlock(nn.Module):
             nn.Conv2d(256, 64 * 9, 1, padding=0),
         )
 
-        self.use_setrans = args.use_setrans
+        self.use_setrans = use_setrans
         if self.use_setrans:
-            self.intra_trans_config = args.intra_trans_config
+            self.intra_trans_config = intra_trans_config
             self.aggregator = ExpandedFeatTrans(
                 self.intra_trans_config, "Motion Aggregator"
             )
         else:
             # Aggregate is attention with a (learnable-weighted) skip connection, without FFN.
-            self.aggregator = Aggregate(
-                args=self.args, dim=128, dim_head=128, heads=self.args.num_heads
-            )
+            self.aggregator = Aggregate(dim=128, dim_head=128, heads=num_heads)
 
     def forward(self, net, inp, corr, flow, attention):
         # encoder: BasicMotionEncoder

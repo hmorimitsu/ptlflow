@@ -1,9 +1,11 @@
-from argparse import ArgumentParser, Namespace
+from typing import Sequence
 
+from loguru import logger
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import *
 from .extractor import BasicEncoder
@@ -19,10 +21,10 @@ except:
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -53,70 +55,68 @@ class SKFlow(BaseModel):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/skflow-things-f84e6538.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=8)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dropout: float = 0.0,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 32,
+        k_conv: Sequence[int] = (1, 15),
+        PCUpdater_conv: Sequence[int] = (1, 7),
+        num_heads: int = 1,
+        position_only: bool = False,
+        position_and_content: bool = False,
+        alternate_corr: bool = False,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
+
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.dropout = dropout
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.iters = iters
+        self.k_conv = k_conv
+        self.PCUpdater_conv = PCUpdater_conv
+        self.num_heads = num_heads
+        self.position_only = position_only
+        self.position_and_content = position_and_content
+        self.alternate_corr = alternate_corr
 
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
 
-        if "dropout" not in self.args:
-            self.args.dropout = 0
-
         # feature network, context network, and update block
-        self.fnet = BasicEncoder(
-            output_dim=256, norm_fn="instance", dropout=args.dropout
-        )
+        self.fnet = BasicEncoder(output_dim=256, norm_fn="instance", dropout=dropout)
         self.cnet = BasicEncoder(
-            output_dim=hdim + cdim, norm_fn="batch", dropout=args.dropout
+            output_dim=hdim + cdim, norm_fn="batch", dropout=dropout
         )
         self.update_block = SKUpdateBlock6_Deep_nopoolres_AllDecoder(
-            self.args, hidden_dim=hdim
+            corr_levels=corr_levels,
+            corr_radius=corr_radius,
+            k_conv=k_conv,
+            PCUpdater_conv=PCUpdater_conv,
+            num_heads=num_heads,
+            hidden_dim=hdim,
         )
         self.att = Attention(
-            args=self.args,
+            position_only=position_only,
+            position_and_content=position_and_content,
             dim=cdim,
-            heads=self.args.num_heads,
+            heads=self.num_heads,
             max_pos_size=160,
             dim_head=cdim,
         )
 
-        if self.args.alternate_corr and alt_cuda_corr is None:
-            print(
+        if self.alternate_corr and alt_cuda_corr is None:
+            logger.warning(
                 "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
             )
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--corr_levels", type=int, default=4)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument("--dropout", type=float, default=0.0)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, default=32)
-        parser.add_argument("--k_conv", type=int, nargs="+", default=(1, 15))
-        parser.add_argument("--PCUpdater_conv", type=int, nargs="+", default=(1, 7))
-        parser.add_argument(
-            "--num_heads",
-            default=1,
-            type=int,
-            help="number of heads in attention and aggregation",
-        )
-        parser.add_argument(
-            "--position_only",
-            default=False,
-            action="store_true",
-            help="only use position-wise attention",
-        )
-        parser.add_argument(
-            "--position_and_content",
-            default=False,
-            action="store_true",
-            help="use position and content-wise attention",
-        )
-        parser.add_argument("--alternate_corr", action="store_true")
-        return parser
 
     def freeze_bn(self):
         for m in self.modules():
@@ -182,9 +182,9 @@ class SKFlow(BaseModel):
         corr_fn = get_corr_block(
             fmap1=fmap1,
             fmap2=fmap2,
-            radius=self.args.corr_radius,
-            num_levels=self.args.corr_levels,
-            alternate_corr=self.args.alternate_corr,
+            radius=self.corr_radius,
+            num_levels=self.corr_levels,
+            alternate_corr=self.alternate_corr,
         )
 
         # run the context network
@@ -205,7 +205,7 @@ class SKFlow(BaseModel):
             coords1 = coords1 + forward_flow
 
         flow_predictions = []
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             coords1 = coords1.detach()
             corr = corr_fn(coords1)  # index correlation volume
 
@@ -232,3 +232,9 @@ class SKFlow(BaseModel):
             outputs = {"flows": flow_up[:, None], "flow_small": coords1 - coords0}
 
         return outputs
+
+
+@register_model
+@trainable
+class skflow(SKFlow):
+    pass

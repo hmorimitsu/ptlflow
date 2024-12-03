@@ -2,28 +2,62 @@ import torch
 from torch.optim.lr_scheduler import OneCycleLR
 
 
-def fetch_optimizer(model, cfg):
+def fetch_optimizer(
+    model,
+    optimizer_name,
+    scheduler_name,
+    canonical_lr,
+    twins_lr_factor,
+    adam_decay,
+    adamw_decay,
+    epsilon,
+    num_steps,
+    anneal_strategy,
+):
     """Create the optimizer and learning rate scheduler"""
-    optimizer = build_optimizer(model, cfg)
-    scheduler = build_scheduler(cfg, optimizer)
+    optimizer = build_optimizer(
+        model,
+        optimizer_name,
+        canonical_lr,
+        twins_lr_factor,
+        adam_decay,
+        adamw_decay,
+        epsilon,
+    )
+    scheduler = build_scheduler(
+        scheduler_name,
+        canonical_lr,
+        twins_lr_factor,
+        num_steps,
+        anneal_strategy,
+        optimizer,
+    )
 
     return optimizer, scheduler
 
 
-def build_optimizer(model, config):
-    name = config.optimizer
-    lr = config.canonical_lr
+def build_optimizer(
+    model,
+    optimizer_name,
+    canonical_lr,
+    twins_lr_factor,
+    adam_decay,
+    adamw_decay,
+    epsilon,
+):
+    name = optimizer_name
+    lr = canonical_lr
 
     if name == "adam":
         return torch.optim.Adam(
             model.parameters(),
             lr=lr,
-            weight_decay=config.adam_decay,
-            eps=config.epsilon,
+            weight_decay=adam_decay,
+            eps=epsilon,
         )
     elif name == "adamw":
-        if hasattr(config, "twins_lr_factor"):
-            factor = config.twins_lr_factor
+        if twins_lr_factor is not None:
+            factor = twins_lr_factor
             print("[Decrease lr of pre-trained model by factor {}]".format(factor))
             param_dicts = [
                 {
@@ -47,20 +81,22 @@ def build_optimizer(model, config):
             ]
             full = [n for n, _ in model.named_parameters()]
             return torch.optim.AdamW(
-                param_dicts, lr=lr, weight_decay=config.adamw_decay, eps=config.epsilon
+                param_dicts, lr=lr, weight_decay=adamw_decay, eps=epsilon
             )
         else:
             return torch.optim.AdamW(
                 model.parameters(),
                 lr=lr,
-                weight_decay=config.adamw_decay,
-                eps=config.epsilon,
+                weight_decay=adamw_decay,
+                eps=epsilon,
             )
     else:
         raise ValueError(f"TRAINER.OPTIMIZER = {name} is not a valid optimizer!")
 
 
-def build_scheduler(config, optimizer):
+def build_scheduler(
+    scheduler_name, canonical_lr, twins_lr_factor, num_steps, anneal_strategy, optimizer
+):
     """
     Returns:
         scheduler (dict):{
@@ -68,28 +104,28 @@ def build_scheduler(config, optimizer):
             'interval': 'step',  # or 'epoch'
         }
     """
-    name = config.scheduler
-    lr = config.canonical_lr
+    name = scheduler_name
+    lr = canonical_lr
 
     if name == "OneCycleLR":
-        if hasattr(config, "twins_lr_factor"):
-            factor = config.twins_lr_factor
+        if twins_lr_factor is not None:
+            factor = twins_lr_factor
             scheduler = OneCycleLR(
                 optimizer,
                 [lr, lr * factor],
-                config.num_steps + 100,
+                num_steps + 100,
                 pct_start=0.05,
                 cycle_momentum=False,
-                anneal_strategy=config.anneal_strategy,
+                anneal_strategy=anneal_strategy,
             )
         else:
             scheduler = OneCycleLR(
                 optimizer,
                 lr,
-                config.num_steps + 100,
+                num_steps + 100,
                 pct_start=0.05,
                 cycle_momentum=False,
-                anneal_strategy=config.anneal_strategy,
+                anneal_strategy=anneal_strategy,
             )
     else:
         raise NotImplementedError()

@@ -1,9 +1,10 @@
-from argparse import ArgumentParser, Namespace
+from typing import Sequence
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from .backbone import CNNEncoder
 from .transformer import FeatureTransformer, FeatureFlowAttention
 from .matching import global_correlation_softmax, local_correlation_softmax
@@ -13,10 +14,10 @@ from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -50,56 +51,65 @@ class GMFlow(BaseModel):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow-kitti-af50eb2e.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=32)
+    def __init__(
+        self,
+        attention_type: str = "swin",
+        attn_splits_list: Sequence[int] = (2,),
+        corr_radius_list: Sequence[int] = (-1,),
+        feature_channels: int = 128,
+        ffn_dim_expansion: int = 4,
+        gamma: float = 0.9,
+        max_flow: float = 400.0,
+        num_head: int = 1,
+        num_scales: int = 1,
+        num_transformer_layers: int = 6,
+        pred_bidir_flow: bool = False,
+        prop_radius_list: Sequence[int] = (-1,),
+        upsample_factor: int = 8,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=32, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
+
+        self.attention_type = attention_type
+        self.attn_splits_list = attn_splits_list
+        self.corr_radius_list = corr_radius_list
+        self.feature_channels = feature_channels
+        self.ffn_dim_expansion = ffn_dim_expansion
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.num_head = num_head
+        self.num_scales = num_scales
+        self.num_transformer_layers = num_transformer_layers
+        self.pred_bidir_flow = pred_bidir_flow
+        self.prop_radius_list = prop_radius_list
+        self.upsample_factor = upsample_factor
 
         # CNN backbone
         self.backbone = CNNEncoder(
-            output_dim=self.args.feature_channels,
-            num_output_scales=self.args.num_scales,
+            output_dim=self.feature_channels,
+            num_output_scales=self.num_scales,
         )
 
         # Transformer
         self.transformer = FeatureTransformer(
-            num_layers=self.args.num_transformer_layers,
-            d_model=self.args.feature_channels,
-            nhead=self.args.num_head,
-            attention_type=self.args.attention_type,
-            ffn_dim_expansion=self.args.ffn_dim_expansion,
+            num_layers=self.num_transformer_layers,
+            d_model=self.feature_channels,
+            nhead=self.num_head,
+            attention_type=self.attention_type,
+            ffn_dim_expansion=self.ffn_dim_expansion,
         )
 
         # flow propagation with self-attn
-        self.feature_flow_attn = FeatureFlowAttention(
-            in_channels=self.args.feature_channels
-        )
+        self.feature_flow_attn = FeatureFlowAttention(in_channels=self.feature_channels)
 
         # convex upsampling: concat feature0 and flow as input
         self.upsampler = nn.Sequential(
-            nn.Conv2d(2 + self.args.feature_channels, 256, 3, 1, 1),
+            nn.Conv2d(2 + self.feature_channels, 256, 3, 1, 1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(256, self.args.upsample_factor**2 * 9, 1, 1, 0),
+            nn.Conv2d(256, self.upsample_factor**2 * 9, 1, 1, 0),
         )
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument(
-            "--attention_type", type=str, choices=("full", "swin"), default="swin"
-        )
-        parser.add_argument("--attn_splits_list", type=int, nargs="+", default=(2,))
-        parser.add_argument("--corr_radius_list", type=int, nargs="+", default=(-1,))
-        parser.add_argument("--feature_channels", type=int, default=128)
-        parser.add_argument("--ffn_dim_expansion", type=int, default=4)
-        parser.add_argument("--gamma", type=float, default=0.9)
-        parser.add_argument("--max_flow", type=float, default=400.0)
-        parser.add_argument("--num_head", type=int, default=1)
-        parser.add_argument("--num_scales", type=int, default=1)
-        parser.add_argument("--num_transformer_layers", type=int, default=6)
-        parser.add_argument("--pred_bidir_flow", action="store_true")
-        parser.add_argument("--prop_radius_list", type=int, nargs="+", default=(-1,))
-        parser.add_argument("--upsample_factor", type=int, default=8)
-        return parser
 
     def extract_feature(self, img0, img1):
         concat = torch.cat((img0, img1), dim=0)  # [2B, C, H, W]
@@ -145,11 +155,11 @@ class GMFlow(BaseModel):
             mask = self.upsampler(concat)
             b, flow_channel, h, w = flow.shape
             mask = mask.view(
-                b, 1, 9, self.args.upsample_factor, self.args.upsample_factor, h, w
+                b, 1, 9, self.upsample_factor, self.upsample_factor, h, w
             )  # [B, 1, 9, K, K, H, W]
             mask = torch.softmax(mask, dim=2)
 
-            up_flow = F.unfold(self.args.upsample_factor * flow, [3, 3], padding=1)
+            up_flow = F.unfold(self.upsample_factor * flow, [3, 3], padding=1)
             up_flow = up_flow.view(
                 b, flow_channel, 9, 1, 1, h, w
             )  # [B, 2, 9, 1, 1, H, W]
@@ -159,8 +169,8 @@ class GMFlow(BaseModel):
             up_flow = up_flow.reshape(
                 b,
                 flow_channel,
-                self.args.upsample_factor * h,
-                self.args.upsample_factor * w,
+                self.upsample_factor * h,
+                self.upsample_factor * w,
             )  # [B, 2, K*H, K*W]
 
         return up_flow
@@ -190,23 +200,23 @@ class GMFlow(BaseModel):
         flow = None
 
         assert (
-            len(self.args.attn_splits_list)
-            == len(self.args.corr_radius_list)
-            == len(self.args.prop_radius_list)
-            == self.args.num_scales
+            len(self.attn_splits_list)
+            == len(self.corr_radius_list)
+            == len(self.prop_radius_list)
+            == self.num_scales
         )
 
-        for scale_idx in range(self.args.num_scales):
+        for scale_idx in range(self.num_scales):
             feature0, feature1 = feature0_list[scale_idx], feature1_list[scale_idx]
 
-            if self.args.pred_bidir_flow and scale_idx > 0:
+            if self.pred_bidir_flow and scale_idx > 0:
                 # predicting bidirectional flow with refinement
                 feature0, feature1 = torch.cat((feature0, feature1), dim=0), torch.cat(
                     (feature1, feature0), dim=0
                 )
 
-            upsample_factor = self.args.upsample_factor * (
-                2 ** (self.args.num_scales - 1 - scale_idx)
+            upsample_factor = self.upsample_factor * (
+                2 ** (self.num_scales - 1 - scale_idx)
             )
 
             if scale_idx > 0:
@@ -221,13 +231,13 @@ class GMFlow(BaseModel):
                 flow = flow.detach()
                 feature1 = flow_warp(feature1, flow)  # [B, C, H, W]
 
-            attn_splits = self.args.attn_splits_list[scale_idx]
-            corr_radius = self.args.corr_radius_list[scale_idx]
-            prop_radius = self.args.prop_radius_list[scale_idx]
+            attn_splits = self.attn_splits_list[scale_idx]
+            corr_radius = self.corr_radius_list[scale_idx]
+            prop_radius = self.prop_radius_list[scale_idx]
 
             # add position to features
             feature0, feature1 = feature_add_position(
-                feature0, feature1, attn_splits, self.args.feature_channels
+                feature0, feature1, attn_splits, self.feature_channels
             )
 
             # Transformer
@@ -238,7 +248,7 @@ class GMFlow(BaseModel):
             # correlation and softmax
             if corr_radius == -1:  # global matching
                 flow_pred = global_correlation_softmax(
-                    feature0, feature1, self.args.pred_bidir_flow
+                    feature0, feature1, self.pred_bidir_flow
                 )[0]
             else:  # local matching
                 flow_pred = local_correlation_softmax(feature0, feature1, corr_radius)[
@@ -261,7 +271,7 @@ class GMFlow(BaseModel):
                 flow_preds.append(flow_bilinear)
 
             # flow propagation with self-attn
-            if self.args.pred_bidir_flow and scale_idx == 0:
+            if self.pred_bidir_flow and scale_idx == 0:
                 feature0 = torch.cat(
                     (feature0, feature1), dim=0
                 )  # [2*B, C, H, W] for propagation
@@ -273,7 +283,7 @@ class GMFlow(BaseModel):
             )
 
             # bilinear upsampling at training time except the last one
-            if self.training and scale_idx < self.args.num_scales - 1:
+            if self.training and scale_idx < self.num_scales - 1:
                 flow_up = self.upsample_flow(
                     flow, feature0, bilinear=True, upsample_factor=upsample_factor
                 )
@@ -282,7 +292,7 @@ class GMFlow(BaseModel):
                 )
                 flow_preds.append(flow_up)
 
-            if scale_idx == self.args.num_scales - 1:
+            if scale_idx == self.num_scales - 1:
                 flow_up = self.upsample_flow(flow, feature0)
                 flow_up = self.postprocess_predictions(
                     flow_up, image_resizer, is_flow=True
@@ -305,10 +315,48 @@ class GMFlowWithRefinement(GMFlow):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflow_refine-kitti-b7bf2fda.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        args.attn_splits_list = (2, 8)
-        args.corr_radius_list = (-1, 4)
-        args.num_scales = 2
-        args.prop_radius_list = (-1, 1)
-        args.upsample_factor = 4
-        super().__init__(args)
+    def __init__(
+        self,
+        attention_type: str = "swin",
+        attn_splits_list: Sequence[int] = (2, 8),
+        corr_radius_list: Sequence[int] = (-1, 4),
+        feature_channels: int = 128,
+        ffn_dim_expansion: int = 4,
+        gamma: float = 0.9,
+        max_flow: float = 400,
+        num_head: int = 1,
+        num_scales: int = 2,
+        num_transformer_layers: int = 6,
+        pred_bidir_flow: bool = False,
+        prop_radius_list: Sequence[int] = (-1, 1),
+        upsample_factor: int = 4,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            attention_type,
+            attn_splits_list,
+            corr_radius_list,
+            feature_channels,
+            ffn_dim_expansion,
+            gamma,
+            max_flow,
+            num_head,
+            num_scales,
+            num_transformer_layers,
+            pred_bidir_flow,
+            prop_radius_list,
+            upsample_factor,
+            **kwargs,
+        )
+
+
+@register_model
+@trainable
+class gmflow(GMFlow):
+    pass
+
+
+@register_model
+@trainable
+class gmflow_refine(GMFlowWithRefinement):
+    pass

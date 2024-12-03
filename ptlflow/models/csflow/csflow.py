@@ -1,18 +1,17 @@
-from argparse import ArgumentParser, Namespace
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from ptlflow.utils.utils import forward_interpolate_batch
 from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -43,40 +42,45 @@ class CSFlow(BaseModel):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/csflow-kitti-dc66357a.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=8)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dropout: float = 0.0,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 32,
+        gen_fmap: bool = False,
+        skip_encode: bool = False,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
+
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.dropout = dropout
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.iters = iters
+        self.gen_fmap = gen_fmap
+        self.skip_encode = skip_encode
 
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
 
-        if "dropout" not in self.args:
-            self.args.dropout = 0
-
         # feature network, context network, and update block
-        self.fnet = BasicEncoder(
-            output_dim=256, norm_fn="instance", dropout=args.dropout
-        )
+        self.fnet = BasicEncoder(output_dim=256, norm_fn="instance", dropout=dropout)
 
         self.cnet = BasicEncoder(
-            output_dim=hdim + cdim, norm_fn="batch", dropout=args.dropout
+            output_dim=hdim + cdim, norm_fn="batch", dropout=dropout
         )
 
         self.strip_corr_block_v2 = StripCrossCorrMap_v2(in_chan=256, out_chan=256)
-        self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--corr_levels", type=int, default=4)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument("--dropout", type=float, default=0.0)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=400.0)
-        parser.add_argument("--iters", type=int, default=32)
-        parser.add_argument("--gen_fmap", action="store_true")
-        parser.add_argument("--skip_encode", action="store_true")
-        return parser
+        self.update_block = BasicUpdateBlock(
+            corr_levels=corr_levels, corr_radius=corr_radius, hidden_dim=hdim
+        )
 
     def freeze_bn(self):
         for m in self.modules():
@@ -124,7 +128,7 @@ class CSFlow(BaseModel):
         image1 = images[:, 0]
         image2 = images[:, 1]
 
-        if not self.args.skip_encode:
+        if not self.skip_encode:
             # run the feature network
             fmap1, fmap2 = self.fnet([image1, image2])
         else:
@@ -135,11 +139,11 @@ class CSFlow(BaseModel):
         cdim = self.context_dim
 
         # run the context network
-        if not self.args.skip_encode:
+        if not self.skip_encode:
             cnet = self.cnet(image1)
 
             if not self.training:
-                if self.args.gen_fmap:
+                if self.gen_fmap:
                     return fmap1, fmap2, cnet
         else:
             cnet = inputs["images"][:, 2] * 255.0
@@ -151,11 +155,9 @@ class CSFlow(BaseModel):
         strip_coor_map, strip_corr_map_w, strip_corr_map_h = self.strip_corr_block_v2(
             [fmap1, fmap2]
         )
-        corr_fn = CorrBlock_v2(
-            fmap1, fmap2, strip_coor_map, radius=self.args.corr_radius
-        )
+        corr_fn = CorrBlock_v2(fmap1, fmap2, strip_coor_map, radius=self.corr_radius)
 
-        if not self.args.skip_encode:
+        if not self.skip_encode:
             coords0, coords1 = self.initialize_flow(image1)
         else:
             b, c, h, w = fmap1.shape
@@ -195,7 +197,7 @@ class CSFlow(BaseModel):
         flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
         flow_predictions.append(flow_up)
 
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             coords1 = coords1.detach()
             corr = corr_fn(coords1)  # index correlation volume
 
@@ -324,29 +326,14 @@ class ConvBNReLU(nn.Module):
                     nn.init.constant_(ly.bias, 0)
 
 
-class SmallUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=96):
-        super(SmallUpdateBlock, self).__init__()
-        self.encoder = SmallMotionEncoder(args)
-        self.gru = ConvGRU(hidden_dim=hidden_dim, input_dim=82 + 64)
-        self.flow_head = FlowHead(hidden_dim, hidden_dim=128)
-
-    def forward(self, net, inp, corr, flow):
-        motion_features = self.encoder(flow, corr)
-        inp = torch.cat([inp, motion_features], dim=1)
-        net = self.gru(net, inp)
-        delta_flow = self.flow_head(net)
-
-        return net, None, delta_flow
-
-
 class BasicUpdateBlock(nn.Module):
     """Modified by Hao, support for CSFlow"""
 
-    def __init__(self, args, hidden_dim=128, input_dim=128):
+    def __init__(self, corr_levels: int, corr_radius: int, hidden_dim: int = 128):
         super(BasicUpdateBlock, self).__init__()
-        self.args = args
-        self.encoder = BasicMotionEncoder_v2(args)
+        self.encoder = BasicMotionEncoder_v2(
+            corr_levels=corr_levels, corr_radius=corr_radius
+        )
         self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=128 + hidden_dim)
         self.flow_head = FlowHead(hidden_dim, hidden_dim=256)
 
@@ -444,79 +431,6 @@ class BasicEncoder(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
 
-        x = self.conv2(x)
-
-        if self.training and self.dropout is not None:
-            x = self.dropout(x)
-
-        if is_list:
-            x = torch.split(x, [batch_dim, batch_dim], dim=0)
-
-        return x
-
-
-class SmallEncoder(nn.Module):
-    def __init__(self, output_dim=128, norm_fn="batch", dropout=0.0):
-        super(SmallEncoder, self).__init__()
-        self.norm_fn = norm_fn
-
-        if self.norm_fn == "group":
-            self.norm1 = nn.GroupNorm(num_groups=8, num_channels=32)
-
-        elif self.norm_fn == "batch":
-            self.norm1 = nn.BatchNorm2d(32)
-
-        elif self.norm_fn == "instance":
-            self.norm1 = nn.InstanceNorm2d(32)
-
-        elif self.norm_fn == "none":
-            self.norm1 = nn.Sequential()
-
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=7, stride=2, padding=3)
-        self.relu1 = nn.ReLU(inplace=True)
-
-        self.in_planes = 32
-        self.layer1 = self._make_layer(32, stride=1)
-        self.layer2 = self._make_layer(64, stride=2)
-        self.layer3 = self._make_layer(96, stride=2)
-
-        self.dropout = None
-        if dropout > 0:
-            self.dropout = nn.Dropout2d(p=dropout)
-
-        self.conv2 = nn.Conv2d(96, output_dim, kernel_size=1)
-
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
-            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-                if m.weight is not None:
-                    nn.init.constant_(m.weight, 1)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-
-    def _make_layer(self, dim, stride=1):
-        layer1 = BottleneckBlock(self.in_planes, dim, self.norm_fn, stride=stride)
-        layer2 = BottleneckBlock(dim, dim, self.norm_fn, stride=1)
-        layers = (layer1, layer2)
-
-        self.in_planes = dim
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        # if input is list, combine batch dimension
-        is_list = isinstance(x, tuple) or isinstance(x, list)
-        if is_list:
-            batch_dim = x[0].shape[0]
-            x = torch.cat(x, dim=0)
-
-        x = self.conv1(x)
-        x = self.norm1(x)
-        x = self.relu1(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
         x = self.conv2(x)
 
         if self.training and self.dropout is not None:
@@ -740,10 +654,10 @@ class BottleneckBlock(nn.Module):
 class BasicMotionEncoder_v2(nn.Module):
     """Get Motion Feature from CSFlow, by Hao"""
 
-    def __init__(self, args):
+    def __init__(self, corr_levels: int, corr_radius: int):
         super(BasicMotionEncoder_v2, self).__init__()
         # double cor_plances due to concat aug
-        cor_planes = 2 * (args.corr_levels * (2 * args.corr_radius + 1) ** 2)
+        cor_planes = 2 * (corr_levels * (2 * corr_radius + 1) ** 2)
         self.convc1 = nn.Conv2d(cor_planes, 256, 1, padding=0)
         self.convc2 = nn.Conv2d(256, 192, 3, padding=1)
         self.convf1 = nn.Conv2d(2, 128, 7, padding=3)
@@ -756,24 +670,6 @@ class BasicMotionEncoder_v2(nn.Module):
         flo = F.relu(self.convf1(flow))
         flo = F.relu(self.convf2(flo))
 
-        cor_flo = torch.cat([cor, flo], dim=1)
-        out = F.relu(self.conv(cor_flo))
-        return torch.cat([out, flow], dim=1)
-
-
-class SmallMotionEncoder(nn.Module):
-    def __init__(self, args):
-        super(SmallMotionEncoder, self).__init__()
-        cor_planes = args.corr_levels * (2 * args.corr_radius + 1) ** 2
-        self.convc1 = nn.Conv2d(cor_planes, 96, 1, padding=0)
-        self.convf1 = nn.Conv2d(2, 64, 7, padding=3)
-        self.convf2 = nn.Conv2d(64, 32, 3, padding=1)
-        self.conv = nn.Conv2d(128, 80, 3, padding=1)
-
-    def forward(self, flow, corr):
-        cor = F.relu(self.convc1(corr))
-        flo = F.relu(self.convf1(flow))
-        flo = F.relu(self.convf2(flo))
         cor_flo = torch.cat([cor, flo], dim=1)
         out = F.relu(self.conv(cor_flo))
         return torch.cat([out, flow], dim=1)
@@ -847,3 +743,9 @@ class ConvGRU(nn.Module):
 
         h = (1 - z) * h + z * q
         return h
+
+
+@register_model
+@trainable
+class csflow(CSFlow):
+    pass

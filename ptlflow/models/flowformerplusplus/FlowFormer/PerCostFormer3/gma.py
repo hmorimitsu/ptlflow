@@ -33,14 +33,12 @@ class Attention(nn.Module):
     def __init__(
         self,
         *,
-        args,
         dim,
         max_pos_size=100,
         heads=4,
         dim_head=128,
     ):
         super().__init__()
-        self.args = args
         self.heads = heads
         self.scale = dim_head**-0.5
         inner_dim = heads * dim_head
@@ -57,15 +55,6 @@ class Attention(nn.Module):
         q, k = map(lambda t: rearrange(t, "b (h d) x y -> b h x y d", h=heads), (q, k))
         q = self.scale * q
 
-        # if self.args.position_only:
-        #     sim = self.pos_emb(q)
-
-        # elif self.args.position_and_content:
-        #     sim_content = einsum('b h x y d, b h u v d -> b h x y u v', q, k)
-        #     sim_pos = self.pos_emb(q)
-        #     sim = sim_content + sim_pos
-
-        # else:
         sim = einsum("b h x y d, b h u v d -> b h x y u v", q, k)
 
         sim = rearrange(sim, "b h x y u v -> b h (x y) (u v)")
@@ -77,13 +66,11 @@ class Attention(nn.Module):
 class Aggregate(nn.Module):
     def __init__(
         self,
-        args,
         dim,
         heads=4,
         dim_head=128,
     ):
         super().__init__()
-        self.args = args
         self.heads = heads
         self.scale = dim_head**-0.5
         inner_dim = heads * dim_head

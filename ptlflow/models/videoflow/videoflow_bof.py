@@ -3,6 +3,7 @@ from argparse import ArgumentParser, Namespace
 import torch
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model
 from .Networks.BOFNet.update import GMAUpdateBlock
 from .Networks.encoders import twins_svt_large
 from .Networks.BOFNet.cnn import BasicEncoder
@@ -21,75 +22,74 @@ class VideoFlowBOF(BaseModel):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/videoflow_bof-kitti-fa9af79c.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=None, output_stride=8)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        cnet: str = "twins",
+        fnet: str = "twins",
+        gma: str = "GMA-SK2",
+        pretrain: bool = True,
+        corr_fn: str = "default",
+        decoder_depth: int = 32,
+        cost_heads_num: int = 1,
+        **kwargs,
+    ) -> None:
+        super().__init__(loss_fn=None, output_stride=8, **kwargs)
 
-        self.hidden_dim = hdim = 128
-        self.context_dim = cdim = 128
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.cnet = cnet
+        self.fnet = fnet
+        self.gma = gma
+        self.pretrain = pretrain
+        self.corr_fn = corr_fn
+        self.decoder_depth = decoder_depth
 
-        args.corr_radius = 4
-        args.corr_levels = 4
+        self.hidden_dim = 128
+        self.context_dim = 128
 
         # feature network, context network, and update block
-        if args.cnet == "twins":
+        if cnet == "twins":
             print("[Using twins as context encoder]")
-            self.cnet = twins_svt_large(pretrained=self.args.pretrain)
-        elif args.cnet == "basicencoder":
+            self.cnet = twins_svt_large(pretrained=self.pretrain)
+        elif cnet == "basicencoder":
             print("[Using basicencoder as context encoder]")
             self.cnet = BasicEncoder(output_dim=256, norm_fn="instance")
 
-        if args.fnet == "twins":
+        if fnet == "twins":
             print("[Using twins as feature encoder]")
-            self.fnet = twins_svt_large(pretrained=self.args.pretrain)
-        elif args.fnet == "basicencoder":
+            self.fnet = twins_svt_large(pretrained=self.pretrain)
+        elif fnet == "basicencoder":
             print("[Using basicencoder as feature encoder]")
             self.fnet = BasicEncoder(output_dim=256, norm_fn="instance")
 
-        if self.args.gma == "GMA":
+        if self.gma == "GMA":
             print("[Using GMA]")
-            self.update_block = GMAUpdateBlock(self.args, hidden_dim=128)
-        elif self.args.gma == "GMA-SK":
+            self.update_block = GMAUpdateBlock(
+                corr_levels=corr_levels, corr_radius=corr_radius, hidden_dim=128
+            )
+        elif self.gma == "GMA-SK":
             print("[Using GMA-SK]")
-            self.args.cost_heads_num = 1
+            self.cost_heads_num = 1
             self.update_block = SKUpdateBlock6_Deep_nopoolres_AllDecoder(
-                args=self.args, hidden_dim=128
+                cost_heads_num=cost_heads_num, hidden_dim=128
             )
-        elif self.args.gma == "GMA-SK2":
+        elif self.gma == "GMA-SK2":
             print("[Using GMA-SK2]")
-            self.args.cost_heads_num = 1
+            self.cost_heads_num = 1
             self.update_block = SKUpdateBlock6_Deep_nopoolres_AllDecoder2(
-                args=self.args, hidden_dim=128
+                corr_radius=corr_radius,
+                corr_levels=corr_levels,
+                cost_heads_num=cost_heads_num,
+                hidden_dim=128,
             )
 
-        print("[Using corr_fn {}]".format(self.args.corr_fn))
+        print("[Using corr_fn {}]".format(self.corr_fn))
 
-        self.att = Attention(
-            args=self.args, dim=128, heads=1, max_pos_size=160, dim_head=128
-        )
+        self.att = Attention(dim=128, heads=1, max_pos_size=160, dim_head=128)
 
         self.has_showed_warning = False
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--corr_levels", type=int, default=4)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument(
-            "--cnet", type=str, choices=("twins", "basicencoder"), default="twins"
-        )
-        parser.add_argument(
-            "--fnet", type=str, choices=("twins", "basicencoder"), default="twins"
-        )
-        parser.add_argument(
-            "--gma", type=str, choices=("GMA", "GMA-SK", "GMA-SK2"), default="GMA-SK2"
-        )
-        parser.add_argument("--no_pretrain", action="store_false", dest="pretrain")
-        parser.add_argument(
-            "--corr_fn", type=str, choices=("default", "efficient"), default="default"
-        )
-        parser.add_argument("--decoder_depth", type=int, default=32)
-        return parser
 
     def initialize_flow(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
@@ -139,21 +139,21 @@ class VideoFlowBOF(BaseModel):
         fmap2 = fmaps[:, 1, ...]
         fmap3 = fmaps[:, 2, ...]
 
-        if self.args.corr_fn == "efficient":
-            corr_fn_21 = AlternateCorrBlock(fmap2, fmap1, radius=self.args.corr_radius)
-            corr_fn_23 = AlternateCorrBlock(fmap2, fmap3, radius=self.args.corr_radius)
+        if self.corr_fn == "efficient":
+            corr_fn_21 = AlternateCorrBlock(fmap2, fmap1, radius=self.corr_radius)
+            corr_fn_23 = AlternateCorrBlock(fmap2, fmap3, radius=self.corr_radius)
         else:
             corr_fn_21 = CorrBlock(
                 fmap2,
                 fmap1,
-                num_levels=self.args.corr_levels,
-                radius=self.args.corr_radius,
+                num_levels=self.corr_levels,
+                radius=self.corr_radius,
             )
             corr_fn_23 = CorrBlock(
                 fmap2,
                 fmap3,
-                num_levels=self.args.corr_levels,
-                radius=self.args.corr_radius,
+                num_levels=self.corr_levels,
+                radius=self.corr_radius,
             )
 
         cnet = self.cnet(images[:, 1, ...])
@@ -166,7 +166,7 @@ class VideoFlowBOF(BaseModel):
         coords0_23, coords1_23 = self.initialize_flow(images[:, 0, ...])
 
         flow_predictions = []
-        for itr in range(self.args.decoder_depth):
+        for itr in range(self.decoder_depth):
             coords1_21 = coords1_21.detach()
             coords1_23 = coords1_23.detach()
 
@@ -228,3 +228,8 @@ class VideoFlowBOF(BaseModel):
                 self.has_showed_warning = True
             images = torch.cat([images[:, :1], images], 1)
         return images
+
+
+@register_model
+class videoflow_bof(VideoFlowBOF):
+    pass

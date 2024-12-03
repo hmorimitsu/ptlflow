@@ -1,19 +1,17 @@
-from argparse import ArgumentParser, Namespace
+from typing import Sequence
 
+from loguru import logger
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock
 from .extractor import BasicEncoder, Basic_Context_Encoder
 from .corr import get_corr_block
 from .utils import coords_grid, upflow2, get_correlation_depth
 from ..base_model.base_model import BaseModel
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 try:
     import alt_cuda_corr
@@ -38,10 +36,10 @@ def downflow(flow, mode="bilinear", factor=0.125):
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -70,11 +68,29 @@ class MSRAFTPlus(BaseModel):
         "mixed": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/ms_raft_plus-mixed-2bb01f62.ckpt"
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=16)
+    def __init__(
+        self,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: Sequence[int] = (4, 6, 5, 10),
+        lookup_pyramid_levels: int = 2,
+        lookup_radius: int = 4,
+        alternate_corr: bool = True,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=16, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
+
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.iters = iters
+        self.lookup_pyramid_levels = lookup_pyramid_levels
+        self.lookup_radius = lookup_radius
+        self.alternate_corr = alternate_corr
 
         self.correlation_depth = get_correlation_depth(
-            self.args.lookup_pyramid_levels, self.args.lookup_radius
+            self.lookup_pyramid_levels, self.lookup_radius
         )
 
         self.hidden_dim = 128
@@ -84,27 +100,13 @@ class MSRAFTPlus(BaseModel):
         self.fnet = BasicEncoder(output_dim=256, norm_fn="group")
         self.cnet = Basic_Context_Encoder(output_dim=256, norm_fn="group")
         self.update_block = BasicUpdateBlock(
-            self.args, self.correlation_depth, hidden_dim=128, scale=2
+            self.correlation_depth, hidden_dim=128, scale=2
         )
 
-        if self.args.alternate_corr and alt_cuda_corr is None:
-            print(
+        if self.alternate_corr and alt_cuda_corr is None:
+            logger.warning(
                 "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
             )
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, nargs="+", default=[4, 6, 5, 10])
-        parser.add_argument("--lookup_pyramid_levels", type=int, default=2)
-        parser.add_argument("--lookup_radius", default=4)
-        parser.add_argument(
-            "--no_alternate_corr", action="store_false", dest="alternate_corr"
-        )
-        return parser
 
     def freeze_bn(self):
         for m in self.modules():
@@ -175,23 +177,23 @@ class MSRAFTPlus(BaseModel):
             cnet_pyramid
         ), "fnet and cnet pyramid should have the same length."
         assert len(fnet_pyramid) == len(
-            self.args.iters
+            self.iters
         ), "pyramid levels and the length of GRU iteration lists should be the same."
 
         for index, (fmap1, fmap2) in enumerate(fnet_pyramid):
             corr_fn = get_corr_block(
                 fmap1=fmap1,
                 fmap2=fmap2,
-                radius=self.args.lookup_radius,
-                num_levels=self.args.lookup_pyramid_levels,
-                alternate_corr=self.args.alternate_corr,
+                radius=self.lookup_radius,
+                num_levels=self.lookup_pyramid_levels,
+                alternate_corr=self.alternate_corr,
             )
 
             net, inp = torch.split(cnet_pyramid[index], [128, 128], dim=1)
             net = torch.tanh(net)
             inp = torch.relu(inp)
 
-            for itr in range(self.args.iters[index]):
+            for itr in range(self.iters[index]):
                 coords1 = coords1.detach()
                 if index >= 1 and itr == 0:
                     coords1 = self.upsample_flow(coords1, up_mask, scale=2)
@@ -222,3 +224,8 @@ class MSRAFTPlus(BaseModel):
             }
 
         return outputs
+
+
+@register_model
+class ms_raft_p(MSRAFTPlus):
+    pass

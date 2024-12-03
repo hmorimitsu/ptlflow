@@ -1,7 +1,7 @@
 """Validate optical flow estimation performance on standard datasets."""
 
 # =============================================================================
-# Copyright 2021 Henrique Morimitsu
+# Copyright 2024 Henrique Morimitsu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

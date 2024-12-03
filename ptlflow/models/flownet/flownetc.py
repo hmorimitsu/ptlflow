@@ -1,11 +1,10 @@
-from argparse import Namespace
-
 from einops import rearrange
 
 import torch
 import torch.nn as nn
 from torch.nn import init
 
+from ptlflow.utils.registry import register_model, trainable
 from .submodules import *
 from .flownet_base import FlowNetBase
 
@@ -15,28 +14,45 @@ class FlowNetC(FlowNetBase):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flownetc-things-cc8ac7fd.ckpt"
     }
 
-    def __init__(self, args: Namespace):
-        super(FlowNetC, self).__init__(args)
-
-        self.args = args
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        input_channels: int = 6,
+        batch_norm: bool = False,
+        loss_start_scale: int = 4,
+        loss_num_scales: int = 5,
+        loss_base_weight: float = 0.32,
+        loss_norm: str = "L2",
+        **kwargs,
+    ):
+        super(FlowNetC, self).__init__(
+            div_flow=div_flow,
+            input_channels=input_channels,
+            batch_norm=batch_norm,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
 
         self.rgb_max = 1
 
-        self.conv1 = conv(self.args.batch_norm, 3, 64, kernel_size=7, stride=2)
-        self.conv2 = conv(self.args.batch_norm, 64, 128, kernel_size=5, stride=2)
-        self.conv3 = conv(self.args.batch_norm, 128, 256, kernel_size=5, stride=2)
-        self.conv_redir = conv(self.args.batch_norm, 256, 32, kernel_size=1, stride=1)
+        self.conv1 = conv(self.batch_norm, 3, 64, kernel_size=7, stride=2)
+        self.conv2 = conv(self.batch_norm, 64, 128, kernel_size=5, stride=2)
+        self.conv3 = conv(self.batch_norm, 128, 256, kernel_size=5, stride=2)
+        self.conv_redir = conv(self.batch_norm, 256, 32, kernel_size=1, stride=1)
 
         self.corr = correlate  # Correlation(pad_size=20, kernel_size=1, max_displacement=20, stride1=1, stride2=2, corr_multiply=1)
 
         self.corr_activation = nn.LeakyReLU(0.1, inplace=True)
-        self.conv3_1 = conv(self.args.batch_norm, 473, 256)
-        self.conv4 = conv(self.args.batch_norm, 256, 512, stride=2)
-        self.conv4_1 = conv(self.args.batch_norm, 512, 512)
-        self.conv5 = conv(self.args.batch_norm, 512, 512, stride=2)
-        self.conv5_1 = conv(self.args.batch_norm, 512, 512)
-        self.conv6 = conv(self.args.batch_norm, 512, 1024, stride=2)
-        self.conv6_1 = conv(self.args.batch_norm, 1024, 1024)
+        self.conv3_1 = conv(self.batch_norm, 473, 256)
+        self.conv4 = conv(self.batch_norm, 256, 512, stride=2)
+        self.conv4_1 = conv(self.batch_norm, 512, 512)
+        self.conv5 = conv(self.batch_norm, 512, 512, stride=2)
+        self.conv5_1 = conv(self.batch_norm, 512, 512)
+        self.conv6 = conv(self.batch_norm, 512, 1024, stride=2)
+        self.conv6_1 = conv(self.batch_norm, 1024, 1024)
 
         self.deconv5 = deconv(1024, 512)
         self.deconv4 = deconv(1026, 256)
@@ -139,7 +155,7 @@ class FlowNetC(FlowNetBase):
 
         flow2 = self.predict_flow2(concat2)
 
-        out_flow = self.args.div_flow * self.upsample1(flow2)
+        out_flow = self.div_flow * self.upsample1(flow2)
         if image_resizer is not None:
             out_flow = self.postprocess_predictions(
                 out_flow, image_resizer, is_flow=True
@@ -154,3 +170,9 @@ class FlowNetC(FlowNetBase):
             outputs["flows"] = out_flow[:, None]
 
         return outputs
+
+
+@register_model
+@trainable
+class flownetc(FlowNetC):
+    pass

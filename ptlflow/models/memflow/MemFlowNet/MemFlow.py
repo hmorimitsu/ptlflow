@@ -19,56 +19,74 @@ except:
 
 
 class MemFlowNet(nn.Module):
-    def __init__(self, cfg):
+    def __init__(
+        self,
+        cnet,
+        fnet,
+        corr_levels,
+        corr_radius,
+        decoder_depth,
+        pretrain,
+        gma,
+        corr_fn,
+        train_avg_length,
+    ):
         super().__init__()
-        self.cfg = cfg
+
+        self.cnet_name = cnet
+        self.fnet_name = fnet
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.decoder_depth = decoder_depth
 
         self.hidden_dim = 128
         self.context_dim = 128
 
         # feature network, context network, and update block
-        if cfg.cnet == "twins":
+        if cnet == "twins":
             print("[Using twins as context encoder]")
-            self.cnet = twins_svt_large(pretrained=self.cfg.pretrain)
+            self.cnet = twins_svt_large(pretrained=pretrain)
             self.proj = nn.Conv2d(256, 256, 1)
-        elif cfg.cnet == "basicencoder":
+        elif cnet == "basicencoder":
             print("[Using basicencoder as context encoder]")
             self.cnet = BasicEncoder(output_dim=256, norm_fn="batch")
 
-        if cfg.fnet == "twins":
+        if fnet == "twins":
             print("[Using twins as feature encoder]")
-            self.fnet = twins_svt_large(pretrained=self.cfg.pretrain)
+            self.fnet = twins_svt_large(pretrained=pretrain)
             self.channel_convertor = nn.Conv2d(256, 256, 1, padding=0, bias=False)
-        elif cfg.fnet == "basicencoder":
+        elif fnet == "basicencoder":
             print("[Using basicencoder as feature encoder]")
             self.fnet = BasicEncoder(output_dim=256, norm_fn="instance")
 
-        if self.cfg.gma == "GMA":
+        if gma == "GMA":
             print("[Using GMA]")
-            self.update_block = GMAUpdateBlock(self.cfg, hidden_dim=128)
-        elif self.cfg.gma == "GMA-SK":
-            print("[Using GMA-SK]")
-            self.cfg.cost_heads_num = 1
-            self.update_block = SKUpdateBlock6_Deep_nopoolres_AllDecoder(
-                args=self.cfg, hidden_dim=128
+            self.update_block = GMAUpdateBlock(
+                corr_levels=corr_levels, corr_radius=corr_radius, hidden_dim=128
             )
-        elif self.cfg.gma == "GMA-SK2":
+        elif gma == "GMA-SK":
+            print("[Using GMA-SK]")
+            self.update_block = SKUpdateBlock6_Deep_nopoolres_AllDecoder(
+                cost_heads_num=1, hidden_dim=128
+            )
+        elif gma == "GMA-SK2":
             print("[Using GMA-SK2]")
-            self.cfg.cost_heads_num = 1
             self.update_block = SKUpdateBlock6_Deep_nopoolres_AllDecoder2_Mem_skflow(
-                args=self.cfg, hidden_dim=128
+                corr_radius=corr_radius,
+                corr_levels=corr_levels,
+                cost_heads_num=1,
+                hidden_dim=128,
             )
 
-        print("[Using corr_fn {}]".format(self.cfg.corr_fn))
+        print("[Using corr_fn {}]".format(corr_fn))
 
         self.att = Attention(
-            args=self.cfg,
             dim=self.context_dim,
             heads=1,
             max_pos_size=160,
             dim_head=self.context_dim,
         )
-        self.train_avg_length = cfg.train_avg_length
+        self.train_avg_length = train_avg_length
 
     def encode_features(self, frame, flow_init=None):
         # Determine input shape
@@ -85,7 +103,7 @@ class MemFlowNet(nn.Module):
             raise NotImplementedError
 
         fmaps = self.fnet(frame)
-        if self.cfg.fnet == "twins":
+        if self.fnet_name == "twins":
             fmaps = self.channel_convertor(fmaps)
         if need_reshape:
             # B*T*C*H*W
@@ -115,7 +133,7 @@ class MemFlowNet(nn.Module):
 
         # shape is b*c*h*w
         cnet = self.cnet(frame)
-        if self.cfg.cnet == "twins":
+        if self.cnet_name == "twins":
             cnet = self.proj(cnet)
 
         net, inp = torch.split(cnet, [self.hidden_dim, self.context_dim], dim=1)
@@ -149,13 +167,13 @@ class MemFlowNet(nn.Module):
         corr_fn = CorrBlock(
             fmaps[:, 0, ...],
             fmaps[:, 1, ...],
-            num_levels=self.cfg.corr_levels,
-            radius=self.cfg.corr_radius,
+            num_levels=self.corr_levels,
+            radius=self.corr_radius,
         )
         flow_predictions = []
         query = query.flatten(start_dim=2).permute(0, 2, 1).unsqueeze(2)
         ref_keys = ref_keys.flatten(start_dim=2).permute(0, 2, 1).unsqueeze(2)
-        for _ in range(self.cfg.decoder_depth):
+        for _ in range(self.decoder_depth):
             coords1 = coords1.detach()
             corr = corr_fn(coords1)  # index correlation volume
             flow = coords1 - coords0

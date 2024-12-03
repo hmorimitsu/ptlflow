@@ -95,18 +95,18 @@ class SKMotionEncoder6_Deep_nopool_res_Mem(nn.Module):
 
 
 class SKMotionEncoder6_Deep_nopool_res_Mem_skflow(nn.Module):
-    def __init__(self, args):
+    def __init__(self, corr_radius, corr_levels, k_conv, cost_heads_num):
         super().__init__()
         self.cor_planes = cor_planes = (
-            (args.corr_radius * 2 + 1) ** 2 * args.cost_heads_num * args.corr_levels
+            (corr_radius * 2 + 1) ** 2 * cost_heads_num * corr_levels
         )
-        self.convc1 = PCBlock4_Deep_nopool_res(cor_planes, 256, k_conv=args.k_conv)
-        self.convc2 = PCBlock4_Deep_nopool_res(256, 192, k_conv=args.k_conv)
+        self.convc1 = PCBlock4_Deep_nopool_res(cor_planes, 256, k_conv=k_conv)
+        self.convc2 = PCBlock4_Deep_nopool_res(256, 192, k_conv=k_conv)
 
         self.convf1 = nn.Conv2d(2, 128, 1, 1, 0)
-        self.convf2 = PCBlock4_Deep_nopool_res(128, 64, k_conv=args.k_conv)
+        self.convf2 = PCBlock4_Deep_nopool_res(128, 64, k_conv=k_conv)
 
-        self.conv = PCBlock4_Deep_nopool_res(64 + 192, 128 - 2, k_conv=args.k_conv)
+        self.conv = PCBlock4_Deep_nopool_res(64 + 192, 128 - 2, k_conv=k_conv)
 
     def forward(self, flow, corr):
         cor = F.gelu(self.convc1(corr))
@@ -199,18 +199,21 @@ class SKUpdateBlock6_Deep_nopoolres_AllDecoder2_Mem(nn.Module):
 
 
 class SKUpdateBlock6_Deep_nopoolres_AllDecoder2_Mem_skflow(nn.Module):
-    def __init__(self, args, hidden_dim):
+    def __init__(self, corr_radius, corr_levels, cost_heads_num, hidden_dim):
         super().__init__()
-        self.args = args
+        k_conv = [1, 15]
+        PCUpdater_conv = [1, 7]
 
-        args.k_conv = [1, 15]
-        args.PCUpdater_conv = [1, 7]
-
-        self.encoder = SKMotionEncoder6_Deep_nopool_res_Mem_skflow(args)
-        self.gru = PCBlock4_Deep_nopool_res(
-            128 + hidden_dim + hidden_dim + 128, 128, k_conv=args.PCUpdater_conv
+        self.encoder = SKMotionEncoder6_Deep_nopool_res_Mem_skflow(
+            corr_radius=corr_radius,
+            corr_levels=corr_levels,
+            k_conv=k_conv,
+            cost_heads_num=cost_heads_num,
         )
-        self.flow_head = PCBlock4_Deep_nopool_res(128, 2, k_conv=args.k_conv)
+        self.gru = PCBlock4_Deep_nopool_res(
+            128 + hidden_dim + hidden_dim + 128, 128, k_conv=PCUpdater_conv
+        )
+        self.flow_head = PCBlock4_Deep_nopool_res(128, 2, k_conv=k_conv)
 
         self.mask = nn.Sequential(
             nn.Conv2d(128, 256, 3, padding=1),
@@ -218,7 +221,7 @@ class SKUpdateBlock6_Deep_nopoolres_AllDecoder2_Mem_skflow(nn.Module):
             nn.Conv2d(256, 64 * 9, 1, padding=0),
         )
 
-        self.aggregator = Aggregate(args=self.args, dim=128, dim_head=128, heads=1)
+        self.aggregator = Aggregate(dim=128, dim_head=128, heads=1)
 
     def get_motion_and_value(self, flow, corr):
         motion_features = self.encoder(flow, corr)

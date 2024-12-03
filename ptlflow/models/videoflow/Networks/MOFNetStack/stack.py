@@ -55,21 +55,21 @@ class velocity_update_block(nn.Module):
 
 
 class SKMotionEncoder6_Deep_nopool_res(nn.Module):
-    def __init__(self, args):
+    def __init__(self, corr_radius, corr_levels, cost_heads_num, k_conv):
         super().__init__()
         self.cor_planes = cor_planes = (
-            (args.corr_radius * 2 + 1) ** 2 * args.cost_heads_num * args.corr_levels
+            (corr_radius * 2 + 1) ** 2 * cost_heads_num * corr_levels
         )
-        self.convc1 = PCBlock4_Deep_nopool_res(cor_planes, 128, k_conv=args.k_conv)
-        self.convc2 = PCBlock4_Deep_nopool_res(256, 192, k_conv=args.k_conv)
+        self.convc1 = PCBlock4_Deep_nopool_res(cor_planes, 128, k_conv=k_conv)
+        self.convc2 = PCBlock4_Deep_nopool_res(256, 192, k_conv=k_conv)
 
         self.init_hidden_state = nn.Parameter(torch.randn(1, 1, 48, 1, 1))
 
         self.convf1_ = nn.Conv2d(4, 128, 1, 1, 0)
-        self.convf2 = PCBlock4_Deep_nopool_res(128, 64, k_conv=args.k_conv)
+        self.convf2 = PCBlock4_Deep_nopool_res(128, 64, k_conv=k_conv)
 
         self.conv = PCBlock4_Deep_nopool_res(
-            64 + 192 + 48 * 3, 128 - 4 + 48, k_conv=args.k_conv
+            64 + 192 + 48 * 3, 128 - 4 + 48, k_conv=k_conv
         )
 
         self.velocity_update_block = velocity_update_block()
@@ -153,34 +153,38 @@ class SKMotionEncoder6_Deep_nopool_res(nn.Module):
 
 
 class SKUpdateBlock6_Deep_nopoolres_AllDecoder2(nn.Module):
-    def __init__(self, args, hidden_dim):
+    def __init__(
+        self, feat_dim, down_ratio, corr_radius, corr_levels, cost_heads_num, hidden_dim
+    ):
         super().__init__()
-        self.args = args
 
-        args.k_conv = [1, 15]
-        args.PCUpdater_conv = [1, 7]
+        k_conv = [1, 15]
+        PCUpdater_conv = [1, 7]
 
-        hidden_dim_ratio = 256 // args.feat_dim
+        hidden_dim_ratio = 256 // feat_dim
 
-        self.encoder = SKMotionEncoder6_Deep_nopool_res(args)
+        self.encoder = SKMotionEncoder6_Deep_nopool_res(
+            corr_radius=corr_radius,
+            corr_levels=corr_levels,
+            cost_heads_num=cost_heads_num,
+            k_conv=k_conv,
+        )
         self.gru = PCBlock4_Deep_nopool_res(
             128 + hidden_dim + hidden_dim + 128,
             128 // hidden_dim_ratio,
-            k_conv=args.PCUpdater_conv,
+            k_conv=PCUpdater_conv,
         )
         self.flow_head = PCBlock4_Deep_nopool_res(
-            128 // hidden_dim_ratio, 4, k_conv=args.k_conv
+            128 // hidden_dim_ratio, 4, k_conv=k_conv
         )
 
         self.mask = nn.Sequential(
             nn.Conv2d(128 // hidden_dim_ratio, 256 // hidden_dim_ratio, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(
-                256 // hidden_dim_ratio, args.down_ratio**2 * 9 * 2, 1, padding=0
-            ),
+            nn.Conv2d(256 // hidden_dim_ratio, down_ratio**2 * 9 * 2, 1, padding=0),
         )
 
-        self.aggregator = Aggregate(args=self.args, dim=128, dim_head=128, heads=1)
+        self.aggregator = Aggregate(dim=128, dim_head=128, heads=1)
 
     def forward(
         self,

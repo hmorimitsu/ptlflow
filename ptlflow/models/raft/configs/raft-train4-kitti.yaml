@@ -1,0 +1,29 @@
+# lightning.pytorch==2.4.0
+seed_everything: true
+trainer:
+  max_epochs: 1500
+  check_val_every_n_epoch: 50
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+ckpt_path: /path/to/sintel.ckpt  # Change to the ckpt resulting from raft-train3-sintel
+model:
+  class_path: ptlflow.models.raft
+  init_args:
+    corr_levels: 4
+    corr_radius: 4
+    dropout: 0.0
+    gamma: 0.85
+    max_flow: 400.0
+    iters: 12
+    alternate_corr: false
+    lr: 0.0001
+    wdecay: 0.00001
+    warm_start: false
+data:
+  train_dataset: kitti-2015
+  val_dataset: kitti-2015-val+sintel-final-val
+  train_batch_size: 6
+  train_num_workers: 4
+  train_crop_size: [288, 960]
+  train_transform_cuda: false
+  train_transform_fp16: false

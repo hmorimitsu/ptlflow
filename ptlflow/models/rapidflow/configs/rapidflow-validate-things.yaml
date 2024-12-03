@@ -1,0 +1,49 @@
+# lightning.pytorch==2.4.0
+all: false
+select: null
+exclude: null
+ckpt_path: things
+output_path: outputs/validate
+write_outputs: false
+show: false
+flow_format: original
+max_forward_side: null
+scale_factor: null
+max_show_side: 1000
+max_samples: null
+reversed: false
+fp16: true
+seq_val_mode: all
+write_individual_metrics: false
+epe_clip: 5.0
+seed_everything: true
+model:
+  class_path: ptlflow.models.rapidflow
+  init_args:
+    pyramid_ranges:
+    - 32
+    - 8
+    iters: 12
+    corr_mode: allpairs
+    corr_levels: 1
+    corr_range: 4
+    enc_hidden_chs: 64
+    enc_out_chs: 128
+    enc_stem_stride: 4
+    enc_mlp_ratio: 4.0
+    enc_depth: 4
+    dec_net_chs: 64
+    dec_inp_chs: 64
+    dec_motion_chs: 128
+    dec_depth: 2
+    dec_mlp_ratio: 4.0
+    use_upsample_mask: true
+    fuse_next1d_weights: false
+    simple_io: false
+    gamma: 0.8
+    max_flow: 400
+    lr: null
+    wdecay: null
+    warm_start: false
+data:
+  val_dataset: sintel-clean+sintel-final+kitti-2012+kitti-2015

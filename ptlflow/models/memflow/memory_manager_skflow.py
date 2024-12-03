@@ -8,14 +8,23 @@ class MemoryManager:
     Manages all three memory stores and the transition between working/long-term memory
     """
 
-    def __init__(self, config):
-        self.cfg = config
-        self.enable_long_term = config.enable_long_term
-        self.enable_long_term_usage = config.enable_long_term_count_usage
+    def __init__(
+        self,
+        train_avg_length,
+        enable_long_term,
+        enable_long_term_count_usage,
+        top_k,
+        max_mid_term_frames,
+        min_mid_term_frames,
+    ):
+        self.train_avg_length = train_avg_length
+
+        self.enable_long_term = enable_long_term
+        self.enable_long_term_usage = enable_long_term_count_usage
         # top_k for softmax
-        self.top_k = config.top_k
-        self.max_mt_frames = config.max_mid_term_frames
-        self.min_mt_frames = config.min_mid_term_frames
+        self.top_k = top_k
+        self.max_mt_frames = max_mid_term_frames
+        self.min_mt_frames = min_mid_term_frames
 
         # dimensions will be inferred from input later
         self.CK = self.CV = None
@@ -47,7 +56,7 @@ class MemoryManager:
             else:
                 memory_key = self.work_mem.key
 
-            scale = scale * math.log(memory_key.shape[-1], self.cfg.train_avg_length)
+            scale = scale * math.log(memory_key.shape[-1], self.train_avg_length)
             similarity = (
                 torch.einsum("b c l, b c t -> b t l", query_key, memory_key) * scale
             )
@@ -70,9 +79,7 @@ class MemoryManager:
             # No working-term memory
             if current_key is not None and current_value is not None:
                 memory_key = current_key
-                scale = scale * math.log(
-                    memory_key.shape[-1], self.cfg.train_avg_length
-                )
+                scale = scale * math.log(memory_key.shape[-1], self.train_avg_length)
                 similarity = (
                     torch.einsum("b c l, b c t -> b t l", query_key, memory_key) * scale
                 )

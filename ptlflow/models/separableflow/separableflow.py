@@ -1,22 +1,21 @@
-from argparse import ArgumentParser, Namespace
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .update import BasicUpdateBlock, SmallUpdateBlock
-from .extractor import BasicEncoder, SmallEncoder
+from ptlflow.utils.registry import register_model, trainable
+from .update import BasicUpdateBlock
+from .extractor import BasicEncoder
 from .corr import CorrBlock, CorrBlock1D
 from .cost_agg import CostAggregation
-from .utils import coords_grid, upflow8, InputPadder
+from .utils import coords_grid, upflow8
 from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -213,40 +212,45 @@ class SeparableFlow(BaseModel):
         "universal": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/separableflow-universal-87350d91.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=64)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dropout: float = 0.0,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 32,
+        hidden_dim: int = 128,
+        context_dim: int = 128,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
 
-        hdim = self.args.hidden_dim
-        cdim = self.args.context_dim
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.dropout = dropout
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.iters = iters
+        self.hidden_dim = hidden_dim
+        self.context_dim = context_dim
 
-        if "dropout" not in self.args:
-            self.args.dropout = 0
+        hdim = self.hidden_dim
+        cdim = self.context_dim
 
         # feature network, context network, and update block
-        self.fnet = BasicEncoder(
-            output_dim=256, norm_fn="instance", dropout=args.dropout
-        )
+        self.fnet = BasicEncoder(output_dim=256, norm_fn="instance", dropout=dropout)
         self.cnet = BasicEncoder(
-            output_dim=hdim + cdim, norm_fn="batch", dropout=args.dropout
+            output_dim=hdim + cdim, norm_fn="batch", dropout=dropout
         )
-        self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)
+        self.update_block = BasicUpdateBlock(
+            corr_levels=corr_levels, corr_radius=corr_radius, hidden_dim=hdim
+        )
         self.guidance = Guidance(channels=256)
         self.cost_agg1 = CostAggregation(in_channel=8)
         self.cost_agg2 = CostAggregation(in_channel=8)
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--corr_levels", type=int, default=4)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument("--dropout", type=float, default=0.0)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, default=32)
-        parser.add_argument("--hidden_dim", type=int, default=128)
-        parser.add_argument("--context_dim", type=int, default=128)
-        return parser
 
     def freeze_bn(self):
         count1, count2, count3 = 0, 0, 0
@@ -301,8 +305,8 @@ class SeparableFlow(BaseModel):
         image1 = images[:, 0]
         image2 = images[:, 1]
 
-        hdim = self.args.hidden_dim
-        cdim = self.args.context_dim
+        hdim = self.hidden_dim
+        cdim = self.context_dim
 
         # run the feature network
         fmap1, fmap2 = self.fnet([image1, image2])
@@ -310,7 +314,7 @@ class SeparableFlow(BaseModel):
         fmap1 = fmap1.float()
         fmap2 = fmap2.float()
         guid, guid_u, guid_v = self.guidance(fmap1.detach(), image1)
-        corr_fn = CorrBlock(fmap1, fmap2, guid, radius=self.args.corr_radius)
+        corr_fn = CorrBlock(fmap1, fmap2, guid, radius=self.corr_radius)
 
         cnet = self.cnet(image1)
         net, inp = torch.split(cnet, [hdim, cdim], dim=1)
@@ -342,9 +346,9 @@ class SeparableFlow(BaseModel):
             mode="bilinear",
             align_corners=True,
         )
-        corr1d_fn = CorrBlock1D(corr1, corr2, radius=self.args.corr_radius)
+        corr1d_fn = CorrBlock1D(corr1, corr2, radius=self.corr_radius)
         coords1 = coords1 + flow_init
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             coords1 = coords1.detach()
 
             corr = corr_fn(coords1)  # index correlation volume
@@ -372,3 +376,9 @@ class SeparableFlow(BaseModel):
             outputs = {"flows": flow_up[:, None], "flow_small": coords1 - coords0}
 
         return outputs
+
+
+@register_model
+@trainable
+class separableflow(SeparableFlow):
+    pass

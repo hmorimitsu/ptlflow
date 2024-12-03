@@ -92,10 +92,10 @@ class SmallMotionEncoder(nn.Module):
 
 
 class BasicMotionEncoder(nn.Module):
-    def __init__(self, args):
+    def __init__(self, corr_levels, corr_radius):
         super(BasicMotionEncoder, self).__init__()
-        cor_planes = args.corr_levels * (2 * args.corr_radius + 1) ** 2
-        cor1_planes = args.corr_levels * (2 * args.corr_radius + 1)
+        cor_planes = corr_levels * (2 * corr_radius + 1) ** 2
+        cor1_planes = corr_levels * (2 * corr_radius + 1)
         self.convc1 = nn.Conv2d(cor_planes, 256, 1, padding=0)
         self.convc11 = nn.Conv2d(cor1_planes, 64, 1, padding=0)
         self.convc12 = nn.Conv2d(cor1_planes, 64, 1, padding=0)
@@ -140,10 +140,11 @@ class SmallUpdateBlock(nn.Module):
 
 
 class BasicUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=128, input_dim=128):
+    def __init__(self, corr_levels, corr_radius, hidden_dim=128):
         super(BasicUpdateBlock, self).__init__()
-        self.args = args
-        self.encoder = BasicMotionEncoder(args)
+        self.encoder = BasicMotionEncoder(
+            corr_levels=corr_levels, corr_radius=corr_radius
+        )
         self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=128 + hidden_dim)
         self.flow_head = FlowHead(hidden_dim, hidden_dim=256)
 

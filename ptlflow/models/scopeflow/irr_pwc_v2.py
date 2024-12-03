@@ -1,6 +1,5 @@
-from argparse import ArgumentParser
-from pathlib import Path
 import random
+from typing import Optional, Sequence
 
 try:
     from spatial_correlation_sampler import SpatialCorrelationSampler
@@ -11,6 +10,7 @@ except ModuleNotFoundError:
 import torch
 import torch.nn as nn
 
+from ptlflow.utils.registry import register_model, trainable
 from .pwc_modules import conv, upsample2d_as, rescale_flow, initialize_msra
 from .pwc_modules import (
     WarpingLayer,
@@ -33,10 +33,43 @@ class ScopeFlow(BaseModel):
         "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/scopeflow-sintel-21a91683.ckpt",
     }
 
-    def __init__(self, args):
+    def __init__(
+        self,
+        div_flow: float = 0.05,
+        search_range: int = 4,
+        output_level: int = 4,
+        num_levels: int = 7,
+        num_chs: Sequence[int] = (3, 16, 32, 64, 96, 128, 196),
+        dropout_p: float = 0.0,
+        bilateral_mask: bool = False,
+        random_freeze: bool = False,
+        freeze_list: Optional[str] = None,
+        seploss: bool = False,
+        loss_perc: bool = False,
+        train_batch_size: Optional[int] = None,
+        **kwargs,
+    ):
         super(ScopeFlow, self).__init__(
-            args=args, loss_fn=MultiScaleEPE_PWC_Bi_Occ_upsample(args), output_stride=64
+            output_stride=64,
+            loss_fn=MultiScaleEPE_PWC_Bi_Occ_upsample(
+                train_batch_size=train_batch_size, div_flow=div_flow
+            ),
+            **kwargs,
         )
+
+        self.div_flow = div_flow
+        self.search_range = search_range
+        self.output_level = output_level
+        self.num_levels = num_levels
+        self.num_chs = num_chs
+        self.dropout_p = dropout_p
+        self.bilateral_mask = bilateral_mask
+        self.random_freeze = random_freeze
+        self.freeze_list = freeze_list
+        self.seploss = seploss
+        self.loss_perc = loss_perc
+        self.train_batch_size = train_batch_size
+
         self.pwc_groups = [
             "extractor",
             "1x1",
@@ -47,7 +80,6 @@ class ScopeFlow(BaseModel):
         ] + ["occ"] * 3
 
         # Init sizes
-        self.args = args
         self.search_range = 4
         self.num_chs = [3, 16, 32, 64, 96, 128, 196]
         self.output_level = 4
@@ -60,7 +92,7 @@ class ScopeFlow(BaseModel):
         self.feature_pyramid_extractor = FeatureExtractor(self.num_chs)
         self.warping_layer = WarpingLayer()
         self.correlation = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.args.search_range + 1, padding=0
+            kernel_size=1, patch_size=2 * self.search_range + 1, padding=0
         )
 
         # Calc dimensions
@@ -74,9 +106,9 @@ class ScopeFlow(BaseModel):
         self.occ_estimators = OccEstimatorDense(self.num_ch_in_occ)
         self.occ_context_networks = OccContextNetwork(self.num_ch_in_occ + 448 + 1)
         self.occ_shuffle_upsample = OccUpsampleNetwork(11, 1)
-        if hasattr(args, "dropout") and self.args.dropout:
+        if dropout_p > 0.0:
             print("Starting dropout!")
-            self.dropout = nn.Dropout2d(p=self.args.dropout, inplace=False)
+            self.dropout = nn.Dropout2d(p=dropout_p, inplace=False)
 
         self.conv_1x1 = nn.ModuleList(
             [
@@ -95,49 +127,18 @@ class ScopeFlow(BaseModel):
             self.num_chs[self.min_layer - 1], 3, kernel_size=1, stride=1, dilation=1
         )
 
-        # Initialize attention
-        if hasattr(args, "self_attention") and self.args.self_attention:
-            print("Initializing self attention!")
-            from models.self_attention import (
-                AttentionConv,
-                AttentionStem,
-                SelfAttentionConv2d,
-            )
-
-            self.attention_conv = SelfAttentionConv2d(2, 2, kernel_size=5, padding=2)
-        self.refine_flow = RefineFlow(2 + 1 + self.ch_proj_size, args.bilateral_mask)
+        self.refine_flow = RefineFlow(2 + 1 + self.ch_proj_size, bilateral_mask)
         self.refine_occ = RefineOcc(1 + self.ch_proj_size + self.ch_proj_size)
 
         # Init weights
         initialize_msra(self.modules())
         self.param_groups = self._get_param_groups(self.pwc_groups)
 
-        if hasattr(args, "freeze_list") and args.freeze_list:
-            self.freezed_params = args.freeze_list.split(",")
+        if freeze_list is not None:
+            self.freezed_params = freeze_list.split(",")
             self._freeze()
             self.random_freeze = False
-        elif hasattr(args, "random_freeze") and args.random_freeze:
-            self.random_freeze = True
         self.mean_per_module = None
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--div_flow", type=float, default=0.05)
-        parser.add_argument("--search_range", type=int, default=4)
-        parser.add_argument("--output_level", type=int, default=4)
-        parser.add_argument("--num_levels", type=int, default=7)
-        parser.add_argument(
-            "--num_chs", type=int, nargs="+", default=[3, 16, 32, 64, 96, 128, 196]
-        )
-        parser.add_argument("--dropout", type=float, default=0.0)
-        parser.add_argument("--self_attention", action="store_true")
-        parser.add_argument("--bilateral_mask", action="store_true")
-        parser.add_argument("--random_freeze", action="store_true")
-        parser.add_argument("--seploss", action="store_true")
-        parser.add_argument("--loss_perc", action="store_true")
-        return parser
 
     def forward(self, inputs):
         images, image_resizer = self.preprocess_images(
@@ -157,7 +158,7 @@ class ScopeFlow(BaseModel):
         # Get pyramid, on the bottom level are original images
         cur_x1 = self.feature_pyramid_extractor(x1_raw)
         cur_x2 = self.feature_pyramid_extractor(x2_raw)
-        if hasattr(self.args, "dropout") and self.args.dropout:
+        if self.dropout_p > 0.0:
             # print("Dropout in ctx!")
             for xl in range(len(cur_x1)):
                 # cur_x1[xl] = self.dropout(cur_x1[xl])
@@ -262,21 +263,16 @@ class ScopeFlow(BaseModel):
                     l, x1, x2, flow_f, flow_b, occ_f, occ_b, height_im, width_im
                 )
 
-                # Apply self attention
-                if hasattr(self.args, "self_attention") and self.args.self_attention:
-                    flow_f = self.attention_conv(flow_f)
-                    flow_b = self.attention_conv(flow_b)
-
                 # Aggregate outputs
                 flows.append([flow_f, flow_b])
                 occs.append([occ_f, occ_b])
 
         flow_f_up = upsample2d_as(flow_f, x1_raw, mode="bilinear") * (
-            1.0 / self.args.div_flow
+            1.0 / self.div_flow
         )
         flow_f_up = self.postprocess_predictions(flow_f_up, image_resizer, is_flow=True)
         flow_b_up = upsample2d_as(flow_b, x1_raw, mode="bilinear") * (
-            1.0 / self.args.div_flow
+            1.0 / self.div_flow
         )
         flow_b_up = self.postprocess_predictions(flow_b_up, image_resizer, is_flow=True)
         occ_f_up = upsample2d_as(torch.sigmoid(occ_f), x1_raw, mode="bilinear")
@@ -399,12 +395,8 @@ class ScopeFlow(BaseModel):
             flow_b = upsample2d_as(flow_b, x2, mode="bilinear")
             occ_f = upsample2d_as(occ_f, x1, mode="bilinear")
             occ_b = upsample2d_as(occ_b, x2, mode="bilinear")
-            x2_warp = self.warping_layer(
-                x2, flow_f, height_im, width_im, self.args.div_flow
-            )
-            x1_warp = self.warping_layer(
-                x1, flow_b, height_im, width_im, self.args.div_flow
-            )
+            x2_warp = self.warping_layer(x2, flow_f, height_im, width_im, self.div_flow)
+            x1_warp = self.warping_layer(x1, flow_b, height_im, width_im, self.div_flow)
         return x1_warp, x2_warp, flow_f, flow_b, occ_f, occ_b
 
     @staticmethod
@@ -433,12 +425,8 @@ class ScopeFlow(BaseModel):
         return x1_1by1, x2_1by1
 
     def _rescale_flow(self, flow_f, flow_b, height_im, width_im):
-        flow_f = rescale_flow(
-            flow_f, self.args.div_flow, width_im, height_im, to_local=True
-        )
-        flow_b = rescale_flow(
-            flow_b, self.args.div_flow, width_im, height_im, to_local=True
-        )
+        flow_f = rescale_flow(flow_f, self.div_flow, width_im, height_im, to_local=True)
+        flow_b = rescale_flow(flow_b, self.div_flow, width_im, height_im, to_local=True)
         return flow_f, flow_b
 
     def _estimate_flow(
@@ -505,18 +493,18 @@ class ScopeFlow(BaseModel):
 
         # Rescaling flow to the layer's size
         rescaled_f = rescale_flow(
-            flow_cont_f, self.args.div_flow, width_im, height_im, to_local=False
+            flow_cont_f, self.div_flow, width_im, height_im, to_local=False
         )
         rescaled_b = rescale_flow(
-            flow_cont_b, self.args.div_flow, width_im, height_im, to_local=False
+            flow_cont_b, self.div_flow, width_im, height_im, to_local=False
         )
 
         # Warping resized images
         img2_warp = self.warping_layer(
-            img2_resize, rescaled_f, height_im, width_im, self.args.div_flow
+            img2_resize, rescaled_f, height_im, width_im, self.div_flow
         )
         img1_warp = self.warping_layer(
-            img1_resize, rescaled_b, height_im, width_im, self.args.div_flow
+            img1_resize, rescaled_b, height_im, width_im, self.div_flow
         )
 
         return img1_resize, img2_resize, img1_warp, img2_warp, rescaled_f, rescaled_b
@@ -542,16 +530,16 @@ class ScopeFlow(BaseModel):
         )
 
         flow_cont_f = rescale_flow(
-            flow_cont_f, self.args.div_flow, width_im, height_im, to_local=False
+            flow_cont_f, self.div_flow, width_im, height_im, to_local=False
         )
         flow_cont_b = rescale_flow(
-            flow_cont_b, self.args.div_flow, width_im, height_im, to_local=False
+            flow_cont_b, self.div_flow, width_im, height_im, to_local=False
         )
         flow_f = rescale_flow(
-            flow_f, self.args.div_flow, width_im, height_im, to_local=False
+            flow_f, self.div_flow, width_im, height_im, to_local=False
         )
         flow_b = rescale_flow(
-            flow_b, self.args.div_flow, width_im, height_im, to_local=False
+            flow_b, self.div_flow, width_im, height_im, to_local=False
         )
         return flow_f, flow_cont_f, flow_b, flow_cont_b
 
@@ -567,10 +555,10 @@ class ScopeFlow(BaseModel):
         width_im,
     ):
         x2_1by1_warp = self.warping_layer(
-            x2_1by1, flow_f, height_im, width_im, self.args.div_flow
+            x2_1by1, flow_f, height_im, width_im, self.div_flow
         )
         x1_1by1_warp = self.warping_layer(
-            x1_1by1, flow_b, height_im, width_im, self.args.div_flow
+            x1_1by1, flow_b, height_im, width_im, self.div_flow
         )
 
         occ_f = self.refine_occ(occ_cont_f.detach(), x1_1by1, x1_1by1 - x2_1by1_warp)
@@ -580,17 +568,13 @@ class ScopeFlow(BaseModel):
     def occ_upsampling(
         self, l, x1, x2, flow_f, flow_b, occ_f, occ_b, height_im, width_im
     ):
-        x2_warp = self.warping_layer(
-            x2, flow_f, height_im, width_im, self.args.div_flow
-        )
-        x1_warp = self.warping_layer(
-            x1, flow_b, height_im, width_im, self.args.div_flow
-        )
+        x2_warp = self.warping_layer(x2, flow_f, height_im, width_im, self.div_flow)
+        x1_warp = self.warping_layer(x1, flow_b, height_im, width_im, self.div_flow)
         flow_b_warp = self.warping_layer(
-            flow_b, flow_f, height_im, width_im, self.args.div_flow
+            flow_b, flow_f, height_im, width_im, self.div_flow
         )
         flow_f_warp = self.warping_layer(
-            flow_f, flow_b, height_im, width_im, self.args.div_flow
+            flow_f, flow_b, height_im, width_im, self.div_flow
         )
 
         if l != self.num_levels - 1:
@@ -611,3 +595,9 @@ class ScopeFlow(BaseModel):
             occ_b, torch.cat([x2_in, x1_w_in, flow_b, flow_f_warp], dim=1)
         )
         return occ_f, occ_b
+
+
+@register_model
+@trainable
+class scopeflow(ScopeFlow):
+    pass

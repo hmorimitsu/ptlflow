@@ -1,4 +1,3 @@
-from argparse import ArgumentParser, Namespace
 from typing import Dict, List, Optional
 
 try:
@@ -11,6 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model
 from .warp import WarpingLayer
 from ..base_model.base_model import BaseModel
 
@@ -255,40 +255,42 @@ class LiteFlowNet(BaseModel):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet-things-a4d066e2.ckpt",
     }
 
-    def __init__(self, args: Namespace):
-        super(LiteFlowNet, self).__init__(args=args, loss_fn=None, output_stride=32)
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        **kwargs,
+    ):
+        super(LiteFlowNet, self).__init__(
+            loss_fn=None,
+            output_stride=32,
+            **kwargs,
+        )
 
+        self.div_flow = div_flow
         self.num_levels = 5
 
         self.feature_net = FeatureExtractor()
         self.matching_nets = nn.ModuleList(
             [
-                Matching(i, self.num_levels, self.args.div_flow)
+                Matching(i, self.num_levels, self.div_flow)
                 for i in range(self.num_levels)
             ]
         )
         self.subpixel_nets = nn.ModuleList(
             [
-                SubPixel(i, self.num_levels, self.args.div_flow)
+                SubPixel(i, self.num_levels, self.div_flow)
                 for i in range(self.num_levels)
             ]
         )
         self.regularization_nets = nn.ModuleList(
             [
-                Regularization(i, self.num_levels, self.args.div_flow)
+                Regularization(i, self.num_levels, self.div_flow)
                 for i in range(self.num_levels)
             ]
         )
         self.feat2_conv = nn.Sequential(
             nn.Conv2d(32, 64, 1, 1, 0), nn.LeakyReLU(0.1, inplace=True)
         )
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--div_flow", type=float, default=20.0)
-        return parser
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         # The original implementation uses different BGR means for im1 and im2
@@ -320,7 +322,7 @@ class LiteFlowNet(BaseModel):
             flow = self.regularization_nets[i](images_pyr[i], feats_pyr[i], flow)
             flow_preds.append(flow)
 
-        flow = flow * self.args.div_flow
+        flow = flow * self.div_flow
         flow = F.interpolate(flow, scale_factor=2, mode="bilinear", align_corners=False)
         flow = self.postprocess_predictions(flow, image_resizer, is_flow=True)
 
@@ -348,3 +350,8 @@ class LiteFlowNet(BaseModel):
         ]
         images_pyr = [im.view(batch_size, -1, *im.shape[1:]) for im in images_pyr]
         return images_pyr
+
+
+@register_model
+class liteflownet(LiteFlowNet):
+    pass

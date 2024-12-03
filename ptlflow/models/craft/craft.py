@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import GMAUpdateBlock
 from .extractor import BasicEncoder
@@ -15,10 +16,10 @@ from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -27,7 +28,6 @@ class SequenceLoss(nn.Module):
         flow_gt = inputs["flows"][:, 0]
         valid = inputs["valids"][:, 0]
 
-        # n_predictions = args.iters = 12
         n_predictions = len(flow_preds)
         flow_loss = 0.0
 
@@ -54,24 +54,70 @@ class CRAFT(BaseModel):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/craft-kitti-4d99b0c1.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=8)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dropout: float = 0.0,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 32,
+        f1trans: str = "none",
+        f2trans: str = "full",
+        f2_attn_mask_radius: int = -1,
+        f2_num_modes: int = 4,
+        f2_pos_code_weight: float = 0.5,
+        inter_num_modes: int = 4,
+        inter_pos_code_type: str = "bias",
+        inter_pos_code_weight: float = 0.5,
+        intra_pos_code_type: str = "bias",
+        intra_pos_code_weight: float = 1.0,
+        intra_num_modes: int = 4,
+        craft: bool = True,
+        inter_qk_have_bias: bool = True,
+        num_heads: int = 1,
+        pos_bias_radius: int = 7,
+        use_setrans: bool = True,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
+
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.dropout = dropout
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.iters = iters
+        self.f1trans = f1trans
+        self.f2trans = f2trans
+        self.f2_attn_mask_radius = f2_attn_mask_radius
+        self.f2_num_modes = f2_num_modes
+        self.f2_pos_code_weight = f2_pos_code_weight
+        self.inter_num_modes = inter_num_modes
+        self.inter_pos_code_type = inter_pos_code_type
+        self.inter_pos_code_weight = inter_pos_code_weight
+        self.intra_pos_code_type = intra_pos_code_type
+        self.intra_pos_code_weight = intra_pos_code_weight
+        self.intra_num_modes = intra_num_modes
+        self.craft = craft
+        self.inter_qk_have_bias = inter_qk_have_bias
+        self.num_heads = num_heads
+        self.pos_bias_radius = pos_bias_radius
+        self.use_setrans = use_setrans
 
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
-        args.corr_levels = 4
-
-        if "dropout" not in self.args:
-            self.args.dropout = 0
 
         # default CRAFT corr_radius: 4
-        if args.corr_radius == -1:
-            args.corr_radius = 4
-        print0("Lookup radius: %d" % args.corr_radius)
+        if corr_radius == -1:
+            corr_radius = 4
+        print0("Lookup radius: %d" % corr_radius)
 
-        if args.craft:
+        if craft:
             self.inter_trans_config = SETransConfig()
-            self.inter_trans_config.update_config(args)
+            self.inter_trans_config.update_config(self.__dict__["_hparams"])
             self.inter_trans_config.in_feat_dim = 256
             self.inter_trans_config.feat_dim = 256
             self.inter_trans_config.max_pos_size = 160
@@ -80,41 +126,34 @@ class CRAFT(BaseModel):
                 True  # implies no FFN and no skip.
             )
             self.inter_trans_config.attn_diag_cycles = 1000
-            self.inter_trans_config.num_modes = args.inter_num_modes  # default: 4
+            self.inter_trans_config.num_modes = inter_num_modes  # default: 4
             self.inter_trans_config.tie_qk_scheme = "shared"  # Symmetric Q/K
-            self.inter_trans_config.qk_have_bias = (
-                args.inter_qk_have_bias
-            )  # default: True
-            self.inter_trans_config.pos_code_type = (
-                args.inter_pos_code_type
-            )  # default: bias
+            self.inter_trans_config.qk_have_bias = inter_qk_have_bias  # default: True
+            self.inter_trans_config.pos_code_type = inter_pos_code_type  # default: bias
             self.inter_trans_config.pos_code_weight = (
-                args.inter_pos_code_weight
-            )  # default: 0.5
-            self.args.inter_trans_config = self.inter_trans_config
+                inter_pos_code_weight  # default: 0.5
+            )
             print0(
                 "Inter-frame trans config:\n{}".format(self.inter_trans_config.__dict__)
             )
 
             self.corr_fn = TransCorrBlock(
                 self.inter_trans_config,
-                radius=self.args.corr_radius,
+                radius=corr_radius,
                 do_corr_global_norm=True,
             )
 
         # feature network, context network, and update block
-        self.fnet = BasicEncoder(
-            output_dim=256, norm_fn="instance", dropout=args.dropout
-        )
+        self.fnet = BasicEncoder(output_dim=256, norm_fn="instance", dropout=dropout)
         self.cnet = BasicEncoder(
-            output_dim=hdim + cdim, norm_fn="batch", dropout=args.dropout
+            output_dim=hdim + cdim, norm_fn="batch", dropout=dropout
         )
 
-        if args.f2trans != "none":
+        if f2trans != "none":
             # f2_trans has the same configuration as GMA att,
             # except that the feature dimension is doubled, and not out_attn_probs_only.
             self.f2_trans_config = SETransConfig()
-            self.f2_trans_config.update_config(args)
+            self.f2_trans_config.update_config(self.__dict__["_hparams"])
             self.f2_trans_config.in_feat_dim = 256
             self.f2_trans_config.feat_dim = 256
             # f2trans(x) = attn_aggregate(v(x)) + x. Here attn_aggregate and v (first_linear) both have 4 modes.
@@ -124,29 +163,25 @@ class CRAFT(BaseModel):
             self.f2_trans_config.has_FFN = False
             # When doing feature aggregation, set attn_mask_radius > 0 to exclude points that are too far apart, to reduce noises.
             # E.g., 64 corresponds to 64*8=512 pixels in the image space.
-            self.f2_trans_config.attn_mask_radius = args.f2_attn_mask_radius
+            self.f2_trans_config.attn_mask_radius = f2_attn_mask_radius
             # Not tying QK performs slightly better.
             self.f2_trans_config.tie_qk_scheme = None
             self.f2_trans_config.qk_have_bias = False
             self.f2_trans_config.out_attn_probs_only = False
             self.f2_trans_config.attn_diag_cycles = 1000
-            self.f2_trans_config.num_modes = args.f2_num_modes  # default: 4
-            self.f2_trans_config.pos_code_type = (
-                args.intra_pos_code_type
-            )  # default: bias
-            self.f2_trans_config.pos_code_weight = (
-                args.f2_pos_code_weight
-            )  # default: 0.5
+            self.f2_trans_config.num_modes = f2_num_modes  # default: 4
+            self.f2_trans_config.pos_code_type = intra_pos_code_type  # default: bias
+            self.f2_trans_config.pos_code_weight = f2_pos_code_weight  # default: 0.5
             self.f2_trans = SelfAttVisPosTrans(self.f2_trans_config, "F2 transformer")
             print0("F2-trans config:\n{}".format(self.f2_trans_config.__dict__))
-            self.args.f2_trans_config = self.f2_trans_config
+            self.f2_trans_config = self.f2_trans_config
 
-            if args.f1trans != "none":
-                args.corr_multiplier = 2
-                if args.f1trans == "shared":
+            if f1trans != "none":
+                corr_multiplier = 2
+                if f1trans == "shared":
                     # f1_trans and f2_trans are shared.
                     self.f1_trans = self.f2_trans
-                elif args.f1trans == "private":
+                elif f1trans == "private":
                     # f1_trans is a private instance of SelfAttVisPosTrans.
                     self.f1_trans = SelfAttVisPosTrans(
                         self.f2_trans_config, "F1 transformer"
@@ -155,11 +190,11 @@ class CRAFT(BaseModel):
                     breakpoint()
             else:
                 self.f1_trans = None
-                args.corr_multiplier = 1
+                corr_multiplier = 1
 
-        if args.use_setrans:
+        if use_setrans:
             self.intra_trans_config = SETransConfig()
-            self.intra_trans_config.update_config(args)
+            self.intra_trans_config.update_config(self.__dict__["_hparams"])
             self.intra_trans_config.in_feat_dim = 128
             self.intra_trans_config.feat_dim = 128
             # has_FFN & has_input_skip are for GMAUpdateBlock.aggregator.
@@ -172,73 +207,37 @@ class CRAFT(BaseModel):
             self.intra_trans_config.qk_have_bias = False
             self.intra_trans_config.out_attn_probs_only = True
             self.intra_trans_config.attn_diag_cycles = 1000
-            self.intra_trans_config.num_modes = args.intra_num_modes  # default: 4
-            self.intra_trans_config.pos_code_type = (
-                args.intra_pos_code_type
-            )  # default: bias
+            self.intra_trans_config.num_modes = intra_num_modes  # default: 4
+            self.intra_trans_config.pos_code_type = intra_pos_code_type  # default: bias
             self.intra_trans_config.pos_code_weight = (
-                args.intra_pos_code_weight
-            )  # default: 1
+                intra_pos_code_weight  # default: 1
+            )
             self.att = SelfAttVisPosTrans(
                 self.intra_trans_config, "Intra-frame attention"
             )
-            self.args.intra_trans_config = self.intra_trans_config
             print0(
                 "Intra-frame trans config:\n{}".format(self.intra_trans_config.__dict__)
             )
         else:
             self.att = Attention(
-                args=self.args,
                 dim=cdim,
-                heads=self.args.num_heads,
+                heads=num_heads,
                 max_pos_size=160,
                 dim_head=cdim,
             )
 
-        # if args.use_setrans, initialization of GMAUpdateBlock.aggregator needs to access self.args.intra_trans_config.
+        # if args.use_setrans, initialization of GMAUpdateBlock.aggregator needs to access self.intra_trans_config.
         # So GMAUpdateBlock() construction has to be done after initializing intra_trans_config.
-        self.update_block = GMAUpdateBlock(self.args, hidden_dim=hdim)
+        self.update_block = GMAUpdateBlock(
+            corr_levels=corr_levels,
+            corr_multiplier=corr_multiplier,
+            corr_radius=corr_radius,
+            use_setrans=use_setrans,
+            intra_trans_config=self.intra_trans_config,
+            num_heads=num_heads,
+            hidden_dim=hdim,
+        )
         self.call_counter = 0
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--corr_levels", type=int, default=4)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument("--dropout", type=float, default=0.0)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, default=32)
-        parser.add_argument(
-            "--f1trans", type=str, choices=["none", "shared", "private"], default="none"
-        )
-        parser.add_argument(
-            "--f2trans", type=str, choices=("none", "full"), default="full"
-        )
-        parser.add_argument("--f2_attn_mask_radius", type=int, default=-1)
-        parser.add_argument("--f2_num_modes", type=int, default=4)
-        parser.add_argument("--f2_pos_code_weight", type=float, default=0.5)
-        parser.add_argument("--inter_num_modes", type=int, default=4)
-        parser.add_argument(
-            "--inter_pos_code_type", type=str, choices=("bias", "lsinu"), default="bias"
-        )
-        parser.add_argument("--inter_pos_code_weight", type=float, default=0.5)
-        parser.add_argument(
-            "--intra_pos_code_type", type=str, choices=("bias", "lsinu"), default="bias"
-        )
-        parser.add_argument("--intra_pos_code_weight", type=float, default=1.0)
-        parser.add_argument("--intra_num_modes", type=int, default=4)
-        parser.add_argument("--no_craft", action="store_false", dest="craft")
-        parser.add_argument(
-            "--no_inter_qk_have_bias", action="store_false", dest="inter_qk_have_bias"
-        )
-        parser.add_argument("--num_heads", type=int, default=1)
-        parser.add_argument("--pos_bias_radius", type=int, default=7)
-        parser.add_argument(
-            "--no_use_setrans", action="store_false", dest="use_setrans"
-        )
-        return parser
 
     def freeze_bn(self):
         for m in self.modules():
@@ -290,17 +289,17 @@ class CRAFT(BaseModel):
         # correlation matrix: 7040*7040 (55*128=7040).
         fmap1, fmap2 = self.fnet([image1, image2])
         fmap1o, fmap2o = None, None
-        if self.args.f1trans != "none":
+        if self.f1trans != "none":
             fmap1o = fmap1
             fmap1 = self.f1_trans(fmap1)
-        if self.args.f2trans != "none":
+        if self.f2trans != "none":
             fmap2o = fmap2
             fmap2 = self.f2_trans(fmap2)
 
         # If not craft, the correlation volume is computed in the ctor.
         # If craft, the correlation volume is computed in corr_fn.update().
-        if not self.args.craft:
-            self.corr_fn = CorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
+        if not self.craft:
+            self.corr_fn = CorrBlock(fmap1, fmap2, radius=self.corr_radius)
 
         # run the context network
         # cnet: context network to extract features from image1 only.
@@ -331,12 +330,12 @@ class CRAFT(BaseModel):
             coords1 = coords1 + forward_flow
 
         # If craft, the correlation volume is computed in corr_fn.update().
-        if self.args.craft:
+        if self.craft:
             # only update() once, instead of dynamically updating coords1.
             self.corr_fn.update(fmap1, fmap2, fmap1o, fmap2o, coords1, coords2=None)
 
         flow_predictions = []
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             coords1 = coords1.detach()
             # corr: [6, 324, 50, 90]. 324: number of points in the neighborhood.
             # radius = 4 -> neighbor points = (4*2+1)^2 = 81. 4 levels: x4 -> 324.
@@ -375,3 +374,9 @@ class CRAFT(BaseModel):
             outputs = {"flows": flow_up[:, None], "flow_small": coords1 - coords0}
 
         return outputs
+
+
+@register_model
+@trainable
+class craft(CRAFT):
+    pass

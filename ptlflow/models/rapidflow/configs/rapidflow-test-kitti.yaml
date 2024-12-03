@@ -1,0 +1,39 @@
+# lightning.pytorch==2.4.0
+ckpt_path: kitti
+output_path: outputs/test
+show: false
+max_forward_side: null
+scale_factor: null
+max_show_side: 1000
+save_viz: true
+seed_everything: true
+model:
+  class_path: ptlflow.models.rapidflow
+  init_args:
+    pyramid_ranges:
+    - 32
+    - 8
+    iters: 12
+    corr_mode: allpairs
+    corr_levels: 1
+    corr_range: 4
+    enc_hidden_chs: 64
+    enc_out_chs: 128
+    enc_stem_stride: 4
+    enc_mlp_ratio: 4.0
+    enc_depth: 4
+    dec_net_chs: 64
+    dec_inp_chs: 64
+    dec_motion_chs: 128
+    dec_depth: 2
+    dec_mlp_ratio: 4.0
+    use_upsample_mask: true
+    fuse_next1d_weights: false
+    simple_io: false
+    gamma: 0.8
+    max_flow: 400
+    lr: null
+    wdecay: null
+    warm_start: false
+data:
+  test_dataset: kitti-2015

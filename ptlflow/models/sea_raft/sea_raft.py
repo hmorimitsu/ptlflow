@@ -1,10 +1,11 @@
-from argparse import ArgumentParser, Namespace
 import math
+from typing import Sequence
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from .update import BasicUpdateBlock
 from .corr import get_corr_block
 from .utils import coords_grid
@@ -19,10 +20,10 @@ except:
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -50,70 +51,91 @@ class SequenceLoss(nn.Module):
 
 
 class SEARAFT(BaseModel):
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=8)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dim: int = 128,
+        initial_dim: int = 64,
+        num_blocks: int = 2,
+        block_dims: Sequence[int] = (64, 128, 256),
+        pretrain: str = "resnet18",
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 4,
+        alternate_corr: bool = False,
+        use_var: bool = True,
+        var_min: float = 0,
+        var_max: float = 10,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
 
-        self.output_dim = args.dim * 2
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.dim = dim
+        self.initial_dim = initial_dim
+        self.num_blocks = num_blocks
+        self.block_dims = block_dims
+        self.pretrain = pretrain
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.iters = iters
+        self.alternate_corr = alternate_corr
+        self.use_var = use_var
+        self.var_min = var_min
+        self.var_max = var_max
 
-        self.args.corr_channel = args.corr_levels * (args.corr_radius * 2 + 1) ** 2
+        self.output_dim = dim * 2
+
+        self.corr_channel = corr_levels * (corr_radius * 2 + 1) ** 2
         self.cnet = ResNetFPN(
-            args,
+            block_dims=block_dims,
+            initial_dim=initial_dim,
+            pretrain=pretrain,
             input_dim=6,
-            output_dim=2 * self.args.dim,
+            output_dim=2 * self.dim,
             norm_layer=nn.BatchNorm2d,
             init_weight=True,
         )
 
         # conv for iter 0 results
-        self.init_conv = conv3x3(2 * args.dim, 2 * args.dim)
+        self.init_conv = conv3x3(2 * dim, 2 * dim)
         self.upsample_weight = nn.Sequential(
             # convex combination of 3x3 patches
-            nn.Conv2d(args.dim, args.dim * 2, 3, padding=1),
+            nn.Conv2d(dim, dim * 2, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(args.dim * 2, 64 * 9, 1, padding=0),
+            nn.Conv2d(dim * 2, 64 * 9, 1, padding=0),
         )
         self.flow_head = nn.Sequential(
             # flow(2) + weight(2) + log_b(2)
-            nn.Conv2d(args.dim, 2 * args.dim, 3, padding=1),
+            nn.Conv2d(dim, 2 * dim, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(2 * args.dim, 6, 3, padding=1),
+            nn.Conv2d(2 * dim, 6, 3, padding=1),
         )
-        if args.iters > 0:
+        if iters > 0:
             self.fnet = ResNetFPN(
-                args,
+                block_dims=block_dims,
+                initial_dim=initial_dim,
+                pretrain=pretrain,
                 input_dim=3,
                 output_dim=self.output_dim,
                 norm_layer=nn.BatchNorm2d,
                 init_weight=True,
             )
-            self.update_block = BasicUpdateBlock(args, hdim=args.dim, cdim=args.dim)
+            self.update_block = BasicUpdateBlock(
+                corr_channel=self.corr_channel,
+                num_blocks=num_blocks,
+                hdim=dim,
+                cdim=dim,
+            )
 
-        if self.args.alternate_corr and alt_cuda_corr is None:
+        if self.alternate_corr and alt_cuda_corr is None:
             print(
                 "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
             )
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--corr_levels", type=int, default=4)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument("--dim", type=int, default=128)
-        parser.add_argument("--initial_dim", type=int, default=64)
-        parser.add_argument("--num_blocks", type=int, default=2)
-        parser.add_argument("--block_dims", type=int, nargs="+", default=[64, 128, 256])
-        parser.add_argument(
-            "--pretrain", type=str, default="resnet18", choices=("resnet18, resnet34")
-        )
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, default=4)
-        parser.add_argument("--alternate_corr", action="store_true")
-        parser.add_argument("--not_use_var", action="store_false", dest="use_var")
-        parser.add_argument("--var_min", type=float, default=0)
-        parser.add_argument("--var_max", type=float, default=10)
-        return parser
 
     def initialize_flow(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords2 - coords1"""
@@ -167,7 +189,7 @@ class SEARAFT(BaseModel):
         # run the context network
         cnet = self.cnet(torch.cat([image1, image2], dim=1))
         cnet = self.init_conv(cnet)
-        net, context = torch.split(cnet, [self.args.dim, self.args.dim], dim=1)
+        net, context = torch.split(cnet, [self.dim, self.dim], dim=1)
 
         # init flow
         flow_update = self.flow_head(net)
@@ -178,19 +200,19 @@ class SEARAFT(BaseModel):
         flow_predictions.append(flow_up)
         info_predictions.append(info_up)
 
-        if self.args.iters > 0:
+        if self.iters > 0:
             # run the feature network
             fmap1_8x = self.fnet(image1)
             fmap2_8x = self.fnet(image2)
             corr_fn = get_corr_block(
                 fmap1=fmap1_8x,
                 fmap2=fmap2_8x,
-                radius=self.args.corr_radius,
-                num_levels=self.args.corr_levels,
-                alternate_corr=self.args.alternate_corr,
+                radius=self.corr_radius,
+                num_levels=self.corr_levels,
+                alternate_corr=self.alternate_corr,
             )
 
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             N, _, H, W = flow_8x.shape
             flow_8x = flow_8x.detach()
             coords2 = (
@@ -215,11 +237,11 @@ class SEARAFT(BaseModel):
             # exlude invalid pixels and extremely large diplacements
             nf_predictions = []
             for i in range(len(info_predictions)):
-                if not self.args.use_var:
+                if not self.use_var:
                     var_max = var_min = 0
                 else:
-                    var_max = self.args.var_max
-                    var_min = self.args.var_min
+                    var_max = self.var_max
+                    var_min = self.var_min
 
                 raw_b = info_predictions[i][:, 2:]
                 log_b = torch.zeros_like(raw_b)
@@ -262,10 +284,41 @@ class SEARAFT_S(SEARAFT):
         "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/sea_raft_s-spring-4d13c106.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        args.iters = 4
-        args.pretrain = "resnet18"
-        super().__init__(args)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dim: int = 128,
+        initial_dim: int = 64,
+        num_blocks: int = 2,
+        block_dims: Sequence[int] = (64, 128, 256),
+        pretrain: str = "resnet18",
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 4,
+        alternate_corr: bool = False,
+        use_var: bool = True,
+        var_min: float = 0,
+        var_max: float = 10,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            corr_levels,
+            corr_radius,
+            dim,
+            initial_dim,
+            num_blocks,
+            block_dims,
+            pretrain,
+            gamma,
+            max_flow,
+            iters,
+            alternate_corr,
+            use_var,
+            var_min,
+            var_max,
+            **kwargs,
+        )
 
 
 class SEARAFT_M(SEARAFT):
@@ -278,10 +331,41 @@ class SEARAFT_M(SEARAFT):
         "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/sea_raft_m-spring-de7c13e2.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        args.iters = 4
-        args.pretrain = "resnet34"
-        super().__init__(args)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dim: int = 128,
+        initial_dim: int = 64,
+        num_blocks: int = 2,
+        block_dims: Sequence[int] = (64, 128, 256),
+        pretrain: str = "resnet34",
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 4,
+        alternate_corr: bool = False,
+        use_var: bool = True,
+        var_min: float = 0,
+        var_max: float = 10,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            corr_levels,
+            corr_radius,
+            dim,
+            initial_dim,
+            num_blocks,
+            block_dims,
+            pretrain,
+            gamma,
+            max_flow,
+            iters,
+            alternate_corr,
+            use_var,
+            var_min,
+            var_max,
+            **kwargs,
+        )
 
 
 class SEARAFT_L(SEARAFT):
@@ -294,7 +378,62 @@ class SEARAFT_L(SEARAFT):
         "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/sea_raft_m-spring-de7c13e2.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        args.iters = 12
-        args.pretrain = "resnet34"
-        super().__init__(args)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dim: int = 128,
+        initial_dim: int = 64,
+        num_blocks: int = 2,
+        block_dims: Sequence[int] = (64, 128, 256),
+        pretrain: str = "resnet34",
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 12,
+        alternate_corr: bool = False,
+        use_var: bool = True,
+        var_min: float = 0,
+        var_max: float = 10,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            corr_levels,
+            corr_radius,
+            dim,
+            initial_dim,
+            num_blocks,
+            block_dims,
+            pretrain,
+            gamma,
+            max_flow,
+            iters,
+            alternate_corr,
+            use_var,
+            var_min,
+            var_max,
+            **kwargs,
+        )
+
+
+@register_model
+@trainable
+class sea_raft(SEARAFT):
+    pass
+
+
+@register_model
+@trainable
+class sea_raft_s(SEARAFT_S):
+    pass
+
+
+@register_model
+@trainable
+class sea_raft_m(SEARAFT_M):
+    pass
+
+
+@register_model
+@trainable
+class sea_raft_l(SEARAFT_L):
+    pass

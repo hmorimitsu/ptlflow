@@ -4,7 +4,10 @@
 
 Follow the [PTLFlow installation instructions](https://ptlflow.readthedocs.io/en/latest/starting/installation.html).
 
-This model can be called using the following names: `rapidflow`, `rapidflow_it1`, `rapidflow_it2`, `rapidflow_it3`, `rapidflow_it6`, `rapidflow_it12`.
+IMPORTANT: This model was trained and tested on ptlflow v0.3.2.
+It should also probably work on newer versions as well, but it has not been validated.
+
+This model can be called using the following names: `rapidflow`, `rapidflow_it1`, `rapidflow_it2`, `rapidflow_it3`, `rapidflow_it6`.
 
 The exact versions of the packages we used for our tests are listed in [requirements.txt](requirements.txt).
 
@@ -35,23 +38,23 @@ We train our model in four stages as follows.
 ### Stage 1: FlyingChairs
 
 ```bash
-python train.py rapidflow --random_seed 1234 --gradient_clip_val 1.0 --lr 2.5e-4 --wdecay 1e-4 --gamma 0.8 --train_dataset chairs --train_batch_size 8 --max_epochs 35 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs
+python train.py --config ptlflow/models/rapidflow/configs/rapidflow-train1-chairs.yaml
 ```
 
 ### Stage 2: FlyingThings3D
 
 ```bash
-python train.py rapidflow --pretrained path_to_stage1_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-4 --gamma 0.8 --train_dataset things --train_batch_size 4 --max_epochs 10 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs
+python train.py --config ptlflow/models/rapidflow/configs/rapidflow-train2-things.yaml
 ```
 
 ### Stage 3: FlyingThings3D+Sintel+KITTI+HD1K
 ```bash
-python train.py rapidflow --pretrained path_to_stage2_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-5 --gamma 0.85 --train_dataset 200*sintel+400*kitti-2015+10*hd1k+things-train-sinteltransform --train_batch_size 6 --max_epochs 4 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs
+python train.py --config ptlflow/models/rapidflow/configs/rapidflow-train3-sintel.yaml
 ```
 
 ### Stage 4: KITTI 2015
 ```bash
-python train.py rapidflow --pretrained path_to_stage3_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-5 --gamma 0.85 --train_dataset kitti-2015 --train_batch_size 6 --max_epochs 150 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs
+python train.py --config ptlflow/models/rapidflow/configs/rapidflow-train4-kitti.yaml
 ```
 
 ## Validation
@@ -59,7 +62,7 @@ python train.py rapidflow --pretrained path_to_stage3_ckpt --random_seed 1234 --
 To validate our model on the training sets of Sintel and KITTI, use the following command at the root folder of PTLFlow:
 
 ```bash
-python validate.py rapidflow_it12 --pretrained_ckpt things --val_dataset sintel-clean+sintel-final+kitti-2012+kitti-2015 --fp16
+python validate.py --config ptlflow/models/rapidflow/configs/rapidflow-validate-things.yaml
 ```
 
 It should generate the following results:
@@ -78,43 +81,63 @@ The results submitted to the public benchmarks are generated with the respective
 ### MPI-Sintel
 
 ```bash
-python test.py rapidflow --iters 12 --pretrained_ckpt sintel --test_dataset sintel --warm_start
+python test.py --config ptlflow/models/rapidflow/configs/rapidflow-test-sintel.yaml
 ```
 
 ### KITTI 2015
 
 ```bash
-python test.py rapidflow --iters 12 --pretrained_ckpt kitti --test_dataset kitti-2015 --input_pad_one_side
+python test.py --config ptlflow/models/rapidflow/configs/rapidflow-test-kitti.yaml
 ```
 
 ## Converting model to ONNX
 
+### Installation
+
+You will need to install the following additional packages
+
+```bash
+pip install onnx onnxruntime
+```
+
+### Usage
+
 The script [convert_to_onnx.py](convert_to_onnx.py) provides a simple example of how to convert RAPIDFlow models to ONNX format.
 For example, to convert the 12 iterations version with the checkpoint trained on the Sintel dataset, you can run:
 ```bash
-python convert_to_onnx.py rapidflow_it12 --checkpoint sintel
+python convert_to_onnx.py --model rapidflow --ckpt_path sintel
 ```
 
 We also provide the script [onnx_infer.py](onnx_infer.py) to quickly test the converted ONNX model.
 To test the model converted above, just run:
 ```bash
-python onnx_infer.py rapidflow_it12.onnx
+python onnx_infer.py rapidflow.onnx
 ```
 
 You can also provide your own images to test by providing an additional argument:
 ```bash
-python onnx_infer.py rapidflow_it12.onnx --image_paths /path/to/first/image /path/to/second/image
+python onnx_infer.py rapidflow.onnx --image_paths /path/to/first/image /path/to/second/image
 ```
 
 ## Compiling model to TensorRT
 
+### Installation
+
+You will need to install the following additional packages
+
+```bash
+pip install torch-tensorrt
+```
+
+### Usage
+
 The script [tensorrt_test.py](tensorrt_test.py) provides a simple example of how to compile RAPIDFlow models to TensorRT.
 Run it by typing:
 ```bash
-python tensorrt_test.py rapidflow_it12 --checkpoint things
+python tensorrt_test.py rapidflow --checkpoint things
 ```
 
-### ONNX and TensorRT example limitations
+## ONNX and TensorRT example limitations
 
 Directly converting the model to ONNX and TensorRT as shown in this example will work, but it is not optimal.
 To obtain the best convertion, it would be necessary to rewrite some parts of the code to remove conditions and operations that may change according to the input size.

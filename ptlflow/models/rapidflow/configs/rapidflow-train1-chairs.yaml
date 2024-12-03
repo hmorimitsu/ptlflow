@@ -1,0 +1,43 @@
+# lightning.pytorch==2.4.0
+seed_everything: true
+trainer:
+  max_epochs: 45
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+  devices: 0,
+model:
+  class_path: ptlflow.models.rapidflow
+  init_args:
+    pyramid_ranges:
+    - 32
+    - 8
+    iters: 12
+    corr_mode: allpairs
+    corr_levels: 1
+    corr_range: 4
+    enc_hidden_chs: 64
+    enc_out_chs: 128
+    enc_stem_stride: 4
+    enc_mlp_ratio: 4.0
+    enc_depth: 4
+    dec_net_chs: 64
+    dec_inp_chs: 64
+    dec_motion_chs: 128
+    dec_depth: 2
+    dec_mlp_ratio: 4.0
+    use_upsample_mask: true
+    fuse_next1d_weights: false
+    simple_io: false
+    gamma: 0.8
+    max_flow: 400
+    lr: 0.0004
+    wdecay: 0.0001
+    warm_start: false
+data:
+  train_dataset: chairs
+  val_dataset: sintel-final-val+kitti-2015-val
+  train_batch_size: 1
+  train_num_workers: 4
+  train_crop_size: [352, 480]
+  train_transform_cuda: false
+  train_transform_fp16: false

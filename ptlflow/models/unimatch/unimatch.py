@@ -1,9 +1,10 @@
-from argparse import ArgumentParser, Namespace
+from typing import Sequence
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from .backbone import CNNEncoder
 from .transformer import FeatureTransformer
 from .matching import (
@@ -15,19 +16,17 @@ from .attention import SelfAttnPropagation
 from .geometry import flow_warp
 from .reg_refine import BasicUpdateBlock
 from .utils import (
-    normalize_img,
     feature_add_position,
     upsample_flow_with_mask,
-    InputPadder,
 )
 from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -56,69 +55,83 @@ class UniMatch(BaseModel):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/unimatch-things-2433864a.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=32)
+    def __init__(
+        self,
+        gamma: float = 0.9,
+        max_flow: float = 400.0,
+        corr_radius: int = 4,
+        feature_channels: int = 128,
+        num_scales: int = 1,
+        upsample_factor: int = 8,
+        reg_refine: bool = False,
+        num_transformer_layers: int = 6,
+        num_head: int = 1,
+        ffn_dim_expansion: int = 4,
+        pred_bidir_flow: bool = False,
+        num_reg_refine: int = 1,
+        attn_type: str = "swin",
+        attn_splits_list: Sequence[int] = (2,),
+        corr_radius_list: Sequence[int] = (-1,),
+        prop_radius_list: Sequence[int] = (-1,),
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=32, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
+
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.corr_radius = corr_radius
+        self.feature_channels = feature_channels
+        self.num_scales = num_scales
+        self.upsample_factor = upsample_factor
+        self.reg_refine = reg_refine
+        self.num_transformer_layers = num_transformer_layers
+        self.num_head = num_head
+        self.ffn_dim_expansion = ffn_dim_expansion
+        self.pred_bidir_flow = pred_bidir_flow
+        self.num_reg_refine = num_reg_refine
+        self.attn_type = attn_type
+        self.attn_splits_list = attn_splits_list
+        self.corr_radius_list = corr_radius_list
+        self.prop_radius_list = prop_radius_list
 
         # CNN
         self.backbone = CNNEncoder(
-            output_dim=self.args.feature_channels,
-            num_output_scales=self.args.num_scales,
+            output_dim=self.feature_channels,
+            num_output_scales=self.num_scales,
         )
 
         # Transformer
         self.transformer = FeatureTransformer(
-            num_layers=self.args.num_transformer_layers,
-            d_model=self.args.feature_channels,
-            nhead=self.args.num_head,
-            ffn_dim_expansion=self.args.ffn_dim_expansion,
+            num_layers=self.num_transformer_layers,
+            d_model=self.feature_channels,
+            nhead=self.num_head,
+            ffn_dim_expansion=self.ffn_dim_expansion,
         )
 
         # propagation with self-attn
-        self.feature_flow_attn = SelfAttnPropagation(
-            in_channels=self.args.feature_channels
-        )
+        self.feature_flow_attn = SelfAttnPropagation(in_channels=self.feature_channels)
 
-        if not self.args.reg_refine:
+        if not self.reg_refine:
             # convex upsampling simiar to RAFT
             # concat feature0 and low res flow as input
             self.upsampler = nn.Sequential(
-                nn.Conv2d(2 + self.args.feature_channels, 256, 3, 1, 1),
+                nn.Conv2d(2 + self.feature_channels, 256, 3, 1, 1),
                 nn.ReLU(inplace=True),
-                nn.Conv2d(256, self.args.upsample_factor**2 * 9, 1, 1, 0),
+                nn.Conv2d(256, self.upsample_factor**2 * 9, 1, 1, 0),
             )
             # thus far, all the learnable parameters are task-agnostic
 
-        if self.args.reg_refine:
+        if self.reg_refine:
             # optional task-specific local regression refinement
             self.refine_proj = nn.Conv2d(128, 256, 1)
             self.refine = BasicUpdateBlock(
                 corr_channels=(2 * 4 + 1) ** 2,
-                downsample_factor=self.args.upsample_factor,
+                downsample_factor=self.upsample_factor,
                 flow_dim=2,
                 bilinear_up=False,
             )
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument("--feature_channels", type=int, default=128)
-        parser.add_argument("--num_scales", type=int, default=1)
-        parser.add_argument("--upsample_factor", type=int, default=8)
-        parser.add_argument("--reg_refine", action="store_true")
-        parser.add_argument("--num_transformer_layers", type=int, default=6)
-        parser.add_argument("--num_head", type=int, default=1)
-        parser.add_argument("--ffn_dim_expansion", type=int, default=4)
-        parser.add_argument("--pred_bidir_flow", action="store_true")
-        parser.add_argument("--num_reg_refine", type=int, default=1)
-        parser.add_argument("--attn_type", type=str, default="swin")
-        parser.add_argument("--attn_splits_list", type=int, nargs="+", default=(2,))
-        parser.add_argument("--corr_radius_list", type=int, nargs="+", default=(-1,))
-        parser.add_argument("--prop_radius_list", type=int, nargs="+", default=(-1,))
-        return parser
 
     def extract_feature(self, img0, img1):
         concat = torch.cat((img0, img1), dim=0)  # [2B, C, H, W]
@@ -155,7 +168,7 @@ class UniMatch(BaseModel):
             concat = torch.cat((flow, feature), dim=1)
             mask = self.upsampler(concat)
             up_flow = upsample_flow_with_mask(
-                flow, mask, upsample_factor=self.args.upsample_factor
+                flow, mask, upsample_factor=self.upsample_factor
             )
 
         return up_flow
@@ -186,16 +199,16 @@ class UniMatch(BaseModel):
         flow = None
 
         assert (
-            len(self.args.attn_splits_list)
-            == len(self.args.corr_radius_list)
-            == len(self.args.prop_radius_list)
-            == self.args.num_scales
+            len(self.attn_splits_list)
+            == len(self.corr_radius_list)
+            == len(self.prop_radius_list)
+            == self.num_scales
         )
 
-        for scale_idx in range(self.args.num_scales):
+        for scale_idx in range(self.num_scales):
             feature0, feature1 = feature0_list[scale_idx], feature1_list[scale_idx]
 
-            if self.args.pred_bidir_flow and scale_idx > 0:
+            if self.pred_bidir_flow and scale_idx > 0:
                 # predicting bidirectional flow with refinement
                 feature0, feature1 = torch.cat((feature0, feature1), dim=0), torch.cat(
                     (feature1, feature0), dim=0
@@ -203,8 +216,8 @@ class UniMatch(BaseModel):
 
             feature0_ori, feature1_ori = feature0, feature1
 
-            upsample_factor = self.args.upsample_factor * (
-                2 ** (self.args.num_scales - 1 - scale_idx)
+            upsample_factor = self.upsample_factor * (
+                2 ** (self.num_scales - 1 - scale_idx)
             )
 
             if scale_idx > 0:
@@ -219,27 +232,27 @@ class UniMatch(BaseModel):
                 flow = flow.detach()
                 feature1 = flow_warp(feature1, flow)  # [B, C, H, W]
 
-            attn_splits = self.args.attn_splits_list[scale_idx]
-            corr_radius = self.args.corr_radius_list[scale_idx]
-            prop_radius = self.args.prop_radius_list[scale_idx]
+            attn_splits = self.attn_splits_list[scale_idx]
+            corr_radius = self.corr_radius_list[scale_idx]
+            prop_radius = self.prop_radius_list[scale_idx]
 
             # add position to features
             feature0, feature1 = feature_add_position(
-                feature0, feature1, attn_splits, self.args.feature_channels
+                feature0, feature1, attn_splits, self.feature_channels
             )
 
             # Transformer
             feature0, feature1 = self.transformer(
                 feature0,
                 feature1,
-                attn_type=self.args.attn_type,
+                attn_type=self.attn_type,
                 attn_num_splits=attn_splits,
             )
 
             # correlation and softmax
             if corr_radius == -1:  # global matching
                 flow_pred = global_correlation_softmax(
-                    feature0, feature1, self.args.pred_bidir_flow
+                    feature0, feature1, self.pred_bidir_flow
                 )[0]
             else:  # local matching
                 flow_pred = local_correlation_softmax(feature0, feature1, corr_radius)[
@@ -260,7 +273,7 @@ class UniMatch(BaseModel):
                 flow_preds.append(flow_bilinear)
 
             # flow propagation with self-attn
-            if self.args.pred_bidir_flow and scale_idx == 0:
+            if self.pred_bidir_flow and scale_idx == 0:
                 feature0 = torch.cat(
                     (feature0, feature1), dim=0
                 )  # [2*B, C, H, W] for propagation
@@ -273,7 +286,7 @@ class UniMatch(BaseModel):
             )
 
             # bilinear exclude the last one
-            if self.training and scale_idx < self.args.num_scales - 1:
+            if self.training and scale_idx < self.num_scales - 1:
                 flow_up = self.upsample_flow(
                     flow, feature0, bilinear=True, upsample_factor=upsample_factor
                 )
@@ -282,8 +295,8 @@ class UniMatch(BaseModel):
                 )
                 flow_preds.append(flow_up)
 
-            if scale_idx == self.args.num_scales - 1:
-                if not self.args.reg_refine:
+            if scale_idx == self.num_scales - 1:
+                if not self.reg_refine:
                     # upsample to the original image resolution
                     flow_up = self.upsample_flow(flow, feature0)
                     flow_up = self.postprocess_predictions(
@@ -305,8 +318,8 @@ class UniMatch(BaseModel):
                         )
                         flow_preds.append(flow_up)
 
-                    assert self.args.num_reg_refine > 0
-                    for refine_iter_idx in range(self.args.num_reg_refine):
+                    assert self.num_reg_refine > 0
+                    for refine_iter_idx in range(self.num_reg_refine):
                         flow = flow.detach()
                         correlation = local_correlation_with_flow(
                             feature0_ori,
@@ -330,12 +343,9 @@ class UniMatch(BaseModel):
                         )
                         flow = flow + residual_flow
 
-                        if (
-                            self.training
-                            or refine_iter_idx == self.args.num_reg_refine - 1
-                        ):
+                        if self.training or refine_iter_idx == self.num_reg_refine - 1:
                             flow_up = upsample_flow_with_mask(
-                                flow, up_mask, upsample_factor=self.args.upsample_factor
+                                flow, up_mask, upsample_factor=self.upsample_factor
                             )
 
                             flow_up = self.postprocess_predictions(
@@ -360,13 +370,45 @@ class UniMatchScale2(UniMatch):
         "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/unimatch_scale2-sintel-f43b76ab.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        args.num_scales = 2
-        args.upsample_factor = 4
-        args.attn_splits_list = (2, 8)
-        args.corr_radius_list = (-1, 4)
-        args.prop_radius_list = (-1, 1)
-        super().__init__(args)
+    def __init__(
+        self,
+        gamma: float = 0.9,
+        max_flow: float = 400,
+        corr_radius: int = 4,
+        feature_channels: int = 128,
+        num_scales: int = 2,
+        upsample_factor: int = 4,
+        reg_refine: bool = False,
+        num_transformer_layers: int = 6,
+        num_head: int = 1,
+        ffn_dim_expansion: int = 4,
+        pred_bidir_flow: bool = False,
+        num_reg_refine: int = 1,
+        attn_type: str = "swin",
+        attn_splits_list: Sequence[int] = (2, 8),
+        corr_radius_list: Sequence[int] = (-1, 4),
+        prop_radius_list: Sequence[int] = (-1, 1),
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            gamma,
+            max_flow,
+            corr_radius,
+            feature_channels,
+            num_scales,
+            upsample_factor,
+            reg_refine,
+            num_transformer_layers,
+            num_head,
+            ffn_dim_expansion,
+            pred_bidir_flow,
+            num_reg_refine,
+            attn_type,
+            attn_splits_list,
+            corr_radius_list,
+            prop_radius_list,
+            **kwargs,
+        )
 
 
 class UniMatchScale2With6Refinements(UniMatch):
@@ -377,12 +419,78 @@ class UniMatchScale2With6Refinements(UniMatch):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/unimatch_scale2_refine6-kitti-0626279a.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        args.num_scales = 2
-        args.upsample_factor = 4
-        args.attn_splits_list = (2, 8)
-        args.corr_radius_list = (-1, 4)
-        args.prop_radius_list = (-1, 1)
-        args.reg_refine = True
-        args.num_reg_refine = 6
-        super().__init__(args)
+    def __init__(
+        self,
+        gamma: float = 0.9,
+        max_flow: float = 400,
+        corr_radius: int = 4,
+        feature_channels: int = 128,
+        num_scales: int = 2,
+        upsample_factor: int = 4,
+        reg_refine: bool = True,
+        num_transformer_layers: int = 6,
+        num_head: int = 1,
+        ffn_dim_expansion: int = 4,
+        pred_bidir_flow: bool = False,
+        num_reg_refine: int = 6,
+        attn_type: str = "swin",
+        attn_splits_list: Sequence[int] = (2, 8),
+        corr_radius_list: Sequence[int] = (-1, 4),
+        prop_radius_list: Sequence[int] = (-1, 1),
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            gamma,
+            max_flow,
+            corr_radius,
+            feature_channels,
+            num_scales,
+            upsample_factor,
+            reg_refine,
+            num_transformer_layers,
+            num_head,
+            ffn_dim_expansion,
+            pred_bidir_flow,
+            num_reg_refine,
+            attn_type,
+            attn_splits_list,
+            corr_radius_list,
+            prop_radius_list,
+            **kwargs,
+        )
+
+
+@register_model
+@trainable
+class unimatch(UniMatch):
+    pass
+
+
+@register_model
+@trainable
+class unimatch_sc2(UniMatchScale2):
+    pass
+
+
+@register_model
+@trainable
+class unimatch_sc2_ref6(UniMatchScale2With6Refinements):
+    pass
+
+
+@register_model
+@trainable
+class gmflow_p(UniMatch):
+    pass
+
+
+@register_model
+@trainable
+class gmflow_p_sc2(UniMatchScale2):
+    pass
+
+
+@register_model
+@trainable
+class gmflow_p_sc2_ref6(UniMatchScale2With6Refinements):
+    pass

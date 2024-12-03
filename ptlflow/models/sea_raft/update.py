@@ -16,9 +16,9 @@ class FlowHead(nn.Module):
 
 
 class BasicMotionEncoder(nn.Module):
-    def __init__(self, args, dim=128):
+    def __init__(self, corr_channel, dim=128):
         super(BasicMotionEncoder, self).__init__()
-        cor_planes = args.corr_channel
+        cor_planes = corr_channel
         self.convc1 = nn.Conv2d(cor_planes, dim * 2, 1, padding=0)
         self.convc2 = nn.Conv2d(dim * 2, dim + dim // 2, 3, padding=1)
         self.convf1 = nn.Conv2d(2, dim, 7, padding=3)
@@ -37,17 +37,16 @@ class BasicMotionEncoder(nn.Module):
 
 
 class BasicUpdateBlock(nn.Module):
-    def __init__(self, args, hdim=128, cdim=128):
+    def __init__(self, corr_channel, num_blocks, hdim=128, cdim=128):
         # net: hdim, inp: cdim
         super(BasicUpdateBlock, self).__init__()
-        self.args = args
-        self.encoder = BasicMotionEncoder(args, dim=cdim)
+        self.encoder = BasicMotionEncoder(corr_channel=corr_channel, dim=cdim)
         self.refine = []
-        for i in range(args.num_blocks):
+        for i in range(num_blocks):
             self.refine.append(ConvNextBlock(2 * cdim + hdim, hdim))
         self.refine = nn.ModuleList(self.refine)
 
-    def forward(self, net, inp, corr, flow, upsample=True):
+    def forward(self, net, inp, corr, flow):
         motion_features = self.encoder(flow, corr)
         inp = torch.cat([inp, motion_features], dim=1)
         for blk in self.refine:

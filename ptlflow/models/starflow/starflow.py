@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+from typing import Optional, Sequence
 
 try:
     from spatial_correlation_sampler import SpatialCorrelationSampler
@@ -9,6 +9,7 @@ except ModuleNotFoundError:
 import torch
 import torch.nn as nn
 
+from ptlflow.utils.registry import register_model
 from .pwc_modules import conv, upsample2d_as, rescale_flow, initialize_msra
 from .pwc_modules import WarpingLayer, FeatureExtractor
 from .pwc_modules import FlowAndOccContextNetwork, FlowAndOccEstimatorDense
@@ -23,15 +24,35 @@ class StarFlow(BaseModel):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/starflow-kitti-34b9a3ed.ckpt",
     }
 
-    def __init__(self, args):
-        super(StarFlow, self).__init__(args=args, loss_fn=None, output_stride=1)
-        self.args = args
+    def __init__(
+        self,
+        div_flow: float = 0.05,
+        search_range: int = 4,
+        output_level: int = 4,
+        num_levels: int = 7,
+        num_chs: Sequence[int] = (3, 16, 32, 64, 96, 128, 196),
+        train_batch_size: Optional[int] = None,
+        **kwargs,
+    ):
+        super(StarFlow, self).__init__(
+            output_stride=64,
+            loss_fn=None,
+            **kwargs,
+        )
+
+        self.div_flow = div_flow
+        self.search_range = search_range
+        self.output_level = output_level
+        self.num_levels = num_levels
+        self.num_chs = num_chs
+        self.train_batch_size = train_batch_size
+
         self.leakyRELU = nn.LeakyReLU(0.1, inplace=True)
 
-        self.feature_pyramid_extractor = FeatureExtractor(self.args.num_chs)
+        self.feature_pyramid_extractor = FeatureExtractor(self.num_chs)
         self.warping_layer = WarpingLayer()
 
-        self.dim_corr = (self.args.search_range * 2 + 1) ** 2
+        self.dim_corr = (self.search_range * 2 + 1) ** 2
         self.num_ch_in = self.dim_corr + 32 + 2 + 1
 
         self.flow_and_occ_estimators = FlowAndOccEstimatorDense(2 * self.num_ch_in)
@@ -64,24 +85,10 @@ class StarFlow(BaseModel):
         self.refine_occ = RefineOcc(1 + 32 + 32)
 
         self.corr = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.args.search_range + 1, padding=0
+            kernel_size=1, patch_size=2 * self.search_range + 1, padding=0
         )
 
         initialize_msra(self.modules())
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--div_flow", type=float, default=0.05)
-        parser.add_argument("--search_range", type=int, default=4)
-        parser.add_argument("--output_level", type=int, default=4)
-        parser.add_argument(
-            "--num_chs", type=int, nargs="+", default=[3, 16, 32, 64, 96, 128, 196]
-        )
-        parser.add_argument("--num_iters", type=int, default=1)
-        parser.add_argument("--num_levels", type=int, default=7)
-        return parser
 
     def forward(self, inputs):
         images, image_resizer = self.preprocess_images(
@@ -116,7 +123,7 @@ class StarFlow(BaseModel):
             flows_b.append([])
             occs_f.append([])
             occs_b.append([])
-        for l in range(self.args.output_level + 1):
+        for l in range(self.output_level + 1):
             flows_coarse_f.append([])
             occs_coarse_f.append([])
 
@@ -145,7 +152,7 @@ class StarFlow(BaseModel):
             x1_pyramid, x2_pyramid = list_pyramids[i : i + 2]
 
             for l, (x1, x2) in enumerate(zip(x1_pyramid, x2_pyramid)):
-                if l <= self.args.output_level:
+                if l <= self.output_level:
                     if i == 0:
                         (
                             bs_,
@@ -176,10 +183,10 @@ class StarFlow(BaseModel):
                         occ_f = upsample2d_as(occ_f, x1, mode="bilinear")
                         occ_b = upsample2d_as(occ_b, x2, mode="bilinear")
                         x2_warp = self.warping_layer(
-                            x2, flow_f, height_im, width_im, self.args.div_flow
+                            x2, flow_f, height_im, width_im, self.div_flow
                         )
                         x1_warp = self.warping_layer(
-                            x1, flow_b, height_im, width_im, self.args.div_flow
+                            x1, flow_b, height_im, width_im, self.div_flow
                         )
 
                     # correlation
@@ -204,7 +211,7 @@ class StarFlow(BaseModel):
                     out_corr_relu_f = self.leakyRELU(out_corr_f)
                     out_corr_relu_b = self.leakyRELU(out_corr_b)
 
-                    if l != self.args.output_level:
+                    if l != self.output_level:
                         x1_1by1 = self.conv_1x1[l](x1)
                         x2_1by1 = self.conv_1x1[l](x2)
                     else:
@@ -217,15 +224,15 @@ class StarFlow(BaseModel):
                             flows_b[l][-1],
                             height_im,
                             width_im,
-                            self.args.div_flow,
+                            self.div_flow,
                         )
 
                     # Flow and occlusions estimation
                     flow_f = rescale_flow(
-                        flow_f, self.args.div_flow, width_im, height_im, to_local=True
+                        flow_f, self.div_flow, width_im, height_im, to_local=True
                     )
                     flow_b = rescale_flow(
-                        flow_b, self.args.div_flow, width_im, height_im, to_local=True
+                        flow_b, self.div_flow, width_im, height_im, to_local=True
                     )
 
                     features = torch.cat(
@@ -275,14 +282,14 @@ class StarFlow(BaseModel):
                     )
                     flow_cont_f = rescale_flow(
                         flow_cont_f,
-                        self.args.div_flow,
+                        self.div_flow,
                         width_im,
                         height_im,
                         to_local=False,
                     )
                     flow_cont_b = rescale_flow(
                         flow_cont_b,
-                        self.args.div_flow,
+                        self.div_flow,
                         width_im,
                         height_im,
                         to_local=False,
@@ -292,14 +299,14 @@ class StarFlow(BaseModel):
                         flow_cont_f,
                         height_im,
                         width_im,
-                        self.args.div_flow,
+                        self.div_flow,
                     )
                     img1_warp = self.warping_layer(
                         img1_resize,
                         flow_cont_b,
                         height_im,
                         width_im,
-                        self.args.div_flow,
+                        self.div_flow,
                     )
 
                     # flow refine
@@ -311,18 +318,18 @@ class StarFlow(BaseModel):
                     )
 
                     flow_f = rescale_flow(
-                        flow_f, self.args.div_flow, width_im, height_im, to_local=False
+                        flow_f, self.div_flow, width_im, height_im, to_local=False
                     )
                     flow_b = rescale_flow(
-                        flow_b, self.args.div_flow, width_im, height_im, to_local=False
+                        flow_b, self.div_flow, width_im, height_im, to_local=False
                     )
 
                     # occ refine
                     x2_1by1_warp = self.warping_layer(
-                        x2_1by1, flow_f, height_im, width_im, self.args.div_flow
+                        x2_1by1, flow_f, height_im, width_im, self.div_flow
                     )
                     x1_1by1_warp = self.warping_layer(
-                        x1_1by1, flow_b, height_im, width_im, self.args.div_flow
+                        x1_1by1, flow_b, height_im, width_im, self.div_flow
                     )
 
                     occ_f = self.refine_occ(
@@ -351,19 +358,19 @@ class StarFlow(BaseModel):
                     # flows.append([flow_f, flow_b])
 
                     x2_warp = self.warping_layer(
-                        x2, flow_f, height_im, width_im, self.args.div_flow
+                        x2, flow_f, height_im, width_im, self.div_flow
                     )
                     x1_warp = self.warping_layer(
-                        x1, flow_b, height_im, width_im, self.args.div_flow
+                        x1, flow_b, height_im, width_im, self.div_flow
                     )
                     flow_b_warp = self.warping_layer(
-                        flow_b, flow_f, height_im, width_im, self.args.div_flow
+                        flow_b, flow_f, height_im, width_im, self.div_flow
                     )
                     flow_f_warp = self.warping_layer(
-                        flow_f, flow_b, height_im, width_im, self.args.div_flow
+                        flow_f, flow_b, height_im, width_im, self.div_flow
                     )
 
-                    if l != self.args.num_levels - 1:
+                    if l != self.num_levels - 1:
                         x1_in = self.conv_1x1_1(x1)
                         x2_in = self.conv_1x1_1(x2)
                         x1_w_in = self.conv_1x1_1(x1_warp)
@@ -400,7 +407,7 @@ class StarFlow(BaseModel):
 
         flow_f_up = torch.stack(
             [
-                upsample2d_as(f, list_imgs[0], mode="bilinear") / self.args.div_flow
+                upsample2d_as(f, list_imgs[0], mode="bilinear") / self.div_flow
                 for f in flows_f[-1]
             ],
             dim=1,
@@ -408,7 +415,7 @@ class StarFlow(BaseModel):
         flow_f_up = self.postprocess_predictions(flow_f_up, image_resizer, is_flow=True)
         flow_b_up = torch.stack(
             [
-                upsample2d_as(f, list_imgs[0], mode="bilinear") / self.args.div_flow
+                upsample2d_as(f, list_imgs[0], mode="bilinear") / self.div_flow
                 for f in flows_b[-1]
             ],
             dim=1,
@@ -446,3 +453,8 @@ class StarFlow(BaseModel):
             outputs["occs_b"] = occs_b_up
 
         return outputs
+
+
+@register_model
+class starflow(StarFlow):
+    pass

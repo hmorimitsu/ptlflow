@@ -1,12 +1,10 @@
-from argparse import ArgumentParser, Namespace
-
 import torch
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model
 from .attention import Attention
 from .extractor import BasicEncoder
 from .corr import CorrBlock
-
 from .update import Update
 from ..base_model.base_model import BaseModel
 
@@ -21,8 +19,28 @@ class SplatFlow(BaseModel):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/splatflow-kitti-2aa8e145.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=None, output_stride=8)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dropout: float = 0.0,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 32,
+        alternate_corr: bool = False,
+        fast_inference: bool = True,
+        **kwargs,
+    ) -> None:
+        super().__init__(output_stride=8, loss_fn=None, **kwargs)
+
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.dropout = dropout
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.iters = iters
+        self.alternate_corr = alternate_corr
+        self.fast_inference = fast_inference
 
         self.hdim = self.cdim = 128
         self.fnet = BasicEncoder(output_dim=256, norm_fn="instance")
@@ -34,22 +52,6 @@ class SplatFlow(BaseModel):
 
         if forward_warping is None:
             raise ModuleNotFoundError("No module named 'cupy'")
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--corr_levels", type=int, default=4)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument("--dropout", type=float, default=0.0)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, default=32)
-        parser.add_argument("--alternate_corr", action="store_true")
-        parser.add_argument(
-            "--not_fast_inference", action="store_false", dest="fast_inference"
-        )
-        return parser
 
     def init_coord(self, fmap):
         f_shape = fmap.shape
@@ -130,7 +132,7 @@ class SplatFlow(BaseModel):
 
         flow_predictions = []
 
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             coords1 = coords1.detach()
 
             corr = corr_fn(coords1)
@@ -141,8 +143,8 @@ class SplatFlow(BaseModel):
             )
             coords1 = coords1 + delta_flow
 
-            if (self.args.fast_inference and (itr == self.args.iters - 1)) or (
-                not self.args.fast_inference
+            if (self.fast_inference and (itr == self.iters - 1)) or (
+                not self.fast_inference
             ):
                 flow_up = self.cvx_upsample(8 * (coords1 - coords0), up_mask)
                 flow_predictions.append(flow_up)
@@ -150,3 +152,8 @@ class SplatFlow(BaseModel):
             low = coords1 - coords0
 
         return flow_predictions, mf, low
+
+
+@register_model
+class splatflow(SplatFlow):
+    pass

@@ -1,10 +1,9 @@
-from argparse import Namespace
-
 from einops import rearrange
 import torch
 import torch.nn as nn
 from torch.nn import init
 
+from ptlflow.utils.registry import register_model, trainable
 from .flownetc import FlowNetC
 from .flownets import FlowNetS
 from .flownetsd import FlowNetSD
@@ -18,27 +17,86 @@ class FlowNet2(FlowNetBase):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flownet2-things-d63b53a7.ckpt"
     }
 
-    def __init__(self, args: Namespace):
-        args.input_channels = 12
-        args.loss_start_scale = 1
-        args.loss_num_scales = 3
-        super(FlowNet2, self).__init__(args)
-
-        self.args = args
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        input_channels: int = 12,
+        batch_norm: bool = False,
+        loss_start_scale: int = 1,
+        loss_num_scales: int = 3,
+        loss_base_weight: float = 0.32,
+        loss_norm: str = "L2",
+        **kwargs,
+    ):
+        super(FlowNet2, self).__init__(
+            div_flow=div_flow,
+            input_channels=input_channels,
+            batch_norm=batch_norm,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
         self.rgb_max = 1
 
         # First Block (FlowNetC)
-        self.flownetc = FlowNetC(args)
+        self.flownetc = FlowNetC(
+            div_flow=div_flow,
+            input_channels=input_channels,
+            batch_norm=batch_norm,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
 
         # Block (FlowNetS)
-        self.flownets_1 = FlowNetS(args)
-        self.flownets_2 = FlowNetS(args)
+        self.flownets_1 = FlowNetS(
+            div_flow=div_flow,
+            input_channels=input_channels,
+            batch_norm=batch_norm,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
+        self.flownets_2 = FlowNetS(
+            div_flow=div_flow,
+            input_channels=input_channels,
+            batch_norm=batch_norm,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
 
         # Block (FlowNetSD)
-        self.flownets_d = FlowNetSD(args)
+        self.flownets_d = FlowNetSD(
+            div_flow=div_flow,
+            input_channels=input_channels,
+            batch_norm=batch_norm,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
 
         # Block (FLowNetFusion)
-        self.flownetfusion = FlowNetFusion(args)
+        self.flownetfusion = FlowNetFusion(
+            div_flow=div_flow,
+            input_channels=input_channels,
+            batch_norm=batch_norm,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -113,7 +171,7 @@ class FlowNet2(FlowNetBase):
                 inputs["images"][:, 0],
                 inputs["images"][:, 1],
                 resampled_img1,
-                flownetc_flow / self.args.div_flow,
+                flownetc_flow / self.div_flow,
                 norm_diff_img0,
             ),
             dim=1,
@@ -135,7 +193,7 @@ class FlowNet2(FlowNetBase):
                 inputs["images"][:, 0],
                 inputs["images"][:, 1],
                 resampled_img1,
-                flownets1_flow / self.args.div_flow,
+                flownets1_flow / self.div_flow,
                 norm_diff_img0,
             ),
             dim=1,
@@ -155,7 +213,7 @@ class FlowNet2(FlowNetBase):
         # flownetsd
         flownetsd_flow = (
             self.flownets_d(inputs, skip_preprocess=True)["flows"][:, 0]
-            / self.args.div_flow**2
+            / self.div_flow**2
         )
         norm_flownetsd_flow = torch.norm(flownetsd_flow, p=2, dim=1, keepdim=True)
 
@@ -185,3 +243,9 @@ class FlowNet2(FlowNetBase):
         inputs["images"] = orig_images
 
         return flownetfusion_preds
+
+
+@register_model
+@trainable
+class flownet2(FlowNet2):
+    pass

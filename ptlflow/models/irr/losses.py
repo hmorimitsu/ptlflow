@@ -72,10 +72,10 @@ def f1_score_bal_loss(y_pred, y_true):
 
 
 class MultiScaleEPE_FlowNet(nn.Module):
-    def __init__(self, args):
+    def __init__(self, div_flow, train_batch_size):
         super(MultiScaleEPE_FlowNet, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._div_flow = div_flow
+        self._batch_size = train_batch_size
         self._weights = [0.005, 0.01, 0.02, 0.08, 0.32]
 
     def forward(self, output_dict, target_dict):
@@ -88,7 +88,7 @@ class MultiScaleEPE_FlowNet(nn.Module):
             ]
 
             # div_flow trick
-            target = self._args.div_flow * target_dict["flows"][:, 0]
+            target = self._div_flow * target_dict["flows"][:, 0]
 
             total_loss = 0
             for i, output_i in enumerate(outputs):
@@ -109,12 +109,12 @@ class MultiScaleEPE_FlowNet(nn.Module):
 
 
 class MultiScaleEPE_FlowNet_IRR(nn.Module):
-    def __init__(self, args):
+    def __init__(self, div_flow, train_batch_size, num_iters):
         super(MultiScaleEPE_FlowNet_IRR, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._div_flow = div_flow
+        self._batch_size = train_batch_size
         self._weights = [0.005, 0.01, 0.02, 0.08, 0.32]
-        self._num_iters = args.num_iters
+        self._num_iters = num_iters
 
     def forward(self, output_dict, target_dict):
         loss_dict = {}
@@ -126,7 +126,7 @@ class MultiScaleEPE_FlowNet_IRR(nn.Module):
             ]
 
             # div_flow trick
-            target_f = self._args.div_flow * target_dict["flows"][:, 0]
+            target_f = self._div_flow * target_dict["flows"][:, 0]
 
             total_loss = 0
             for ii, output_ii in enumerate(outputs_flo):
@@ -147,12 +147,12 @@ class MultiScaleEPE_FlowNet_IRR(nn.Module):
 
 
 class MultiScaleEPE_FlowNet_IRR_Bi(nn.Module):
-    def __init__(self, args):
+    def __init__(self, div_flow, train_batch_size, num_iters):
         super(MultiScaleEPE_FlowNet_IRR_Bi, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._div_flow = div_flow
+        self._batch_size = train_batch_size
         self._weights = [0.005, 0.01, 0.02, 0.08, 0.32]
-        self._num_iters = args.num_iters
+        self._num_iters = num_iters
 
     def forward(self, output_dict, target_dict):
         loss_dict = {}
@@ -164,8 +164,8 @@ class MultiScaleEPE_FlowNet_IRR_Bi(nn.Module):
             ]
 
             # div_flow trick
-            target_f = self._args.div_flow * target_dict["flows"][:, 0]
-            target_b = self._args.div_flow * target_dict["flows_b"][:, 0]
+            target_f = self._div_flow * target_dict["flows"][:, 0]
+            target_b = self._div_flow * target_dict["flows_b"][:, 0]
 
             total_loss = 0
             for ii, output_ii in enumerate(outputs_flo):
@@ -189,12 +189,12 @@ class MultiScaleEPE_FlowNet_IRR_Bi(nn.Module):
 
 
 class MultiScaleEPE_FlowNet_IRR_Occ(nn.Module):
-    def __init__(self, args):
+    def __init__(self, div_flow, train_batch_size, num_iters):
         super(MultiScaleEPE_FlowNet_IRR_Occ, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._div_flow = div_flow
+        self._batch_size = train_batch_size
         self._weights = [0.005, 0.01, 0.02, 0.08, 0.32]
-        self._num_iters = args.num_iters
+        self._num_iters = num_iters
 
         self.f1_score_bal_loss = f1_score_bal_loss
         self.occ_activ = nn.Sigmoid()
@@ -212,7 +212,7 @@ class MultiScaleEPE_FlowNet_IRR_Occ(nn.Module):
             ]
 
             # div_flow trick
-            target = self._args.div_flow * target_dict["flows"][:, 0]
+            target = self._div_flow * target_dict["flows"][:, 0]
             target_occ = target_dict["occs"][:, 0]
 
             flow_loss = 0
@@ -264,12 +264,12 @@ class MultiScaleEPE_FlowNet_IRR_Occ(nn.Module):
 
 
 class MultiScaleEPE_FlowNet_IRR_Bi_Occ(nn.Module):
-    def __init__(self, args):
+    def __init__(self, div_flow, train_batch_size, num_iters):
         super(MultiScaleEPE_FlowNet_IRR_Bi_Occ, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._div_flow = div_flow
+        self._batch_size = train_batch_size
         self._weights = [0.005, 0.01, 0.02, 0.08, 0.32]
-        self._num_iters = args.num_iters
+        self._num_iters = num_iters
 
         self.f1_score_bal_loss = f1_score_bal_loss
         self.occ_activ = nn.Sigmoid()
@@ -287,8 +287,8 @@ class MultiScaleEPE_FlowNet_IRR_Bi_Occ(nn.Module):
             ]
 
             # div_flow trick
-            target_f = self._args.div_flow * target_dict["flows"][:, 0]
-            target_b = self._args.div_flow * target_dict["flows_b"][:, 0]
+            target_f = self._div_flow * target_dict["flows"][:, 0]
+            target_b = self._div_flow * target_dict["flows_b"][:, 0]
             target_occ_f = target_dict["occs"][:, 0]
             target_occ_b = target_dict["occs_b"][:, 0]
 
@@ -347,10 +347,10 @@ class MultiScaleEPE_FlowNet_IRR_Bi_Occ(nn.Module):
 
 
 class MultiScaleEPE_FlowNet_IRR_Bi_Occ_upsample(nn.Module):
-    def __init__(self, args):
+    def __init__(self, div_flow, train_batch_size):
         super(MultiScaleEPE_FlowNet_IRR_Bi_Occ_upsample, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._div_flow = div_flow
+        self._batch_size = train_batch_size
         self._weights = [0.0003125, 0.00125, 0.005, 0.01, 0.02, 0.08, 0.32]
 
         self.occ_activ = nn.Sigmoid()
@@ -378,8 +378,8 @@ class MultiScaleEPE_FlowNet_IRR_Bi_Occ_upsample(nn.Module):
             ]
 
             # div_flow trick
-            target_f = self._args.div_flow * target_dict["flows"][:, 0]
-            target_b = self._args.div_flow * target_dict["flows_b"][:, 0]
+            target_f = self._div_flow * target_dict["flows"][:, 0]
+            target_b = self._div_flow * target_dict["flows_b"][:, 0]
             target_occ_f = target_dict["occs"][:, 0]
             target_occ_b = target_dict["occs_b"][:, 0]
 
@@ -437,10 +437,10 @@ class MultiScaleEPE_FlowNet_IRR_Bi_Occ_upsample(nn.Module):
 
 
 class MultiScaleEPE_PWC(nn.Module):
-    def __init__(self, args):
+    def __init__(self, div_flow, train_batch_size):
         super(MultiScaleEPE_PWC, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._div_flow = div_flow
+        self._batch_size = train_batch_size
         self._weights = [0.32, 0.08, 0.02, 0.01, 0.005]
 
     def forward(self, output_dict, target_dict):
@@ -450,7 +450,7 @@ class MultiScaleEPE_PWC(nn.Module):
             outputs = output_dict["flow_preds"]
 
             # div_flow trick
-            target = self._args.div_flow * target_dict["flows"][:, 0]
+            target = self._div_flow * target_dict["flows"][:, 0]
 
             total_loss = 0
             for ii, output_ii in enumerate(outputs):
@@ -470,10 +470,10 @@ class MultiScaleEPE_PWC(nn.Module):
 
 
 class MultiScaleEPE_PWC_Bi(nn.Module):
-    def __init__(self, args):
+    def __init__(self, div_flow, train_batch_size):
         super(MultiScaleEPE_PWC_Bi, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._div_flow = div_flow
+        self._batch_size = train_batch_size
         self._weights = [0.32, 0.08, 0.02, 0.01, 0.005]
 
     def forward(self, output_dict, target_dict):
@@ -483,8 +483,8 @@ class MultiScaleEPE_PWC_Bi(nn.Module):
             outputs = output_dict["flow_preds"]
 
             # div_flow trick
-            target_f = self._args.div_flow * target_dict["flows"][:, 0]
-            target_b = self._args.div_flow * target_dict["flows_b"][:, 0]
+            target_f = self._div_flow * target_dict["flows"][:, 0]
+            target_b = self._div_flow * target_dict["flows_b"][:, 0]
 
             total_loss = 0
             for i, output_i in enumerate(outputs):
@@ -508,10 +508,10 @@ class MultiScaleEPE_PWC_Bi(nn.Module):
 
 
 class MultiScaleEPE_PWC_Occ(nn.Module):
-    def __init__(self, args):
+    def __init__(self, div_flow, train_batch_size):
         super(MultiScaleEPE_PWC_Occ, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._div_flow = div_flow
+        self._batch_size = train_batch_size
         self._weights = [0.32, 0.08, 0.02, 0.01, 0.005]
 
         self.occ_activ = nn.Sigmoid()
@@ -525,7 +525,7 @@ class MultiScaleEPE_PWC_Occ(nn.Module):
             output_occ = output_dict["occ_preds"]
 
             # div_flow trick
-            target_flo = self._args.div_flow * target_dict["flows"][:, 0]
+            target_flo = self._div_flow * target_dict["flows"][:, 0]
             target_occ = target_dict["occs"][:, 0]
 
             flow_loss = 0
@@ -574,10 +574,10 @@ class MultiScaleEPE_PWC_Occ(nn.Module):
 
 
 class MultiScaleEPE_PWC_Bi_Occ(nn.Module):
-    def __init__(self, args):
+    def __init__(self, div_flow, train_batch_size):
         super(MultiScaleEPE_PWC_Bi_Occ, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._div_flow = div_flow
+        self._batch_size = train_batch_size
         self._weights = [0.32, 0.08, 0.02, 0.01, 0.005]
 
         self.occ_activ = nn.Sigmoid()
@@ -591,8 +591,8 @@ class MultiScaleEPE_PWC_Bi_Occ(nn.Module):
             output_occ = output_dict["occ_preds"]
 
             # div_flow trick
-            target_flo_f = self._args.div_flow * target_dict["flows"][:, 0]
-            target_flo_b = self._args.div_flow * target_dict["flows_b"][:, 0]
+            target_flo_f = self._div_flow * target_dict["flows"][:, 0]
+            target_flo_b = self._div_flow * target_dict["flows_b"][:, 0]
             target_occ_f = target_dict["occs"][:, 0]
             target_occ_b = target_dict["occs_b"][:, 0]
 
@@ -654,10 +654,10 @@ class MultiScaleEPE_PWC_Bi_Occ(nn.Module):
 
 
 class MultiScaleEPE_PWC_Bi_Occ_upsample(nn.Module):
-    def __init__(self, args):
+    def __init__(self, train_batch_size, div_flow):
         super(MultiScaleEPE_PWC_Bi_Occ_upsample, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._div_flow = div_flow
+        self._batch_size = train_batch_size
         self._weights = [0.32, 0.08, 0.02, 0.01, 0.005, 0.00125, 0.0003125]
 
         self.occ_activ = nn.Sigmoid()
@@ -671,8 +671,8 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample(nn.Module):
             output_occ = output_dict["occ_preds"]
 
             # div_flow trick
-            target_flo_f = self._args.div_flow * target_dict["flows"][:, 0]
-            target_flo_b = self._args.div_flow * target_dict["flows_b"][:, 0]
+            target_flo_f = self._div_flow * target_dict["flows"][:, 0]
+            target_flo_b = self._div_flow * target_dict["flows_b"][:, 0]
             target_occ_f = target_dict["occs"][:, 0]
             target_occ_b = target_dict["occs_b"][:, 0]
 
@@ -740,10 +740,10 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample(nn.Module):
 
 
 class MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel(nn.Module):
-    def __init__(self, args):
+    def __init__(self, div_flow, train_batch_size):
         super(MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._div_flow = div_flow
+        self._batch_size = train_batch_size
         self._weights = [0.32, 0.08, 0.02, 0.01, 0.005, 0.00125, 0.0003125]
 
         self.occ_activ = nn.Sigmoid()
@@ -757,7 +757,7 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel(nn.Module):
             output_occ = output_dict["occ_preds"]
 
             # div_flow trick
-            target_flo_f = self._args.div_flow * target_dict["flows"][:, 0]
+            target_flo_f = self._div_flow * target_dict["flows"][:, 0]
             target_occ_f = target_dict["occs"][:, 0]
 
             # bchw
@@ -815,10 +815,10 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel(nn.Module):
 
 
 class MultiScaleEPE_PWC_Bi_Occ_upsample_KITTI(nn.Module):
-    def __init__(self, args):
+    def __init__(self, div_flow, train_batch_size):
         super(MultiScaleEPE_PWC_Bi_Occ_upsample_KITTI, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._div_flow = div_flow
+        self._batch_size = train_batch_size
         self._weights = [0.001, 0.001, 0.001, 0.002, 0.004, 0.004, 0.004]
 
         self.occ_activ = nn.Sigmoid()
@@ -834,7 +834,7 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample_KITTI(nn.Module):
             output_occ = output_dict["occ_preds"]
 
             # div_flow trick
-            target_flo_f = self._args.div_flow * target_dict["flows"][:, 0]
+            target_flo_f = self._div_flow * target_dict["flows"][:, 0]
 
             # bchw
             flow_loss = 0

@@ -74,28 +74,10 @@ class SepConvGRU(nn.Module):
         return h
 
 
-class SmallMotionEncoder(nn.Module):
-    def __init__(self, args):
-        super(SmallMotionEncoder, self).__init__()
-        cor_planes = args.corr_levels * (2 * args.corr_radius + 1) ** 2
-        self.convc1 = nn.Conv2d(cor_planes, 96, 1, padding=0)
-        self.convf1 = nn.Conv2d(2, 64, 7, padding=3)
-        self.convf2 = nn.Conv2d(64, 32, 3, padding=1)
-        self.conv = nn.Conv2d(128, 80, 3, padding=1)
-
-    def forward(self, flow, corr):
-        cor = F.relu(self.convc1(corr))
-        flo = F.relu(self.convf1(flow))
-        flo = F.relu(self.convf2(flo))
-        cor_flo = torch.cat([cor, flo], dim=1)
-        out = F.relu(self.conv(cor_flo))
-        return torch.cat([out, flow], dim=1)
-
-
 class BasicMotionEncoder(nn.Module):
-    def __init__(self, args):
+    def __init__(self, corr_levels: int, corr_radius: int):
         super(BasicMotionEncoder, self).__init__()
-        cor_planes = args.corr_levels * (2 * args.corr_radius + 1) ** 2
+        cor_planes = corr_levels * (2 * corr_radius + 1) ** 2
         self.convc1 = nn.Conv2d(cor_planes, 256, 1, padding=0)
         self.convc2 = nn.Conv2d(256, 192, 3, padding=1)
         self.convf1 = nn.Conv2d(2, 128, 7, padding=3)
@@ -113,27 +95,12 @@ class BasicMotionEncoder(nn.Module):
         return torch.cat([out, flow], dim=1)
 
 
-class SmallUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=96):
-        super(SmallUpdateBlock, self).__init__()
-        self.encoder = SmallMotionEncoder(args)
-        self.gru = ConvGRU(hidden_dim=hidden_dim, input_dim=82 + 64)
-        self.flow_head = FlowHead(hidden_dim, hidden_dim=128)
-
-    def forward(self, net, inp, corr, flow):
-        motion_features = self.encoder(flow, corr)
-        inp = torch.cat([inp, motion_features], dim=1)
-        net = self.gru(net, inp)
-        delta_flow = self.flow_head(net)
-
-        return net, None, delta_flow
-
-
 class BasicUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=128, input_dim=128):
+    def __init__(self, corr_levels: int, corr_radius: int, hidden_dim=128):
         super(BasicUpdateBlock, self).__init__()
-        self.args = args
-        self.encoder = BasicMotionEncoder(args)
+        self.encoder = BasicMotionEncoder(
+            corr_levels=corr_levels, corr_radius=corr_radius
+        )
         self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=128 + hidden_dim)
         self.flow_head = FlowHead(hidden_dim, hidden_dim=256)
 
@@ -143,7 +110,7 @@ class BasicUpdateBlock(nn.Module):
             nn.Conv2d(256, 64 * 9, 1, padding=0),
         )
 
-    def forward(self, net, inp, corr, flow, upsample=True):
+    def forward(self, net, inp, corr, flow):
         motion_features = self.encoder(flow, corr)
         inp = torch.cat([inp, motion_features], dim=1)
 
@@ -156,10 +123,11 @@ class BasicUpdateBlock(nn.Module):
 
 
 class GMAUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=128):
+    def __init__(self, corr_levels: int, corr_radius: int, hidden_dim: int = 128):
         super().__init__()
-        self.args = args
-        self.encoder = BasicMotionEncoder(args)
+        self.encoder = BasicMotionEncoder(
+            corr_levels=corr_levels, corr_radius=corr_radius
+        )
         self.gru = SepConvGRU(
             hidden_dim=hidden_dim, input_dim=128 + hidden_dim + hidden_dim
         )
@@ -171,7 +139,7 @@ class GMAUpdateBlock(nn.Module):
             nn.Conv2d(256, 64 * 9, 1, padding=0),
         )
 
-        self.aggregator = Aggregate(args=self.args, dim=128, dim_head=128, heads=1)
+        self.aggregator = Aggregate(dim=128, dim_head=128, heads=1)
 
     def forward(self, net, inp, corr, flow, attention):
         motion_features = self.encoder(flow, corr)

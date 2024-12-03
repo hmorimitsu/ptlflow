@@ -218,9 +218,7 @@ class SKMotionEncoder(nn.Module):
         super(SKMotionEncoder, self).__init__()
 
         if args.r_16 > 0:
-            cor_planes = (
-                81 * args.cost_heads_num + args.query_latent_dim + args.r_16**2
-            )
+            cor_planes = 81 * args.cost_heads_num + args.query_latent_dim + args.r_16**2
         else:
             cor_planes = 81 * args.cost_heads_num + args.query_latent_dim
 
@@ -249,15 +247,13 @@ class SKWoGRU(nn.Module):
 
 
 class BasicMotionEncoder(nn.Module):
-    def __init__(self, args):
+    def __init__(self, r_16, cost_heads_num, query_latent_dim):
         super(BasicMotionEncoder, self).__init__()
 
-        if args.r_16 > 0:
-            cor_planes = (
-                81 * args.cost_heads_num + args.query_latent_dim + args.r_16**2
-            )
+        if r_16 > 0:
+            cor_planes = 81 * cost_heads_num + query_latent_dim + r_16**2
         else:
-            cor_planes = 81 * args.cost_heads_num + args.query_latent_dim
+            cor_planes = 81 * cost_heads_num + query_latent_dim
 
         self.convc1 = nn.Conv2d(cor_planes, 256, 1, padding=0)
         self.convc2 = nn.Conv2d(256, 192, 3, padding=1)
@@ -281,9 +277,7 @@ class ConvAttMotionEncoder(nn.Module):
         super(ConvAttMotionEncoder, self).__init__()
 
         if args.r_16 > 0:
-            cor_planes = (
-                81 * args.cost_heads_num + args.query_latent_dim + args.r_16**2
-            )
+            cor_planes = 81 * args.cost_heads_num + args.query_latent_dim + args.r_16**2
         else:
             cor_planes = 81 * args.cost_heads_num + args.query_latent_dim
 
@@ -306,10 +300,11 @@ class ConvAttMotionEncoder(nn.Module):
 
 
 class BasicUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=128, input_dim=128):
+    def __init__(self, r_16, cost_heads_num, query_latent_dim, hidden_dim=128):
         super(BasicUpdateBlock, self).__init__()
-        self.args = args
-        self.encoder = BasicMotionEncoder(args)
+        self.encoder = BasicMotionEncoder(
+            r_16=r_16, cost_heads_num=cost_heads_num, query_latent_dim=query_latent_dim
+        )
         self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=128 + hidden_dim)
         self.flow_head = FlowHead(hidden_dim, hidden_dim=256)
 
@@ -319,7 +314,7 @@ class BasicUpdateBlock(nn.Module):
             nn.Conv2d(256, 64 * 9, 1, padding=0),
         )
 
-    def forward(self, net, inp, corr, flow, upsample=True):
+    def forward(self, net, inp, corr, flow):
         motion_features = self.encoder(flow, corr)
         inp = torch.cat([inp, motion_features], dim=1)
 
@@ -335,10 +330,11 @@ from .gma import Aggregate
 
 
 class GMAUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=128):
+    def __init__(self, r_16, cost_heads_num, query_latent_dim, hidden_dim=128):
         super().__init__()
-        self.args = args
-        self.encoder = BasicMotionEncoder(args)
+        self.encoder = BasicMotionEncoder(
+            r_16=r_16, cost_heads_num=cost_heads_num, query_latent_dim=query_latent_dim
+        )
         self.gru = SepConvGRU(
             hidden_dim=hidden_dim, input_dim=128 + hidden_dim + hidden_dim
         )
@@ -350,7 +346,7 @@ class GMAUpdateBlock(nn.Module):
             nn.Conv2d(256, 64 * 9, 1, padding=0),
         )
 
-        self.aggregator = Aggregate(args=self.args, dim=128, dim_head=128, heads=1)
+        self.aggregator = Aggregate(dim=128, dim_head=128, heads=1)
 
     def forward(self, net, inp, corr, flow, attention):
         motion_features = self.encoder(flow, corr)

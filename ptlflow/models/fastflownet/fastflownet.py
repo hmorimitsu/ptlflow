@@ -2,11 +2,6 @@
 Portions of this code copyright 2017, Clement Pinard
 """
 
-from argparse import ArgumentParser, Namespace
-from pathlib import Path
-
-import numpy as np
-
 try:
     from spatial_correlation_sampler import SpatialCorrelationSampler
 except ModuleNotFoundError:
@@ -18,6 +13,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from ..base_model.base_model import BaseModel
 from ..flownet.losses import MultiScale
 
@@ -105,17 +101,31 @@ class FastFlowNet(BaseModel):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/fastflownet-things3d-fc093d29.ckpt",
     }
 
-    def __init__(self, args: Namespace):
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        md: int = 4,
+        groups: int = 3,
+        loss_start_scale: int = 4,
+        loss_num_scales: int = 5,
+        loss_base_weight: float = 0.32,
+        loss_norm: str = "L2",
+        **kwargs,
+    ):
         super(FastFlowNet, self).__init__(
-            args=args,
             loss_fn=MultiScale(
-                startScale=args.loss_start_scale,
-                numScales=args.loss_num_scales,
-                l_weight=args.loss_base_weight,
-                norm=args.loss_norm,
+                startScale=loss_start_scale,
+                numScales=loss_num_scales,
+                l_weight=loss_base_weight,
+                norm=loss_norm,
             ),
             output_stride=64,
+            **kwargs,
         )
+
+        self.div_flow = div_flow
+        self.md = md
+        self.groups = groups
 
         self.pconv1_1 = convrelu(3, 16, 3, 2)
         self.pconv1_2 = convrelu(16, 16, 3, 1)
@@ -127,7 +137,7 @@ class FastFlowNet(BaseModel):
         self.pconv3_3 = convrelu(64, 64, 3, 1)
 
         self.corr_layer = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.args.md + 1, padding=0
+            kernel_size=1, patch_size=2 * self.md + 1, padding=0
         )
         self.index = torch.tensor(
             [
@@ -198,30 +208,17 @@ class FastFlowNet(BaseModel):
         self.up5 = deconv(2, 2)
         self.up6 = deconv(2, 2)
 
-        self.decoder2 = Decoder(87, self.args.groups)
-        self.decoder3 = Decoder(87, self.args.groups)
-        self.decoder4 = Decoder(87, self.args.groups)
-        self.decoder5 = Decoder(87, self.args.groups)
-        self.decoder6 = Decoder(87, self.args.groups)
+        self.decoder2 = Decoder(87, self.groups)
+        self.decoder3 = Decoder(87, self.groups)
+        self.decoder4 = Decoder(87, self.groups)
+        self.decoder5 = Decoder(87, self.groups)
+        self.decoder6 = Decoder(87, self.groups)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
                 nn.init.kaiming_normal_(m.weight)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--div_flow", type=float, default=20.0)
-        parser.add_argument("--md", type=int, default=4)
-        parser.add_argument("--groups", type=int, default=3)
-        parser.add_argument("--loss_start_scale", type=float, default=4)
-        parser.add_argument("--loss_num_scales", type=int, default=5)
-        parser.add_argument("--loss_base_weight", type=float, default=0.32)
-        parser.add_argument("--loss_norm", type=str, default="L2")
-        return parser
 
     def corr(self, f1, f2):
         corr = self.corr_layer(f1, f2)
@@ -316,7 +313,7 @@ class FastFlowNet(BaseModel):
         cat2 = torch.cat([cv2, r12, flow3_up], 1)
         flow2 = self.decoder2(cat2) + flow3_up
 
-        flow_up = self.args.div_flow * F.interpolate(
+        flow_up = self.div_flow * F.interpolate(
             flow2, size=img2.shape[-2:], mode="bilinear", align_corners=False
         )
         flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
@@ -328,3 +325,9 @@ class FastFlowNet(BaseModel):
         else:
             outputs["flows"] = flow_up[:, None]
         return outputs
+
+
+@register_model
+@trainable
+class fastflownet(FastFlowNet):
+    pass

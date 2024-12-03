@@ -1,3 +1,19 @@
+# =============================================================================
+# Copyright 2024 Henrique Morimitsu
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# =============================================================================
+
 # TensorRT conversion code comes from the tutorial:
 # https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html
 
@@ -16,39 +32,27 @@ this_dir = Path(__file__).parent.resolve()
 sys.path.insert(0, str(this_dir.parent.parent.parent))
 
 from ptlflow import get_model, load_checkpoint
-from ptlflow.models.rapidflow.rapidflow import RAPIDFlow
 from ptlflow.utils import flow_utils
+from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
+from ptlflow.utils.registry import RegisteredModel
 
 
 def _init_parser() -> ArgumentParser:
-    parser = ArgumentParser()
+    parser = ArgumentParser(add_help=False)
     parser.add_argument(
-        "model",
-        type=str,
-        choices=(
-            "rapidflow",
-            "rapidflow_it1",
-            "rapidflow_it2",
-            "rapidflow_it3",
-            "rapidflow_it6",
-            "rapidflow_it12",
-        ),
-        help="Name of the model to use.",
-    )
-    parser.add_argument(
-        "--checkpoint",
+        "--ckpt_path",
         type=str,
         default=None,
-        help="Path to the checkpoint to be loaded. It can also be one of the following names: \{chairs, things, sintel, kitti\}, in which case the respective pretrained checkpoint will be downloaded.",
+        help="Path to the checkpoint to be loaded. It can also be one of the following names: {chairs, things, sintel, kitti}, in which case the respective pretrained checkpoint will be downloaded.",
     )
     parser.add_argument(
         "--image_paths",
         type=str,
         nargs=2,
-        default=(
+        default=[
             str(this_dir / "image_samples" / "000000_10.png"),
             str(this_dir / "image_samples" / "000000_11.png"),
-        ),
+        ],
         help="Path to two images to estimate the optical flow with the TensorRT model.",
     )
     parser.add_argument(
@@ -61,7 +65,7 @@ def _init_parser() -> ArgumentParser:
         "--input_size",
         type=int,
         nargs=2,
-        default=(384, 1280),
+        default=[384, 1280],
         help="Size of the input image.",
     )
     return parser
@@ -70,7 +74,12 @@ def _init_parser() -> ArgumentParser:
 def compile_engine_and_infer(args):
     # Initialize model with half precision and sample inputs
     model = load_model(args).half().eval().to("cuda")
-    images = [torch.from_numpy(load_images(args.image_paths)).half().to("cuda")]
+    images = [
+        torch.from_numpy(load_images(args.image_paths, args.input_size))
+        .contiguous()
+        .half()
+        .to("cuda")
+    ]
 
     num_tries = 11
     total_time_orig = 0.0
@@ -152,18 +161,22 @@ def compile_engine_and_infer(args):
     torch._dynamo.reset()
 
 
-def load_images(image_paths):
+def load_images(image_paths, input_size):
     images = [cv.imread(p) for p in image_paths]
-    images = [cv.resize(im, args.input_size[::-1]) for im in images]
+    images = [cv.resize(im, input_size[::-1]) for im in images]
     images = np.stack(images)
     images = images.transpose(0, 3, 1, 2)[None]
     images = images.astype(np.float32) / 255.0
     return images
 
 
-def load_model(args):
-    model = get_model(args.model, args=args)
-    ckpt = load_checkpoint(args.checkpoint, RAPIDFlow, "rapidflow")
+def load_model(cfg):
+    ckpt_path = cfg.ckpt_path
+    cfg.ckpt_path = None  # This is to avoid letting get_model to load the ckpt
+    model = get_model(cfg.model_name, args=cfg)
+    # Since we set fuse_next1d_weights to True in the model,
+    # the ckpt 1D layers also need to be fused before loading
+    ckpt = load_checkpoint(ckpt_path, model.__class__)
     state_dict = fuse_checkpoint_next1d_layers(ckpt["state_dict"])
     model.load_state_dict(state_dict, strict=True)
     return model
@@ -190,10 +203,20 @@ def fuse_checkpoint_next1d_layers(state_dict):
 
 if __name__ == "__main__":
     parser = _init_parser()
-    parser = RAPIDFlow.add_model_specific_args(parser)
-    args = parser.parse_args()
-    args.corr_mode = "allpairs"
-    args.fuse_next1d_weights = True
-    args.simple_io = True
 
-    compile_engine_and_infer(args)
+    cli = PTLFlowCLI(
+        model_class=RegisteredModel,
+        subclass_mode_model=True,
+        parser_kwargs={"parents": [parser]},
+        run=False,
+        parse_only=False,
+        auto_configure_optimizers=False,
+    )
+
+    cfg = cli.config
+    cfg.model.init_args.corr_mode = "allpairs"
+    cfg.model.init_args.fuse_next1d_weights = True
+    cfg.model.init_args.simple_io = True
+    cfg.model_name = cfg.model.class_path.split(".")[-1]
+
+    compile_engine_and_infer(cfg)

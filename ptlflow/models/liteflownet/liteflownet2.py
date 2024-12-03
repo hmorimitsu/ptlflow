@@ -1,4 +1,3 @@
-from argparse import ArgumentParser, Namespace
 from typing import Any, Dict, List, Optional
 
 try:
@@ -11,6 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model
 from .warp import WarpingLayer
 from ..base_model.base_model import BaseModel
 
@@ -318,45 +318,49 @@ class LiteFlowNet2(BaseModel):
         "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet2-sintel-1e1eb282.ckpt"
     }
 
-    def __init__(self, args: Namespace):
-        super(LiteFlowNet2, self).__init__(args=args, loss_fn=None, output_stride=32)
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        use_pseudo_regularization: bool = False,
+        **kwargs,
+    ):
+        super(LiteFlowNet2, self).__init__(
+            loss_fn=None,
+            output_stride=32,
+            **kwargs,
+        )
+
+        self.div_flow = div_flow
+        self.use_pseudo_regularization = use_pseudo_regularization
 
         self.num_levels = 4
 
         self.feature_net = FeatureExtractor()
         self.matching_nets = nn.ModuleList(
             [
-                Matching(i, self.num_levels, self.args.div_flow)
+                Matching(i, self.num_levels, self.div_flow)
                 for i in range(self.num_levels)
             ]
         )
         self.subpixel_nets = nn.ModuleList(
             [
-                SubPixel(i, self.num_levels, self.args.div_flow)
+                SubPixel(i, self.num_levels, self.div_flow)
                 for i in range(self.num_levels)
             ]
         )
         self.regularization_nets = nn.ModuleList(
             [
-                Regularization(i, self.num_levels, self.args.div_flow)
+                Regularization(i, self.num_levels, self.div_flow)
                 for i in range(self.num_levels)
             ]
         )
 
-        if self.args.use_pseudo_regularization:
+        if self.use_pseudo_regularization:
             self.pseudo_subpixel = PseudoSubpixel()
             self.pseudo_regularization = PseudoRegularization()
             self.up_flow = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False, groups=2)
         else:
             self.up_flow = nn.ConvTranspose2d(2, 2, 8, 4, 2, bias=False, groups=2)
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--div_flow", type=float, default=20.0)
-        parser.add_argument("--use_pseudo_regularization", action="store_true")
-        return parser
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         # The original implementation uses different BGR means for im1 and im2
@@ -385,13 +389,13 @@ class LiteFlowNet2(BaseModel):
             )
             flow_preds.append(flow)
 
-        if self.args.use_pseudo_regularization:
+        if self.use_pseudo_regularization:
             flow = self.pseudo_subpixel(sub_feat, flow)
             flow = self.pseudo_regularization(reg_feat, flow)
             flow = self.up_flow(flow)
         else:
             flow = self.up_flow(flow)
-        flow = flow * self.args.div_flow
+        flow = flow * self.div_flow
         flow = self.postprocess_predictions(flow, image_resizer, is_flow=True)
 
         outputs = {}
@@ -425,6 +429,24 @@ class LiteFlowNet2PseudoReg(LiteFlowNet2):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/liteflownet2-kitti-da069fca.ckpt"
     }
 
-    def __init__(self, args: Namespace):
-        args.use_pseudo_regularization = True
-        super(LiteFlowNet2PseudoReg, self).__init__(args=args)
+    def __init__(
+        self,
+        div_flow: float = 20,
+        use_pseudo_regularization: bool = True,
+        **kwargs,
+    ):
+        super().__init__(
+            div_flow,
+            use_pseudo_regularization,
+            **kwargs,
+        )
+
+
+@register_model
+class liteflownet2(LiteFlowNet2):
+    pass
+
+
+@register_model
+class liteflownet2_pseudoreg(LiteFlowNet2PseudoReg):
+    pass

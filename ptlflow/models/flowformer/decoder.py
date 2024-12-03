@@ -117,20 +117,22 @@ class CrossAttentionLayer(nn.Module):
 
 
 class MemoryDecoderLayer(nn.Module):
-    def __init__(self, dim, cfg):
+    def __init__(
+        self, patch_size, query_latent_dim, cost_latent_dim, add_flow_token, dropout
+    ):
         super(MemoryDecoderLayer, self).__init__()
-        self.cfg = cfg
-        self.patch_size = cfg.patch_size  # for converting coords into H2', W2' space
+        self.patch_size = patch_size  # for converting coords into H2', W2' space
+        self.query_latent_dim = query_latent_dim
 
-        query_token_dim, tgt_token_dim = cfg.query_latent_dim, cfg.cost_latent_dim
+        query_token_dim, tgt_token_dim = query_latent_dim, cost_latent_dim
         qk_dim, v_dim = query_token_dim, query_token_dim
         self.cross_attend = CrossAttentionLayer(
             qk_dim,
             v_dim,
             query_token_dim,
             tgt_token_dim,
-            add_flow_token=cfg.add_flow_token,
-            dropout=cfg.dropout,
+            add_flow_token=add_flow_token,
+            dropout=dropout,
         )
 
     def forward(self, query, key, value, memory, coords1, size, size_h3w3):
@@ -147,7 +149,7 @@ class MemoryDecoderLayer(nn.Module):
             query, key, value, memory, coords1, self.patch_size, size_h3w3
         )
         B, C, H1, W1 = size
-        C = self.cfg.query_latent_dim
+        C = self.query_latent_dim
         x_global = x_global.view(B, H1, W1, C).permute(0, 3, 1, 2)
         return x_global, k, v
 
@@ -197,27 +199,52 @@ class ReverseCostExtractor(nn.Module):
 
 
 class MemoryDecoder(nn.Module):
-    def __init__(self, cfg):
+    def __init__(
+        self,
+        query_latent_dim,
+        cost_heads_num,
+        decoder_depth,
+        gma,
+        only_global,
+        patch_size,
+        cost_latent_dim,
+        add_flow_token,
+        dropout,
+    ):
         super(MemoryDecoder, self).__init__()
-        dim = self.dim = cfg.query_latent_dim
-        self.cfg = cfg
+        self.gma = gma
+        self.only_global = only_global
+
+        dim = self.dim = query_latent_dim
 
         self.flow_token_encoder = nn.Sequential(
-            nn.Conv2d(81 * cfg.cost_heads_num, dim, 1, 1),
+            nn.Conv2d(81 * cost_heads_num, dim, 1, 1),
             nn.GELU(),
             nn.Conv2d(dim, dim, 1, 1),
         )
         self.proj = nn.Conv2d(256, 256, 1)
-        self.depth = cfg.decoder_depth
-        self.decoder_layer = MemoryDecoderLayer(dim, cfg)
+        self.depth = decoder_depth
+        self.decoder_layer = MemoryDecoderLayer(
+            patch_size=patch_size,
+            query_latent_dim=query_latent_dim,
+            cost_latent_dim=cost_latent_dim,
+            add_flow_token=add_flow_token,
+            dropout=dropout,
+        )
 
-        if self.cfg.gma:
-            self.update_block = GMAUpdateBlock(self.cfg, hidden_dim=128)
-            self.att = Attention(
-                args=self.cfg, dim=128, heads=1, max_pos_size=160, dim_head=128
+        if gma:
+            self.update_block = GMAUpdateBlock(
+                only_global=only_global,
+                query_latent_dim=query_latent_dim,
+                hidden_dim=128,
             )
+            self.att = Attention(dim=128, heads=1, max_pos_size=160, dim_head=128)
         else:
-            self.update_block = BasicUpdateBlock(self.cfg, hidden_dim=128)
+            self.update_block = BasicUpdateBlock(
+                only_global=only_global,
+                query_latent_dim=query_latent_dim,
+                hidden_dim=128,
+            )
 
     def upsample_flow(self, flow, mask):
         """Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination"""
@@ -272,7 +299,7 @@ class MemoryDecoder(nn.Module):
         net, inp = torch.split(context, [128, 128], dim=1)
         net = torch.tanh(net)
         inp = torch.relu(inp)
-        if self.cfg.gma:
+        if self.gma:
             attention = self.att(inp)
 
         size = net.shape
@@ -293,14 +320,14 @@ class MemoryDecoder(nn.Module):
             cost_global, key, value = self.decoder_layer(
                 query, key, value, cost_memory, coords1, size, data["H3W3"]
             )
-            if self.cfg.only_global:
+            if self.only_global:
                 corr = cost_global
             else:
                 corr = torch.cat([cost_global, cost_forward], dim=1)
 
             flow = coords1 - coords0
 
-            if self.cfg.gma:
+            if self.gma:
                 net, up_mask, delta_flow = self.update_block(
                     net, inp, corr, flow, attention
                 )

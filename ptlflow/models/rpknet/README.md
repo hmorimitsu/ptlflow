@@ -4,6 +4,9 @@
 
 Follow the [PTLFlow installation instructions](https://ptlflow.readthedocs.io/en/latest/starting/installation.html).
 
+IMPORTANT: This model was trained and tested on ptlflow v0.3.2.
+It should also probably work on newer versions as well, but it has not been validated.
+
 This model can be called using the name `rpknet`.
 
 The exact versions of the packages we used for our tests are listed in [requirements.txt](requirements.txt).
@@ -35,24 +38,26 @@ We train our model in four stages as follows.
 
 ### Stage 1: FlyingChairs
 
+### Stage 1: FlyingChairs
+
 ```bash
-python train.py rpknet --random_seed 1234 --gradient_clip_val 1.0 --lr 2.5e-4 --wdecay 1e-4 --gamma 0.8 --train_dataset chairs --train_batch_size 8 --max_epochs 35 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs --not_cache_pkconv_weights
+python train.py --config ptlflow/models/rpknet/configs/rpknet-train1-chairs.yaml
 ```
 
 ### Stage 2: FlyingThings3D
 
 ```bash
-python train.py rpknet --pretrained path_to_stage1_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-4 --gamma 0.8 --train_dataset things --train_batch_size 4 --max_epochs 40 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs --not_cache_pkconv_weights
+python train.py --config ptlflow/models/rpknet/configs/rpknet-train2-things.yaml
 ```
 
 ### Stage 3: FlyingThings3D+Sintel+KITTI+HD1K
 ```bash
-python train.py rpknet --pretrained path_to_stage2_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-5 --gamma 0.85 --train_dataset 200*sintel+400*kitti-2015+10*hd1k+things-train-sinteltransform --train_batch_size 6 --max_epochs 4 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs --not_cache_pkconv_weights
+python train.py --config ptlflow/models/rpknet/configs/rpknet-train3-sintel.yaml
 ```
 
 ### Stage 4: KITTI 2015
 ```bash
-python train.py rpknet --pretrained path_to_stage3_ckpt --random_seed 1234 --gradient_clip_val 1.0 --lr 1.25e-4 --wdecay 1e-5 --gamma 0.85 --train_dataset kitti-2015 --train_batch_size 6 --max_epochs 150 --pyramid_ranges 32 8 --iters 12 --corr_mode allpairs --not_cache_pkconv_weights
+python train.py --config ptlflow/models/rpknet/configs/rpknet-train4-kitti.yaml
 ```
 
 ## Validation
@@ -60,7 +65,7 @@ python train.py rpknet --pretrained path_to_stage3_ckpt --random_seed 1234 --gra
 To validate our model on the training sets of Sintel and KITTI, use the following command at the root folder of PTLFlow:
 
 ```bash
-python validate.py rpknet --iters 12 --pretrained_ckpt things --val_dataset sintel-clean+sintel-final+kitti-2012+kitti-2015
+python validate.py --config ptlflow/models/rpknet/configs/rpknet-validate-things.yaml
 ```
 
 It should generate the following results:
@@ -79,21 +84,20 @@ The results submitted to the public benchmarks are generated with the respective
 ### MPI-Sintel
 
 ```bash
-python test.py rpknet --iters 32 --pretrained_ckpt sintel --test_dataset sintel --warm_start
+python test.py --config ptlflow/models/rpknet/configs/rpknet-test-sintel.yaml
 ```
 
 ### KITTI 2015
 
 ```bash
-python test.py rpknet --iters 32 --pretrained_ckpt kitti --test_dataset kitti-2015 --input_pad_one_side
+python test.py --config ptlflow/models/rpknet/configs/rpknet-test-kitti.yaml
 ```
 
 ### Spring
 
 ```bash
-python test.py rpknet --iters 32 --pretrained_ckpt sintel --test_dataset spring --warm_start  --input_bgr_to_rgb
+python test.py --config ptlflow/models/rpknet/configs/rpknet-test-spring.yaml
 ```
-*There is no special reason to convert to RGB here. But this mode was used by accident when submitting our results. 
 
 ## Code license
 

@@ -14,13 +14,14 @@
 # limitations under the License.
 # =============================================================================
 
-from argparse import ArgumentParser
 import math
+from typing import Optional, Sequence
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable, ptlflow_trained
 from ptlflow.utils.utils import forward_interpolate_batch
 from .pwc_modules import rescale_flow, upsample2d_as
 from .update_partial import UpdatePartialBlock
@@ -32,9 +33,10 @@ from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.args = args
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -48,7 +50,7 @@ class SequenceLoss(nn.Module):
 
         # exclude invalid pixels and extremely large diplacements
         mag = torch.sum(flow_gt**2, dim=1, keepdim=True).sqrt()
-        valid = (valid >= 0.5) & (mag < self.args.max_flow)
+        valid = (valid >= 0.5) & (mag < self.max_flow)
 
         for i in range(n_predictions):
             pred = flow_preds[i]
@@ -59,7 +61,7 @@ class SequenceLoss(nn.Module):
                 pred = F.interpolate(
                     pred, size=flow_gt.shape[-2:], mode="bilinear", align_corners=True
                 )
-            i_weight = self.args.gamma ** (n_predictions - i - 1)
+            i_weight = self.gamma ** (n_predictions - i - 1)
             diff = pred - flow_gt
             i_loss = (diff).abs()
             valid_loss = valid * i_loss
@@ -69,26 +71,32 @@ class SequenceLoss(nn.Module):
 
 
 class UpNetPartial(nn.Module):
-    def __init__(self, args) -> None:
+    def __init__(
+        self,
+        net_chs_fixed: int,
+        enc_norm_type: str,
+        use_norm_affine: bool,
+        group_norm_num_groups: int,
+        cache_pkconv_weights: bool,
+    ) -> None:
         super().__init__()
-        self.args = args
         self.conv = PKConv2d(
-            2 * self.args.net_chs_fixed,
-            self.args.net_chs_fixed,
+            2 * net_chs_fixed,
+            net_chs_fixed,
             1,
-            cache_weights=args.cache_pkconv_weights,
+            cache_weights=cache_pkconv_weights,
         )
         self.act = nn.ReLU(inplace=True)
         self.res = ResidualPartialBlock(
-            self.args.net_chs_fixed,
-            self.args.net_chs_fixed,
+            net_chs_fixed,
+            net_chs_fixed,
             norm_layer=get_norm_layer(
-                self.args.enc_norm_type,
-                affine=self.args.use_norm_affine,
-                num_groups=self.args.group_norm_num_groups,
+                enc_norm_type,
+                affine=use_norm_affine,
+                num_groups=group_norm_num_groups,
             ),
             use_out_activation=False,
-            cache_pkconv_weights=args.cache_pkconv_weights,
+            cache_pkconv_weights=cache_pkconv_weights,
         )
 
     def forward(self, x):
@@ -106,13 +114,39 @@ class RPKNet(BaseModel):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/rpknet-things-f79b0d81.ckpt",
     }
 
-    def __init__(self, args):
-        assert (len(args.pyramid_ranges) == 1) or (
-            (len(args.pyramid_ranges) % 2) == 0
-        ), f"--pyramid_ranges must have one or an even number of elements, but found {len(args.pyramid_ranges)}"
-        if len(args.pyramid_ranges) == 1:
-            args.pyramid_ranges = [args.pyramid_ranges[0], args.pyramid_ranges[0]]
-        for v in args.pyramid_ranges:
+    def __init__(
+        self,
+        pyramid_ranges: tuple[int, int] = (32, 8),
+        iters: int = 12,
+        input_pad_one_side: bool = False,
+        input_bgr_to_rgb: bool = False,
+        detach_flow: bool = True,
+        corr_mode: str = "allpairs",
+        upgate_norm_type: str = "group",
+        use_norm_affine: bool = False,
+        group_norm_num_groups: int = 8,
+        corr_levels: int = 1,
+        corr_range: int = 4,
+        enc_norm_type: str = "group",
+        enc_stem_stride: int = 2,
+        enc_depth: int = 2,
+        enc_mlp_ratio: float = 4.0,
+        enc_hidden_chs: Sequence[int] = (32, 64, 96),
+        enc_out_1x1_chs: str = "2.0",
+        dec_gru_iters: int = 2,
+        dec_gru_depth: int = 2,
+        dec_gru_mlp_ratio: float = 4.0,
+        dec_net_chs: Optional[int] = None,
+        dec_inp_chs: Optional[int] = None,
+        dec_motion_chs: int = 128,
+        use_upsample_mask: bool = True,
+        upmask_gradient_scale: float = 1.0,
+        cache_pkconv_weights: bool = True,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        **kwargs,
+    ) -> None:
+        for v in pyramid_ranges:
             assert (
                 v > 0
             ), f"--pyramid_ranges values must be larger than 0, but found {v}"
@@ -120,38 +154,66 @@ class RPKNet(BaseModel):
             assert (log_res) - int(
                 log_res
             ) < 1e-3, f"--pyramid_ranges values must be powers of 2, but found {v}"
-        num_recurrent_layers = int(math.log2(max(args.pyramid_ranges))) - 1
+        num_recurrent_layers = int(math.log2(max(pyramid_ranges))) - 1
         output_stride = int(2 ** (num_recurrent_layers + 1))
         super().__init__(
-            args=args, loss_fn=SequenceLoss(args), output_stride=output_stride
+            output_stride=output_stride,
+            loss_fn=SequenceLoss(gamma, max_flow),
+            **kwargs,
         )
-        if isinstance(self.args.enc_out_1x1_chs, str):
-            self.args.enc_out_1x1_chs = (
-                float(self.args.enc_out_1x1_chs)
-                if "." in self.args.enc_out_1x1_chs
-                else int(self.args.enc_out_1x1_chs)
+
+        self.pyramid_ranges = pyramid_ranges
+        self.iters = iters
+        self.input_pad_one_side = input_pad_one_side
+        self.input_bgr_to_rgb = input_bgr_to_rgb
+        self.detach_flow = detach_flow
+        self.corr_mode = corr_mode
+        self.upgate_norm_type = upgate_norm_type
+        self.use_norm_affine = use_norm_affine
+        self.group_norm_num_groups = group_norm_num_groups
+        self.corr_levels = corr_levels
+        self.corr_range = corr_range
+        self.enc_norm_type = enc_norm_type
+        self.enc_stem_stride = enc_stem_stride
+        self.enc_depth = enc_depth
+        self.enc_mlp_ratio = enc_mlp_ratio
+        self.enc_hidden_chs = enc_hidden_chs
+        self.enc_out_1x1_chs = enc_out_1x1_chs
+        self.dec_gru_iters = dec_gru_iters
+        self.dec_gru_depth = dec_gru_depth
+        self.dec_gru_mlp_ratio = dec_gru_mlp_ratio
+        self.dec_net_chs = dec_net_chs
+        self.dec_inp_chs = dec_inp_chs
+        self.dec_motion_chs = dec_motion_chs
+        self.use_upsample_mask = use_upsample_mask
+        self.upmask_gradient_scale = upmask_gradient_scale
+        self.cache_pkconv_weights = cache_pkconv_weights
+
+        if isinstance(self.enc_out_1x1_chs, str):
+            self.enc_out_1x1_chs = (
+                float(self.enc_out_1x1_chs)
+                if "." in self.enc_out_1x1_chs
+                else int(self.enc_out_1x1_chs)
             )
 
-        if isinstance(self.args.enc_out_1x1_chs, float):
-            self.args.out_1x1_factor = self.args.enc_out_1x1_chs
-            self.args.out_1x1_abs_chs = int(
-                self.args.enc_out_1x1_chs * self.args.enc_hidden_chs[-1]
-            )
+        if isinstance(self.enc_out_1x1_chs, float):
+            self.out_1x1_factor = self.enc_out_1x1_chs
+            self.out_1x1_abs_chs = int(self.enc_out_1x1_chs * self.enc_hidden_chs[-1])
         else:
-            self.args.out_1x1_factor = None
-            self.args.out_1x1_abs_chs = self.args.enc_out_1x1_chs
+            self.out_1x1_factor = None
+            self.out_1x1_abs_chs = self.enc_out_1x1_chs
 
         self.max_feat_chs = max(
-            self.args.enc_hidden_chs[-1],
-            self.args.out_1x1_abs_chs,
+            self.enc_hidden_chs[-1],
+            self.out_1x1_abs_chs,
         )
 
-        net_chs = self.args.dec_net_chs
-        inp_chs = self.args.dec_inp_chs
+        net_chs = self.dec_net_chs
+        inp_chs = self.dec_inp_chs
         if net_chs is None or inp_chs is None:
-            base_chs = self.args.out_1x1_abs_chs
+            base_chs = self.out_1x1_abs_chs
             if base_chs < 1:
-                base_chs = args.enc_hidden_chs[-1]
+                base_chs = enc_hidden_chs[-1]
 
             base_chs = base_chs // 3 * 2
 
@@ -161,108 +223,65 @@ class RPKNet(BaseModel):
                 net_chs = base_chs - inp_chs
             elif net_chs is not None and inp_chs is None:
                 inp_chs = base_chs - net_chs
-        self.args.net_chs_fixed = net_chs
-        self.args.inp_chs_fixed = inp_chs
+        self.net_chs_fixed = net_chs
+        self.inp_chs_fixed = inp_chs
 
         self.pyramid_levels = [
-            num_recurrent_layers + 1 - int(math.log2(v))
-            for v in self.args.pyramid_ranges
+            num_recurrent_layers + 1 - int(math.log2(v)) for v in self.pyramid_ranges
         ]
-        self.args.min_pyr_level = min(self.pyramid_levels)
-        self.args.max_pyr_level = max(self.pyramid_levels)
+        self.min_pyr_level = min(self.pyramid_levels)
+        self.max_pyr_level = max(self.pyramid_levels)
 
-        pyr_range = [min(self.args.pyramid_ranges), max(self.args.pyramid_ranges)]
+        pyr_range = [min(self.pyramid_ranges), max(self.pyramid_ranges)]
 
         self.fnet = PKConvSLKEncoder(
             pyr_range=pyr_range,
-            hidden_chs=self.args.enc_hidden_chs,
-            out_1x1_abs_chs=self.args.out_1x1_abs_chs,
-            out_1x1_factor=self.args.out_1x1_factor,
-            mlp_ratio=self.args.enc_mlp_ratio,
-            depth=self.args.enc_depth,
+            hidden_chs=self.enc_hidden_chs,
+            out_1x1_abs_chs=self.out_1x1_abs_chs,
+            out_1x1_factor=self.out_1x1_factor,
+            mlp_ratio=self.enc_mlp_ratio,
+            depth=self.enc_depth,
             norm_layer=get_norm_layer(
-                self.args.enc_norm_type,
-                affine=self.args.use_norm_affine,
-                num_groups=self.args.group_norm_num_groups,
+                self.enc_norm_type,
+                affine=self.use_norm_affine,
+                num_groups=self.group_norm_num_groups,
             ),
-            stem_stride=self.args.enc_stem_stride,
-            cache_pkconv_weights=self.args.cache_pkconv_weights,
+            stem_stride=self.enc_stem_stride,
+            cache_pkconv_weights=self.cache_pkconv_weights,
         )
 
-        self.dim_corr = (self.args.corr_range * 2 + 1) ** 2 * self.args.corr_levels
+        self.dim_corr = (self.corr_range * 2 + 1) ** 2 * self.corr_levels
 
-        self.update_block = UpdatePartialBlock(self.args)
+        self.update_block = UpdatePartialBlock(
+            pyramid_ranges=self.pyramid_ranges,
+            corr_levels=self.corr_levels,
+            corr_range=self.corr_range,
+            net_chs_fixed=self.net_chs_fixed,
+            inp_chs_fixed=self.inp_chs_fixed,
+            group_norm_num_groups=self.group_norm_num_groups,
+            use_norm_affine=self.use_norm_affine,
+            dec_motion_chs=self.dec_motion_chs,
+            dec_gru_depth=self.dec_gru_depth,
+            dec_gru_iters=self.dec_gru_iters,
+            dec_gru_mlp_ratio=self.dec_gru_mlp_ratio,
+            use_upsample_mask=self.use_upsample_mask,
+            upmask_gradient_scale=self.upmask_gradient_scale,
+            cache_pkconv_weights=self.cache_pkconv_weights,
+        )
 
         self.upnet_layer = InterpolationTransition(False, 2)
 
-        self.upnet_gate_layer = UpNetPartial(args)
+        self.upnet_gate_layer = UpNetPartial(
+            net_chs_fixed=self.net_chs_fixed,
+            enc_norm_type=enc_norm_type,
+            use_norm_affine=use_norm_affine,
+            group_norm_num_groups=group_norm_num_groups,
+            cache_pkconv_weights=cache_pkconv_weights,
+        )
 
         self.input_act = nn.ReLU()
 
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-
-        parser.add_argument("--pyramid_ranges", type=int, nargs="+", default=(32, 8))
-        parser.add_argument("--iters", type=int, default=12)
-        parser.add_argument("--input_pad_one_side", action="store_true")
-        parser.add_argument("--input_bgr_to_rgb", action="store_true")
-
-        parser.add_argument(
-            "--not_detach_flow", action="store_false", dest="detach_flow"
-        )
-
-        parser.add_argument(
-            "--upgate_norm_type",
-            type=str,
-            choices=("none", "instance", "group", "layer", "batch"),
-            default="group",
-        )
-        parser.add_argument("--use_norm_affine", action="store_true")
-        parser.add_argument("--group_norm_num_groups", type=int, default=8)
-
-        parser.add_argument(
-            "--corr_mode",
-            type=str,
-            choices=("allpairs", "local"),
-            default="local",
-        )
-        parser.add_argument("--corr_levels", type=int, default=1)
-        parser.add_argument("--corr_range", type=int, default=4)
-        parser.add_argument(
-            "--enc_norm_type",
-            type=str,
-            choices=("none", "instance", "group", "layer", "batch"),
-            default="group",
-        )
-        parser.add_argument("--enc_stem_stride", type=int, default=2)
-        parser.add_argument("--enc_depth", type=int, default=2)
-        parser.add_argument("--enc_mlp_ratio", type=int, default=4)
-        parser.add_argument(
-            "--enc_hidden_chs", type=int, nargs="+", default=(32, 64, 96)
-        )
-        parser.add_argument("--enc_out_1x1_chs", type=str, default="2.0")
-        parser.add_argument("--dec_gru_iters", type=int, default=2)
-        parser.add_argument("--dec_gru_depth", type=int, default=2)
-        parser.add_argument("--dec_gru_mlp_ratio", type=int, default=4)
-        parser.add_argument("--dec_net_chs", type=int, default=None)
-        parser.add_argument("--dec_inp_chs", type=int, default=None)
-        parser.add_argument("--dec_motion_chs", type=int, default=128)
-        parser.add_argument(
-            "--not_use_upsample_mask", action="store_false", dest="use_upsample_mask"
-        )
-        parser.add_argument("--upmask_gradient_scale", type=float, default=1.0)
-        parser.add_argument(
-            "--not_cache_pkconv_weights",
-            action="store_false",
-            dest="cache_pkconv_weights",
-        )
-
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=400.0)
-
-        return parser
+        self.has_trained_on_ptlflow = True
 
     def coords_grid(self, batch, ht, wd):
         coords = torch.meshgrid(
@@ -291,10 +310,10 @@ class RPKNet(BaseModel):
             inputs["images"],
             bgr_add=-0.5,
             bgr_mult=2.0,
-            bgr_to_rgb=self.args.input_bgr_to_rgb,
+            bgr_to_rgb=self.input_bgr_to_rgb,
             resize_mode="pad",
             pad_mode="replicate",
-            pad_two_side=(not self.args.input_pad_one_side),
+            pad_two_side=(not self.input_pad_one_side),
         )
 
         image1 = images[:, 0]
@@ -329,11 +348,11 @@ class RPKNet(BaseModel):
         # outputs
         flows = []
 
-        pred_stride = min(self.args.pyramid_ranges)
+        pred_stride = min(self.pyramid_ranges)
 
         ipyr = 0
         if self.training:
-            ipyr = self.global_step % (len(self.args.pyramid_ranges) // 2)
+            ipyr = self.global_step % (len(self.pyramid_ranges) // 2)
         pyr_levels = self.pyramid_levels[2 * ipyr : 2 * ipyr + 2]
 
         start_level, output_level = pyr_levels
@@ -341,9 +360,9 @@ class RPKNet(BaseModel):
         pass_pyramid2 = x2_pyramid[start_level : output_level + 1]
 
         level_diff = output_level - start_level
-        iters_per_level = [
-            int(math.ceil(float(self.args.iters) / (level_diff + 1)))
-        ] * (level_diff + 1)
+        iters_per_level = [int(math.ceil(float(self.iters) / (level_diff + 1)))] * (
+            level_diff + 1
+        )
 
         # init
         (
@@ -384,9 +403,9 @@ class RPKNet(BaseModel):
             corr_fn = get_corr_block(
                 x1,
                 x2,
-                self.args.corr_levels,
-                self.args.corr_range,
-                alternate_corr=self.args.corr_mode == "local",
+                self.corr_levels,
+                self.corr_range,
+                alternate_corr=self.corr_mode == "local",
             )
 
             if net is None:
@@ -406,7 +425,7 @@ class RPKNet(BaseModel):
                 flow = upsample2d_as(flow, x1, mode="bilinear")
 
             for _ in range(iters_per_level[l]):
-                if self.args.detach_flow:
+                if self.detach_flow:
                     flow = flow.detach()
 
                 # correlation
@@ -436,3 +455,10 @@ class RPKNet(BaseModel):
         small_flow = upsample2d_as(small_flow, pass_pyramid1[0], mode="bilinear")
 
         return flows, small_flow, out_flow
+
+
+@register_model
+@trainable
+@ptlflow_trained
+class rpknet(RPKNet):
+    pass

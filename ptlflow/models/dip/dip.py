@@ -1,9 +1,8 @@
-from argparse import ArgumentParser, Namespace
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock, SmallUpdateBlock
 from .extractor import BasicEncoderQuarter
@@ -13,10 +12,10 @@ from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -47,8 +46,28 @@ class DIP(BaseModel):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dip-things-688d52a0.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=16)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dropout: float = 0.0,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 20,
+        max_offset: int = 256,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=16, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
+
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.dropout = dropout
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.iters = iters
+        self.max_offset = max_offset
 
         self.hidden_dim = 128
         self.context_dim = 128
@@ -62,19 +81,6 @@ class DIP(BaseModel):
 
         self.update_block_s = SmallUpdateBlock(hidden_dim=self.hidden_dim)
         self.update_block = BasicUpdateBlock(hidden_dim=self.hidden_dim)
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--corr_levels", type=int, default=4)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument("--dropout", type=float, default=0.0)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--iters", type=int, default=20)
-        parser.add_argument("--max_offset", type=int, default=256)
-        return parser
 
     def freeze_bn(self):
         for m in self.modules():
@@ -147,7 +153,6 @@ class DIP(BaseModel):
             auto_layer = int(auto_layer.ceil().cpu().numpy())
             if auto_layer < max_layers:
                 max_layers = auto_layer
-            # print("mag:", max_offset, "layers:", max_layers)
 
         # run the feature network
         fmap1, fmap2 = self.fnet([image1, image2])
@@ -178,13 +183,12 @@ class DIP(BaseModel):
             scale = 2 ** (n_levels - 1 + 2) * 1.0
             s_flow = self.random_init_flow(
                 s_fmap1,
-                max_offset=self.args.max_offset / scale,
+                max_offset=self.max_offset / scale,
                 test_mode=(not self.training),
             )
 
         up_mask = None
         for i in range(n_levels):
-            # print('i: ', i)
             curr_fmap1 = py_fmap1[n_levels - i - 1]
             curr_fmap2 = py_fmap2[n_levels - i - 1]
             curr_cnet = py_cnet[n_levels - i - 1]
@@ -247,7 +251,7 @@ class DIP(BaseModel):
 
         if not self.training and init_flow is not None:
             flow_up = self.inference(
-                image1, image2, iters=self.args.iters, init_flow=init_flow
+                image1, image2, iters=self.iters, init_flow=init_flow
             )
             flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
             return {"flows": flow_up[:, None]}
@@ -275,7 +279,7 @@ class DIP(BaseModel):
         s_flow = None
         s_flow = self.random_init_flow(
             s_fmap1,
-            max_offset=self.args.max_offset // 16,
+            max_offset=self.max_offset // 16,
             test_mode=(not self.training),
         )
 
@@ -283,7 +287,7 @@ class DIP(BaseModel):
         flow = None
         flow_up = None
         flow_predictions = []
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             # --------------- update1 ---------------
             s_flow = s_flow.detach()
             out_corrs = s_patch_fn(s_flow, is_search=False)
@@ -314,7 +318,7 @@ class DIP(BaseModel):
 
         patch_fn = PathMatch(fmap1, fmap2)
         # large refine: 1/4
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             # --------------- update1 ---------------
             flow = flow.detach()
             out_corrs = patch_fn(flow, is_search=False)
@@ -341,3 +345,9 @@ class DIP(BaseModel):
             outputs = {"flows": flow_up[:, None], "flow_small": flow}
 
         return outputs
+
+
+@register_model
+@trainable
+class dip(DIP):
+    pass
