@@ -24,6 +24,20 @@ This is still under development, so some things may not work as intended. I plan
 
 ## What's new
 
+###  - v0.4.0
+
+Major update to support Lightning 2 (finally!). However, it also introduces breaking changes from the previous v0.3 code. See the details below.
+
+- Transitioning from v0.3 to v0.4: check the [v0.4 upgrade guide](https://ptlflow.readthedocs.io/en/latest/starting/v04_upgrade_guide.html)
+- Added features:
+  - Support for YAML config files. See the [config file documentation](https://ptlflow.readthedocs.io/en/latest/starting/config_files.html)
+  - Table [comparing PTLFlow results with the original papers](https://ptlflow.readthedocs.io/en/latest/results/paper_ptlflow.html) to check the stability of the included models.
+- Added new models:
+  - NeuFlow v2 [https://arxiv.org/abs/2408.10161](https://arxiv.org/abs/2408.10161)
+- Add support for more datasets:
+  - Middlebury-ST [https://vision.middlebury.edu/stereo/data/scenes2014/]{https://vision.middlebury.edu/stereo/data/scenes2014/}
+  - VIPER [https://playing-for-benchmarks.org/](https://playing-for-benchmarks.org/)
+
 ###  - v0.3.2
 
 - Added new models:
@@ -129,8 +143,13 @@ Please take a look at the [documentation](https://ptlflow.readthedocs.io/) to le
 
 You can also check the notebooks below running on Google Colab for some practical examples:
 
-- [Inference with a pretrained model](https://colab.research.google.com/drive/1YARBRUGplqTRnRuY9sKIs6LY_2kWAWZJ?usp=sharing).
-- [Training and using the learned weights for inference](https://colab.research.google.com/drive/1mbuAEF728_jZpFEsQHXDxjIGAcB1-nVs?usp=sharing).
+- [Inference with a pretrained model](https://colab.research.google.com/drive/1_WXvIRweQJgex0X-HS0LFXBb0IWZIvR4?usp=sharing).
+- [Training and using the learned weights for inference](https://colab.research.google.com/drive/1b_SMGSXh9F9TkinqZt0c64EH-GE87HVi?usp=sharing).
+
+If you are using the previous v0.3.X code, then check the [v0.3.2 documentation](https://ptlflow.readthedocs.io/en/v0.3.2/) and the following example notebooks:
+
+- [Inference with a pretrained model (PTLFlow v0.3)](https://colab.research.google.com/drive/1YARBRUGplqTRnRuY9sKIs6LY_2kWAWZJ?usp=sharing).
+- [Training and using the learned weights for inference (PTLFlow v0.3)](https://colab.research.google.com/drive/1mbuAEF728_jZpFEsQHXDxjIGAcB1-nVs?usp=sharing).
 
 ## Licenses
 
