@@ -42,7 +42,7 @@ def _init_parser() -> argparse.ArgumentParser:
         "--chosen_metrics",
         type=str,
         nargs="+",
-        default=("epe", "outlier"),
+        default=("epe", "flall"),
         help=(
             "Names of which metrics to keep in the summarized results. The chosen names must be at the end of the column "
             "name of the csv file. If exactly two metrics are chosen, a plot between the two will also be generated."

@@ -1,0 +1,24 @@
+# lightning.pytorch==2.4.0
+# Use this config to benchmark all the models.
+# python validate.py --config configs/results/model_benchmark_all.yaml
+all: true
+select: null
+ckpt_path: null
+exclude: null
+csv_path: null
+num_trials: 1
+num_samples: 10
+sleep_interval: 0.0
+input_size:
+- 500
+- 1000
+output_path: outputs/benchmark
+final_speed_mode: median
+final_memory_mode: first
+plot_axes: null
+plot_log_x: false
+plot_log_y: false
+datatypes:
+- fp32
+batch_size: 1
+seed_everything: true

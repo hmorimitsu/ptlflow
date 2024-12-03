@@ -16,51 +16,45 @@
 # limitations under the License.
 # =============================================================================
 
-import logging
-import sys
-from argparse import ArgumentParser, Namespace
+from copy import deepcopy
 from pathlib import Path
+import sys
 from typing import Any, Dict, List, Optional
 
 import cv2 as cv
+from jsonargparse import ArgumentParser, Namespace
+from loguru import logger
 import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import yaml
 
 import ptlflow
-from ptlflow import get_model, get_model_reference
+from ptlflow import get_model
+from ptlflow.data.flow_datamodule import FlowDataModule
 from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils import flow_utils
 from ptlflow.utils.io_adapter import IOAdapter
-from ptlflow.utils.utils import (
-    add_datasets_to_parser,
-    config_logging,
-    get_list_of_available_models_list,
-    tensor_dict_to_numpy,
-)
-
-config_logging()
+from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
+from ptlflow.utils.registry import RegisteredModel
+from ptlflow.utils.utils import tensor_dict_to_numpy
 
 
 def _init_parser() -> ArgumentParser:
-    parser = ArgumentParser()
+    parser = ArgumentParser(add_help=False)
     parser.add_argument(
-        "model",
-        type=str,
-        choices=["all", "select"] + get_list_of_available_models_list(),
-        help="Name of the model to use.",
+        "--all",
+        action="store_true",
+        help="If set, run validation on all available models.",
     )
     parser.add_argument(
-        "--selection",
+        "--select",
         type=str,
         nargs="+",
         default=None,
-        help=(
-            "Used in combination with model=select. The select mode can be used to run the validation on multiple models "
-            "at once. Put a list of model names here separated by spaces."
-        ),
+        help=("Used to provide a list of model names to be validated."),
     )
     parser.add_argument(
         "--exclude",
@@ -68,8 +62,14 @@ def _init_parser() -> ArgumentParser:
         nargs="+",
         default=None,
         help=(
-            "Used in combination with model=all. A list of model names that will not be validated."
+            "Used in combination with --all. A list of model names that will not be validated."
         ),
+    )
+    parser.add_argument(
+        "--ckpt_path",
+        type=str,
+        default=None,
+        help=("Path to a ckpt file for the chosen model."),
     )
     parser.add_argument(
         "--output_path",
@@ -135,11 +135,6 @@ def _init_parser() -> ArgumentParser:
         help="To be combined with model all or select. Iterates over the list of models in reversed order",
     )
     parser.add_argument(
-        "--warm_start",
-        action="store_true",
-        help="If set, stores the previous estimation to be used a starting point for prediction.",
-    )
-    parser.add_argument(
         "--fp16", action="store_true", help="If set, use half floating point precision."
     )
     parser.add_argument(
@@ -155,6 +150,12 @@ def _init_parser() -> ArgumentParser:
         "--write_individual_metrics",
         action="store_true",
         help="If set, save a table of metrics for every image.",
+    )
+    parser.add_argument(
+        "--epe_clip",
+        type=float,
+        default=5.0,
+        help=("Maximum EPE value to before clipping. Used for EPE visualization."),
     )
     return parser
 
@@ -192,6 +193,14 @@ def generate_outputs(
     preds["flows_viz"] = flow_utils.flow_to_rgb(preds["flows"])[:, :, ::-1]
     if preds.get("flows_b") is not None:
         preds["flows_b_viz"] = flow_utils.flow_to_rgb(preds["flows_b"])[:, :, ::-1]
+    epe = np.sqrt(np.square(preds["flows"] - inputs["flows"]).sum(-1))
+    epe = np.clip(epe, 0, args.epe_clip)
+    epe_img = ((255.0 / args.epe_clip) * epe).astype(np.uint8)
+    epe_img = cv.applyColorMap(epe_img, cv.COLORMAP_CIVIDIS)
+    invalid_mask = inputs["valids"] < 0.5
+    invalid_mask = np.concatenate([invalid_mask, invalid_mask, invalid_mask], -1)
+    epe_img[invalid_mask] = 0
+    preds["epe"] = epe_img
 
     if args.show:
         _show(inputs, preds, args.max_show_side)
@@ -200,7 +209,9 @@ def generate_outputs(
         _write_to_file(args, preds, dataloader_name, batch_idx, metadata)
 
 
-def validate(args: Namespace, model: BaseModel) -> pd.DataFrame:
+def validate(
+    args: Namespace, model: BaseModel, data_module: FlowDataModule
+) -> pd.DataFrame:
     """Perform the validation.
 
     Parameters
@@ -225,27 +236,34 @@ def validate(args: Namespace, model: BaseModel) -> pd.DataFrame:
         if args.fp16:
             model = model.half()
 
-    dataloaders = model.val_dataloader()
+    data_module.setup("validate")
+    dataloaders = data_module.val_dataloader()
     dataloaders = {
-        model.val_dataloader_names[i]: dataloaders[i] for i in range(len(dataloaders))
+        data_module.val_dataloader_names[i]: dataloaders[i]
+        for i in range(len(dataloaders))
     }
 
     metrics_df = pd.DataFrame()
-    metrics_df["model"] = [args.model]
-    metrics_df["checkpoint"] = [args.pretrained_ckpt]
+    metrics_df["model"] = [args.model_name]
+    metrics_df["checkpoint"] = [args.ckpt_path]
 
-    for dataset_name, dl in dataloaders.items():
-        metrics_mean = validate_one_dataloader(args, model, dl, dataset_name)
+    if args.write_outputs:
+        logger.info("Outputs will be saved to {}.", args.output_path)
+
+    output_path = Path(args.output_path)
+    for i, (dataset_name, dl) in enumerate(dataloaders.items()):
+        metrics_mean = validate_one_dataloader(args, model, dl, i, dataset_name)
         metrics_df[[f"{dataset_name}-{k}" for k in metrics_mean.keys()]] = list(
             metrics_mean.values()
         )
-        args.output_path.mkdir(parents=True, exist_ok=True)
-        metrics_df.T.to_csv(args.output_path / "metrics.csv", header=False)
+
+        output_path.mkdir(parents=True, exist_ok=True)
+        metrics_df.T.to_csv(output_path / "metrics.csv", header=False)
     metrics_df = metrics_df.round(3)
     return metrics_df
 
 
-def validate_list_of_models(args: Namespace) -> None:
+def validate_list_of_models(args: Namespace, data_module: FlowDataModule) -> None:
     """Perform the validation.
 
     Parameters
@@ -262,44 +280,62 @@ def validate_list_of_models(args: Namespace) -> None:
     exclude = args.exclude
     if exclude is None:
         exclude = []
+    else:
+        available_model_names = ptlflow.get_model_names()
+        for name in exclude:
+            assert name in available_model_names
+
     for mname in model_names:
         if mname in exclude:
             continue
 
-        logging.info(mname)
+        logger.info("Model: {}", mname)
         model_ref = ptlflow.get_model_reference(mname)
 
-        if hasattr(model_ref, "pretrained_checkpoints"):
+        ckpt_names = []
+        if args.ckpt_path is None and hasattr(model_ref, "pretrained_checkpoints"):
             ckpt_names = model_ref.pretrained_checkpoints.keys()
-            for cname in ckpt_names:
-                try:
-                    logging.info(cname)
-                    parser_tmp = model_ref.add_model_specific_args(parser)
-                    args = parser_tmp.parse_args()
+        elif args.ckpt_path is not None:
+            ckpt_names = [args.ckpt_path]
 
-                    args.model = mname
-                    args.pretrained_ckpt = cname
+        for cname in ckpt_names:
+            try:
+                logger.info("Checkpoint: {}", cname)
 
-                    model_id = args.model
-                    if args.pretrained_ckpt is not None:
-                        model_id += f"_{args.pretrained_ckpt}"
-                    args.output_path = Path(args.output_path) / model_id
+                model_id = f"{mname}_{cname}"
+                output_path = Path(args.output_path) / model_id
 
-                    model = get_model(mname, cname, args)
-                    instance_metrics_df = validate(args, model)
-                    metrics_df = pd.concat([metrics_df, instance_metrics_df])
-                    args.output_path.parent.mkdir(parents=True, exist_ok=True)
-                    if args.reversed:
-                        metrics_df.to_csv(
-                            args.output_path.parent / "metrics_all_rev.csv", index=False
-                        )
-                    else:
-                        metrics_df.to_csv(
-                            args.output_path.parent / "metrics_all.csv", index=False
-                        )
-                except Exception as e:  # noqa: B902
-                    logging.warning("Skipping model %s due to exception %s", mname, e)
-                    break
+                local_args = deepcopy(args)
+                local_args.model_name = mname
+                local_args.ckpt_path = cname
+                local_args.output_path = str(output_path)
+
+                model = get_model(mname, cname)
+                instance_metrics_df = validate(local_args, model, data_module)
+                metrics_df = pd.concat([metrics_df, instance_metrics_df])
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+
+                file_name = "metrics"
+                if args.all:
+                    file_name += "_all"
+                else:
+                    file_name += "_select"
+
+                if local_args.reversed:
+                    file_name += "_rev"
+
+                metrics_path = output_path.parent / f"{file_name}.csv"
+                metrics_df.to_csv(metrics_path, index=False)
+                logger.info("Saved metrics to {}", metrics_path)
+
+            except Exception as e:  # noqa: B902
+                logger.warning(
+                    "Skipping model {} with ckpt {} due to exception {}",
+                    mname,
+                    cname,
+                    e,
+                )
+                break
 
 
 @torch.no_grad()
@@ -307,6 +343,7 @@ def validate_one_dataloader(
     args: Namespace,
     model: BaseModel,
     dataloader: DataLoader,
+    dataloader_idx: int,
     dataloader_name: str,
 ) -> Dict[str, float]:
     """Perform validation for all examples of one dataloader.
@@ -319,6 +356,8 @@ def validate_one_dataloader(
         The model to be used for validation.
     dataloader : DataLoader
         The dataloader for the validation.
+    dataloader_idx : index
+        The index of this dataloader.
     dataloader_name : str
         A string to identify this dataloader.
 
@@ -331,10 +370,15 @@ def validate_one_dataloader(
 
     metrics_individual = None
     if args.write_individual_metrics:
-        metrics_individual = {"filename": [], "epe": [], "outlier": []}
+        metrics_individual = {
+            "filename": [],
+            "epe": [],
+            "flall": [],
+            "wauc": [],
+            "px1": [],
+        }
 
     with tqdm(dataloader) as tdl:
-        prev_preds = None
         for i, inputs in enumerate(tdl):
             if args.scale_factor is not None:
                 scale_factor = args.scale_factor
@@ -342,35 +386,29 @@ def validate_one_dataloader(
                 scale_factor = (
                     None
                     if args.max_forward_side is None
-                    else float(args.max_forward_side) / min(inputs["images"].shape[-2:])
+                    else float(args.max_forward_side) / max(inputs["images"].shape[-2:])
                 )
 
             io_adapter = IOAdapter(
-                model,
-                inputs["images"].shape[-2:],
+                output_stride=model.output_stride,
+                input_size=inputs["images"].shape[-2:],
                 target_scale_factor=scale_factor,
                 cuda=torch.cuda.is_available(),
                 fp16=args.fp16,
             )
             inputs = io_adapter.prepare_inputs(inputs=inputs, image_only=True)
-            inputs["prev_preds"] = prev_preds
 
-            preds = model(inputs)
-
-            if args.warm_start:
-                if (
-                    "is_seq_start" in inputs["meta"]
-                    and inputs["meta"]["is_seq_start"][0]
-                ):
-                    prev_preds = None
-                else:
-                    prev_preds = preds
-                    for k, v in prev_preds.items():
-                        if isinstance(v, torch.Tensor):
-                            prev_preds[k] = v.detach()
+            outputs = model.validation_step(inputs, i, dataloader_idx)
 
             inputs = io_adapter.unscale(inputs, image_only=True)
+            preds = outputs["preds"]
             preds = io_adapter.unscale(preds)
+            for k, v in inputs.items():
+                if isinstance(v, torch.Tensor) and args.fp16:
+                    inputs[k] = v.float()
+            for k, v in preds.items():
+                if isinstance(v, torch.Tensor) and args.fp16:
+                    preds[k] = v.float()
 
             if inputs["flows"].shape[1] > 1 and args.seq_val_mode != "all":
                 if args.seq_val_mode == "first":
@@ -389,30 +427,40 @@ def validate_one_dataloader(
                     elif isinstance(val, torch.Tensor) and len(val.shape) == 5:
                         inputs[key] = val[:, k : k + 1]
 
-            metrics = model.val_metrics(preds, inputs)
-
+            metrics = outputs["metrics"]
             for k in metrics.keys():
                 if metrics_sum.get(k) is None:
                     metrics_sum[k] = 0.0
                 metrics_sum[k] += metrics[k].item()
-            tdl.set_postfix(
-                epe=metrics_sum["val/epe"] / (i + 1),
-                outlier=metrics_sum["val/outlier"] / (i + 1),
-            )
+            progress_bar_values = {
+                "epe": metrics_sum["val/epe"] / (i + 1),
+                "flall": metrics_sum["val/flall"] / (i + 1),
+                "wauc": metrics_sum["val/wauc"] / (i + 1),
+                "px1": 100 * (((i + 1) - metrics_sum["val/px1"]) / (i + 1)),
+            }
+            tdl.set_postfix(**progress_bar_values)
 
             filename = ""
+            dataloader_suffix = ""
             if "sintel" in inputs["meta"]["dataset_name"][0].lower():
                 filename = f'{Path(inputs["meta"]["image_paths"][0][0]).parent.name}/'
             elif "spring" in inputs["meta"]["dataset_name"][0].lower():
                 filename = (
                     f'{Path(inputs["meta"]["image_paths"][0][0]).parent.parent.name}/'
                 )
+            elif "kubric" in inputs["meta"]["dataset_name"][0].lower():
+                filename = f'{Path(inputs["meta"]["image_paths"][0][0]).parent.name}/'
+                dataloader_suffix = (
+                    f'_{Path(inputs["meta"]["image_paths"][0][0]).parent.parent.name}'
+                )
             filename += Path(inputs["meta"]["image_paths"][0][0]).stem
 
             if metrics_individual is not None:
                 metrics_individual["filename"].append(filename)
                 metrics_individual["epe"].append(metrics["val/epe"].item())
-                metrics_individual["outlier"].append(metrics["val/outlier"].item())
+                metrics_individual["flall"].append(metrics["val/flall"].item())
+                metrics_individual["wauc"].append(metrics["val/wauc"].item())
+                metrics_individual["px1"].append(metrics["val/px1"].item())
 
             generate_outputs(
                 args, inputs, preds, dataloader_name, i, inputs.get("meta")
@@ -424,9 +472,15 @@ def validate_one_dataloader(
     if args.write_individual_metrics:
         ind_df = pd.DataFrame(metrics_individual)
         args.output_path.mkdir(parents=True, exist_ok=True)
-        ind_df.to_csv(
-            Path(args.output_path) / f"{dataloader_name}_epe_outlier.csv", index=None
+        csv_path = (
+            Path(args.output_path)
+            / f"{dataloader_name}{dataloader_suffix}_epe_flall.csv"
         )
+        ind_df.to_csv(
+            csv_path,
+            index=None,
+        )
+        logger.info("Saved individual metrics to: {}", csv_path)
 
     metrics_mean = {}
     for k, v in metrics_sum.items():
@@ -435,14 +489,14 @@ def validate_one_dataloader(
 
 
 def _get_model_names(args: Namespace) -> List[str]:
-    if args.model == "all":
-        model_names = ptlflow.models_dict.keys()
-    elif args.model == "select":
-        if args.selection is None:
-            raise ValueError(
-                "When select is chosen, model names must be provided to --selection."
-            )
-        model_names = args.selection
+    available_model_names = ptlflow.get_model_names()
+    if args.all:
+        model_names = available_model_names
+    else:
+        assert len(args.select) > 0
+        model_names = args.select
+        for name in model_names:
+            assert name in available_model_names
     return model_names
 
 
@@ -485,7 +539,11 @@ def _write_to_file(
     if metadata is not None:
         img_path = Path(metadata["image_paths"][0][0])
         image_name = img_path.stem
-        if "sintel" in dataloader_name:
+        if (
+            "sintel" in dataloader_name
+            or "middlebury_st" in dataloader_name
+            or "kubric" in dataloader_name
+        ):
             seq_name = img_path.parts[-2]
             extra_dirs = seq_name
         elif "spring" in dataloader_name:
@@ -516,32 +574,66 @@ def _write_to_file(
                 cv.imwrite(str(out_dir / f"{image_name}.png"), v.astype(np.uint8))
 
 
+def _show_v04_warning():
+    ignore_args = ["-h", "--help", "--model", "--config", "--all", "--select"]
+    for arg in ignore_args:
+        if arg in sys.argv:
+            return
+
+    logger.warning(
+        "Since v0.4, it is now necessary to inform the model using the --model argument. For example, use: python infer.py --model raft --ckpt_path things"
+    )
+
+
 if __name__ == "__main__":
+    _show_v04_warning()
+
     parser = _init_parser()
 
-    # TODO: It is ugly that the model has to be gotten from the argv rather than the argparser.
-    # However, I do not see another way, since the argparser requires the model to load some of the args.
-    FlowModel = None
-    if len(sys.argv) > 1 and sys.argv[1] not in ["-h", "--help", "all", "select"]:
-        FlowModel = get_model_reference(sys.argv[1])
-        parser = FlowModel.add_model_specific_args(parser)
+    is_validate_list = False
+    if "--config" in sys.argv:
+        config_file_idx = sys.argv.index("--config") + 1
+        with open(sys.argv[config_file_idx], "r") as f:
+            config = yaml.safe_load(f)
+        if config["all"] or config["select"] is not None:
+            is_validate_list = True
 
-    add_datasets_to_parser(parser, "datasets.yml")
+    if "--all" in sys.argv or "--select" in sys.argv:
+        is_validate_list = True
 
-    args = parser.parse_args()
-
-    if args.model not in ["all", "select"]:
-        model_id = args.model
-        if args.pretrained_ckpt is not None:
-            model_id += f"_{Path(args.pretrained_ckpt).stem}"
-        if args.max_forward_side is not None:
-            model_id += f"_maxside{args.max_forward_side}"
-        if args.scale_factor is not None:
-            model_id += f"_scale{args.scale_factor}"
-        args.output_path = Path(args.output_path) / model_id
-        model = get_model(sys.argv[1], args.pretrained_ckpt, args)
-        args.output_path.mkdir(parents=True, exist_ok=True)
-
-        validate(args, model)
+    if is_validate_list:
+        model_class = None
+        subclass_mode_model = False
     else:
-        validate_list_of_models(args)
+        model_class = RegisteredModel
+        subclass_mode_model = True
+
+    cli = PTLFlowCLI(
+        model_class=model_class,
+        subclass_mode_model=subclass_mode_model,
+        datamodule_class=FlowDataModule,
+        parser_kwargs={"parents": [parser]},
+        run=False,
+        parse_only=False,
+        auto_configure_optimizers=False,
+    )
+
+    if is_validate_list:
+        validate_list_of_models(cli.config, cli.datamodule)
+    else:
+        cfg = cli.config
+        cfg.model_name = cfg.model.class_path.split(".")[-1]
+        model_id = cfg.model_name
+        if cfg.ckpt_path is not None:
+            model_id += f"_{Path(cfg.ckpt_path).stem}"
+        if cfg.max_forward_side is not None:
+            model_id += f"_maxside{cfg.max_forward_side}"
+        if cfg.scale_factor is not None:
+            model_id += f"_scale{cfg.scale_factor}"
+        cfg.output_path = str(Path(cfg.output_path) / model_id)
+        Path(cfg.output_path).mkdir(parents=True, exist_ok=True)
+
+        model = cli.model
+        model = ptlflow.restore_model(model, cfg.ckpt_path)
+
+        validate(cfg, model, cli.datamodule)

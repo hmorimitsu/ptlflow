@@ -1,7 +1,5 @@
-"""Train one of the available models."""
-
 # =============================================================================
-# Copyright 2021 Henrique Morimitsu
+# Copyright 2024 Henrique Morimitsu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,129 +14,163 @@
 # limitations under the License.
 # =============================================================================
 
-from argparse import ArgumentParser, Namespace
+from datetime import datetime
 from pathlib import Path
 import sys
 
-import lightning
-import lightning.pytorch as pl
-import torch
-from lightning.pytorch.strategies import DDPStrategy
+from jsonargparse import ArgumentParser
+from loguru import logger
 
-from ptlflow import get_model, get_model_reference
-from ptlflow.utils.callbacks.logger import LoggerCallback
-from ptlflow.utils.utils import (
-    add_datasets_to_parser,
-    get_list_of_available_models_list,
-)
+from ptlflow.data.flow_datamodule import FlowDataModule
+from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
+from ptlflow.utils.lightning.ptlflow_trainer import PTLFlowTrainer
+from ptlflow.utils.registry import RegisteredModel
 
 
-def _init_parser() -> ArgumentParser:
-    parser = ArgumentParser()
+def _init_parser():
+    parser = ArgumentParser(add_help=False)
+    parser.add_argument("--ckpt_path", type=str, default=None)
+    parser.add_argument("--project", type=str, default="ptlflow")
+    parser.add_argument("--version", type=str, default=None)
+    parser.add_argument("--train_ckpt_topk", type=int, default=0)
+    parser.add_argument("--train_ckpt_metric", type=str, default="train/loss_epoch")
+    parser.add_argument("--infer_ckpt_topk", type=int, default=1)
+    parser.add_argument("--infer_ckpt_metric", type=str, default="main_val_metric")
     parser.add_argument(
-        "model",
+        "--logger",
         type=str,
-        choices=get_list_of_available_models_list(),
-        help="Name of the model to use.",
+        default="tensorboard",
+        choices=["tensorboard", "wandb"],
     )
-    parser.add_argument(
-        "--random_seed",
-        type=int,
-        default=1234,
-        help="A number to seed the pseudo-random generators.",
-    )
-    parser.add_argument(
-        "--clear_train_state",
-        action="store_true",
-        help=(
-            "Only used if --resume_from_checkpoint is not None. If set, only the weights are loaded from the checkpoint "
-            "and the training state is ignored. Set it when you want to finetune the model from a previous checkpoint."
-        ),
-    )
-    parser.add_argument(
-        "--log_dir",
-        type=str,
-        default="ptlflow_logs",
-        help="The path to the directory where the logs will be saved.",
-    )
-    parser.add_argument("--find_unused_parameters", action="store_true")
+    parser.add_argument("--log_dir", type=str, default="ptlflow_logs")
     return parser
 
 
-def train(args: Namespace) -> None:
-    """Run the training.
+def cli_main():
+    parser = _init_parser()
 
-    Parameters
-    ----------
-    args : Namespace
-        Arguments to configure the training.
-    """
-    _print_untested_warning()
+    cfg = PTLFlowCLI(
+        model_class=RegisteredModel,
+        subclass_mode_model=True,
+        datamodule_class=FlowDataModule,
+        trainer_class=PTLFlowTrainer,
+        auto_configure_optimizers=False,
+        parser_kwargs={"parents": [parser]},
+        run=False,
+        parse_only=True,
+    ).config
 
-    lightning.fabric.utilities.seed.seed_everything(args.random_seed)
-
-    if args.train_transform_cuda:
-        from torch.multiprocessing import set_start_method
-
-        set_start_method("spawn")
-
-    if args.train_dataset is None:
-        args.train_dataset = "chairs-train"
-        print('INFO: --train_dataset is not set. It will be set to "chairs-train"')
-
-    log_model_name = f"{args.model}-{_gen_dataset_id(args.train_dataset)}"
-
-    model = get_model(args.model, args.pretrained_ckpt, args)
-
-    if args.resume_from_checkpoint is not None and args.clear_train_state:
-        # Restore model weights, but not the train state
-        pl_ckpt = torch.load(args.resume_from_checkpoint)
-        model.load_state_dict(pl_ckpt["state_dict"])
-        args.resume_from_checkpoint = None
+    model_name = cfg.model.class_path.split(".")[-1]
 
     # Setup loggers and callbacks
 
+    timestamp = datetime.now().strftime("%d%m%Y_%H%M%S")
+    log_model_name = (
+        f"{model_name}-{_gen_dataset_id(cfg.data.train_dataset)}-{timestamp}"
+    )
+    log_model_dir = Path(cfg.log_dir) / log_model_name
+    log_model_dir.mkdir(parents=True, exist_ok=True)
+    if cfg.logger == "tensorboard":
+        trainer_logger = {
+            "class_path": "lightning.pytorch.loggers.TensorBoardLogger",
+            "init_args": {
+                "save_dir": str(log_model_dir),
+                "name": f"{model_name}-{cfg.data.train_dataset}",
+                "version": cfg.version,
+            },
+        }
+    elif cfg.logger == "wandb":
+        trainer_logger = {
+            "class_path": "lightning.pytorch.loggers.WandbLogger",
+            "init_args": {
+                "save_dir": str(log_model_dir),
+                "project": cfg.project,
+                "version": cfg.version,
+                "name": f"{model_name}-{cfg.data.train_dataset}",
+            },
+        }
+
     callbacks = []
 
-    lr_logger = pl.callbacks.LearningRateMonitor(logging_interval="step")
-    callbacks.append(lr_logger)
-
-    log_model_dir = str(Path(args.log_dir) / log_model_name)
-    tb_logger = pl.loggers.TensorBoardLogger(log_model_dir)
-
-    model.val_dataloader()  # Called just to populate model.val_dataloader_names
-
-    model_ckpt_last = pl.callbacks.model_checkpoint.ModelCheckpoint(
-        filename=args.model + "_last_{epoch}_{step}", save_weights_only=True, mode="max"
+    callbacks.append(
+        {
+            "class_path": "lightning.pytorch.callbacks.model_checkpoint.ModelCheckpoint",
+            "init_args": {
+                "filename": model_name + "_last_{epoch}_{step}",
+                "save_weights_only": True,
+                "mode": "max",
+            },
+        }
     )
-    callbacks.append(model_ckpt_last)
-    model_ckpt_train = pl.callbacks.model_checkpoint.ModelCheckpoint(
-        filename=args.model + "_train_{epoch}_{step}"
-    )
-    callbacks.append(model_ckpt_train)
 
-    if len(model.val_dataloader_names) > 0:
-        model_ckpt_best = pl.callbacks.model_checkpoint.ModelCheckpoint(
-            filename=args.model
-            + "_best_{"
-            + model.val_dataloader_names[0]
-            + ":.2f}_{epoch}_{step}",
-            save_weights_only=True,
-            save_top_k=1,
-            monitor=model.val_dataloader_names[0],
+    callbacks.append(
+        {
+            "class_path": "lightning.pytorch.callbacks.model_checkpoint.ModelCheckpoint",
+            "init_args": {
+                "filename": model_name + "_train_{epoch}_{step}",
+            },
+        }
+    )
+
+    if cfg.train_ckpt_topk > 0:
+        callbacks.append(
+            {
+                "class_path": "lightning.pytorch.callbacks.model_checkpoint.ModelCheckpoint",
+                "init_args": {
+                    "filename": model_name
+                    + "_{"
+                    + cfg.train_ckpt_metric
+                    + ":.2f}_{epoch}",
+                    "save_weights_only": False,
+                    "save_top_k": cfg.train_ckpt_topk,
+                    "monitor": "train/loss_epoch",
+                },
+            }
         )
-        callbacks.append(model_ckpt_best)
 
-    callbacks.append(LoggerCallback())
+    if cfg.infer_ckpt_topk > 0:
+        assert (
+            cfg.infer_ckpt_metric is not None
+        ), "You must provide a metric name for --infer_ckpt_topk_metric"
+        callbacks.append(
+            {
+                "class_path": "lightning.pytorch.callbacks.model_checkpoint.ModelCheckpoint",
+                "init_args": {
+                    "filename": model_name
+                    + "_best_{"
+                    + cfg.infer_ckpt_metric
+                    + ":.2f}_{epoch}_{step}",
+                    "save_weights_only": True,
+                    "save_top_k": cfg.infer_ckpt_topk,
+                    "monitor": cfg.infer_ckpt_metric,
+                },
+            }
+        )
 
-    trainer = pl.Trainer.from_argparse_args(
-        args,
-        logger=tb_logger,
-        callbacks=callbacks,
-        strategy=DDPStrategy(find_unused_parameters=args.find_unused_parameters),
+    callbacks.append(
+        {
+            "class_path": "ptlflow.utils.callbacks.logger.LoggerCallback",
+        }
     )
-    trainer.tune(model)
-    trainer.fit(model)
+
+    cfg.trainer.logger = trainer_logger
+    cfg.trainer.callbacks = callbacks
+    cli = PTLFlowCLI(
+        model_class=RegisteredModel,
+        subclass_mode_model=True,
+        trainer_class=PTLFlowTrainer,
+        datamodule_class=FlowDataModule,
+        auto_configure_optimizers=False,
+        args=cfg,
+        run=False,
+        ignore_sys_argv=True,
+        parser_kwargs={"parents": [parser]},
+    )
+
+    if not cli.model.has_trained_on_ptlflow:
+        _print_untested_warning()
+
+    cli.trainer.fit(cli.model, datamodule=cli.datamodule, ckpt_path=cfg.ckpt_path)
 
 
 def _gen_dataset_id(dataset_string: str) -> str:
@@ -165,29 +197,27 @@ def _print_untested_warning():
     print("###########################################################################")
     print("# WARNING, please read!                                                   #")
     print("#                                                                         #")
-    print("# This training script has not been tested!                               #")
-    print("# Therefore, there is no guarantee that a model trained with this script  #")
-    print("# will produce good results after the training!                           #")
+    print("# This training script has not been tested for this model!                #")
+    print("# Therefore, there is no guarantee that training it with this script      #")
+    print("# will produce good results!                                              #")
     print("#                                                                         #")
     print("# You can find more information at                                        #")
     print("# https://ptlflow.readthedocs.io/en/latest/starting/training.html         #")
     print("###########################################################################")
 
 
+def _show_v04_warning():
+    ignore_args = ["-h", "--help", "--model", "--config"]
+    for arg in ignore_args:
+        if arg in sys.argv:
+            return
+
+    logger.warning(
+        "Since v0.4, it is now necessary to inform the model using the --model argument. For example, use: python infer.py --model raft --ckpt_path things"
+    )
+
+
 if __name__ == "__main__":
-    parser = _init_parser()
+    _show_v04_warning()
 
-    # TODO: It is ugly that the model has to be gotten from the argv rather than the argparser.
-    # However, I do not see another way, since the argparser requires the model to load some of the args.
-    FlowModel = None
-    if len(sys.argv) > 1 and sys.argv[1] != "-h" and sys.argv[1] != "--help":
-        FlowModel = get_model_reference(sys.argv[1])
-        parser = FlowModel.add_model_specific_args(parser)
-
-    add_datasets_to_parser(parser, "datasets.yml")
-
-    parser = pl.Trainer.add_argparse_args(parser)
-
-    args = parser.parse_args()
-
-    train(args)
+    cli_main()
