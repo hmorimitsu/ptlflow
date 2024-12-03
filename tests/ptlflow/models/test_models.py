@@ -69,7 +69,7 @@ MODEL_ARGS = {
 
 
 def test_forward() -> None:
-    model_names = ptlflow.models_dict.keys()
+    model_names = ptlflow._models_dict.keys()
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
@@ -102,7 +102,7 @@ def test_forward() -> None:
 
 def test_forward_fp16() -> None:
     if torch.cuda.is_available():
-        model_names = ptlflow.models_dict.keys()
+        model_names = ptlflow._models_dict.keys()
         for mname in model_names:
             if mname in EXCLUDE_MODELS_FP16:
                 continue
@@ -140,7 +140,7 @@ def test_forward_fp16() -> None:
 def test_train(tmp_path: Path):
     write_flying_chairs2(tmp_path)
 
-    model_names = ptlflow.models_dict.keys()
+    model_names = ptlflow._models_dict.keys()
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
@@ -181,7 +181,7 @@ def _train_one_pass(tmp_path: Path, model_name: str) -> None:
 def test_overfit(tmp_path: Path) -> None:
     print("Saving outputs to " + str(tmp_path))
 
-    model_names = ptlflow.models_dict.keys()
+    model_names = ptlflow._models_dict.keys()
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
