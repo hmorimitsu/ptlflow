@@ -16,23 +16,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lightning: [1.9.5]
+        lightning: ["2.1.4", "2.2.5", "2.3.3", "2.4.0"]
 
     steps:
       - uses: actions/checkout@v4
       - name: Replace lightning
         uses: jacobtomlinson/gha-find-replace@v3
         with:
-          find: "lightning<2"
-          replace: "lightning==${{ matrix.lightning }}"
+          find: "lightning[pytorch-extra]>=2,<2.5"
+          replace: "lightning[pytorch-extra]==${{ matrix.lightning }}"
           regex: false
           include: "requirements.txt"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cpu
+          pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
       - name: Test with pytest
         run: |
-          pip install pytest
+          pip install pytest==8.3.3
           python -m pytest tests/
