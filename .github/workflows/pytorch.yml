@@ -17,9 +17,10 @@ jobs:
       fail-fast: false
       matrix:
         pytorch: [
-          'torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cpu',
-          'torch==2.0.1 torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cpu',
-          'torch==1.13.1+cpu torchvision==0.14.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu',
+          'torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu',
+          'torch==2.4.1 torchvision==0.19.1 --index-url https://download.pytorch.org/whl/cpu',
+          'torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cpu',
+          'torch==2.2.2 torchvision==0.17.2 --index-url https://download.pytorch.org/whl/cpu',
         ]
 
     steps:
@@ -31,5 +32,5 @@ jobs:
           pip install -r requirements.txt
       - name: Test with pytest
         run: |
-          pip install pytest
+          pip install pytest==8.3.3
           python -m pytest tests/

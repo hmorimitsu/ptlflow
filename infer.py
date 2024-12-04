@@ -25,29 +25,32 @@ including: individual images, a folder of images, a video, or a webcam stream.
 
 
 import sys
-from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 import cv2 as cv
+from jsonargparse import ArgumentParser, Namespace
+from loguru import logger
 import numpy as np
 import torch
 from tqdm import tqdm
 
-from ptlflow import get_model, get_model_reference
+import ptlflow
 from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils.flow_utils import flow_to_rgb, flow_write, flow_read
 from ptlflow.utils.io_adapter import IOAdapter
-from ptlflow.utils.utils import get_list_of_available_models_list, tensor_dict_to_numpy
+from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
+from ptlflow.utils.registry import RegisteredModel
+from ptlflow.utils.utils import tensor_dict_to_numpy
 
 
 def _init_parser() -> ArgumentParser:
-    parser = ArgumentParser()
+    parser = ArgumentParser(add_help=False)
     parser.add_argument(
-        "model",
+        "--ckpt_path",
         type=str,
-        choices=get_list_of_available_models_list(),
-        help="Name of the model to use.",
+        default=None,
+        help=("Path to a ckpt file for the chosen model."),
     )
     parser.add_argument(
         "--input_path",
@@ -68,9 +71,10 @@ def _init_parser() -> ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--write_outputs",
-        action="store_true",
+        "--not_write_outputs",
+        action="store_false",
         help="If set, the model outputs are saved to disk.",
+        dest="write_outputs",
     )
     parser.add_argument(
         "--output_path",
@@ -155,17 +159,17 @@ def infer(args: Namespace, model: BaseModel) -> None:
 
     if args.scale_factor is not None:
         io_adapter = IOAdapter(
-            model,
-            prev_img.shape[:2],
+            output_stride=model.output_stride,
+            input_size=prev_img.shape[:2],
             target_scale_factor=args.scale_factor,
             cuda=torch.cuda.is_available(),
             fp16=args.fp16,
         )
     else:
         io_adapter = IOAdapter(
-            model,
-            prev_img.shape[:2],
-            args.input_size,
+            output_stride=model.output_stride,
+            input_size=prev_img.shape[:2],
+            target_size=args.input_size,
             cuda=torch.cuda.is_available(),
             fp16=args.fp16,
         )
@@ -196,9 +200,9 @@ def infer(args: Namespace, model: BaseModel) -> None:
 
                 gt_sq_dist = np.power(flow_gt, 2).sum(2)
                 gt_dist_valid = np.sqrt(gt_sq_dist[valid])
-                outlier = (epe > 3) & (epe > 0.05 * gt_dist_valid)
+                flall = (epe > 3) & (epe > 0.05 * gt_dist_valid)
                 print(
-                    f"EPE: {epe.mean():.03f}, Outlier: {100*outlier.mean():.03f}",
+                    f"EPE: {epe.mean():.03f}, Fl-All: {100*flall.mean():.03f}",
                 )
 
             preds_npy["flows_viz"] = flow_to_rgb(preds_npy["flows"])[:, :, ::-1]
@@ -260,10 +264,10 @@ def init_input(
             # Assumes it is a folder of images
             img_paths = sorted([p for p in input_path.glob("**/*") if not p.is_dir()])
         else:
-            # Assumes it is a video or webcam index
+            inp = str(input_path)
             try:
-                inp = int(input_path)
-            except ValueError:
+                inp = int(inp)
+            except (ValueError, TypeError):
                 pass
             cap = cv.VideoCapture(inp)
 
@@ -366,14 +370,13 @@ def write_outputs(
             if flow_format[0] != ".":
                 flow_format = "." + flow_format
             flow_write(out_path.with_suffix(flow_format), v)
-            print(f"Saved flow at: {out_path}")
-        elif len(v.shape) == 2 or (
-            len(v.shape) == 3 and (v.shape[2] == 1 or v.shape[2] == 3)
+        elif isinstance(v, np.ndarray) and (
+            len(v.shape) == 2
+            or (len(v.shape) == 3 and (v.shape[2] == 1 or v.shape[2] == 3))
         ):
             if v.max() <= 1:
                 v = v * 255
             cv.imwrite(str(out_path.with_suffix(".png")), v.astype(np.uint8))
-            print(f"Saved image at: {out_path}")
 
 
 def _read_image(
@@ -393,23 +396,46 @@ def _read_image(
     return img, img_dir_name, img_name, is_img_valid
 
 
+def _show_v04_warning():
+    ignore_args = ["-h", "--help", "--model", "--config"]
+    for arg in ignore_args:
+        if arg in sys.argv:
+            return
+
+    logger.warning(
+        "Since v0.4, it is now necessary to inform the model using the --model argument. For example, use: python infer.py --model raft --ckpt_path things"
+    )
+
+
 if __name__ == "__main__":
+    _show_v04_warning()
+
     parser = _init_parser()
 
-    # TODO: It is ugly that the model has to be gotten from the argv rather than the argparser.
-    # However, I do not see another way, since the argparser requires the model to load some of the args.
-    FlowModel = None
-    if len(sys.argv) > 1 and sys.argv[1] != "-h" and sys.argv[1] != "--help":
-        FlowModel = get_model_reference(sys.argv[1])
-        parser = FlowModel.add_model_specific_args(parser)
+    cli = PTLFlowCLI(
+        model_class=RegisteredModel,
+        subclass_mode_model=True,
+        parser_kwargs={"parents": [parser]},
+        run=False,
+        parse_only=False,
+        auto_configure_optimizers=False,
+    )
 
-    args = parser.parse_args()
+    cfg = cli.config
 
-    model_id = args.model
-    if args.pretrained_ckpt is not None:
-        model_id += f"_{Path(args.pretrained_ckpt).stem}"
-    args.output_path = Path(args.output_path) / model_id
+    assert (
+        cfg.input_path is not None and len(cfg.input_path) > 0
+    ), "You need to provide the --input_path argument"
 
-    model = get_model(sys.argv[1], args.pretrained_ckpt, args)
+    cfg.model_name = cfg.model.class_path.split(".")[-1]
+    model_id = cfg.model_name
+    if cfg.ckpt_path is not None:
+        model_id += f"_{Path(cfg.ckpt_path).stem}"
+    cfg.output_path = str(Path(cfg.output_path) / model_id)
 
-    infer(args, model)
+    logger.info("The outputs will be saved to {}.", cfg.output_path)
+
+    model = cli.model
+    model = ptlflow.restore_model(model, cfg.ckpt_path)
+
+    infer(cfg, model)

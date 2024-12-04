@@ -11,7 +11,9 @@ class ResNetFPN(nn.Module):
 
     def __init__(
         self,
-        args,
+        block_dims,
+        initial_dim,
+        pretrain,
         input_dim=3,
         output_dim=256,
         ratio=1.0,
@@ -21,8 +23,8 @@ class ResNetFPN(nn.Module):
         super().__init__()
         # Config
         block = BasicBlock
-        block_dims = args.block_dims
-        initial_dim = args.initial_dim
+        block_dims = block_dims
+        initial_dim = initial_dim
         self.init_weight = init_weight
         self.input_dim = input_dim
         # Class Variable
@@ -35,9 +37,9 @@ class ResNetFPN(nn.Module):
         )
         self.bn1 = norm_layer(initial_dim)
         self.relu = nn.ReLU(inplace=True)
-        if args.pretrain == "resnet34":
+        if pretrain == "resnet34":
             n_block = [3, 4, 6]
-        elif args.pretrain == "resnet18":
+        elif pretrain == "resnet18":
             n_block = [2, 2, 2]
         else:
             raise NotImplementedError
@@ -51,9 +53,9 @@ class ResNetFPN(nn.Module):
             block, block_dims[2], stride=2, norm_layer=norm_layer, num=n_block[2]
         )  # 1/8
         self.final_conv = conv1x1(block_dims[2], output_dim)
-        self._init_weights(args)
+        self._init_weights(pretrain)
 
-    def _init_weights(self, args):
+    def _init_weights(self, pretrain):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
@@ -73,7 +75,7 @@ class ResNetFPN(nn.Module):
                 ResNet34_Weights,
             )
 
-            if args.pretrain == "resnet18":
+            if pretrain == "resnet18":
                 pretrained_dict = resnet18(
                     weights=ResNet18_Weights.IMAGENET1K_V1
                 ).state_dict()

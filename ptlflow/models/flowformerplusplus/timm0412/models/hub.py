@@ -99,9 +99,9 @@ def load_model_config_from_hf(model_id: str):
     assert has_hf_hub(True)
     cached_file = _download_from_hf(model_id, "config.json")
     default_cfg = load_cfg_from_json(cached_file)
-    default_cfg[
-        "hf_hub"
-    ] = model_id  # insert hf_hub id for pretrained weight load during model creation
+    default_cfg["hf_hub"] = (
+        model_id  # insert hf_hub id for pretrained weight load during model creation
+    )
     model_name = default_cfg.get("architecture")
     return default_cfg, model_name
 

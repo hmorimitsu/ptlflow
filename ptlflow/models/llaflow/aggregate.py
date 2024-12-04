@@ -71,12 +71,10 @@ def ImgShift(x, size):
 class GlobalSimilar(nn.Module):
     def __init__(
         self,
-        args,
         dim=128,
         heads=1,
     ):
         super().__init__()
-        self.args = args
         self.dim = dim
         self.heads = heads
         self.scale = (dim // heads) ** -0.5
@@ -99,13 +97,11 @@ class GlobalSimilar(nn.Module):
 class LocalSimilar(nn.Module):
     def __init__(
         self,
-        args,
         dim=128,
         heads=1,
         size=5,
     ):
         super().__init__()
-        self.args = args
         self.dim = dim
         self.heads = heads
         self.scale = (dim // heads) ** -0.5
@@ -136,12 +132,10 @@ class LocalSimilar(nn.Module):
 class GSA(nn.Module):
     def __init__(
         self,
-        args,
         dim=128,
         heads=1,
     ):
         super().__init__()
-        self.args = args
         self.dim = dim
         self.heads = heads
         self.scale = (dim // heads) ** -0.5
@@ -163,13 +157,11 @@ class GSA(nn.Module):
 class ShiftLSA(nn.Module):
     def __init__(
         self,
-        args,
         dim=128,
         heads=1,
         size=5,
     ):
         super().__init__()
-        self.args = args
         self.dim = dim
         self.heads = heads
         self.scale = (dim // heads) ** -0.5
@@ -180,11 +172,6 @@ class ShiftLSA(nn.Module):
 
     def forward(self, attn, fmap, fmap2):
         heads, b, c, h, w = self.heads, *fmap.shape
-
-        # pos_enc = PositionEmbeddingSine(num_pos_feats=c//2)
-        # position = pos_enc(fmap)
-        # fmap = fmap + position
-        # fmap2 = fmap2 + position
 
         f1 = self.to_f1(fmap)
         f1s = PatchExtra(f1, self.size)  # b c l h w
@@ -201,9 +188,8 @@ class ShiftLSA(nn.Module):
 
 
 class LSA(nn.Module):
-    def __init__(self, args, dim=128, heads=1, size=5):
+    def __init__(self, dim=128, heads=1, size=5):
         super().__init__()
-        self.args = args
         self.dim = dim
         self.heads = heads
         self.scale = (dim // heads) ** -0.5

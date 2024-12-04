@@ -1,9 +1,10 @@
-from argparse import ArgumentParser, Namespace
+from typing import Optional
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from .cnn import BasicEncoder
 from .encoder import MemoryEncoder
 from .encoders import twins_svt_large
@@ -13,10 +14,10 @@ from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -47,88 +48,130 @@ class FlowFormer(BaseModel):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flowformer-kitti-d4225180.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=8)
+    def __init__(
+        self,
+        add_flow_token: bool = True,
+        cnet: str = "twins",
+        context_concat: bool = False,
+        cost_encoder_res: bool = True,
+        cost_heads_num: int = 1,
+        cost_latent_dim: int = 128,
+        cost_latent_input_dim: int = 64,
+        cost_latent_token_num: int = 8,
+        decoder_depth: int = 32,
+        dropout: float = 0.0,
+        encoder_depth: int = 3,
+        encoder_latent_dim: int = 256,
+        feat_cross_attn: bool = False,
+        fnet: str = "twins",
+        gamma: float = 0.8,
+        max_flow: float = 400.0,
+        gma: bool = True,
+        only_global: bool = False,
+        patch_size: int = 8,
+        pe: str = "linear",
+        pretrain: bool = False,
+        query_latent_dim: int = 64,
+        use_mlp: bool = False,
+        mlp_expansion_factor: int = 4,
+        vert_c_dim: int = 64,
+        vertical_conv: bool = False,
+        cost_scale_aug: Optional[tuple[float, float]] = None,
+        use_tile_input: bool = True,
+        tile_height: int = 432,
+        tile_sigma: float = 0.05,
+        train_size: Optional[tuple[int, int]] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
 
-        if self.args.gma is None:
-            self.args.gma = True  # Use GMA by default, unless
+        self.add_flow_token = add_flow_token
+        self.cnet = cnet
+        self.context_concat = context_concat
+        self.cost_encoder_res = cost_encoder_res
+        self.cost_heads_num = cost_heads_num
+        self.cost_latent_dim = cost_latent_dim
+        self.cost_latent_input_dim = cost_latent_input_dim
+        self.cost_latent_token_num = cost_latent_token_num
+        self.decoder_depth = decoder_depth
+        self.dropout = dropout
+        self.encoder_depth = encoder_depth
+        self.encoder_latent_dim = encoder_latent_dim
+        self.feat_cross_attn = feat_cross_attn
+        self.fnet = fnet
+        self.gma = gma
+        self.only_global = only_global
+        self.patch_size = patch_size
+        self.pe = pe
+        self.pretrain = pretrain
+        self.query_latent_dim = query_latent_dim
+        self.use_mlp = use_mlp
+        self.mlp_expansion_factor = mlp_expansion_factor
+        self.vert_c_dim = vert_c_dim
+        self.vertical_conv = vertical_conv
+        self.cost_scale_aug = cost_scale_aug
+        self.use_tile_input = use_tile_input
+        self.tile_height = tile_height
+        self.tile_sigma = tile_sigma
+        self.train_size = train_size
 
-        self.memory_encoder = MemoryEncoder(args)
-        self.memory_decoder = MemoryDecoder(args)
-        if args.cnet == "twins":
-            self.context_encoder = twins_svt_large(pretrained=self.args.pretrain)
-        elif args.cnet == "basicencoder":
+        if self.gma is None:
+            self.gma = True  # Use GMA by default, unless
+
+        self.memory_encoder = MemoryEncoder(
+            fnet,
+            encoder_latent_dim=encoder_latent_dim,
+            pretrain=pretrain,
+            feat_cross_attn=feat_cross_attn,
+            cost_heads_num=cost_heads_num,
+            patch_size=patch_size,
+            cost_latent_input_dim=cost_latent_input_dim,
+            pe=pe,
+            encoder_depth=encoder_depth,
+            cost_latent_dim=cost_latent_dim,
+            dropout=dropout,
+            use_mlp=use_mlp,
+            cost_scale_aug=cost_scale_aug,
+            mlp_expansion_factor=mlp_expansion_factor,
+            vert_c_dim=vert_c_dim,
+            vertical_conv=vertical_conv,
+            cost_latent_token_num=cost_latent_token_num,
+            cost_encoder_res=cost_encoder_res,
+        )
+        self.memory_decoder = MemoryDecoder(
+            query_latent_dim=query_latent_dim,
+            cost_heads_num=cost_heads_num,
+            decoder_depth=decoder_depth,
+            gma=gma,
+            only_global=only_global,
+            patch_size=patch_size,
+            cost_latent_dim=cost_latent_dim,
+            add_flow_token=add_flow_token,
+            dropout=dropout,
+        )
+        if cnet == "twins":
+            self.context_encoder = twins_svt_large(pretrained=self.pretrain)
+        elif cnet == "basicencoder":
             self.context_encoder = BasicEncoder(output_dim=256, norm_fn="instance")
 
         self.showed_warning = False
 
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument(
-            "--no_add_flow_token", action="store_false", dest="add_flow_token"
-        )
-        parser.add_argument(
-            "--cnet", type=str, choices=("basicencoder", "twins"), default="twins"
-        )
-        parser.add_argument("--context_concat", action="store_true")
-        parser.add_argument(
-            "--no_cost_encoder_res", action="store_false", dest="cost_encoder_res"
-        )
-        parser.add_argument("--cost_heads_num", type=int, default=1)
-        parser.add_argument("--cost_latent_dim", type=int, default=128)
-        parser.add_argument("--cost_latent_input_dim", type=int, default=64)
-        parser.add_argument("--cost_latent_token_num", type=int, default=8)
-        parser.add_argument("--decoder_depth", type=int, default=32)
-        parser.add_argument("--dropout", type=float, default=0.0)
-        parser.add_argument("--encoder_depth", type=int, default=3)
-        parser.add_argument("--encoder_latent_dim", type=int, default=256)
-        parser.add_argument("--feat_cross_attn", action="store_true")
-        parser.add_argument(
-            "--fnet", type=str, choices=("basicencoder", "twins"), default="twins"
-        )
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=400.0)
-        parser.add_argument("--no_gma", action="store_false", dest="gma")
-        parser.add_argument("--only_global", action="store_true")
-        parser.add_argument("--patch_size", type=int, default=8)
-        parser.add_argument(
-            "--pe", type=str, choices=("exp", "linear"), default="linear"
-        )
-        parser.add_argument("--pretrain", action="store_true")
-        parser.add_argument("--query_latent_dim", type=int, default=64)
-        parser.add_argument("--use_mlp", action="store_true")
-        parser.add_argument("--vert_c_dim", type=int, default=64)
-        parser.add_argument("--vertical_conv", action="store_true")
-        parser.add_argument(
-            "--not_use_tile_input", action="store_false", dest="use_tile_input"
-        )
-        parser.add_argument("--tile_height", type=int, default=432)
-        parser.add_argument("--tile_sigma", type=float, default=0.05)
-        parser.add_argument(
-            "--train_size",
-            type=int,
-            nargs=2,
-            default=None,
-            help="train_size will be normally loaded from the checkpoint. However, if you provide this value, it will override the value from the checkpoint.",
-        )
-        return parser
-
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
-        if self.args.train_size is not None:
-            train_size = self.args.train_size
+        if self.train_size is not None:
+            train_size = self.train_size
         else:
             train_size = self.train_size
 
-        if self.args.use_tile_input and train_size is None and not self.showed_warning:
+        if self.use_tile_input and train_size is None and not self.showed_warning:
             print(
                 "WARNING: --train_size is not provided and it cannot be loaded from the checkpoint either. Flowformer will run without input tile."
             )
             self.showed_warning = True
 
-        if self.args.use_tile_input and train_size is not None:
+        if self.use_tile_input and train_size is not None:
             return self.forward_tile(inputs, train_size)
         else:
             return self.forward_pad(inputs)
@@ -175,11 +218,11 @@ class FlowFormer(BaseModel):
 
     def forward_tile(self, inputs, train_size):
         input_size = inputs["images"].shape[-2:]
-        image_size = (max(self.args.tile_height, input_size[-2]), input_size[-1])
+        image_size = (max(self.tile_height, input_size[-2]), input_size[-1])
         hws = compute_grid_indices(image_size, train_size)
         device = inputs["images"].device
         weights = compute_weight(
-            hws, image_size, train_size, self.args.tile_sigma, device=device
+            hws, image_size, train_size, self.tile_sigma, device=device
         )
 
         images, image_resizer = self.preprocess_images(
@@ -230,7 +273,7 @@ class FlowFormer(BaseModel):
 
         data = {}
 
-        if self.args.context_concat:
+        if self.context_concat:
             context = self.context_encoder(torch.cat([image1, image2], dim=1))
         else:
             context = self.context_encoder(image1)
@@ -242,3 +285,9 @@ class FlowFormer(BaseModel):
         )
 
         return flow_predictions, flow_small
+
+
+@register_model
+@trainable
+class flowformer(FlowFormer):
+    pass

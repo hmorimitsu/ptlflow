@@ -91,8 +91,7 @@ class Timer(object):
             torch.cuda.synchronize()
         self.end = time.perf_counter()
         assert self.has_tic, "toc called without tic"
-        if self.num_tocs > 0:
-            self.total_time += self.end - self.start
+        self.total_time += self.end - self.start
         self.has_tic = False
         self.num_tocs += 1
 

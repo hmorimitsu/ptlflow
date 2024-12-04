@@ -107,7 +107,7 @@ class ResidualBlock(nn.Module):
 
 
 class BasicMotionEncoder(nn.Module):
-    def __init__(self, args, input_dim=128):
+    def __init__(self, input_dim=128):
         super().__init__()
         self.convc1 = nn.Conv2d(input_dim, 256, 1)
         self.convc2 = nn.Conv2d(256, 192, 3, padding=1)
@@ -127,10 +127,9 @@ class BasicMotionEncoder(nn.Module):
 
 
 class BasicUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=128, input_dim=128):
+    def __init__(self, hidden_dim=128, input_dim=128):
         super(BasicUpdateBlock, self).__init__()
-        self.args = args
-        self.encoder = BasicMotionEncoder(args, input_dim=input_dim)
+        self.encoder = BasicMotionEncoder(input_dim=input_dim)
         self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=128 + hidden_dim)
         self.flow_head = FlowHead(hidden_dim, hidden_dim=256)
 
@@ -153,10 +152,9 @@ class BasicUpdateBlock(nn.Module):
 
 
 class BasicUpdateBlockQuarter(nn.Module):
-    def __init__(self, args, hidden_dim=128, input_dim=128):
+    def __init__(self, hidden_dim=128, input_dim=128):
         super(BasicUpdateBlockQuarter, self).__init__()
-        self.args = args
-        self.encoder = BasicMotionEncoder(args, input_dim=input_dim)
+        self.encoder = BasicMotionEncoder(input_dim=input_dim)
         self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=128 + hidden_dim)
         self.flow_head = FlowHead(input_dim=hidden_dim, hidden_dim=256)
 

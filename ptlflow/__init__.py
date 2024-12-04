@@ -16,180 +16,31 @@
 # limitations under the License.
 # =============================================================================
 
-__version__ = "0.3.2"
+__version__ = "0.4.0"
 
-import logging
-from argparse import Namespace
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from jsonargparse import ArgumentParser, Namespace
+from loguru import logger
 import requests
 import torch
 from torch import hub
 
 from ptlflow.models.base_model.base_model import BaseModel
-from ptlflow.models.ccmr.ccmr import CCMR, CCMRPlus
-from ptlflow.models.craft.craft import CRAFT
-from ptlflow.models.csflow.csflow import CSFlow
-from ptlflow.models.dicl.dicl import DICL
-from ptlflow.models.dip.dip import DIP
-from ptlflow.models.fastflownet.fastflownet import FastFlowNet
-from ptlflow.models.flow1d.flow1d import Flow1D
-from ptlflow.models.flowformer.flowformer import FlowFormer
-from ptlflow.models.flowformerplusplus.flowformerplusplus import FlowFormerPlusPlus
-from ptlflow.models.flownet.flownet2 import FlowNet2
-from ptlflow.models.flownet.flownetc import FlowNetC
-from ptlflow.models.flownet.flownetcs import FlowNetCS
-from ptlflow.models.flownet.flownetcss import FlowNetCSS
-from ptlflow.models.flownet.flownets import FlowNetS
-from ptlflow.models.flownet.flownetsd import FlowNetSD
-from ptlflow.models.gma.gma import GMA
-from ptlflow.models.gmflow.gmflow import GMFlow, GMFlowWithRefinement
-from ptlflow.models.gmflownet.gmflownet import GMFlowNet, GMFlowNetMix
-from ptlflow.models.hd3.hd3 import HD3, HD3Context
-from ptlflow.models.irr.pwcnet import IRRPWCNet
-from ptlflow.models.irr.pwcnet_irr import IRRPWCNetIRR
-from ptlflow.models.irr.irr_pwc import IRRPWC
-from ptlflow.models.lcv.lcv_raft import LCV_RAFT, LCV_RAFTSmall
-from ptlflow.models.liteflownet.liteflownet import LiteFlowNet
-from ptlflow.models.liteflownet.liteflownet3 import (
-    LiteFlowNet3,
-    LiteFlowNet3PseudoReg,
-    LiteFlowNet3S,
-    LiteFlowNet3SPseudoReg,
+
+from ptlflow.utils.registry import (
+    _models_dict,
+    _ptlflow_trained_models,
+    _trainable_models,
 )
-from ptlflow.models.liteflownet.liteflownet2 import LiteFlowNet2, LiteFlowNet2PseudoReg
-from ptlflow.models.llaflow.llaflow import LLAFlow, LLAFlowRAFT
-from ptlflow.models.maskflownet.maskflownet import MaskFlownet, MaskFlownet_S
-from ptlflow.models.matchflow.matchflow import MatchFlow, MatchFlowRAFT
-from ptlflow.models.memflow.memflow import MemFlow, MemFlowT
-from ptlflow.models.ms_raft_plus.ms_raft_plus import MSRAFTPlus
-from ptlflow.models.neuflow.neuflow import NeuFlow
-from ptlflow.models.neuflow2.neuflow2 import NeuFlow2
-from ptlflow.models.pwcnet.pwcnet import PWCNet, PWCDCNet
-from ptlflow.models.raft.raft import RAFT, RAFTSmall
-from ptlflow.models.rapidflow.rapidflow import (
-    RAPIDFlow,
-    RAPIDFlow_it1,
-    RAPIDFlow_it2,
-    RAPIDFlow_it3,
-    RAPIDFlow_it6,
-    RAPIDFlow_it12,
-)
-from ptlflow.models.rpknet.rpknet import RPKNet
-from ptlflow.models.sea_raft.sea_raft import SEARAFT, SEARAFT_S, SEARAFT_M, SEARAFT_L
-from ptlflow.models.scopeflow.irr_pwc_v2 import ScopeFlow
-from ptlflow.models.separableflow.separableflow import SeparableFlow
-from ptlflow.models.skflow.skflow import SKFlow
-from ptlflow.models.splatflow.splatflow import SplatFlow
-from ptlflow.models.starflow.starflow import StarFlow
-from ptlflow.models.unimatch.unimatch import (
-    UniMatch,
-    UniMatchScale2,
-    UniMatchScale2With6Refinements,
-)
-from ptlflow.models.vcn.vcn import VCN, VCNSmall
-from ptlflow.models.videoflow.videoflow_bof import VideoFlowBOF
-from ptlflow.models.videoflow.videoflow_mof import VideoFlowMOF
-from ptlflow.utils.utils import config_logging
-
-try:
-    from ptlflow.models.scv.scv import SCVEighth, SCVQuarter
-except ImportError as e:
-    print(e)
-    SCVEighth = None
-    SCVQuarter = None
-
-config_logging()
-
-
-models_dict = {
-    "ccmr": CCMR,
-    "ccmr+": CCMRPlus,
-    "craft": CRAFT,
-    "csflow": CSFlow,
-    "dicl": DICL,
-    "dip": DIP,
-    "fastflownet": FastFlowNet,
-    "flow1d": Flow1D,
-    "flowformer": FlowFormer,
-    "flowformer++": FlowFormerPlusPlus,
-    "flownet2": FlowNet2,
-    "flownetc": FlowNetC,
-    "flownetcs": FlowNetCS,
-    "flownetcss": FlowNetCSS,
-    "flownets": FlowNetS,
-    "flownetsd": FlowNetSD,
-    "gma": GMA,
-    "gmflow": GMFlow,
-    "gmflow_refine": GMFlowWithRefinement,
-    "gmflow+": UniMatch,
-    "gmflow+_sc2": UniMatchScale2,
-    "gmflow+_sc2_refine6": UniMatchScale2With6Refinements,
-    "gmflownet": GMFlowNet,
-    "gmflownet_mix": GMFlowNetMix,
-    "hd3": HD3,
-    "hd3_ctxt": HD3Context,
-    "irr_pwc": IRRPWC,
-    "irr_pwcnet": IRRPWCNet,
-    "irr_pwcnet_irr": IRRPWCNetIRR,
-    "lcv_raft": LCV_RAFT,
-    "lcv_raft_small": LCV_RAFTSmall,
-    "liteflownet": LiteFlowNet,
-    "liteflownet2": LiteFlowNet2,
-    "liteflownet2_pseudoreg": LiteFlowNet2PseudoReg,
-    "liteflownet3": LiteFlowNet3,
-    "liteflownet3_pseudoreg": LiteFlowNet3PseudoReg,
-    "liteflownet3s": LiteFlowNet3S,
-    "liteflownet3s_pseudoreg": LiteFlowNet3SPseudoReg,
-    "llaflow": LLAFlow,
-    "llaflow_raft": LLAFlowRAFT,
-    "maskflownet": MaskFlownet,
-    "maskflownet_s": MaskFlownet_S,
-    "matchflow": MatchFlow,
-    "matchflow_raft": MatchFlowRAFT,
-    "memflow": MemFlow,
-    "memflow_t": MemFlowT,
-    "ms_raft+": MSRAFTPlus,
-    "neuflow": NeuFlow,
-    "neuflow2": NeuFlow2,
-    "pwcnet": PWCDCNet,
-    "pwcnet_nodc": PWCNet,
-    "raft": RAFT,
-    "raft_small": RAFTSmall,
-    "rapidflow": RAPIDFlow,
-    "rapidflow_it1": RAPIDFlow_it1,
-    "rapidflow_it2": RAPIDFlow_it2,
-    "rapidflow_it3": RAPIDFlow_it3,
-    "rapidflow_it6": RAPIDFlow_it6,
-    "rapidflow_it12": RAPIDFlow_it12,
-    "rpknet": RPKNet,
-    "sea_raft": SEARAFT,
-    "sea_raft_s": SEARAFT_S,
-    "sea_raft_m": SEARAFT_M,
-    "sea_raft_l": SEARAFT_L,
-    "scopeflow": ScopeFlow,
-    "scv4": SCVQuarter,
-    "scv8": SCVEighth,
-    "separableflow": SeparableFlow,
-    "skflow": SKFlow,
-    "splatflow": SplatFlow,
-    "starflow": StarFlow,
-    "unimatch": UniMatch,
-    "unimatch_sc2": UniMatchScale2,
-    "unimatch_sc2_refine6": UniMatchScale2With6Refinements,
-    "vcn": VCN,
-    "vcn_small": VCNSmall,
-    "videoflow_bof": VideoFlowBOF,
-    "videoflow_mof": VideoFlowMOF,
-}
 
 
 def download_scripts(destination_dir: Path = Path("ptlflow_scripts")) -> None:
     """Download the main scripts and configs to start working with PTLFlow."""
     github_url = "https://raw.githubusercontent.com/hmorimitsu/ptlflow/main/"
     script_names = [
-        "datasets.yml",
+        "datasets.yaml",
         "infer.py",
         "model_benchmark.py",
         "test.py",
@@ -206,14 +57,14 @@ def download_scripts(destination_dir: Path = Path("ptlflow_scripts")) -> None:
             with open(destination_dir / sname, "wb") as f:
                 f.write(data.content)
         else:
-            logging.warning("Script %s was not found.", script_url)
+            logger.warning("Script {} was not found.", script_url)
 
-    logging.info("Downloaded scripts to %s.", str(destination_dir))
+    logger.info("Downloaded scripts to {}.", str(destination_dir))
 
 
 def get_model(
     model_name: str,
-    pretrained_ckpt: Optional[str] = None,
+    ckpt_path: Optional[str] = None,
     args: Optional[Namespace] = None,
 ) -> BaseModel:
     """Return an instance of a chosen model.
@@ -229,7 +80,7 @@ def get_model(
     ----------
     model_name : str
         Name of the model to get an instance of.
-    pretrained_ckpt : Optional[str], optional
+    ckpt_path : Optional[str], optional
         Name of the pretrained weight to load or a path to a local checkpoint file.
     args : Optional[Namespace], optional
         Some arguments that ill be provided to the model.
@@ -252,31 +103,24 @@ def get_model(
     """
     model_ref = get_model_reference(model_name)
     if args is None:
-        parser = model_ref.add_model_specific_args()
+        parser = ArgumentParser()
+        parser.add_class_arguments(model_ref, "model")
         args = parser.parse_args([])
-    model = model_ref(args)
+
+    model_parser = ArgumentParser(exit_on_error=False)
+    model_parser.add_argument("--model", type=model_ref)
+    model_cfg = model_parser.parse_object({"model": args.model})
+    model = model_parser.instantiate_classes(model_cfg).model
 
     if (
-        pretrained_ckpt is None
+        ckpt_path is None
         and args is not None
-        and args.pretrained_ckpt is not None
+        and hasattr(args, "ckpt_path")
+        and args.ckpt_path is not None
     ):
-        pretrained_ckpt = args.pretrained_ckpt
+        ckpt_path = args.ckpt_path
 
-    if pretrained_ckpt is not None:
-        ckpt = load_checkpoint(pretrained_ckpt, model_ref, model_name)
-
-        state_dict = ckpt["state_dict"]
-        if "hyper_parameters" in ckpt:
-            if "train_size" in ckpt["hyper_parameters"]:
-                model.train_size = ckpt["hyper_parameters"]["train_size"]
-            if "train_avg_length" in ckpt["hyper_parameters"]:
-                model.train_avg_length = ckpt["hyper_parameters"]["train_avg_length"]
-            if "extra_params" in ckpt["hyper_parameters"]:
-                extra_params = ckpt["hyper_parameters"]["extra_params"]
-                for name, value in extra_params.items():
-                    model.add_extra_param(name, value)
-        model.load_state_dict(state_dict)
+    model = restore_model(model, ckpt_path)
 
     return model
 
@@ -308,11 +152,24 @@ def get_model_reference(model_name: str) -> BaseModel:
     get_model : To get an instance of a model.
     """
     try:
-        return models_dict[model_name]
+        return _models_dict[model_name]
     except KeyError:
         raise ValueError(
-            f'Unknown model name: {model_name}. Choose from [{", ".join(models_dict.keys())}]'
+            f'Unknown model name: {model_name}. Choose from [{", ".join(_models_dict.keys())}]'
         )
+
+
+def get_model_names() -> List[str]:
+    """Return a list of all model names that are registered in this platform.
+
+    Models are added to this list by decorating their classes with @ptlflow.utils.registry.register_model.
+
+    Returns
+    -------
+    List[str]
+        The list of the all registered model names.
+    """
+    return sorted(list(_models_dict.keys()))
 
 
 def get_trainable_model_names() -> List[str]:
@@ -325,24 +182,31 @@ def get_trainable_model_names() -> List[str]:
     List[str]
         The list of the model names that can be trained.
     """
-    return [
-        mname for mname in models_dict.keys() if get_model(mname).loss_fn is not None
-    ]
+    return _trainable_models
 
 
-def load_checkpoint(
-    pretrained_ckpt: str, model_ref: BaseModel, model_name: str
-) -> Dict[str, Any]:
-    """Try to load the checkpoint specified in pretrained_ckpt.
+def get_ptlflow_trained_model_names() -> List[str]:
+    """Return a list of model names that have been trained on PTLFlow.
+
+    This function return the names of the model that have set model.has_trained_on_ptlflow = True.
+
+    Returns
+    -------
+    List[str]
+        The list of the model names that has been trained on PTLFlow.
+    """
+    return _ptlflow_trained_models
+
+
+def load_checkpoint(ckpt_path: str, model_ref: BaseModel) -> Dict[str, Any]:
+    """Try to load the checkpoint specified in ckpt_path.
 
     Parameters
     ----------
-    pretrained_ckpt : str
+    ckpt_path : str
         Path to a local file or name of a pretrained checkpoint.
     model_ref : BaseModel
         A reference to the model class. See the function get_model_reference() for more details.
-    model_name : str
-        A string representing the name of the model, just for debugging purposes.
 
     Returns
     -------
@@ -353,18 +217,20 @@ def load_checkpoint(
     --------
     get_model_reference : To get a reference to the class of a model.
     """
-    if Path(pretrained_ckpt).exists():
-        ckpt_path = pretrained_ckpt
+    if Path(ckpt_path).exists():
+        ckpt_path = ckpt_path
     elif hasattr(model_ref, "pretrained_checkpoints"):
-        ckpt_path = model_ref.pretrained_checkpoints.get(pretrained_ckpt)
-        if ckpt_path is None:
+        tmp_ckpt_path = model_ref.pretrained_checkpoints.get(ckpt_path)
+        if tmp_ckpt_path is None:
             raise ValueError(
-                f"Invalid checkpoint name {pretrained_ckpt}. "
+                f"Invalid checkpoint name {ckpt_path}. "
                 f'Choose one from {{{",".join(model_ref.pretrained_checkpoints.keys())}}}'
             )
+        else:
+            ckpt_path = tmp_ckpt_path
     else:
         raise ValueError(
-            f"Cannot find checkpoint {pretrained_ckpt} for model {model_name}"
+            f"Cannot find checkpoint {ckpt_path} for model {model_ref.__name__}"
         )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -372,7 +238,7 @@ def load_checkpoint(
     if Path(ckpt_path).exists():
         ckpt = torch.load(ckpt_path, map_location=torch.device(device))
     else:
-        model_dir = Path(hub.get_dir()) / "ptlflow" / "checkpoints"
+        model_dir = Path(hub.get_dir()) / "checkpoints"
         ckpt = hub.load_state_dict_from_url(
             ckpt_path,
             model_dir=model_dir,
@@ -380,3 +246,37 @@ def load_checkpoint(
             check_hash=True,
         )
     return ckpt
+
+
+def restore_model(model, ckpt_path):
+    """Load model state from the checkpoint.
+
+    Parameters
+    ----------
+    model : BaseModel
+        An instance of the model to be restored.
+    ckpt_path : str
+        Path to a local file or name of a pretrained checkpoint.
+
+    Returns
+    -------
+    BaseModel
+        An instance of the restored model.
+    """
+    if ckpt_path is not None:
+        ckpt = load_checkpoint(ckpt_path, model.__class__)
+
+        state_dict = ckpt["state_dict"]
+        if "hyper_parameters" in ckpt:
+            if "train_size" in ckpt["hyper_parameters"]:
+                model.train_size = ckpt["hyper_parameters"]["train_size"]
+            if "train_avg_length" in ckpt["hyper_parameters"]:
+                model.train_avg_length = ckpt["hyper_parameters"]["train_avg_length"]
+            if "extra_params" in ckpt["hyper_parameters"]:
+                extra_params = ckpt["hyper_parameters"]["extra_params"]
+                for name, value in extra_params.items():
+                    model.add_extra_param(name, value)
+        model.load_state_dict(state_dict)
+        logger.info("Restored model state from checkpoint: {}", ckpt_path)
+
+    return model

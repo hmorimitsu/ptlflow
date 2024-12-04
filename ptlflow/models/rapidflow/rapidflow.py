@@ -16,13 +16,14 @@
 # Adapted from RAFT: https://github.com/princeton-vl/RAFT
 # =============================================================================
 
-from argparse import ArgumentParser
 import math
 
+from loguru import logger
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable, ptlflow_trained
 from ptlflow.utils.utils import forward_interpolate_batch
 from .pwc_modules import rescale_flow
 from .update import UpdateBlock
@@ -40,10 +41,10 @@ except:
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -75,15 +76,57 @@ class RAPIDFlow(BaseModel):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/rapidflow-kitti-2561329f.ckpt",
     }
 
-    def __init__(self, args):
-        num_recurrent_layers = int(math.log2(max(args.pyramid_ranges))) - 1
+    def __init__(
+        self,
+        pyramid_ranges: tuple[int, int] = (32, 8),
+        iters: int = 12,
+        corr_mode: str = "allpairs",
+        corr_levels: int = 1,
+        corr_range: int = 4,
+        enc_hidden_chs: int = 64,
+        enc_out_chs: int = 128,
+        enc_stem_stride: int = 4,
+        enc_mlp_ratio: float = 4.0,
+        enc_depth: int = 4,
+        dec_net_chs: int = 64,
+        dec_inp_chs: int = 64,
+        dec_motion_chs: int = 128,
+        dec_depth: int = 2,
+        dec_mlp_ratio: float = 4.0,
+        use_upsample_mask: bool = True,
+        fuse_next1d_weights: bool = False,
+        simple_io: bool = False,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        **kwargs,
+    ) -> None:
+        num_recurrent_layers = int(math.log2(max(pyramid_ranges))) - 1
         super().__init__(
-            args=args,
-            loss_fn=SequenceLoss(args),
             output_stride=int(2 ** (num_recurrent_layers + 1)),
+            loss_fn=SequenceLoss(gamma, max_flow),
+            **kwargs,
         )
 
-        for v in self.args.pyramid_ranges:
+        self.pyramid_ranges = pyramid_ranges
+        self.iters = iters
+        self.corr_mode = corr_mode
+        self.corr_levels = corr_levels
+        self.corr_range = corr_range
+        self.enc_hidden_chs = enc_hidden_chs
+        self.enc_out_chs = enc_out_chs
+        self.enc_stem_stride = enc_stem_stride
+        self.enc_mlp_ratio = enc_mlp_ratio
+        self.enc_depth = enc_depth
+        self.dec_net_chs = dec_net_chs
+        self.dec_inp_chs = dec_inp_chs
+        self.dec_motion_chs = dec_motion_chs
+        self.dec_depth = dec_depth
+        self.dec_mlp_ratio = dec_mlp_ratio
+        self.use_upsample_mask = use_upsample_mask
+        self.fuse_next1d_weights = fuse_next1d_weights
+        self.simple_io = simple_io
+
+        for v in self.pyramid_ranges:
             assert (
                 v > 1
             ), f"--pyramid_ranges values must be larger than 1, but found {v}"
@@ -91,197 +134,77 @@ class RAPIDFlow(BaseModel):
             assert (log_res) - int(
                 log_res
             ) < 1e-3, f"--pyramid_ranges values must be powers of 2, but found {v}"
-        num_recurrent_layers = int(math.log2(max(self.args.pyramid_ranges))) - 1
+        num_recurrent_layers = int(math.log2(max(self.pyramid_ranges))) - 1
 
         self.pyramid_levels = [
-            num_recurrent_layers + 1 - int(math.log2(v))
-            for v in self.args.pyramid_ranges
+            num_recurrent_layers + 1 - int(math.log2(v)) for v in self.pyramid_ranges
         ]
 
-        max_pyr_range = (min(self.args.pyramid_ranges), max(self.args.pyramid_ranges))
+        max_pyr_range = (min(self.pyramid_ranges), max(self.pyramid_ranges))
         self.fnet = NeXt1DEncoder(
             max_pyr_range=max_pyr_range,
-            stem_stride=self.args.enc_stem_stride,
+            stem_stride=self.enc_stem_stride,
             num_recurrent_layers=num_recurrent_layers,
-            hidden_chs=self.args.enc_hidden_chs,
-            out_chs=self.args.enc_out_chs,
-            mlp_ratio=self.args.enc_mlp_ratio,
+            hidden_chs=self.enc_hidden_chs,
+            out_chs=self.enc_out_chs,
+            mlp_ratio=self.enc_mlp_ratio,
             norm_layer=LayerNorm2d,
-            depth=self.args.enc_depth,
-            fuse_next1d_weights=self.args.fuse_next1d_weights,
+            depth=self.enc_depth,
+            fuse_next1d_weights=self.fuse_next1d_weights,
         )
 
         self.cnet = NeXt1DEncoder(
             max_pyr_range=max_pyr_range,
-            stem_stride=self.args.enc_stem_stride,
+            stem_stride=self.enc_stem_stride,
             num_recurrent_layers=num_recurrent_layers,
-            hidden_chs=self.args.enc_hidden_chs,
-            out_chs=self.args.enc_out_chs,
-            mlp_ratio=self.args.enc_mlp_ratio,
+            hidden_chs=self.enc_hidden_chs,
+            out_chs=self.enc_out_chs,
+            mlp_ratio=self.enc_mlp_ratio,
             norm_layer=LayerNorm2d,
-            depth=self.args.enc_depth,
-            fuse_next1d_weights=self.args.fuse_next1d_weights,
+            depth=self.enc_depth,
+            fuse_next1d_weights=self.fuse_next1d_weights,
         )
 
-        self.dim_corr = (self.args.corr_range * 2 + 1) ** 2 * self.args.corr_levels
+        self.dim_corr = (self.corr_range * 2 + 1) ** 2 * self.corr_levels
 
-        self.update_block = UpdateBlock(self.args)
+        self.update_block = UpdateBlock(
+            pyramid_ranges=pyramid_ranges,
+            corr_levels=corr_levels,
+            corr_range=corr_range,
+            dec_net_chs=dec_net_chs,
+            dec_inp_chs=dec_inp_chs,
+            dec_motion_chs=dec_motion_chs,
+            dec_depth=dec_depth,
+            dec_mlp_ratio=dec_mlp_ratio,
+            fuse_next1d_weights=fuse_next1d_weights,
+            use_upsample_mask=use_upsample_mask,
+        )
 
         self.upnet_layer = nn.Sequential(
-            nn.Conv2d(2 * self.args.dec_net_chs, self.args.dec_net_chs, 1),
+            nn.Conv2d(2 * self.dec_net_chs, self.dec_net_chs, 1),
             nn.ReLU(inplace=True),
             NeXt1DStage(
-                self.args.dec_net_chs,
-                self.args.dec_net_chs,
+                self.dec_net_chs,
+                self.dec_net_chs,
                 stride=1,
                 depth=2,
-                mlp_ratio=args.dec_mlp_ratio,
+                mlp_ratio=self.dec_mlp_ratio,
                 norm_layer=LayerNorm2d,
-                fuse_next1d_weights=self.args.fuse_next1d_weights,
+                fuse_next1d_weights=self.fuse_next1d_weights,
             ),
         )
 
-        if self.args.corr_mode == "local" and alt_cuda_corr is None:
-            print(
+        self.has_trained_on_ptlflow = True
+
+        if self.corr_mode == "local" and alt_cuda_corr is None:
+            logger.warning(
                 "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
             )
 
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-
-        parser.add_argument(
-            "--pyramid_ranges",
-            type=int,
-            nargs="+",
-            default=(32, 8),
-            help="(maximum, minimum) feature pyramid strides.",
-        )
-        parser.add_argument(
-            "--iters",
-            type=int,
-            default=12,
-            help="Total number of refinement iterations.",
-        )
-
-        parser.add_argument(
-            "--corr_mode",
-            type=str,
-            choices=("local", "allpairs"),
-            default="local",
-            help="Correlation mode. Use local for low memory consumption or allpairs for maximum speed.",
-        )
-        parser.add_argument(
-            "--corr_levels",
-            type=int,
-            default=1,
-            help="Number or correlation pooling levels.",
-        )
-        parser.add_argument(
-            "--corr_range",
-            type=int,
-            default=4,
-            help="The correlation range will be 2*corr_range+1.",
-        )
-
-        parser.add_argument(
-            "--enc_hidden_chs",
-            type=int,
-            default=64,
-            help="Number of hidden channels in the encoder.",
-        )
-        parser.add_argument(
-            "--enc_out_chs",
-            type=int,
-            default=128,
-            help="Number of channels of the encoder features.",
-        )
-        parser.add_argument(
-            "--enc_stem_stride",
-            type=int,
-            default=4,
-            help="Stride of the stem layer, must be a power of 2.",
-        )
-        parser.add_argument(
-            "--enc_mlp_ratio",
-            type=float,
-            default=4.0,
-            help="Reverse bottleneck ratio in the encoder MLP.",
-        )
-        parser.add_argument(
-            "--enc_depth",
-            type=int,
-            default=4,
-            help="Number of NeXt1D blocks in the encoder.",
-        )
-
-        parser.add_argument(
-            "--dec_net_chs",
-            type=int,
-            default=64,
-            help="Number of net hidden channels in the decoder. Must follow: enc_out_chs=dec_net_chs+dec_inp_chs.",
-        )
-        parser.add_argument(
-            "--dec_inp_chs",
-            type=int,
-            default=64,
-            help="Number of input hidden channels in the decoder. Must follow: enc_out_chs=dec_net_chs+dec_inp_chs.",
-        )
-        parser.add_argument(
-            "--dec_motion_chs",
-            type=int,
-            default=128,
-            help="Number of channels of the motion encoder features.",
-        )
-        parser.add_argument(
-            "--dec_depth",
-            type=int,
-            default=2,
-            help="Number of NeXt1D blocks in the decoder.",
-        )
-        parser.add_argument(
-            "--dec_mlp_ratio",
-            type=float,
-            default=4.0,
-            help="Reverse bottleneck ratio in the decoder MLP.",
-        )
-        parser.add_argument(
-            "--not_use_upsample_mask",
-            action="store_false",
-            dest="use_upsample_mask",
-            help="If set, does not use convex upsampling.",
-        )
-        parser.add_argument(
-            "--fuse_next1d_weights",
-            action="store_true",
-            help="If set, the NeXt1D conv layers will be fused into a single 2D layer. This requires to adapt the pretrained checkpoints before loading.",
-        )
-        parser.add_argument(
-            "--simple_io",
-            action="store_true",
-            help="If set, the inputs and outputs will be simplified from dict to single torch.Tensor. This option should be used when exporting the model to ONNX. This will make the model incompatible with the PTLFlow framework.",
-        )
-
-        parser.add_argument(
-            "--gamma",
-            type=float,
-            default=0.8,
-            help="Used to compute the loss. Decaying factor for intermediate predictions.",
-        )
-        parser.add_argument(
-            "--max_flow",
-            type=float,
-            default=400.0,
-            help="Used to compute the loss. Groundtruth flows with magnitudes larger than this value are ignored.",
-        )
-
-        return parser
-
-    def coords_grid(self, batch, ht, wd, dtype):
+    def coords_grid(self, batch, ht, wd, dtype, device):
         coords = torch.meshgrid(
-            torch.arange(ht, dtype=self.dtype, device=self.device),
-            torch.arange(wd, dtype=self.dtype, device=self.device),
+            torch.arange(ht, dtype=dtype, device=device),
+            torch.arange(wd, dtype=dtype, device=device),
             indexing="ij",
         )
         coords = torch.stack(coords[::-1], dim=0).to(dtype=dtype)
@@ -301,7 +224,7 @@ class RAPIDFlow(BaseModel):
         return up_flow.reshape(N, 2, factor * H, factor * W)
 
     def forward(self, inputs):
-        if self.args.simple_io:
+        if self.simple_io:
             images = inputs
         else:
             images = inputs["images"]
@@ -328,7 +251,7 @@ class RAPIDFlow(BaseModel):
 
         cnet_pyramid = self.cnet(x1_raw)
 
-        pred_stride = min(self.args.pyramid_ranges)
+        pred_stride = min(self.pyramid_ranges)
 
         start_level, output_level = self.pyramid_levels
         pass_pyramid1 = x1_pyramid[start_level : output_level + 1]
@@ -336,7 +259,7 @@ class RAPIDFlow(BaseModel):
         pass_pyramid_cnet = cnet_pyramid[start_level : output_level + 1]
 
         iters_per_level = [
-            int(math.ceil(float(self.args.iters) / (output_level - start_level + 1)))
+            int(math.ceil(float(self.iters) / (output_level - start_level + 1)))
         ] * (output_level - start_level + 1)
 
         # init
@@ -349,7 +272,7 @@ class RAPIDFlow(BaseModel):
         init_device = pass_pyramid1[0].device
 
         if (
-            not self.args.simple_io
+            not self.simple_io
             and "prev_flows" in inputs
             and inputs["prev_flows"] is not None
         ):
@@ -370,18 +293,20 @@ class RAPIDFlow(BaseModel):
         for l, (x1, x2, cnet) in enumerate(
             zip(pass_pyramid1, pass_pyramid2, pass_pyramid_cnet)
         ):
-            coords0 = self.coords_grid(x1.shape[0], x1.shape[2], x1.shape[3], x1.dtype)
+            coords0 = self.coords_grid(
+                x1.shape[0], x1.shape[2], x1.shape[3], x1.dtype, x1.device
+            )
 
             corr_fn = get_corr_block(
                 x1,
                 x2,
-                self.args.corr_levels,
-                self.args.corr_range,
-                alternate_corr=self.args.corr_mode == "local",
+                self.corr_levels,
+                self.corr_range,
+                alternate_corr=self.corr_mode == "local",
             )
 
             net_tmp, inp = torch.split(
-                cnet, [self.args.dec_net_chs, self.args.dec_inp_chs], dim=1
+                cnet, [self.dec_net_chs, self.dec_inp_chs], dim=1
             )
             inp = torch.relu(inp)
 
@@ -427,7 +352,7 @@ class RAPIDFlow(BaseModel):
                 out_flow = rescale_flow(flow, width_im, height_im, to_local=False)
                 if self.training:
                     if mask is not None and l == (output_level - start_level):
-                        if self.args.simple_io:
+                        if self.simple_io:
                             # Just copied the code from self.upsample_flow to here.
                             # For some reason, TensorRT backend does not compile when calling the function
                             N, _, H, W = out_flow.shape
@@ -456,7 +381,7 @@ class RAPIDFlow(BaseModel):
                     iters_per_level[l] - 1
                 ):
                     if mask is not None:
-                        if self.args.simple_io:
+                        if self.simple_io:
                             # Just copied the code from self.upsample_flow to here.
                             # For some reason, TensorRT backend does not compile when calling the function
                             N, _, H, W = out_flow.shape
@@ -486,7 +411,7 @@ class RAPIDFlow(BaseModel):
                 )
                 flows.append(out_flow)
 
-        if self.args.simple_io:
+        if self.simple_io:
             return flows[-1]
         else:
             outputs = {}
@@ -497,40 +422,235 @@ class RAPIDFlow(BaseModel):
 
 
 class RAPIDFlow_it1(RAPIDFlow):
-    def __init__(self, args):
-        args.pyramid_ranges = (32, 32)
-        args.iters = 1
-        args.use_upsample_mask = False
-        super().__init__(args)
+    def __init__(
+        self,
+        pyramid_ranges: tuple[int, int] = (32, 32),
+        iters: int = 1,
+        corr_mode: str = "allpairs",
+        corr_levels: int = 1,
+        corr_range: int = 4,
+        enc_hidden_chs: int = 64,
+        enc_out_chs: int = 128,
+        enc_stem_stride: int = 4,
+        enc_mlp_ratio: float = 4,
+        enc_depth: int = 4,
+        dec_net_chs: int = 64,
+        dec_inp_chs: int = 64,
+        dec_motion_chs: int = 128,
+        dec_depth: int = 2,
+        dec_mlp_ratio: float = 4,
+        use_upsample_mask: bool = False,
+        fuse_next1d_weights: bool = False,
+        simple_io: bool = False,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            pyramid_ranges,
+            iters,
+            corr_mode,
+            corr_levels,
+            corr_range,
+            enc_hidden_chs,
+            enc_out_chs,
+            enc_stem_stride,
+            enc_mlp_ratio,
+            enc_depth,
+            dec_net_chs,
+            dec_inp_chs,
+            dec_motion_chs,
+            dec_depth,
+            dec_mlp_ratio,
+            use_upsample_mask,
+            fuse_next1d_weights,
+            simple_io,
+            gamma,
+            max_flow,
+            **kwargs,
+        )
 
 
 class RAPIDFlow_it2(RAPIDFlow):
-    def __init__(self, args):
-        args.pyramid_ranges = (32, 16)
-        args.iters = 2
-        args.use_upsample_mask = False
-        super().__init__(args)
+    def __init__(
+        self,
+        pyramid_ranges: tuple[int, int] = (32, 16),
+        iters: int = 2,
+        corr_mode: str = "allpairs",
+        corr_levels: int = 1,
+        corr_range: int = 4,
+        enc_hidden_chs: int = 64,
+        enc_out_chs: int = 128,
+        enc_stem_stride: int = 4,
+        enc_mlp_ratio: float = 4,
+        enc_depth: int = 4,
+        dec_net_chs: int = 64,
+        dec_inp_chs: int = 64,
+        dec_motion_chs: int = 128,
+        dec_depth: int = 2,
+        dec_mlp_ratio: float = 4,
+        use_upsample_mask: bool = False,
+        fuse_next1d_weights: bool = False,
+        simple_io: bool = False,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            pyramid_ranges,
+            iters,
+            corr_mode,
+            corr_levels,
+            corr_range,
+            enc_hidden_chs,
+            enc_out_chs,
+            enc_stem_stride,
+            enc_mlp_ratio,
+            enc_depth,
+            dec_net_chs,
+            dec_inp_chs,
+            dec_motion_chs,
+            dec_depth,
+            dec_mlp_ratio,
+            use_upsample_mask,
+            fuse_next1d_weights,
+            simple_io,
+            gamma,
+            max_flow,
+            **kwargs,
+        )
 
 
 class RAPIDFlow_it3(RAPIDFlow):
-    def __init__(self, args):
-        args.pyramid_ranges = (32, 8)
-        args.iters = 3
-        args.use_upsample_mask = True
-        super().__init__(args)
+    def __init__(
+        self,
+        pyramid_ranges: tuple[int, int] = (32, 8),
+        iters: int = 3,
+        corr_mode: str = "allpairs",
+        corr_levels: int = 1,
+        corr_range: int = 4,
+        enc_hidden_chs: int = 64,
+        enc_out_chs: int = 128,
+        enc_stem_stride: int = 4,
+        enc_mlp_ratio: float = 4,
+        enc_depth: int = 4,
+        dec_net_chs: int = 64,
+        dec_inp_chs: int = 64,
+        dec_motion_chs: int = 128,
+        dec_depth: int = 2,
+        dec_mlp_ratio: float = 4,
+        use_upsample_mask: bool = True,
+        fuse_next1d_weights: bool = False,
+        simple_io: bool = False,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            pyramid_ranges,
+            iters,
+            corr_mode,
+            corr_levels,
+            corr_range,
+            enc_hidden_chs,
+            enc_out_chs,
+            enc_stem_stride,
+            enc_mlp_ratio,
+            enc_depth,
+            dec_net_chs,
+            dec_inp_chs,
+            dec_motion_chs,
+            dec_depth,
+            dec_mlp_ratio,
+            use_upsample_mask,
+            fuse_next1d_weights,
+            simple_io,
+            gamma,
+            max_flow,
+            **kwargs,
+        )
 
 
 class RAPIDFlow_it6(RAPIDFlow):
-    def __init__(self, args):
-        args.pyramid_ranges = (32, 8)
-        args.iters = 6
-        args.use_upsample_mask = True
-        super().__init__(args)
+    def __init__(
+        self,
+        pyramid_ranges: tuple[int, int] = (32, 8),
+        iters: int = 6,
+        corr_mode: str = "allpairs",
+        corr_levels: int = 1,
+        corr_range: int = 4,
+        enc_hidden_chs: int = 64,
+        enc_out_chs: int = 128,
+        enc_stem_stride: int = 4,
+        enc_mlp_ratio: float = 4,
+        enc_depth: int = 4,
+        dec_net_chs: int = 64,
+        dec_inp_chs: int = 64,
+        dec_motion_chs: int = 128,
+        dec_depth: int = 2,
+        dec_mlp_ratio: float = 4,
+        use_upsample_mask: bool = True,
+        fuse_next1d_weights: bool = False,
+        simple_io: bool = False,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            pyramid_ranges,
+            iters,
+            corr_mode,
+            corr_levels,
+            corr_range,
+            enc_hidden_chs,
+            enc_out_chs,
+            enc_stem_stride,
+            enc_mlp_ratio,
+            enc_depth,
+            dec_net_chs,
+            dec_inp_chs,
+            dec_motion_chs,
+            dec_depth,
+            dec_mlp_ratio,
+            use_upsample_mask,
+            fuse_next1d_weights,
+            simple_io,
+            gamma,
+            max_flow,
+            **kwargs,
+        )
 
 
-class RAPIDFlow_it12(RAPIDFlow):
-    def __init__(self, args):
-        args.pyramid_ranges = (32, 8)
-        args.iters = 12
-        args.use_upsample_mask = True
-        super().__init__(args)
+@register_model
+@trainable
+@ptlflow_trained
+class rapidflow(RAPIDFlow):
+    pass
+
+
+@register_model
+@trainable
+@ptlflow_trained
+class rapidflow_it1(RAPIDFlow_it1):
+    pass
+
+
+@register_model
+@trainable
+@ptlflow_trained
+class rapidflow_it2(RAPIDFlow_it2):
+    pass
+
+
+@register_model
+@trainable
+@ptlflow_trained
+class rapidflow_it3(RAPIDFlow_it3):
+    pass
+
+
+@register_model
+@trainable
+@ptlflow_trained
+class rapidflow_it6(RAPIDFlow_it6):
+    pass

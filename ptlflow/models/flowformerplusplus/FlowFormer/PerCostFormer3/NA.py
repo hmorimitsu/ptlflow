@@ -63,40 +63,43 @@ class NATTENQKRPBFunction(Function):
 
 
 class selfattentionlayer_nat(nn.Module):
-    def __init__(self, cfg):
+    def __init__(
+        self,
+        dropout,
+        droppath,
+        attn_dim,
+        expand_factor,
+        encoder_latent_dim,
+        vert_c_dim,
+        cost_latent_dim,
+    ):
         super(selfattentionlayer_nat, self).__init__()
-        dropout = cfg.dropout
-        droppath = cfg.droppath
-
-        self.cfg = cfg
         kernel_size = 11
-        qk_dim = cfg.attn_dim
+        qk_dim = attn_dim
         self.num_heads = qk_dim // 16
-        self.expand_factor = cfg.expand_factor
+        self.expand_factor = expand_factor
 
-        self.context_proj = nn.Linear(cfg.encoder_latent_dim, cfg.vert_c_dim, bias=True)
-        self.context_norm = nn.LayerNorm(cfg.encoder_latent_dim)
-        self.norm1 = nn.LayerNorm(cfg.cost_latent_dim + cfg.vert_c_dim)
-        self.norm1_v = nn.LayerNorm(cfg.cost_latent_dim)
-        self.norm2 = nn.LayerNorm(cfg.cost_latent_dim)
+        self.context_proj = nn.Linear(encoder_latent_dim, vert_c_dim, bias=True)
+        self.context_norm = nn.LayerNorm(encoder_latent_dim)
+        self.norm1 = nn.LayerNorm(cost_latent_dim + vert_c_dim)
+        self.norm1_v = nn.LayerNorm(cost_latent_dim)
+        self.norm2 = nn.LayerNorm(cost_latent_dim)
 
         self.q, self.k, self.v = (
-            nn.Linear(cfg.cost_latent_dim + cfg.vert_c_dim, qk_dim, bias=True),
-            nn.Linear(cfg.cost_latent_dim + cfg.vert_c_dim, qk_dim, bias=True),
-            nn.Linear(cfg.cost_latent_dim, qk_dim, bias=True),
+            nn.Linear(cost_latent_dim + vert_c_dim, qk_dim, bias=True),
+            nn.Linear(cost_latent_dim + vert_c_dim, qk_dim, bias=True),
+            nn.Linear(cost_latent_dim, qk_dim, bias=True),
         )
 
-        self.proj = nn.Linear(
-            cfg.attn_dim + cfg.cost_latent_dim, cfg.cost_latent_dim, bias=True
-        )
+        self.proj = nn.Linear(attn_dim + cost_latent_dim, cost_latent_dim, bias=True)
 
         self.drop_path = DropPath(droppath) if droppath > 0.0 else nn.Identity()
 
         self.ffn = nn.Sequential(
-            nn.Linear(cfg.cost_latent_dim, cfg.cost_latent_dim * cfg.expand_factor),
+            nn.Linear(cost_latent_dim, cost_latent_dim * expand_factor),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(cfg.cost_latent_dim * cfg.expand_factor, cfg.cost_latent_dim),
+            nn.Linear(cost_latent_dim * expand_factor, cost_latent_dim),
             nn.Dropout(dropout),
         )
 
@@ -141,11 +144,19 @@ from .twins import Block
 
 
 class NATwins(nn.Module):
-    def __init__(self, cfg):
+    def __init__(
+        self,
+        cost_latent_dim,
+        dropout,
+        droppath,
+        vert_c_dim,
+        encoder_latent_dim,
+        attn_dim,
+        expand_factor,
+    ):
         super(NATwins, self).__init__()
 
-        self.cfg = cfg
-        self.dim = dim = cfg.cost_latent_dim
+        self.dim = dim = cost_latent_dim
         self.num_heads = num_heads = 8
         head_dim = dim // num_heads
         self.scale = head_dim**-0.5
@@ -154,11 +165,19 @@ class NATwins(nn.Module):
         mlp_ratio = 4
         ws = 7
         sr_ratio = 4
-        dpr = cfg.droppath
-        drop_rate = cfg.dropout
+        dpr = droppath
+        drop_rate = dropout
         attn_drop_rate = 0.0
 
-        self.local_block = selfattentionlayer_nat(cfg)
+        self.local_block = selfattentionlayer_nat(
+            dropout=dropout,
+            droppath=droppath,
+            attn_dim=attn_dim,
+            expand_factor=expand_factor,
+            encoder_latent_dim=encoder_latent_dim,
+            vert_c_dim=vert_c_dim,
+            cost_latent_dim=cost_latent_dim,
+        )
         self.global_block = Block(
             dim=embed_dim,
             num_heads=num_heads,
@@ -169,8 +188,8 @@ class NATwins(nn.Module):
             sr_ratio=sr_ratio,
             ws=1,
             with_rpe=True,
-            vert_c_dim=cfg.vert_c_dim,
-            encoder_latent_dim=cfg.encoder_latent_dim,
+            vert_c_dim=vert_c_dim,
+            encoder_latent_dim=encoder_latent_dim,
         )
 
     def forward(self, x, size, context):

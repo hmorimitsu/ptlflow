@@ -23,17 +23,47 @@ without having to download it.
 # limitations under the License.
 # =============================================================================
 
-import logging
+
+import json
 from pathlib import Path
 from typing import Tuple, Union
 
 import cv2 as cv
+from loguru import logger
 import numpy as np
 
 from ptlflow.utils import flow_utils
-from ptlflow.utils.utils import config_logging
 
-config_logging()
+
+def write_autoflow(
+    root_dir: Union[str, Path], img_size: Tuple[int, int] = (448, 576)
+) -> None:
+    """Generate a dummy version of the Autoflow dataset.
+
+    The original dataset is available at:
+
+    https://autoflow-google.github.io/
+
+    Parameters
+    ----------
+    root_dir : Union[str, Path]
+        Path to the directory where the dummy dataset will be created.
+    img_size : Tuple[int, int], default (448, 576)
+        The size of the images inside of this dataset.
+    """
+    img = np.random.randint(0, 256, img_size + (3,), np.uint8)
+    flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
+
+    root_dir = Path(root_dir) / "autoflow"
+    for i in range(1, 5):
+        img_dir = root_dir / f"static_40k_png_{i}_of_4" / "table_0_batch_0"
+        img_dir.mkdir(parents=True, exist_ok=True)
+
+        cv.imwrite(str(img_dir / "im0.png"), img)
+        cv.imwrite(str(img_dir / "im1.png"), img)
+        flow_utils.flow_write(img_dir / "forward.flo", flow)
+
+    logger.info("Created dataset on {}.", str(root_dir))
 
 
 def write_flying_chairs(
@@ -63,7 +93,7 @@ def write_flying_chairs(
     cv.imwrite(str(data_dir / "00001_img2.ppm"), img)
     flow_utils.flow_write(data_dir / "00001_flow.flo", flow)
 
-    logging.info("Created dataset on %s.", str(root_dir))
+    logger.info("Created dataset on {}.", str(root_dir))
 
 
 def write_flying_chairs2(
@@ -102,7 +132,7 @@ def write_flying_chairs2(
         flow_utils.flow_write(img_dir / "0000001-flow_01.flo", flow)
         flow_utils.flow_write(img_dir / "0000001-flow_10.flo", flow)
 
-    logging.info("Created dataset on %s.", str(root_dir))
+    logger.info("Created dataset on {}.", str(root_dir))
 
 
 def write_hd1k(
@@ -139,7 +169,7 @@ def write_hd1k(
     unc_path.parent.mkdir(parents=True, exist_ok=True)
     cv.imwrite(str(unc_path), img)
 
-    logging.info("Created dataset on %s.", str(root_dir))
+    logger.info("Created dataset on {}.", str(root_dir))
 
 
 def write_kitti(
@@ -181,7 +211,75 @@ def write_kitti(
                 flow_path.parent.mkdir(parents=True, exist_ok=True)
                 flow_utils.flow_write(flow_path, flow)
 
-    logging.info("Created dataset on %s.", str(root_dir))
+    logger.info("Created dataset on {}.", str(root_dir))
+
+
+def write_kubric(
+    root_dir: Union[str, Path], img_size: Tuple[int, int] = (540, 960)
+) -> None:
+    """Generate a dummy version of the Kubric dataset.
+
+    The original dataset is available at:
+
+    https://github.com/google-research/kubric
+
+    Parameters
+    ----------
+    root_dir : Union[str, Path]
+        Path to the directory where the dummy dataset will be created.
+    img_size : Tuple[int, int], default (540, 960)
+        The size of the images inside of this dataset.
+    """
+    img = np.random.randint(0, 256, img_size + (3,), np.uint8)
+    flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
+
+    root_dir = Path(root_dir) / "kubric" / "001"
+    root_dir.mkdir(parents=True, exist_ok=True)
+
+    cv.imwrite(str(root_dir / "rgba_00000.png"), img)
+    cv.imwrite(str(root_dir / "rgba_00001.png"), img)
+    flow_utils.flow_write(root_dir / "forward_flow_00000.png", flow)
+    flow_utils.flow_write(root_dir / "forward_flow_00001.png", flow)
+    flow_utils.flow_write(root_dir / "backward_flow_00000.png", flow)
+    flow_utils.flow_write(root_dir / "backward_flow_00001.png", flow)
+
+    with open(root_dir / "data_ranges.json", "w") as f:
+        data_ranges = {
+            "backward_flow": {"max": 100, "min": -100},
+            "forward_flow": {"max": 100, "min": -100},
+        }
+        json.dump(data_ranges, f)
+
+    logger.info("Created dataset on {}.", str(root_dir))
+
+
+def write_middlebury_st(
+    root_dir: Union[str, Path], img_size: Tuple[int, int] = (2000, 2800)
+) -> None:
+    """Generate a dummy version of the Middlebury-ST dataset.
+
+    The original dataset is available at:
+
+    https://vision.middlebury.edu/stereo/data/scenes2014/
+
+    Parameters
+    ----------
+    root_dir : Union[str, Path]
+        Path to the directory where the dummy dataset will be created.
+    img_size : Tuple[int, int], default (436, 1024)
+        The size of the images inside of this dataset.
+    """
+    img = np.random.randint(0, 256, img_size)
+    flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
+
+    root_dir = Path(root_dir) / "middlebury_st" / "sequence"
+    root_dir.mkdir(parents=True, exist_ok=True)
+    cv.imwrite(str(root_dir / "im0.png"), img)
+    cv.imwrite(str(root_dir / "im1.png"), img)
+    flow_utils.flow_write(root_dir / "disp0.pfm", flow[..., 0])
+    flow_utils.flow_write(root_dir / "disp0y.pfm", flow[..., 1])
+
+    logger.info("Created dataset on {}.", str(root_dir))
 
 
 def write_sintel(
@@ -221,7 +319,90 @@ def write_sintel(
             occ_path.parent.mkdir(parents=True, exist_ok=True)
             cv.imwrite(str(occ_path), mask)
 
-    logging.info("Created dataset on %s.", str(root_dir))
+    logger.info("Created dataset on {}.", str(root_dir))
+
+
+def write_spring(
+    root_dir: Union[str, Path],
+    img_size: Tuple[int, int] = (1080, 1920),
+    write_4k_image: bool = False,
+) -> None:
+    """Generate a dummy version of the Spring dataset.
+
+    The original dataset is available at:
+
+    https://spring-benchmark.org/
+
+    Parameters
+    ----------
+    root_dir : Union[str, Path]
+        Path to the directory where the dummy dataset will be created.
+    img_size : Tuple[int, int], default (1080, 1920)
+        The size of the images inside of this dataset.
+    """
+    img = np.random.randint(0, 256, img_size)
+    flow = np.ones((2 * img_size[0], 2 * img_size[1], 2), np.float32)
+    if write_4k_image:
+        img_4k = np.random.randint(0, 256, (2 * img_size[0], 2 * img_size[1]))
+
+    root_dir = Path(root_dir) / "spring"
+    for split in ["train", "test"]:
+        for side in ["left", "right"]:
+            img_dir_path = root_dir / split / "0001" / f"frame_{side}"
+            img_dir_path.mkdir(parents=True, exist_ok=True)
+            cv.imwrite(str(img_dir_path / f"frame_{side}_0001.png"), img)
+            cv.imwrite(str(img_dir_path / f"frame_{side}_0002.png"), img)
+
+            if write_4k_image:
+                img_dir_path = root_dir / f"{split}_4k" / "0001" / f"frame_{side}"
+                img_dir_path.mkdir(parents=True, exist_ok=True)
+                cv.imwrite(str(img_dir_path / f"frame_{side}_0001.png"), img_4k)
+                cv.imwrite(str(img_dir_path / f"frame_{side}_0002.png"), img_4k)
+
+            if split == "train":
+                for direc in ["BW", "FW"]:
+                    flow_dir_path = root_dir / split / "0001" / f"flow_{direc}_{side}"
+                    flow_dir_path.mkdir(parents=True, exist_ok=True)
+                    flow_utils.flow_write(
+                        flow_dir_path / f"flow_{direc}_{side}_0001.flo5", flow
+                    )
+
+    logger.info("Created dataset on {}.", str(root_dir))
+
+
+def write_tartanair(
+    root_dir: Union[str, Path], img_size: Tuple[int, int] = (480, 640)
+) -> None:
+    """Generate a dummy version of the TartanAir dataset.
+
+    The original dataset is available at:
+
+    https://theairlab.org/tartanair-dataset/
+
+    Parameters
+    ----------
+    root_dir : Union[str, Path]
+        Path to the directory where the dummy dataset will be created.
+    img_size : Tuple[int, int], default (436, 1024)
+        The size of the images inside of this dataset.
+    """
+    img = np.random.randint(0, 256, img_size)
+    flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
+    mask = np.random.randint(0, 2, img_size, np.uint8) * 255
+
+    root_dir = Path(root_dir) / "tartanair"
+    for difficulty in ["Easy", "Hard"]:
+        img_dir_path = root_dir / "sequence" / difficulty / "view" / "image_left"
+        img_dir_path.mkdir(parents=True, exist_ok=True)
+        cv.imwrite(str(img_dir_path / "000000_left.png"), img)
+        cv.imwrite(str(img_dir_path / "000001_left.png"), img)
+
+        flow_dir_path = root_dir / "sequence" / difficulty / "view" / "flow"
+        flow_dir_path.mkdir(parents=True, exist_ok=True)
+        flow_utils.flow_write(flow_dir_path / "000000_000001_flow.npy", flow)
+        np.save(str(flow_dir_path / "000000_000001_mask.npy"), mask)
+
+    logger.info("Created dataset on {}.", str(root_dir))
 
 
 def write_things(  # noqa: C901
@@ -307,7 +488,7 @@ def write_things(  # noqa: C901
                                     mask,
                                 )
 
-    logging.info("Created dataset on %s.", str(root_dir))
+    logger.info("Created dataset on {}.", str(root_dir))
 
 
 def write_things_subset(
@@ -365,4 +546,37 @@ def write_things_subset(
                             img_path.parent.mkdir(parents=True, exist_ok=True)
                             cv.imwrite(str(img_path), mask)
 
-    logging.info("Created dataset on %s.", str(root_dir))
+    logger.info("Created dataset on {}.", str(root_dir))
+
+
+def write_viper(
+    root_dir: Union[str, Path], img_size: Tuple[int, int] = (1080, 1920)
+) -> None:
+    """Generate a dummy version of the VIPER dataset.
+
+    The original dataset is available at:
+
+    https://playing-for-benchmarks.org/download
+
+    Parameters
+    ----------
+    root_dir : Union[str, Path]
+        Path to the directory where the dummy dataset will be created.
+    img_size : Tuple[int, int], default (1080, 1920)
+        The size of the images inside of this dataset.
+    """
+    img = np.random.randint(0, 256, img_size)
+    flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
+
+    root_dir = Path(root_dir) / "viper"
+    for split in ["val"]:
+        img_dir_path = root_dir / split / "img" / "001"
+        img_dir_path.mkdir(parents=True, exist_ok=True)
+        cv.imwrite(str(img_dir_path / "001_00010.png"), img)
+        cv.imwrite(str(img_dir_path / "001_00011.png"), img)
+
+        flow_path = root_dir / split / "flow" / "001" / "001_00010.npz"
+        flow_path.parent.mkdir(parents=True, exist_ok=True)
+        flow_utils.flow_write(flow_path, flow, "viper_npz")
+
+    logger.info("Created dataset on {}.", str(root_dir))

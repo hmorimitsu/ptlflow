@@ -17,34 +17,45 @@
 from pathlib import Path
 import shutil
 
+from jsonargparse import ArgumentParser
+
 import ptlflow
-import validate
+from ptlflow.data.flow_datamodule import FlowDataModule
 from ptlflow.utils.dummy_datasets import write_kitti, write_sintel
+import validate
 
 TEST_MODEL = "raft_small"
 
 
 def test_validate(tmp_path: Path) -> None:
-    parser = validate._init_parser()
+    model = ptlflow.get_model(TEST_MODEL)
 
-    model_ref = ptlflow.get_model_reference(TEST_MODEL)
-    parser = model_ref.add_model_specific_args(parser)
+    data_parser = ArgumentParser()
+    data_parser.add_class_arguments(FlowDataModule, "data")
+    data_args = data_parser.parse_args([])
+    data_args.data.val_dataset = "sintel-clean+sintel-final+kitti-2015"
+    data_args.data.mpi_sintel_root_dir = str(tmp_path / "MPI-Sintel")
+    data_args.data.kitti_2012_root_dir = str(tmp_path / "KITTI/2012")
+    data_args.data.kitti_2015_root_dir = str(tmp_path / "KITTI/2015")
 
-    args = parser.parse_args([TEST_MODEL])
+    data_parser = ArgumentParser(exit_on_error=False)
+    data_parser.add_argument("--data", type=FlowDataModule)
+    data_cfg = data_parser.parse_object({"data": data_args.data})
+    datamodule = data_parser.instantiate_classes(data_cfg).data
+    datamodule.setup("validate")
 
-    args.output_path = tmp_path
+    parser = ArgumentParser(parents=[validate._init_parser()])
+    args = parser.parse_args([])
+    args.output_path = str(tmp_path)
     args.write_outputs = True
     args.max_samples = 1
-    args.mpi_sintel_root_dir = tmp_path / "MPI-Sintel"
-    args.kitti_2012_root_dir = tmp_path / "KITTI/2012"
-    args.kitti_2015_root_dir = tmp_path / "KITTI/2015"
+    args.model_name = TEST_MODEL
 
     write_kitti(tmp_path)
     write_sintel(tmp_path)
 
     args.flow_format = "flo"
-    model = ptlflow.get_model(TEST_MODEL, None, args)
-    metrics_df = validate.validate(args, model)
+    metrics_df = validate.validate(args, model, datamodule)
     assert min(metrics_df.shape) > 0
 
     dataset_name_path = [
@@ -57,8 +68,7 @@ def test_validate(tmp_path: Path) -> None:
         assert (tmp_path / dname / "flows_viz" / (dpath + ".png")).exists()
 
     args.flow_format = "png"
-    model = ptlflow.get_model(TEST_MODEL, None, args)
-    validate.validate(args, model)
+    validate.validate(args, model, datamodule)
     for dname, dpath in dataset_name_path:
         assert (tmp_path / dname / "flows" / (dpath + ".png")).exists()
 

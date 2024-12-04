@@ -1,3 +1,5 @@
+.. _new-model:
+
 ==================
 Adding a new model
 ==================
@@ -6,8 +8,7 @@ Suppose you create a new model called ``MyModel``. The code below is an example 
 
 .. code-block:: python
 
-    import argparse
-    from typing import Dict
+    from typing import Dict, Optional, Sequence
 
     import torch
     from ptlflow.models.base_model.base_model import BaseModel
@@ -25,27 +26,19 @@ Suppose you create a new model called ``MyModel``. The code below is an example 
         }
 
         def __init__(
-            args: argparse.Namespace,  # 4 Receive args, which has at least the content of add_model_specific_args() defined below.
-            *other params
+            my_arg1: int = 0,  # an example of an int argument
+            my_arg2: Sequence[float] = (0.0, 1.0, 2.0),  # an example of a list of floats
+            my_arg3: Optional[int] = None,  # an example of an optional int argument
+            **kwargs,  # Add this to receive the other arguments from BaseModel
         ) -> None:
             # 5. Call the parent constructor.
             super(MyModel, self).__init__(
-                args=args,
                 loss_fn=my_model_loss,  # Can be None, if there is no loss function
-                output_stride=64  # Or another value, depends on the stride of your model
+                output_stride=64,  # Or another value, depends on the stride of your model
+                **kwargs,
             )
 
             # Define your model Here
-
-        # This is based on PyTorch Lightning best practices, read more here:
-        # https://pytorch-lightning.readthedocs.io/en/latest/common/hyperparameters.html?highlight=add_model_specific_args
-        # 6. Load the args of BaseModel and add your own.
-        @staticmethod
-        def add_model_specific_args(parent_parser=None):
-            parent_parser = BaseModel.add_model_specific_args(parent_parser)
-            parser = ArgumentParser(parents=[parent_parser], add_help=False)
-            parser.add_argument('--my_model_arg_here')
-            return parser
 
         # 7. Define the forward function
         def forward(
@@ -56,10 +49,26 @@ Suppose you create a new model called ``MyModel``. The code below is an example 
             # inputs['images'] will be a 5D tensor with shape BNCHW, where
             # B=batch size, N=number of inputs, C=channels (usually 3 for images).
             # The normal usage for optical flow is
+
+            # Preprocess the input images. Check BaseModel.preprocess_images() for more information.
+            images, image_resizer = self.preprocess_images(
+                inputs["images"],
+                bgr_add=-0.5,
+                bgr_mult=2.0,
+                bgr_to_rgb=True,
+                resize_mode="pad",
+                pad_mode="replicate",
+                pad_two_side=True,
+            )
+
+            # Get the pair of images.
             image1 = inputs['images'][:, 0]
             image2 = inputs['images'][:, 1]
 
             # Define your forward here
+
+            # Postprocess the predictions. It mostly removes the additional padding and rescales the flow prediction accordingly.
+            my_5D_flow_predictions = self.postprocess_predictions(my_5D_flow_predictions, image_resizer, is_flow=True)
 
             # Pack the model estimations into a dict and return.
             # It must have at least an entry 'flows', which is a 5D tensor BNCHW, typically N=1.
@@ -71,7 +80,7 @@ Suppose you create a new model called ``MyModel``. The code below is an example 
         # 8. BaseModel already define optimizers, dataloaders, training steps, etc.
         # However, if you want to use different ones, you should create methods overriding those steps.
         # Check the PyTorch Lightning documentation for more details about which methods are required:
-        # https://pytorch-lightning.readthedocs.io/en/latest/starter/new-project.html
+        # https://lightning.ai/docs/pytorch/stable/starter/introduction.html
 
 To use a model inside PTLFlow, you need to first clone the source code (see :ref:`running-from-source`).
 Then do the following steps:
@@ -82,8 +91,41 @@ Then do the following steps:
 
 2. Put the code file in the folder, for example in ``ptlflow/models/my_model/my_model.py``.
 
-3. Register the model in PTLFlow by updating ``ptlflow/__init__.py`` This should be all.
-   Now your model can be used as any other one inside the platform.
+3. Create the file ``ptlflow/models/my_model/__init__.py`` with the following content:
+
+.. code-block:: python
+
+    # In file: ptlflow/models/my_model/__init__.py
+    from .my_model import *
+
+4. Edit the file ``ptlflow/models/__init__.py`` to import your new model:
+
+.. code-block:: python
+
+    # In file: ptlflow/models/__init__.py
+
+    # There should already be other models being imported here
+    # Include your import here as well
+    from .my_model import *
+
+5. Follow the example below to register your model:
+
+.. code-block:: python
+
+    # In file: ptlflow/models/my_model/my_model.py
+    from ptlflow.utils.registry import register_model, trainable, ptlflow_trained
+
+    class MyModel(BaseModel):
+    # Your model definition, as described above...
+
+    # Create a lower caps name for your model and register it by decorating it with @register_model
+    @register_model
+    @trainable  # Optional. Only add if your model can be trained (i.e. offer a loss function and differentiable operations)
+    @ptlflow_trained  # Optional. Only add if your model was trained using PTLFlow's training script
+    class my_model(MyModel):
+        pass
+
+ This should be all. Now your model can be used as any other one inside the platform.
 
 Detailed explanation
 ====================
@@ -127,45 +169,26 @@ It must be a ``dict``, in which the key is any identifier string and the value i
 to a local file, or a link to an online resource. If you do not have pretrained weights for your
 model, then simply do not define this variable.
 
-.. _new-model-args:
-
-4. args
--------
-
-Based on the PyTorch Lightning specification, many parameters are stored in ``argparse.Namespace``.
-Therefore, a namespace must be provided. This should contain all the parameters your model needs, as well
-as other parameters used by PyTorch Lightning. See :ref:`new-model-add-model-specific-args` for more details.
-
-5. BaseModel constructor
+4. BaseModel constructor
 ------------------------
 
 Your model should provide 3 arguments to BaseModel:
 
-1. The argument namespace as explained in :ref:`new-model-args` and :ref:`new-model-add-model-specific-args`
-
-2. The loss function, as explained in :ref:`new-model-loss-function`. This can be ``None``, in which
+1. The loss function, as explained in :ref:`new-model-loss-function`. This can be ``None``, in which
    case your model **cannot be trained**.
 
-3. The output stride of your model. This represents how many times the smallest feature map can be inside
+2. The output stride of your model. This represents how many times the smallest feature map can be inside
    your model. Typically this is a power of 2. For example, PWCNet has output stride 64, while RAFT has stride 8.
 
-.. _new-model-add-model-specific-args:
+3. The kwargs arg to receive the additional args defined in BaseModel, unless you prefer to explicitly type all the arguments from BaseModel one-by-one.
 
-6. add_model_specific_args
+5. add_model_specific_args
 --------------------------
 
-Adding this static method is a design choice recommended by PyTorch Lightning
-(read more `here <https://pytorch-lightning.readthedocs.io/en/latest/common/hyperparameters.html?highlight=add_model_specific_args>`__).
+This function is **not used** after Lightning 2.0 and it is also **dropped in PTLFlow 0.4**.
+Provide the model arguments directly to the class constructor instead.
 
-Our models follow this recommendation and should always include this method for generating the arguments
-that are required by the model. Please notice in the code above that this function must also add
-the arguments coming from the ``BaseModel`` as well.
-
-Most parts of PTFLow are not designed to pass information to your model via other methods (e.g. by generic args or kwargs).
-Therefore, it is recommended that any hyperparameters required by your model be included as
-arguments in the parser.
-
-7. forward function
+6. forward function
 -------------------
 
 The ``forward`` function must follow the input and output types of ``BaseModel``.
@@ -192,9 +215,9 @@ The outputs must have the following entries:
 
 .. _new-model-methods:
 
-8. Overriding methods
+7. Overriding methods
 ---------------------
 
-We follow the PyTorch Lightning `LightningModule <https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html>`__
+We follow the PyTorch Lightning `LightningModule <https://lightning.ai/docs/pytorch/stable/common/lightning_module.html>`__
 design for our models. Therefore, if you want to modify any of the methods, please check their documentation.
 You can also see the API documentation of :ref:`base-model`.

@@ -1,9 +1,8 @@
-from argparse import ArgumentParser, Namespace
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from ptlflow.utils.utils import forward_interpolate_batch
 from .extractor import BasicEncoder
 from .attention import Attention1D
@@ -15,10 +14,10 @@ from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -52,29 +51,54 @@ class Flow1D(BaseModel):
         "highres": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow1d-highres-7ab476dc.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=8)
+    def __init__(
+        self,
+        downsample_factor: int = 8,
+        feature_channels: int = 256,
+        hidden_dim: int = 128,
+        context_dim: int = 128,
+        corr_radius: int = 32,
+        iters: int = 32,
+        mixed_precision: bool = False,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
+
+        self.downsample_factor = downsample_factor
+        self.feature_channels = feature_channels
+        self.hidden_dim = hidden_dim
+        self.context_dim = context_dim
+        self.corr_radius = corr_radius
+        self.iters = iters
+        self.mixed_precision = mixed_precision
+        self.gamma = gamma
+        self.max_flow = max_flow
+
         # feature network, context network, and update block
         self.fnet = BasicEncoder(
-            output_dim=self.args.feature_channels,
+            output_dim=self.feature_channels,
             norm_fn="instance",
         )
 
         self.cnet = BasicEncoder(
-            output_dim=self.args.hidden_dim + self.args.context_dim,
+            output_dim=self.hidden_dim + self.context_dim,
             norm_fn="batch",
         )
 
         # 1D attention
-        corr_channels = (2 * self.args.corr_radius + 1) * 2
+        corr_channels = (2 * self.corr_radius + 1) * 2
 
         self.attn_x = Attention1D(
-            self.args.feature_channels,
+            self.feature_channels,
             y_attention=False,
             double_cross_attn=True,
         )
         self.attn_y = Attention1D(
-            self.args.feature_channels,
+            self.feature_channels,
             y_attention=True,
             double_cross_attn=True,
         )
@@ -82,25 +106,10 @@ class Flow1D(BaseModel):
         # Update block
         self.update_block = BasicUpdateBlock(
             corr_channels=corr_channels,
-            hidden_dim=self.args.hidden_dim,
-            context_dim=self.args.context_dim,
-            downsample_factor=self.args.downsample_factor,
+            hidden_dim=self.hidden_dim,
+            context_dim=self.context_dim,
+            downsample_factor=self.downsample_factor,
         )
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--downsample_factor", type=int, default=8)
-        parser.add_argument("--feature_channels", type=int, default=256)
-        parser.add_argument("--hidden_dim", type=int, default=128)
-        parser.add_argument("--context_dim", type=int, default=128)
-        parser.add_argument("--corr_radius", type=int, default=32)
-        parser.add_argument("--iters", type=int, default=32)
-        parser.add_argument("--mixed_precision", action="store_true")
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=400)
-        return parser
 
     def freeze_bn(self):
         for m in self.modules():
@@ -110,9 +119,7 @@ class Flow1D(BaseModel):
     def initialize_flow(self, img, downsample=None):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         n, c, h, w = img.shape
-        downsample_factor = (
-            self.args.downsample_factor if downsample is None else downsample
-        )
+        downsample_factor = self.downsample_factor if downsample is None else downsample
         coords0 = coords_grid(
             n, h // downsample_factor, w // downsample_factor, dtype=img.dtype
         ).to(img.device)
@@ -126,18 +133,16 @@ class Flow1D(BaseModel):
     def learned_upflow(self, flow, mask):
         """Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination"""
         n, _, h, w = flow.shape
-        mask = mask.view(
-            n, 1, 9, self.args.downsample_factor, self.args.downsample_factor, h, w
-        )
+        mask = mask.view(n, 1, 9, self.downsample_factor, self.downsample_factor, h, w)
         mask = torch.softmax(mask, dim=2)
 
-        up_flow = F.unfold(self.args.downsample_factor * flow, [3, 3], padding=1)
+        up_flow = F.unfold(self.downsample_factor * flow, [3, 3], padding=1)
         up_flow = up_flow.view(n, 2, 9, 1, 1, h, w)
 
         up_flow = torch.sum(mask * up_flow, dim=2)
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
         return up_flow.reshape(
-            n, 2, self.args.downsample_factor * h, self.args.downsample_factor * w
+            n, 2, self.downsample_factor * h, self.downsample_factor * w
         )
 
     def forward(self, inputs):
@@ -158,11 +163,11 @@ class Flow1D(BaseModel):
         # run the feature network
         feature1, feature2 = self.fnet([image1, image2])
 
-        hdim = self.args.hidden_dim
-        cdim = self.args.context_dim
+        hdim = self.hidden_dim
+        cdim = self.context_dim
 
         # position encoding
-        pos_channels = self.args.feature_channels // 2
+        pos_channels = self.feature_channels // 2
         pos_enc = PositionEmbeddingSine(pos_channels)
 
         position = pos_enc(feature1)  # [B, C, H, W]
@@ -172,7 +177,7 @@ class Flow1D(BaseModel):
         corr_fn_y = Correlation1D(
             feature1,
             feature2_x,
-            radius=self.args.corr_radius,
+            radius=self.corr_radius,
             x_correlation=False,
         )
 
@@ -180,7 +185,7 @@ class Flow1D(BaseModel):
         corr_fn_x = Correlation1D(
             feature1,
             feature2_y,
-            radius=self.args.corr_radius,
+            radius=self.corr_radius,
             x_correlation=True,
         )
 
@@ -201,7 +206,7 @@ class Flow1D(BaseModel):
             coords1 = coords1 + forward_flow
 
         flow_predictions = []
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             coords1 = coords1.detach()  # stop gradient
 
             corr_x = corr_fn_x(coords1)
@@ -215,7 +220,7 @@ class Flow1D(BaseModel):
                 inp,
                 corr,
                 flow,
-                upsample=(self.training or itr == self.args.iters - 1),
+                upsample=(self.training or itr == self.iters - 1),
             )
 
             coords1 = coords1 + delta_flow
@@ -227,7 +232,7 @@ class Flow1D(BaseModel):
                     flow_up, image_resizer, is_flow=True
                 )
                 flow_predictions.append(flow_up)
-            elif itr == self.args.iters - 1:
+            elif itr == self.iters - 1:
                 flow_up = self.learned_upflow(coords1 - coords0, up_mask)
                 flow_up = self.postprocess_predictions(
                     flow_up, image_resizer, is_flow=True
@@ -239,3 +244,9 @@ class Flow1D(BaseModel):
             outputs = {"flows": flow_up[:, None], "flow_small": coords1 - coords0}
 
         return outputs
+
+
+@register_model
+@trainable
+class flow1d(Flow1D):
+    pass

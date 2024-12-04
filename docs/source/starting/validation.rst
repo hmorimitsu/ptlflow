@@ -11,7 +11,7 @@ Once you have the script, you can run a validation as follows:
 
 .. code-block:: bash
 
-    python validate.py raft_small --pretrained_ckpt things
+    python validate.py --model raft_small --ckpt_path things
 
 This will use the ``raft_small`` model loaded with the weights trained on the FlyingThings3D dataset.
 
@@ -21,15 +21,13 @@ By default, the validation will be run on the following datasets:
 
 - Sintel Clean pass trainval split,
 
-- KITTI 2012 trainval split,
-
 - KITTI 2015 trainval split.
 
-If you want to validate on different datasets, you can do so by using the argument ``--val_dataset``. For example,
+If you want to validate on different datasets, you can do so by using the argument ``--data.val_dataset``. For example,
 
 .. code-block:: bash
 
-    python validate.py raft_small --pretrained_ckpt things --val_dataset chairs-val+sintel-clean-val
+    python validate.py --model raft_small --ckpt_path things --data.val_dataset chairs-val+sintel-clean-val
 
 would use the following two datasets for the validation:
 
@@ -49,7 +47,7 @@ If you have a local checkpoint which is not one of the pretrained ones, you can 
 
 .. code-block:: bash
 
-    python validate.py raft_small --pretrained_ckpt /path/to/checkpoint
+    python validate.py --model raft_small --ckpt_path /path/to/checkpoint
 
 Visualizing the predictions during validation
 =============================================
@@ -58,7 +56,7 @@ You can use the argument ``--show`` to have the images and predictions displayed
 
 .. code-block:: bash
 
-    python validate.py raft_small --pretrained_ckpt things --show
+    python validate.py --model raft_small --ckpt_path things --show
 
 Saving results to disk
 ======================
@@ -68,7 +66,7 @@ predictions that the selected model may generate. The structure of the outputs s
 
 .. code-block:: bash
 
-    python validate.py raft_small --pretrained_ckpt things --write_outputs
+    python validate.py --model raft_small --ckpt_path things --write_outputs
 
 Viewing the validation metrics
 ==============================

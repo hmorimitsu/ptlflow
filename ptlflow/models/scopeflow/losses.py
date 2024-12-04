@@ -88,10 +88,10 @@ def f1_score_bal_loss(y_pred, y_true):
 
 
 class MultiScaleEPE_PWC_Bi_Occ_upsample(nn.Module):
-    def __init__(self, args):
+    def __init__(self, train_batch_size, div_flow):
         super(MultiScaleEPE_PWC_Bi_Occ_upsample, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._batch_size = train_batch_size
+        self._div_flow = div_flow
         self._weights = [0.32, 0.08, 0.02, 0.01, 0.005, 0.00125, 0.0003125]
 
         self.occ_activ = nn.Sigmoid()
@@ -105,8 +105,8 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample(nn.Module):
             output_occ = output_dict["occ_preds"]
 
             # div_flow trick
-            target_flo_f = self._args.div_flow * target_dict["flows"][:, 0]
-            target_flo_b = self._args.div_flow * target_dict["flows_b"][:, 0]
+            target_flo_f = self._div_flow * target_dict["flows"][:, 0]
+            target_flo_b = self._div_flow * target_dict["flows_b"][:, 0]
             target_occ_f = target_dict["occs"][:, 0]
             target_occ_b = target_dict["occs_b"][:, 0]
 
@@ -174,20 +174,20 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample(nn.Module):
 
 
 class MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel(nn.Module):
-    def __init__(self, args):
+    def __init__(self, train_batch_size, div_flow, seploss=False, loss_perc=False):
         super(MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._batch_size = train_batch_size
+        self._div_flow = div_flow
         self._weights = [0.32, 0.08, 0.02, 0.01, 0.005, 0.00125, 0.0003125]
 
         self.occ_activ = nn.Sigmoid()
         self.occ_loss_bce = nn.BCELoss(reduction="sum")
-        self.seploss = hasattr(args, "seploss") and self._args.seploss or False
+        self.seploss = seploss
         if self.seploss:
             print(
                 "Starting MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel loss with seploss!"
             )
-        self.loss_perc = hasattr(args, "loss_perc") and args.loss_perc
+        self.loss_perc = loss_perc
         if self.loss_perc:
             from torchpercentile import Percentile
 
@@ -270,7 +270,7 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel(nn.Module):
             output_occ = output_dict["occ_preds"]
 
             # Extract and prepare target
-            target_flo_f = self._args.div_flow * target_dict["flows"][:, 0]
+            target_flo_f = self._div_flow * target_dict["flows"][:, 0]
             target_occ_f = target_dict["occs"][:, 0]
 
             # Mask with occ
@@ -310,10 +310,10 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel(nn.Module):
 
 
 class MultiScaleEPE_PWC_Bi_Occ_upsample_KITTI(nn.Module):
-    def __init__(self, args):
+    def __init__(self, train_batch_size, div_flow):
         super(MultiScaleEPE_PWC_Bi_Occ_upsample_KITTI, self).__init__()
-        self._args = args
-        self._batch_size = args.train_batch_size
+        self._batch_size = train_batch_size
+        self._div_flow = div_flow
         self._weights = [0.001, 0.001, 0.001, 0.002, 0.004, 0.004, 0.004]
 
         self.occ_activ = nn.Sigmoid()
@@ -329,7 +329,7 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample_KITTI(nn.Module):
             output_occ = output_dict["occ_preds"]
 
             # div_flow trick
-            target_flo_f = self._args.div_flow * target_dict["flows"][:, 0]
+            target_flo_f = self._div_flow * target_dict["flows"][:, 0]
 
             # bchw
             flow_loss = 0
@@ -395,7 +395,7 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample_KITTI(nn.Module):
 
 
 class NO_OP(nn.Module):
-    def __init__(self, args=None):
+    def __init__(self):
         super(NO_OP, self).__init__()
 
     def forward(self, output_dict, target_dict):

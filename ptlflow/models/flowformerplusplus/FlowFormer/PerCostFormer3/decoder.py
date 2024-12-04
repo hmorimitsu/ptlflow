@@ -28,7 +28,6 @@ def initialize_flow(img):
 
 
 class CrossAttentionLayer(nn.Module):
-    # def __init__(self, dim, cfg, num_heads=8, attn_drop=0., proj_drop=0., drop_path=0., dropout=0.):
     def __init__(
         self,
         qk_dim,
@@ -136,12 +135,21 @@ class CrossAttentionLayer(nn.Module):
 
 
 class MemoryDecoderLayer(nn.Module):
-    def __init__(self, dim, cfg):
+    def __init__(
+        self,
+        query_latent_dim,
+        cost_latent_dim,
+        patch_size,
+        flow_or_pe,
+        dropout,
+        pe,
+        no_sc,
+    ):
         super(MemoryDecoderLayer, self).__init__()
-        self.cfg = cfg
-        self.patch_size = cfg.patch_size  # for converting coords into H2', W2' space
+        self.query_latent_dim = query_latent_dim
+        self.patch_size = patch_size  # for converting coords into H2', W2' space
 
-        query_token_dim, tgt_token_dim = cfg.query_latent_dim, cfg.cost_latent_dim
+        query_token_dim, tgt_token_dim = query_latent_dim, cost_latent_dim
         qk_dim, v_dim = query_token_dim, query_token_dim
 
         self.cross_attend = CrossAttentionLayer(
@@ -149,10 +157,10 @@ class MemoryDecoderLayer(nn.Module):
             v_dim,
             query_token_dim,
             tgt_token_dim,
-            flow_or_pe=cfg.flow_or_pe,
-            dropout=cfg.dropout,
-            pe=cfg.pe,
-            no_sc=cfg.no_sc,
+            flow_or_pe=flow_or_pe,
+            dropout=dropout,
+            pe=pe,
+            no_sc=no_sc,
         )
 
     def forward(self, query, key, value, memory, coords1, size, size_h3w3):
@@ -169,30 +177,66 @@ class MemoryDecoderLayer(nn.Module):
             query, key, value, memory, coords1, self.patch_size, size_h3w3
         )
         B, C, H1, W1 = size
-        C = self.cfg.query_latent_dim
+        C = self.query_latent_dim
         x_global = x_global.view(B, H1, W1, C).permute(0, 3, 1, 2)
         return x_global, k, v
 
 
 class MemoryDecoder(nn.Module):
-    def __init__(self, cfg):
+    def __init__(
+        self,
+        gma,
+        use_patch,
+        detach_local,
+        use_rpe,
+        r_16,
+        quater_refine,
+        fix_pe,
+        gt_r,
+        query_num,
+        no_border,
+        W_offset,
+        H_offset,
+        query_latent_dim,
+        cost_latent_input_dim,
+        cost_heads_num,
+        encoder_latent_dim,
+        decoder_depth,
+        cost_latent_dim,
+        patch_size,
+        flow_or_pe,
+        dropout,
+        pe,
+        no_sc,
+    ):
         super(MemoryDecoder, self).__init__()
-        dim = self.dim = cfg.query_latent_dim
-        self.cfg = cfg
+        self.gma = gma
+        self.use_patch = use_patch
+        self.detach_local = detach_local
+        self.use_rpe = use_rpe
+        self.r_16 = r_16
+        self.quater_refine = quater_refine
+        self.fix_pe = fix_pe
+        self.gt_r = gt_r
+        self.query_num = query_num
+        self.no_border = no_border
+        self.W_offset = W_offset
+        self.H_offset = H_offset
+        dim = self.dim = query_latent_dim
 
-        if cfg.use_patch:
+        if use_patch:
             print("[Using cost patch as local cost]")
             self.flow_token_encoder = nn.Conv2d(
-                cfg.cost_latent_input_dim + 64, cfg.query_latent_dim, 1, 1
+                cost_latent_input_dim + 64, query_latent_dim, 1, 1
             )
         else:
             self.flow_token_encoder = nn.Sequential(
-                nn.Conv2d(81 * cfg.cost_heads_num, dim, 1, 1),
+                nn.Conv2d(81 * cost_heads_num, dim, 1, 1),
                 nn.GELU(),
                 nn.Conv2d(dim, dim, 1, 1),
             )
 
-        if self.cfg.fix_pe:
+        if fix_pe:
             print("[fix_pe: regress 8*8 block]")
             self.pretrain_head = nn.Sequential(
                 nn.Conv2d(dim, dim * 2, 1, 1),
@@ -201,23 +245,14 @@ class MemoryDecoder(nn.Module):
                 nn.GELU(),
                 nn.Conv2d(dim * 2, 64, 1, 1),
             )
-        elif self.cfg.gt_r > 0:
-            print("[Using larger cost as gt, radius is {}]".format(self.cfg.gt_r))
-            # self.pretrain_head = nn.Conv2d(dim, self.cfg.gt_r**2, 1, 1)
+        elif gt_r > 0:
+            print("[Using larger cost as gt, radius is {}]".format(gt_r))
             self.pretrain_head = nn.Sequential(
                 nn.Conv2d(dim, dim * 2, 1, 1),
                 nn.GELU(),
                 nn.Conv2d(dim * 2, dim * 2, 1, 1),
                 nn.GELU(),
-                # nn.Conv2d(dim*2, dim*2, 1, 1),
-                # nn.GELU(),
-                # nn.Conv2d(dim*2, dim*2, 1, 1),
-                # nn.GELU(),
-                # nn.Conv2d(dim*2, dim*2, 1, 1),
-                # nn.GELU(),
-                # nn.Conv2d(dim*2, dim*2, 1, 1),
-                # nn.GELU(),
-                nn.Conv2d(dim * 2, self.cfg.gt_r**2, 1, 1),
+                nn.Conv2d(dim * 2, gt_r**2, 1, 1),
             )
         else:
             self.pretrain_head = nn.Sequential(
@@ -228,32 +263,48 @@ class MemoryDecoder(nn.Module):
                 nn.Conv2d(dim * 2, 81, 1, 1),
             )
 
-        self.proj = nn.Conv2d(cfg.encoder_latent_dim, 256, 1)
-        self.depth = cfg.decoder_depth
-        self.decoder_layer = MemoryDecoderLayer(dim, cfg)
+        self.proj = nn.Conv2d(encoder_latent_dim, 256, 1)
+        self.depth = decoder_depth
+        self.decoder_layer = MemoryDecoderLayer(
+            query_latent_dim=query_latent_dim,
+            cost_latent_dim=cost_latent_dim,
+            patch_size=patch_size,
+            flow_or_pe=flow_or_pe,
+            dropout=dropout,
+            pe=pe,
+            no_sc=no_sc,
+        )
 
-        if self.cfg.gma == "GMA":
+        if gma == "GMA":
             print("[Using GMA]")
-            self.update_block = GMAUpdateBlock(self.cfg, hidden_dim=128)
-            self.att = Attention(
-                args=self.cfg, dim=128, heads=1, max_pos_size=160, dim_head=128
+            self.update_block = GMAUpdateBlock(
+                r_16=r_16,
+                cost_heads_num=cost_heads_num,
+                query_latent_dim=query_latent_dim,
+                hidden_dim=128,
             )
-        elif self.cfg.gma == "GMA-SK":
+            self.att = Attention(dim=128, heads=1, max_pos_size=160, dim_head=128)
+        elif gma == "GMA-SK":
             print("[Using GMA-SK]")
             self.update_block = SKUpdateBlock6_Deep_nopoolres_AllDecoder(
-                args=self.cfg, hidden_dim=128
+                cost_heads_num=cost_heads_num,
+                query_latent_dim=query_latent_dim,
+                hidden_dim=128,
             )
-            self.att = Attention(
-                args=self.cfg, dim=128, heads=1, max_pos_size=160, dim_head=128
-            )
+            self.att = Attention(dim=128, heads=1, max_pos_size=160, dim_head=128)
         else:
             print("[Not using GMA decoder]")
-            self.update_block = BasicUpdateBlock(self.cfg, hidden_dim=128)
+            self.update_block = BasicUpdateBlock(
+                r_16=r_16,
+                cost_heads_num=cost_heads_num,
+                query_latent_dim=query_latent_dim,
+                hidden_dim=128,
+            )
 
-        if self.cfg.r_16 > 0:
-            print("[r_16 = {}]".format(self.cfg.r_16))
+        if r_16 > 0:
+            print("[r_16 = {}]".format(r_16))
 
-        if self.cfg.quater_refine:
+        if quater_refine:
             print("[Using Quater Refinement]")
             from .quater_upsampler import quater_upsampler
 
@@ -337,7 +388,7 @@ class MemoryDecoder(nn.Module):
         net, inp = torch.split(context, [128, 128], dim=1)
         net = torch.tanh(net)
         inp = torch.relu(inp)
-        if self.cfg.gma is not None:
+        if self.gma is not None:
             attention = self.att(inp)
 
         size = net.shape
@@ -348,8 +399,8 @@ class MemoryDecoder(nn.Module):
 
             cost_forward = self.encode_flow_token(cost_maps, coords1)
 
-            if self.cfg.use_patch:
-                if self.cfg.detach_local:
+            if self.use_patch:
+                if self.detach_local:
                     _local_cost = self.encode_flow_token(
                         cost_patches, coords1 / 8.0, r=0
                     )
@@ -360,7 +411,7 @@ class MemoryDecoder(nn.Module):
                         self.encode_flow_token(cost_patches, coords1 / 8.0, r=0)
                     )
             else:
-                if self.cfg.detach_local:
+                if self.detach_local:
                     _local_cost = cost_forward.contiguous().detach()
                     query = self.flow_token_encoder(_local_cost)
                 else:
@@ -371,7 +422,7 @@ class MemoryDecoder(nn.Module):
                 .view(size[0] * size[2] * size[3], 1, self.dim)
             )
 
-            if self.cfg.use_rpe:
+            if self.use_rpe:
                 query_coord = coords1 - coords0
             else:
                 query_coord = coords1
@@ -379,9 +430,9 @@ class MemoryDecoder(nn.Module):
                 query, key, value, cost_memory, query_coord, size, data["H3W3"]
             )
 
-            if self.cfg.r_16 > 0:
+            if self.r_16 > 0:
                 cost_forward_16 = self.encode_flow_token(
-                    data["cost_maps_16"], coords1 * 2.0, r=(self.cfg.r_16 - 1) // 2
+                    data["cost_maps_16"], coords1 * 2.0, r=(self.r_16 - 1) // 2
                 )
 
                 corr = torch.cat([cost_global, cost_forward, cost_forward_16], dim=1)
@@ -390,7 +441,7 @@ class MemoryDecoder(nn.Module):
 
             flow = coords1 - coords0
 
-            if self.cfg.gma is not None:
+            if self.gma is not None:
                 net, up_mask, delta_flow = self.update_block(
                     net, inp, corr, flow, attention
                 )
@@ -403,7 +454,7 @@ class MemoryDecoder(nn.Module):
             flow_up = self.upsample_flow(coords1 - coords0, up_mask)
             flow_predictions.append(flow_up)
 
-        if self.cfg.quater_refine:
+        if self.quater_refine:
             coords1 = coords1.detach()
             new_size = context_quater.shape[-2:]
             flow = 2 * F.interpolate(
@@ -430,8 +481,6 @@ class MemoryDecoder(nn.Module):
 
         _, _, H_outter, W_outter = cost_maps_outter.shape
         Bs, _, H_inner, W_inner = cost_maps.shape
-        # print(H_inner,W_inner,H_outter,W_outter, self.cfg.H_offset, self.cfg.W_offset)
-        # exit()
 
         net, inp = torch.split(context, [128, 128], dim=1)
 
@@ -441,7 +490,7 @@ class MemoryDecoder(nn.Module):
 
         loss = 0
 
-        if self.cfg.fix_pe:
+        if self.fix_pe:
             pad_l = pad_t = 0
             pad_r = (8 - W_inner % 8) % 8
             pad_b = (8 - H_inner % 8) % 8
@@ -482,19 +531,18 @@ class MemoryDecoder(nn.Module):
                     .permute(0, 3, 1, 2)
                 )
                 loss += ((cost_forward_pred - target) ** 2).mean()
-        elif self.cfg.gt_r > 0:
-            for idx in range(self.cfg.query_num):
+        elif self.gt_r > 0:
+            for idx in range(self.query_num):
                 coords_outter = torch.rand(
                     B, 2, H_inner, W_inner, device=cost_memory.device
                 )
-                radius = (self.cfg.gt_r - 1) // 2
-                if self.cfg.no_border:
+                radius = (self.gt_r - 1) // 2
+                if self.no_border:
                     coords_outter = (
                         torch.cat(
                             [
-                                coords_outter[:, 0:1, :, :]
-                                * (W_outter - self.cfg.gt_r),
-                                coords_outter[:, 1:, :, :] * (H_outter - self.cfg.gt_r),
+                                coords_outter[:, 0:1, :, :] * (W_outter - self.gt_r),
+                                coords_outter[:, 1:, :, :] * (H_outter - self.gt_r),
                             ],
                             dim=1,
                         )
@@ -511,8 +559,8 @@ class MemoryDecoder(nn.Module):
 
                 coords_inner = torch.cat(
                     [
-                        coords_outter[:, 0:1, :, :] - self.cfg.W_offset // 8,
-                        coords_outter[:, 1:, :, :] - self.cfg.H_offset // 8,
+                        coords_outter[:, 0:1, :, :] - self.W_offset // 8,
+                        coords_outter[:, 1:, :, :] - self.H_offset // 8,
                     ],
                     dim=1,
                 )
@@ -548,11 +596,11 @@ class MemoryDecoder(nn.Module):
 
                 loss += ((cost_forward_pred - cost_forward_outter) ** 2).mean()
         else:
-            for idx in range(self.cfg.query_num):
+            for idx in range(self.query_num):
                 coords_outter = torch.rand(
                     B, 2, H_inner, W_inner, device=cost_memory.device
                 )
-                if self.cfg.no_border:
+                if self.no_border:
                     coords_outter = (
                         torch.cat(
                             [
@@ -574,8 +622,8 @@ class MemoryDecoder(nn.Module):
 
                 coords_inner = torch.cat(
                     [
-                        coords_outter[:, 0:1, :, :] - self.cfg.W_offset // 8,
-                        coords_outter[:, 1:, :, :] - self.cfg.H_offset // 8,
+                        coords_outter[:, 0:1, :, :] - self.W_offset // 8,
+                        coords_outter[:, 1:, :, :] - self.H_offset // 8,
                     ],
                     dim=1,
                 )

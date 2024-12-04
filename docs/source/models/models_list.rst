@@ -16,7 +16,7 @@ CCMR
 
 - Reference code: `https://github.com/cv-stuttgart/CCMR <https://github.com/cv-stuttgart/CCMR>`_
 
-- Model names: ``ccmr``, ``ccmr+``
+- Model names: ``ccmr``, ``ccmr_p``
 
 CRAFT
 -----
@@ -104,7 +104,7 @@ FlowFormer++
 
 - Reference code: `https://github.com/XiaoyuShi97/FlowFormerPlusPlus <https://github.com/XiaoyuShi97/FlowFormerPlusPlus>`_
 
-- Model names: ``flowformer++``
+- Model names: ``flowformer_pp``
 
 Flownet
 -------
@@ -152,7 +152,7 @@ GMFlow+, UniMatch
 
 - Reference code: `https://github.com/autonomousvision/unimatch <https://github.com/autonomousvision/unimatch>`_
 
-- Model names: ``gmflow+``, ``gmflow+_sc2``, ``gmflow+_sc2_refine6``, ``unimatch``, ``unimatch_sc2``, ``unimatch_sc2_refine6``
+- Model names: ``gmflow_p``, ``gmflow_p_sc2``, ``gmflow_p_sc2_ref6``, ``unimatch``, ``unimatch_sc2``, ``unimatch_sc2_ref6``
 
 GMFlowNet
 ---------
@@ -286,7 +286,7 @@ MS-RAFT+
 
 - Reference code: `https://github.com/cv-stuttgart/MS_RAFT_plus <https://github.com/cv-stuttgart/MS_RAFT_plus>`_
 
-- Model names: ``ms_raft+``
+- Model names: ``ms_raft_p``
 
 NeuFlow v1
 ----------

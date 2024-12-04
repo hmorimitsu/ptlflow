@@ -11,7 +11,6 @@ Welcome to the PTLFlow documentation for the code at `https://github.com/hmorimi
 This is an unified platform built on PyTorch Lightning for
 training and testing deep optical flow models. The modular design of systems in PyTorch Lightning
 is ideal for putting lots of models together while keeping each of them well contained
-(see `System vs Model <https://pytorch-lightning.readthedocs.io/en/stable/starter/new-project.html>`_).
 
 PTLFlow is still in early development, so there are only a few models available at the moment,
 but hopefully the list of models will grow soon.
@@ -35,6 +34,7 @@ If you want to use it for a different purpose, then you should check by yourself
 The results presented by the models in this platform are not guaranteed to match the official results
 (in either accuracy or speed). If you need to reproduce the official results for some model, then you should
 use the its original code.
+You can see how the results of the models in PTLFlow compare to the original papers in :ref:`paper-ptlflow-metrics`.
 
 .. toctree::
    :maxdepth: 1
@@ -45,7 +45,9 @@ use the its original code.
    starting/validation
    starting/training
    starting/testing
+   starting/config_files
    starting/benchmark
+   starting/v04_upgrade_guide
 
 .. toctree::
    :maxdepth: 1
@@ -65,9 +67,10 @@ use the its original code.
    :caption: Results:
 
    results/accuracy_epe
-   results/accuracy_epe_outlier
-   results/result_plots
+   results/accuracy_epe_flall
    results/model_benchmark
+   results/paper_ptlflow
+   results/result_plots
 
 .. toctree::
    :maxdepth: 1

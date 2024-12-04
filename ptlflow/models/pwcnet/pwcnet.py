@@ -2,9 +2,6 @@
 Portions of this code copyright 2017, Clement Pinard
 """
 
-from argparse import ArgumentParser, Namespace
-from pathlib import Path
-
 import numpy as np
 
 try:
@@ -16,6 +13,7 @@ except ModuleNotFoundError:
 import torch
 import torch.nn as nn
 
+from ptlflow.utils.registry import register_model, trainable
 from ..base_model.base_model import BaseModel
 from ..flownet.losses import MultiScale
 
@@ -51,17 +49,29 @@ class PWCNet(BaseModel):
         "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/pwcnet-sintel-533815e5.ckpt",
     }
 
-    def __init__(self, args: Namespace):
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        md: int = 4,
+        loss_start_scale: int = 4,
+        loss_num_scales: int = 5,
+        loss_base_weight: float = 0.32,
+        loss_norm: str = "L2",
+        **kwargs,
+    ):
         super(PWCNet, self).__init__(
-            args=args,
             loss_fn=MultiScale(
-                startScale=args.loss_start_scale,
-                numScales=args.loss_num_scales,
-                l_weight=args.loss_base_weight,
-                norm=args.loss_norm,
+                startScale=loss_start_scale,
+                numScales=loss_num_scales,
+                l_weight=loss_base_weight,
+                norm=loss_norm,
             ),
             output_stride=64,
+            **kwargs,
         )
+
+        self.div_flow = div_flow
+        self.md = md
 
         self.conv1a = conv(3, 16, kernel_size=3, stride=2)
         self.conv1aa = conv(16, 16, kernel_size=3, stride=1)
@@ -85,10 +95,10 @@ class PWCNet(BaseModel):
         self.leakyRELU = nn.LeakyReLU(0.1)
 
         self.corr = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.args.md + 1, padding=0
+            kernel_size=1, patch_size=2 * self.md + 1, padding=0
         )
 
-        nd = (2 * self.args.md + 1) ** 2
+        nd = (2 * self.md + 1) ** 2
         dd = np.cumsum([128, 128, 96, 64, 32])
 
         od = nd
@@ -147,18 +157,6 @@ class PWCNet(BaseModel):
         self.upsample1 = nn.Upsample(
             scale_factor=4, mode="bilinear", align_corners=True
         )
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--div_flow", type=float, default=20.0)
-        parser.add_argument("--md", type=int, default=4)
-        parser.add_argument("--loss_start_scale", type=float, default=4)
-        parser.add_argument("--loss_num_scales", type=int, default=5)
-        parser.add_argument("--loss_base_weight", type=float, default=0.32)
-        parser.add_argument("--loss_norm", type=str, default="L2")
-        return parser
 
     def warp(self, x, flo):
         """
@@ -292,7 +290,7 @@ class PWCNet(BaseModel):
         x = torch.cat((self.conv2_4(x), x), 1)
         flow2 = self.predict_flow2(x)
 
-        flow_up = self.upsample1(flow2 * self.args.div_flow)
+        flow_up = self.upsample1(flow2 * self.div_flow)
         flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
 
         outputs = {}
@@ -310,10 +308,27 @@ class PWCDCNet(PWCNet):
         "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/pwcdcnet-sintel-c7d08a46.ckpt",
     }
 
-    def __init__(self, args: Namespace):
-        super(PWCDCNet, self).__init__(args=args)
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        md: int = 4,
+        loss_start_scale: int = 4,
+        loss_num_scales: int = 5,
+        loss_base_weight: float = 0.32,
+        loss_norm: str = "L2",
+        **kwargs,
+    ):
+        super(PWCDCNet, self).__init__(
+            div_flow=div_flow,
+            md=md,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
 
-        nd = (2 * self.args.md + 1) ** 2
+        nd = (2 * self.md + 1) ** 2
         dd = np.cumsum([128, 128, 96, 64, 32])
         od = nd + 32 + 4
 
@@ -436,7 +451,7 @@ class PWCDCNet(PWCNet):
         x = self.dc_conv4(self.dc_conv3(self.dc_conv2(self.dc_conv1(x))))
         flow2 = flow2 + self.dc_conv7(self.dc_conv6(self.dc_conv5(x)))
 
-        flow_up = self.upsample1(flow2 * self.args.div_flow)
+        flow_up = self.upsample1(flow2 * self.div_flow)
         flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
 
         outputs = {}
@@ -446,3 +461,15 @@ class PWCDCNet(PWCNet):
         else:
             outputs["flows"] = flow_up[:, None]
         return outputs
+
+
+@register_model
+@trainable
+class pwcnet(PWCDCNet):
+    pass
+
+
+@register_model
+@trainable
+class pwcnet_nodc(PWCNet):
+    pass

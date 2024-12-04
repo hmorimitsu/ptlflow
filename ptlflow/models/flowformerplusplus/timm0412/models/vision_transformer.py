@@ -22,6 +22,7 @@ for some einops/einsum fun
 
 Hacked together by / Copyright 2021 Ross Wightman
 """
+
 import math
 import logging
 from functools import partial
@@ -362,9 +363,9 @@ class VisionTransformer(nn.Module):
         """
         super().__init__()
         self.num_classes = num_classes
-        self.num_features = (
-            self.embed_dim
-        ) = embed_dim  # num_features for consistency with other models
+        self.num_features = self.embed_dim = (
+            embed_dim  # num_features for consistency with other models
+        )
         self.num_tokens = 2 if distilled else 1
         norm_layer = norm_layer or partial(nn.LayerNorm, eps=1e-6)
         act_layer = act_layer or nn.GELU

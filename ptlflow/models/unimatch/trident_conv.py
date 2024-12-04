@@ -86,12 +86,16 @@ class MultiScaleTridentConv(nn.Module):
                     inputs[0],
                     self.weight,
                     self.bias,
-                    self.strides[self.test_branch_idx]
-                    if self.test_branch_idx == -1
-                    else self.strides[-1],
-                    self.paddings[self.test_branch_idx]
-                    if self.test_branch_idx == -1
-                    else self.paddings[-1],
+                    (
+                        self.strides[self.test_branch_idx]
+                        if self.test_branch_idx == -1
+                        else self.strides[-1]
+                    ),
+                    (
+                        self.paddings[self.test_branch_idx]
+                        if self.test_branch_idx == -1
+                        else self.paddings[-1]
+                    ),
                     self.dilation,
                     self.groups,
                 )

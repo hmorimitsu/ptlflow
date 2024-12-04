@@ -5,7 +5,7 @@ from .utils import bilinear_sampler
 
 try:
     from .libs.GANet.modules.GANet import NLFIter
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     NLFIter = None
 
 try:

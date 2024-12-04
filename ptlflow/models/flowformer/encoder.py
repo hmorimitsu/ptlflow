@@ -147,7 +147,7 @@ class VerticalSelfAttentionLayer(nn.Module):
     def __init__(
         self,
         dim,
-        cfg,
+        vert_c_dim,
         num_heads=8,
         attn_drop=0.0,
         proj_drop=0.0,
@@ -155,7 +155,6 @@ class VerticalSelfAttentionLayer(nn.Module):
         dropout=0.0,
     ):
         super(VerticalSelfAttentionLayer, self).__init__()
-        self.cfg = cfg
         self.dim = dim
         self.num_heads = num_heads
         head_dim = dim // num_heads
@@ -179,7 +178,7 @@ class VerticalSelfAttentionLayer(nn.Module):
             sr_ratio=sr_ratio,
             ws=ws,
             with_rpe=True,
-            vert_c_dim=cfg.vert_c_dim,
+            vert_c_dim=vert_c_dim,
         )
         self.global_block = Block(
             dim=embed_dim,
@@ -191,7 +190,7 @@ class VerticalSelfAttentionLayer(nn.Module):
             sr_ratio=sr_ratio,
             ws=1,
             with_rpe=True,
-            vert_c_dim=cfg.vert_c_dim,
+            vert_c_dim=vert_c_dim,
         )
 
     def forward(self, x, size, context=None):
@@ -212,9 +211,7 @@ class SelfAttentionLayer(nn.Module):
     def __init__(
         self,
         dim,
-        cfg,
         num_heads=8,
-        attn_drop=0.0,
         proj_drop=0.0,
         drop_path=0.0,
         dropout=0.0,
@@ -344,71 +341,95 @@ class CrossAttentionLayer(nn.Module):
 
 
 class CostPerceiverEncoder(nn.Module):
-    def __init__(self, cfg):
+    def __init__(
+        self,
+        patch_size,
+        cost_latent_input_dim,
+        pe,
+        encoder_depth,
+        cost_latent_dim,
+        dropout,
+        use_mlp,
+        cost_scale_aug,
+        mlp_expansion_factor,
+        vert_c_dim,
+        cost_heads_num,
+        vertical_conv,
+        cost_latent_token_num,
+        cost_encoder_res,
+    ):
         super(CostPerceiverEncoder, self).__init__()
-        self.cfg = cfg
-        self.patch_size = cfg.patch_size
+        self.cost_heads_num = cost_heads_num
+        self.vertical_conv = vertical_conv
+        self.cost_latent_token_num = cost_latent_token_num
+        self.cost_encoder_res = cost_encoder_res
+        self.cost_scale_aug = cost_scale_aug
+        if cost_scale_aug is not None:
+            print("[Using cost_scale_aug: {}]".format(self.cost_scale_aug))
+
+        self.patch_size = patch_size
         self.patch_embed = PatchEmbed(
-            in_chans=self.cfg.cost_heads_num,
+            in_chans=cost_heads_num,
             patch_size=self.patch_size,
-            embed_dim=cfg.cost_latent_input_dim,
-            pe=cfg.pe,
+            embed_dim=cost_latent_input_dim,
+            pe=pe,
         )
 
-        self.depth = cfg.encoder_depth
+        self.depth = encoder_depth
 
         self.latent_tokens = nn.Parameter(
-            torch.randn(1, cfg.cost_latent_token_num, cfg.cost_latent_dim)
+            torch.randn(1, cost_latent_token_num, cost_latent_dim)
         )
 
         query_token_dim, tgt_token_dim = (
-            cfg.cost_latent_dim,
-            cfg.cost_latent_input_dim * 2,
+            cost_latent_dim,
+            cost_latent_input_dim * 2,
         )
         qk_dim, v_dim = query_token_dim, query_token_dim
         self.input_layer = CrossAttentionLayer(
-            qk_dim, v_dim, query_token_dim, tgt_token_dim, dropout=cfg.dropout
+            qk_dim, v_dim, query_token_dim, tgt_token_dim, dropout=dropout
         )
 
-        if cfg.use_mlp:
+        if use_mlp:
             self.encoder_layers = nn.ModuleList(
                 [
-                    MLPMixerLayer(cfg.cost_latent_dim, cfg, dropout=cfg.dropout)
+                    MLPMixerLayer(
+                        dim=cost_latent_dim,
+                        cost_latent_token_num=cost_latent_token_num,
+                        mlp_expansion_factor=mlp_expansion_factor,
+                        dropout=dropout,
+                    )
                     for idx in range(self.depth)
                 ]
             )
         else:
             self.encoder_layers = nn.ModuleList(
                 [
-                    SelfAttentionLayer(cfg.cost_latent_dim, cfg, dropout=cfg.dropout)
+                    SelfAttentionLayer(cost_latent_dim, dropout=dropout)
                     for idx in range(self.depth)
                 ]
             )
 
-        if self.cfg.vertical_conv:
+        if vertical_conv:
             self.vertical_encoder_layers = nn.ModuleList(
-                [ConvNextLayer(cfg.cost_latent_dim) for idx in range(self.depth)]
+                [ConvNextLayer(cost_latent_dim) for idx in range(self.depth)]
             )
         else:
             self.vertical_encoder_layers = nn.ModuleList(
                 [
                     VerticalSelfAttentionLayer(
-                        cfg.cost_latent_dim, cfg, dropout=cfg.dropout
+                        dim=cost_latent_dim, vert_c_dim=vert_c_dim, dropout=dropout
                     )
                     for idx in range(self.depth)
                 ]
             )
-        self.cost_scale_aug = None
-        if hasattr(cfg, "cost_scale_aug"):
-            self.cost_scale_aug = cfg.cost_scale_aug
-            print("[Using cost_scale_aug: {}]".format(self.cost_scale_aug))
 
     def forward(self, cost_volume, data, context=None):
         B, heads, H1, W1, H2, W2 = cost_volume.shape
         cost_maps = (
             cost_volume.permute(0, 2, 3, 1, 4, 5)
             .contiguous()
-            .view(B * H1 * W1, self.cfg.cost_heads_num, H2, W2)
+            .view(B * H1 * W1, self.cost_heads_num, H2, W2)
         )
         data["cost_maps"] = cost_maps
 
@@ -418,7 +439,7 @@ class CostPerceiverEncoder(nn.Module):
             else:
                 tensor_function = torch.HalfTensor
             scale_factor = (
-                tensor_function(B * H1 * W1, self.cfg.cost_heads_num, H2, W2)
+                tensor_function(B * H1 * W1, self.cost_heads_num, H2, W2)
                 .uniform_(self.cost_scale_aug[0], self.cost_scale_aug[1])
                 .cuda()
             )
@@ -434,72 +455,108 @@ class CostPerceiverEncoder(nn.Module):
 
         for idx, layer in enumerate(self.encoder_layers):
             x = layer(x)
-            if self.cfg.vertical_conv:
+            if self.vertical_conv:
                 # B, H1*W1, K, D -> B, K, D, H1*W1 -> B*K, D, H1, W1
                 x = (
-                    x.view(B, H1 * W1, self.cfg.cost_latent_token_num, -1)
+                    x.view(B, H1 * W1, self.cost_latent_token_num, -1)
                     .permute(0, 3, 1, 2)
-                    .reshape(B * self.cfg.cost_latent_token_num, -1, H1, W1)
+                    .reshape(B * self.cost_latent_token_num, -1, H1, W1)
                 )
                 x = self.vertical_encoder_layers[idx](x)
                 # B*K, D, H1, W1 -> B, K, D, H1*W1 -> B, H1*W1, K, D
                 x = (
-                    x.view(B, self.cfg.cost_latent_token_num, -1, H1 * W1)
+                    x.view(B, self.cost_latent_token_num, -1, H1 * W1)
                     .permute(0, 2, 3, 1)
-                    .reshape(B * H1 * W1, self.cfg.cost_latent_token_num, -1)
+                    .reshape(B * H1 * W1, self.cost_latent_token_num, -1)
                 )
             else:
                 x = (
-                    x.view(B, H1 * W1, self.cfg.cost_latent_token_num, -1)
+                    x.view(B, H1 * W1, self.cost_latent_token_num, -1)
                     .permute(0, 2, 1, 3)
-                    .reshape(B * self.cfg.cost_latent_token_num, H1 * W1, -1)
+                    .reshape(B * self.cost_latent_token_num, H1 * W1, -1)
                 )
                 x = self.vertical_encoder_layers[idx](x, (H1, W1), context)
                 x = (
-                    x.view(B, self.cfg.cost_latent_token_num, H1 * W1, -1)
+                    x.view(B, self.cost_latent_token_num, H1 * W1, -1)
                     .permute(0, 2, 1, 3)
-                    .reshape(B * H1 * W1, self.cfg.cost_latent_token_num, -1)
+                    .reshape(B * H1 * W1, self.cost_latent_token_num, -1)
                 )
 
-        if self.cfg.cost_encoder_res is True:
+        if self.cost_encoder_res is True:
             x = x + short_cut
             # print("~~~~")
         return x
 
 
 class MemoryEncoder(nn.Module):
-    def __init__(self, cfg):
+    def __init__(
+        self,
+        fnet,
+        encoder_latent_dim,
+        pretrain,
+        feat_cross_attn,
+        cost_heads_num,
+        patch_size,
+        cost_latent_input_dim,
+        pe,
+        encoder_depth,
+        cost_latent_dim,
+        dropout,
+        use_mlp,
+        cost_scale_aug,
+        mlp_expansion_factor,
+        vert_c_dim,
+        vertical_conv,
+        cost_latent_token_num,
+        cost_encoder_res,
+    ):
         super(MemoryEncoder, self).__init__()
-        self.cfg = cfg
+        self.feat_cross_attn = feat_cross_attn
+        self.cost_heads_num = cost_heads_num
 
-        if cfg.fnet == "twins":
-            self.feat_encoder = twins_svt_large(pretrained=self.cfg.pretrain)
-        elif cfg.fnet == "basicencoder":
+        if fnet == "twins":
+            self.feat_encoder = twins_svt_large(pretrained=pretrain)
+        elif fnet == "basicencoder":
             self.feat_encoder = BasicEncoder(output_dim=256, norm_fn="instance")
         else:
             exit()
         self.channel_convertor = nn.Conv2d(
-            cfg.encoder_latent_dim, cfg.encoder_latent_dim, 1, padding=0, bias=False
+            encoder_latent_dim, encoder_latent_dim, 1, padding=0, bias=False
         )
-        self.cost_perceiver_encoder = CostPerceiverEncoder(cfg)
+        self.cost_perceiver_encoder = CostPerceiverEncoder(
+            patch_size=patch_size,
+            cost_latent_input_dim=cost_latent_input_dim,
+            pe=pe,
+            encoder_depth=encoder_depth,
+            cost_latent_dim=cost_latent_dim,
+            dropout=dropout,
+            use_mlp=use_mlp,
+            cost_scale_aug=cost_scale_aug,
+            mlp_expansion_factor=mlp_expansion_factor,
+            vert_c_dim=vert_c_dim,
+            cost_heads_num=cost_heads_num,
+            vertical_conv=vertical_conv,
+            cost_latent_token_num=cost_latent_token_num,
+            cost_encoder_res=cost_encoder_res,
+        )
 
     def corr(self, fmap1, fmap2):
         batch, dim, ht, wd = fmap1.shape
         fmap1 = rearrange(
-            fmap1, "b (heads d) h w -> b heads (h w) d", heads=self.cfg.cost_heads_num
+            fmap1, "b (heads d) h w -> b heads (h w) d", heads=self.cost_heads_num
         )
         fmap2 = rearrange(
-            fmap2, "b (heads d) h w -> b heads (h w) d", heads=self.cfg.cost_heads_num
+            fmap2, "b (heads d) h w -> b heads (h w) d", heads=self.cost_heads_num
         )
         corr = einsum("bhid, bhjd -> bhij", fmap1, fmap2)
         corr = corr.permute(0, 2, 1, 3).view(
-            batch * ht * wd, self.cfg.cost_heads_num, ht, wd
+            batch * ht * wd, self.cost_heads_num, ht, wd
         )
         # corr = self.norm(self.relu(corr))
-        corr = corr.view(batch, ht * wd, self.cfg.cost_heads_num, ht * wd).permute(
+        corr = corr.view(batch, ht * wd, self.cost_heads_num, ht * wd).permute(
             0, 2, 1, 3
         )
-        corr = corr.view(batch, self.cfg.cost_heads_num, ht, wd, ht, wd)
+        corr = corr.view(batch, self.cost_heads_num, ht, wd, ht, wd)
 
         return corr
 
@@ -521,7 +578,7 @@ class MemoryEncoder(nn.Module):
         B, C, H, W = feat_s.shape
         size = (H, W)
 
-        if self.cfg.feat_cross_attn:
+        if self.feat_cross_attn:
             feat_s = feat_s.flatten(2).transpose(1, 2)
             feat_t = feat_t.flatten(2).transpose(1, 2)
 

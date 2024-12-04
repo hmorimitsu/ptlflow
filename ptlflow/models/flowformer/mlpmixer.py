@@ -24,12 +24,12 @@ def FeedForward(dim, expansion_factor=4, dropout=0.0, dense=nn.Linear):
 
 
 class MLPMixerLayer(nn.Module):
-    def __init__(self, dim, cfg, drop_path=0.0, dropout=0.0):
+    def __init__(self, dim, cost_latent_token_num, mlp_expansion_factor, dropout=0.0):
         super(MLPMixerLayer, self).__init__()
 
         # print(f"use mlp mixer layer")
-        K = cfg.cost_latent_token_num
-        expansion_factor = cfg.mlp_expansion_factor
+        K = cost_latent_token_num
+        expansion_factor = mlp_expansion_factor
         chan_first, chan_last = partial(nn.Conv1d, kernel_size=1), nn.Linear
 
         self.mlpmixer = nn.Sequential(

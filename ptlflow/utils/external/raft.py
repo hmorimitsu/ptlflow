@@ -143,9 +143,12 @@ def read_pfm(file_path: str) -> np.ndarray:
         data = np.flipud(data)
 
     # Mark invalid pixels as NaN
-    mask = np.tile(data[:, :, 2:3], (1, 1, 2))
-    flow = data[:, :, :2].astype(np.float32)
-    flow[mask > 0.5] = float("nan")
+    if color:
+        mask = np.tile(data[:, :, 2:3], (1, 1, 2))
+        flow = data[:, :, :2].astype(np.float32)
+        flow[mask > 0.5] = float("nan")
+    else:
+        flow = data.astype(np.float32)
     return flow
 
 
@@ -180,3 +183,20 @@ def forward_interpolate(flow):
 
     flow = np.stack([flow_x, flow_y], axis=0)
     return torch.from_numpy(flow).float()
+
+
+def bilinear_sampler(img, coords, mode="bilinear", mask=False):
+    """Wrapper for grid_sample, uses pixel coordinates"""
+    H, W = img.shape[-2:]
+    xgrid, ygrid = coords.split([1, 1], dim=-1)
+    xgrid = 2 * xgrid / (W - 1) - 1
+    ygrid = 2 * ygrid / (H - 1) - 1
+
+    grid = torch.cat([xgrid, ygrid], dim=-1)
+    img = F.grid_sample(img, grid, mode=mode, align_corners=True)
+
+    if mask:
+        mask = (xgrid > -1) & (ygrid > -1) & (xgrid < 1) & (ygrid < 1)
+        return img, mask.to(dtype=coords.dtype)
+
+    return img

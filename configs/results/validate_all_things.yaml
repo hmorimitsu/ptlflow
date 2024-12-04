@@ -1,0 +1,44 @@
+# lightning.pytorch==2.4.0
+# Use this config to generate validation results for all models using their "things" pretrained ckpt.
+# python validate.py --config configs/results/validate_all_things.yaml
+all: true
+select: null
+exclude: null
+ckpt_path: things
+output_path: outputs/validate
+write_outputs: false
+show: false
+flow_format: original
+max_forward_side: null
+scale_factor: null
+max_show_side: 1000
+max_samples: null
+reversed: false
+fp16: false
+seq_val_mode: all
+write_individual_metrics: false
+epe_clip: 5.0
+seed_everything: true
+data:
+  predict_dataset: null
+  test_dataset: null
+  train_dataset: null
+  val_dataset: sintel-clean+sintel-final+kitti-2015
+  train_batch_size: null
+  train_num_workers: 4
+  train_crop_size: null
+  train_transform_cuda: false
+  train_transform_fp16: false
+  autoflow_root_dir: null
+  flying_chairs_root_dir: null
+  flying_chairs2_root_dir: null
+  flying_things3d_root_dir: null
+  flying_things3d_subset_root_dir: null
+  mpi_sintel_root_dir: null
+  kitti_2012_root_dir: null
+  kitti_2015_root_dir: null
+  hd1k_root_dir: null
+  tartanair_root_dir: null
+  spring_root_dir: null
+  kubric_root_dir: null
+  dataset_config_path: ./datasets.yaml

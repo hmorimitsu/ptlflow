@@ -306,7 +306,7 @@ def flow_read_flo(f):
     mask_u = np.greater(np.abs(result[..., 0]), 1e9, where=(~np.isnan(result[..., 0])))
     mask_v = np.greater(np.abs(result[..., 1]), 1e9, where=(~np.isnan(result[..., 1])))
 
-    result[mask_u | mask_v] = np.NaN
+    result[mask_u | mask_v] = np.nan
 
     return result
 
@@ -331,7 +331,7 @@ def flow_read_png(f):
 
     flow = (flow.astype(np.float32) - 2**15) / 64.0
 
-    flow[~valid.astype(bool)] = np.NaN
+    flow[~valid.astype(bool)] = np.nan
 
     return flow
 

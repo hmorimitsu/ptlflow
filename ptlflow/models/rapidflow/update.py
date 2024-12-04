@@ -71,7 +71,7 @@ class NeXT1DDecoder(nn.Module):
 
 
 class MotionEncoder(nn.Module):
-    def __init__(self, args):
+    def __init__(self, corr_levels: int, corr_range: int, dec_motion_chs: int):
         super(MotionEncoder, self).__init__()
 
         c_hidden = 256
@@ -79,12 +79,12 @@ class MotionEncoder(nn.Module):
         f_hidden = 128
         f_out = 64
 
-        cor_planes = args.corr_levels * (2 * args.corr_range + 1) ** 2
+        cor_planes = corr_levels * (2 * corr_range + 1) ** 2
         self.convc1 = nn.Conv2d(cor_planes, c_hidden, 1, padding=0)
         self.convc2 = nn.Conv2d(c_hidden, c_out, 3, padding=1)
         self.convf1 = nn.Conv2d(2, f_hidden, 7, padding=3)
         self.convf2 = nn.Conv2d(f_hidden, f_out, 3, padding=1)
-        self.conv = nn.Conv2d(f_out + c_out, args.dec_motion_chs - 2, 3, padding=1)
+        self.conv = nn.Conv2d(f_out + c_out, dec_motion_chs - 2, 3, padding=1)
 
     def forward(self, flow, corr):
         cor = F.relu(self.convc1(corr))
@@ -98,30 +98,44 @@ class MotionEncoder(nn.Module):
 
 
 class UpdateBlock(nn.Module):
-    def __init__(self, args):
+    def __init__(
+        self,
+        pyramid_ranges: tuple[int, int],
+        corr_levels: int,
+        corr_range: int,
+        dec_net_chs: int,
+        dec_inp_chs: int,
+        dec_motion_chs: int,
+        dec_depth: int,
+        dec_mlp_ratio: float,
+        fuse_next1d_weights: bool,
+        use_upsample_mask: bool,
+    ):
         super(UpdateBlock, self).__init__()
-        self.args = args
+        self.use_upsample_mask = use_upsample_mask
 
-        self.encoder = MotionEncoder(args)
+        self.encoder = MotionEncoder(
+            corr_levels=corr_levels,
+            corr_range=corr_range,
+            dec_motion_chs=dec_motion_chs,
+        )
         self.decoder = NeXT1DDecoder(
-            hidden_dim=args.dec_net_chs,
-            input_dim=args.dec_motion_chs + args.dec_inp_chs,
+            hidden_dim=dec_net_chs,
+            input_dim=dec_motion_chs + dec_inp_chs,
             ksize=7,
-            depth=args.dec_depth,
-            mlp_ratio=args.dec_mlp_ratio,
+            depth=dec_depth,
+            mlp_ratio=dec_mlp_ratio,
             norm_layer=LayerNorm2d,
-            fuse_next1d_weights=args.fuse_next1d_weights,
+            fuse_next1d_weights=fuse_next1d_weights,
         )
 
-        self.flow_head = FlowHead(args.dec_net_chs, hidden_dim=256)
+        self.flow_head = FlowHead(dec_net_chs, hidden_dim=256)
 
-        pred_stride = (
-            min(self.args.pyramid_ranges) if self.args.use_upsample_mask else 8
-        )
+        pred_stride = min(pyramid_ranges) if use_upsample_mask else 8
         self.mask = nn.Sequential(
-            nn.Conv2d(args.dec_net_chs, args.dec_net_chs * 2, 3, padding=1),
+            nn.Conv2d(dec_net_chs, dec_net_chs * 2, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(args.dec_net_chs * 2, pred_stride**2 * 9, 1, padding=0),
+            nn.Conv2d(dec_net_chs * 2, pred_stride**2 * 9, 1, padding=0),
         )
 
     def forward(self, net, inp, corr, flow, get_mask=False):
@@ -132,7 +146,7 @@ class UpdateBlock(nn.Module):
         delta_flow = self.flow_head(net)
 
         mask = None
-        if self.args.use_upsample_mask and get_mask:
+        if self.use_upsample_mask and get_mask:
             mask = self.mask(net)
 
         return delta_flow, net, mask

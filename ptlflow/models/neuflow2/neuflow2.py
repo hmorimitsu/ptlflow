@@ -1,10 +1,10 @@
-from argparse import ArgumentParser, Namespace
 from importlib.metadata import version
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from . import backbone_v7
 from . import transformer
 from . import matching
@@ -15,10 +15,10 @@ from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -49,8 +49,36 @@ class NeuFlow2(BaseModel):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/neuflow2-things-6ed47437.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=16)
+    def __init__(
+        self,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        feature_dim_s16: int = 128,
+        context_dim_s16: int = 64,
+        iter_context_dim_s16: int = 64,
+        feature_dim_s8: int = 128,
+        context_dim_s8: int = 64,
+        iter_context_dim_s8: int = 64,
+        feature_dim_s1: int = 128,
+        iters_s16: int = 1,
+        iters_s8: int = 8,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=16, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
+
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.feature_dim_s16 = feature_dim_s16
+        self.context_dim_s16 = context_dim_s16
+        self.iter_context_dim_s16 = iter_context_dim_s16
+        self.feature_dim_s8 = feature_dim_s8
+        self.context_dim_s8 = context_dim_s8
+        self.iter_context_dim_s8 = iter_context_dim_s8
+        self.feature_dim_s1 = feature_dim_s1
+        self.iters_s16 = iters_s16
+        self.iters_s8 = iters_s8
 
         if not version("torch").startswith("2"):
             raise ImportError(
@@ -58,14 +86,14 @@ class NeuFlow2(BaseModel):
             )
 
         self.backbone = backbone_v7.CNNEncoder(
-            self.args.feature_dim_s16,
-            self.args.context_dim_s16,
-            self.args.feature_dim_s8,
-            self.args.context_dim_s8,
+            self.feature_dim_s16,
+            self.context_dim_s16,
+            self.feature_dim_s8,
+            self.context_dim_s8,
         )
 
         self.cross_attn_s16 = transformer.FeatureAttention(
-            self.args.feature_dim_s16 + self.args.context_dim_s16,
+            self.feature_dim_s16 + self.context_dim_s16,
             num_layers=2,
             ffn=True,
             ffn_dim_expansion=1,
@@ -74,15 +102,15 @@ class NeuFlow2(BaseModel):
 
         self.matching_s16 = matching.Matching()
 
-        # self.flow_attn_s16 = transformer.FlowAttention(self.args.feature_dim_s16)
+        # self.flow_attn_s16 = transformer.FlowAttention(self.feature_dim_s16)
 
         self.corr_block_s16 = corr.CorrBlock(radius=4, levels=1)
         self.corr_block_s8 = corr.CorrBlock(radius=4, levels=1)
 
         self.merge_s8 = torch.nn.Sequential(
             torch.nn.Conv2d(
-                self.args.feature_dim_s16 + self.args.feature_dim_s8,
-                self.args.feature_dim_s8,
+                self.feature_dim_s16 + self.feature_dim_s8,
+                self.feature_dim_s8,
                 kernel_size=3,
                 stride=1,
                 padding=1,
@@ -90,20 +118,20 @@ class NeuFlow2(BaseModel):
             ),
             torch.nn.GELU(),
             torch.nn.Conv2d(
-                self.args.feature_dim_s8,
-                self.args.feature_dim_s8,
+                self.feature_dim_s8,
+                self.feature_dim_s8,
                 kernel_size=3,
                 stride=1,
                 padding=1,
                 bias=False,
             ),
-            torch.nn.BatchNorm2d(self.args.feature_dim_s8),
+            torch.nn.BatchNorm2d(self.feature_dim_s8),
         )
 
         self.context_merge_s8 = torch.nn.Sequential(
             torch.nn.Conv2d(
-                self.args.context_dim_s16 + self.args.context_dim_s8,
-                self.args.context_dim_s8,
+                self.context_dim_s16 + self.context_dim_s8,
+                self.context_dim_s8,
                 kernel_size=3,
                 stride=1,
                 padding=1,
@@ -111,27 +139,27 @@ class NeuFlow2(BaseModel):
             ),
             torch.nn.GELU(),
             torch.nn.Conv2d(
-                self.args.context_dim_s8,
-                self.args.context_dim_s8,
+                self.context_dim_s8,
+                self.context_dim_s8,
                 kernel_size=3,
                 stride=1,
                 padding=1,
                 bias=False,
             ),
-            torch.nn.BatchNorm2d(self.args.context_dim_s8),
+            torch.nn.BatchNorm2d(self.context_dim_s8),
         )
 
         self.refine_s16 = refine.Refine(
-            self.args.context_dim_s16,
-            self.args.iter_context_dim_s16,
+            self.context_dim_s16,
+            self.iter_context_dim_s16,
             num_layers=5,
             levels=1,
             radius=4,
             inter_dim=128,
         )
         self.refine_s8 = refine.Refine(
-            self.args.context_dim_s8,
-            self.args.iter_context_dim_s8,
+            self.context_dim_s8,
+            self.iter_context_dim_s8,
             num_layers=5,
             levels=1,
             radius=4,
@@ -139,34 +167,15 @@ class NeuFlow2(BaseModel):
         )
 
         self.conv_s8 = backbone_v7.ConvBlock(
-            3, self.args.feature_dim_s1, kernel_size=8, stride=8, padding=0
+            3, self.feature_dim_s1, kernel_size=8, stride=8, padding=0
         )
-        self.upsample_s8 = upsample.UpSample(
-            self.args.feature_dim_s1, upsample_factor=8
-        )
+        self.upsample_s8 = upsample.UpSample(self.feature_dim_s1, upsample_factor=8)
 
         for p in self.parameters():
             if p.dim() > 1:
                 torch.nn.init.xavier_uniform_(p)
 
         self.has_init_bhwd = False
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=400.0)
-        parser.add_argument("--feature_dim_s16", type=int, default=128)
-        parser.add_argument("--context_dim_s16", type=int, default=64)
-        parser.add_argument("--iter_context_dim_s16", type=int, default=64)
-        parser.add_argument("--feature_dim_s8", type=int, default=128)
-        parser.add_argument("--context_dim_s8", type=int, default=64)
-        parser.add_argument("--iter_context_dim_s8", type=int, default=64)
-        parser.add_argument("--feature_dim_s1", type=int, default=128)
-        parser.add_argument("--iters_s16", type=int, default=1)
-        parser.add_argument("--iters_s8", type=int, default=8)
-        return parser
 
     def init_bhwd(self, batch_size, height, width, device, amp=True):
         self.backbone.init_bhwd(batch_size * 2, height // 16, width // 16, device, amp)
@@ -183,7 +192,7 @@ class NeuFlow2(BaseModel):
 
         self.init_iter_context_s16 = torch.zeros(
             batch_size,
-            self.args.iter_context_dim_s16,
+            self.iter_context_dim_s16,
             height // 16,
             width // 16,
             device=device,
@@ -191,7 +200,7 @@ class NeuFlow2(BaseModel):
         )
         self.init_iter_context_s8 = torch.zeros(
             batch_size,
-            self.args.iter_context_dim_s8,
+            self.iter_context_dim_s8,
             height // 8,
             width // 8,
             device=device,
@@ -237,10 +246,10 @@ class NeuFlow2(BaseModel):
         features_s16 = self.cross_attn_s16(features_s16)
 
         features_s16, context_s16 = self.split_features(
-            features_s16, self.args.context_dim_s16, self.args.feature_dim_s16
+            features_s16, self.context_dim_s16, self.feature_dim_s16
         )
         features_s8, context_s8 = self.split_features(
-            features_s8, self.args.context_dim_s8, self.args.feature_dim_s8
+            features_s8, self.context_dim_s8, self.feature_dim_s8
         )
 
         feature0_s16, feature1_s16 = features_s16.chunk(chunks=2, dim=0)
@@ -253,7 +262,7 @@ class NeuFlow2(BaseModel):
 
         iter_context_s16 = self.init_iter_context_s16
 
-        for i in range(self.args.iters_s16):
+        for i in range(self.iters_s16):
             if self.training and i > 0:
                 flow0 = flow0.detach()
                 # iter_context_s16 = iter_context_s16.detach()
@@ -289,7 +298,7 @@ class NeuFlow2(BaseModel):
 
         iter_context_s8 = self.init_iter_context_s8
 
-        for i in range(self.args.iters_s8):
+        for i in range(self.iters_s8):
             if self.training and i > 0:
                 flow0 = flow0.detach()
                 # iter_context_s8 = iter_context_s8.detach()
@@ -302,7 +311,7 @@ class NeuFlow2(BaseModel):
 
             flow0 = flow0 + delta_flow
 
-            if self.training or i == self.args.iters_s8 - 1:
+            if self.training or i == self.iters_s8 - 1:
                 feature0_s1 = self.conv_s8(img0)
                 up_flow0 = self.upsample_s8(feature0_s1, flow0) * 8
                 up_flow0 = self.postprocess_predictions(
@@ -316,3 +325,9 @@ class NeuFlow2(BaseModel):
             outputs = {"flows": up_flow0[:, None]}
 
         return outputs
+
+
+@register_model
+@trainable
+class neuflow2(NeuFlow2):
+    pass

@@ -146,12 +146,16 @@ class BatchNorm2d(nn.BatchNorm2d):
         return F.batch_norm(
             input,
             # If buffers are not to be tracked, ensure that they won't be updated
-            self.running_mean[: input.shape[1]]
-            if not self.training or self.track_running_stats
-            else None,
-            self.running_var[: input.shape[1]]
-            if not self.training or self.track_running_stats
-            else None,
+            (
+                self.running_mean[: input.shape[1]]
+                if not self.training or self.track_running_stats
+                else None
+            ),
+            (
+                self.running_var[: input.shape[1]]
+                if not self.training or self.track_running_stats
+                else None
+            ),
             self.weight[: input.shape[1]],
             self.bias[: input.shape[1]],
             bn_training,
@@ -213,12 +217,16 @@ class BatchNorm2dChannelsLast(nn.BatchNorm2d):
         input = F.batch_norm(
             input,
             # If buffers are not to be tracked, ensure that they won't be updated
-            self.running_mean[: input.shape[1]]
-            if not self.training or self.track_running_stats
-            else None,
-            self.running_var[: input.shape[1]]
-            if not self.training or self.track_running_stats
-            else None,
+            (
+                self.running_mean[: input.shape[1]]
+                if not self.training or self.track_running_stats
+                else None
+            ),
+            (
+                self.running_var[: input.shape[1]]
+                if not self.training or self.track_running_stats
+                else None
+            ),
             self.weight[: input.shape[1]],
             self.bias[: input.shape[1]],
             bn_training,

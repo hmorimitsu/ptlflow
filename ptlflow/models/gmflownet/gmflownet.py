@@ -1,10 +1,10 @@
-from argparse import ArgumentParser, Namespace
 import configparser
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock
 from .extractor import BasicEncoder, BasicConvEncoder
@@ -16,11 +16,11 @@ from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float, use_matching_loss: bool):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
-        self.use_matching_loss = args.use_matching_loss
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.use_matching_loss = use_matching_loss
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -77,51 +77,59 @@ class GMFlowNet(BaseModel):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflownet-kitti-712b4660.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=8)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dropout: float = 0.0,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 32,
+        use_matching_loss: bool = False,
+        use_mix_attn: bool = False,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=8,
+            loss_fn=SequenceLoss(gamma, max_flow, use_matching_loss),
+            **kwargs,
+        )
+
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.dropout = dropout
+        self.gamma = gamma
+        self.max_flow = max_flow
+        self.iters = iters
+        self.use_matching_loss = use_matching_loss
+        self.use_mix_attn = use_mix_attn
 
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
 
-        if not hasattr(self.args, "dropout"):
-            self.args.dropout = 0
-
         # feature network, context network, and update block
-        if self.args.use_mix_attn:
+        if self.use_mix_attn:
             self.fnet = nn.Sequential(
-                BasicConvEncoder(
-                    output_dim=256, norm_fn="instance", dropout=args.dropout
-                ),
+                BasicConvEncoder(output_dim=256, norm_fn="instance", dropout=dropout),
                 MixAxialPOLAUpdate(embed_dim=256, depth=6, num_head=8, window_size=7),
             )
         else:
             self.fnet = nn.Sequential(
-                BasicConvEncoder(
-                    output_dim=256, norm_fn="instance", dropout=args.dropout
-                ),
+                BasicConvEncoder(output_dim=256, norm_fn="instance", dropout=dropout),
                 POLAUpdate(
                     embed_dim=256, depth=6, num_head=8, window_size=7, neig_win_num=1
                 ),
             )
 
         self.cnet = BasicEncoder(
-            output_dim=hdim + cdim, norm_fn="batch", dropout=args.dropout
+            output_dim=hdim + cdim, norm_fn="batch", dropout=dropout
         )
-        self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim, input_dim=cdim)
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--corr_levels", type=int, default=4)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument("--dropout", type=float, default=0.0)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=400.0)
-        parser.add_argument("--iters", type=int, default=32)
-        parser.add_argument("--use_matching_loss", action="store_true")
-        parser.add_argument("--use_mix_attn", action="store_true")
-        return parser
+        self.update_block = BasicUpdateBlock(
+            corr_levels=corr_levels,
+            corr_radius=corr_radius,
+            hidden_dim=hdim,
+            input_dim=cdim,
+        )
 
     def freeze_bn(self):
         for m in self.modules():
@@ -175,7 +183,7 @@ class GMFlowNet(BaseModel):
         # fmap1 = self.transEncoder(fmap1)
         # fmap2 = self.transEncoder(fmap2)
 
-        corr_fn = CorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
+        corr_fn = CorrBlock(fmap1, fmap2, radius=self.corr_radius)
 
         # run the context network
         cnet = self.cnet(image1)
@@ -227,7 +235,7 @@ class GMFlowNet(BaseModel):
 
         # Iterative update
         flow_predictions = []
-        for itr in range(self.args.iters):
+        for itr in range(self.iters):
             coords1 = coords1.detach()
             corr = corr_fn(coords1)  # index correlation volume
 
@@ -264,6 +272,38 @@ class GMFlowNetMix(GMFlowNet):
         "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/gmflownet_mix-sintel-33492618.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        args.use_mix_attn = True
-        super().__init__(args=args)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        dropout: float = 0,
+        gamma: float = 0.8,
+        max_flow: float = 400,
+        iters: int = 32,
+        use_matching_loss: bool = False,
+        use_mix_attn: bool = True,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            corr_levels,
+            corr_radius,
+            dropout,
+            gamma,
+            max_flow,
+            iters,
+            use_matching_loss,
+            use_mix_attn,
+            **kwargs,
+        )
+
+
+@register_model
+@trainable
+class gmflownet(GMFlowNet):
+    pass
+
+
+@register_model
+@trainable
+class gmflownet_mix(GMFlowNetMix):
+    pass

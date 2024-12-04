@@ -1,10 +1,10 @@
-from argparse import ArgumentParser, Namespace
 from importlib.metadata import version
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model, trainable
 from . import backbone
 from . import transformer
 from . import matching
@@ -15,10 +15,10 @@ from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, gamma: float, max_flow: float):
         super().__init__()
-        self.gamma = args.gamma
-        self.max_flow = args.max_flow
+        self.gamma = gamma
+        self.max_flow = max_flow
 
     def forward(self, outputs, inputs):
         """Loss function defined over sequence of flow predictions"""
@@ -48,17 +48,27 @@ class NeuFlow(BaseModel):
         "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/neuflow-sintel-0d969ea2.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=SequenceLoss(args), output_stride=16)
+    def __init__(
+        self,
+        gamma: float = 0.8,
+        max_flow: float = 400.0,
+        feature_dim: int = 90,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            output_stride=16, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+        )
+
+        self.feature_dim = feature_dim
 
         if not version("torch").startswith("2"):
             raise ImportError(
                 f"NeuFlow requires torch 2.X. Your current version is {version('torch')}"
             )
 
-        self.backbone = backbone.CNNEncoder(args.feature_dim)
+        self.backbone = backbone.CNNEncoder(feature_dim)
         self.cross_attn_s16 = transformer.FeatureAttention(
-            args.feature_dim + 2,
+            feature_dim + 2,
             num_layers=2,
             bidir=True,
             ffn=True,
@@ -68,12 +78,12 @@ class NeuFlow(BaseModel):
 
         self.matching_s16 = matching.Matching()
 
-        self.flow_attn_s16 = transformer.FlowAttention(args.feature_dim + 2)
+        self.flow_attn_s16 = transformer.FlowAttention(feature_dim + 2)
 
         self.merge_s8 = torch.nn.Sequential(
             torch.nn.Conv2d(
-                (args.feature_dim + 2) * 2,
-                args.feature_dim * 2,
+                (feature_dim + 2) * 2,
+                feature_dim * 2,
                 kernel_size=3,
                 stride=1,
                 padding=1,
@@ -81,8 +91,8 @@ class NeuFlow(BaseModel):
             ),
             torch.nn.GELU(),
             torch.nn.Conv2d(
-                args.feature_dim * 2,
-                args.feature_dim,
+                feature_dim * 2,
+                feature_dim,
                 kernel_size=3,
                 stride=1,
                 padding=1,
@@ -90,28 +100,19 @@ class NeuFlow(BaseModel):
             ),
         )
 
-        self.refine_s8 = refine.Refine(args.feature_dim, patch_size=7, num_layers=6)
+        self.refine_s8 = refine.Refine(feature_dim, patch_size=7, num_layers=6)
 
         self.conv_s8 = backbone.ConvBlock(
-            3, args.feature_dim, kernel_size=8, stride=8, padding=0
+            3, feature_dim, kernel_size=8, stride=8, padding=0
         )
 
-        self.upsample_s1 = upsample.UpSample(args.feature_dim, upsample_factor=8)
+        self.upsample_s1 = upsample.UpSample(feature_dim, upsample_factor=8)
 
         for p in self.parameters():
             if p.dim() > 1:
                 torch.nn.init.xavier_uniform_(p)
 
         self.curr_bhw = None
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--gamma", type=float, default=0.8)
-        parser.add_argument("--max_flow", type=float, default=1000.0)
-        parser.add_argument("--feature_dim", type=int, default=90)
-        return parser
 
     def init_bhw(self, batch_size, height, width):
         self.backbone.init_pos_12(
@@ -188,3 +189,9 @@ class NeuFlow(BaseModel):
             outputs = {"flows": flow0[:, None]}
 
         return outputs
+
+
+@register_model
+@trainable
+class neuflow(NeuFlow):
+    pass

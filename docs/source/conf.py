@@ -62,7 +62,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "PTLFlow"
-copyright = "2021, Henrique Morimitsu"
+copyright = "2024, Henrique Morimitsu"
 author = "Henrique Morimitsu"
 
 # The version info for the project you're documenting, acts as replacement for
@@ -180,7 +180,7 @@ texinfo_documents = [
         "PTLFlow Documentation",
         author,
         "PTLFlow",
-        "One line description of project.",
+        "PyTorch models for optical flow estimation.",
         "Miscellaneous",
     ),
 ]

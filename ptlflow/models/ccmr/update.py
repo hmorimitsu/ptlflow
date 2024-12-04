@@ -110,7 +110,6 @@ class BasicMotionEncoder(nn.Module):
 class BasicUpdateBlock(nn.Module):
     def __init__(
         self,
-        args,
         correlation_depth,
         hidden_dim=128,
         input_dim=256,
@@ -121,7 +120,6 @@ class BasicUpdateBlock(nn.Module):
         num_scales=4,
     ):
         super(BasicUpdateBlock, self).__init__()
-        self.args = args
         self.encoder = BasicMotionEncoder(correlation_depth)
         self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=input_dim + hidden_dim)
         self.flow_head = FlowHead(hidden_dim, hidden_dim=256)

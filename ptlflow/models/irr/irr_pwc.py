@@ -1,9 +1,9 @@
-from argparse import ArgumentParser, Namespace
-from pathlib import Path
+from typing import Optional, Sequence
 
 import torch
 import torch.nn as nn
 
+from ptlflow.utils.registry import register_model, trainable
 from .pwc_modules import (
     conv,
     upsample2d_as,
@@ -32,16 +32,37 @@ class IRRPWC(BaseModel):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/irr_pwc-kitti-74d8868f.ckpt",
     }
 
-    def __init__(self, args):
+    def __init__(
+        self,
+        div_flow: float = 0.05,
+        search_range: int = 4,
+        output_level: int = 4,
+        num_levels: int = 7,
+        num_chs: Sequence[int] = (3, 16, 32, 64, 96, 128, 196),
+        train_batch_size: Optional[int] = None,
+        **kwargs,
+    ):
         super(IRRPWC, self).__init__(
-            args=args, loss_fn=MultiScaleEPE_PWC_Bi_Occ_upsample(args), output_stride=64
+            output_stride=64,
+            loss_fn=MultiScaleEPE_PWC_Bi_Occ_upsample(
+                train_batch_size=train_batch_size, div_flow=div_flow
+            ),
+            **kwargs,
         )
+
+        self.div_flow = div_flow
+        self.search_range = search_range
+        self.output_level = output_level
+        self.num_levels = num_levels
+        self.num_chs = num_chs
+        self.train_batch_size = train_batch_size
+
         self.leakyRELU = nn.LeakyReLU(0.1, inplace=True)
 
-        self.feature_pyramid_extractor = FeatureExtractor(self.args.num_chs)
+        self.feature_pyramid_extractor = FeatureExtractor(self.num_chs)
         self.warping_layer = WarpingLayer()
 
-        self.dim_corr = (self.args.search_range * 2 + 1) ** 2
+        self.dim_corr = (self.search_range * 2 + 1) ** 2
         self.num_ch_in_flo = self.dim_corr + 32 + 2
         self.num_ch_in_occ = self.dim_corr + 32 + 1
 
@@ -66,29 +87,15 @@ class IRRPWC(BaseModel):
         self.refine_occ = RefineOcc(1 + 32 + 32)
 
         self.corr_params = {
-            "pad_size": self.args.search_range,
+            "pad_size": self.search_range,
             "kernel_size": 1,
-            "max_disp": self.args.search_range,
+            "max_disp": self.search_range,
             "stride1": 1,
             "stride2": 1,
             "corr_multiply": 1,
         }
 
         initialize_msra(self.modules())
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--div_flow", type=float, default=0.05)
-        parser.add_argument("--search_range", type=int, default=4)
-        parser.add_argument("--output_level", type=int, default=4)
-        parser.add_argument("--num_levels", type=int, default=7)
-        parser.add_argument(
-            "--num_chs", type=int, nargs="+", default=[3, 16, 32, 64, 96, 128, 196]
-        )
-        parser.add_argument("--num_iters", type=int, default=1)
-        return parser
 
     def forward(self, inputs):
         images, image_resizer = self.preprocess_images(
@@ -135,7 +142,7 @@ class IRRPWC(BaseModel):
         )
 
         for l, (x1, x2) in enumerate(zip(x1_pyramid, x2_pyramid)):
-            if l <= self.args.output_level:
+            if l <= self.output_level:
                 # warping
                 if l == 0:
                     x2_warp = x2
@@ -146,10 +153,10 @@ class IRRPWC(BaseModel):
                     occ_f = upsample2d_as(occ_f, x1, mode="bilinear")
                     occ_b = upsample2d_as(occ_b, x2, mode="bilinear")
                     x2_warp = self.warping_layer(
-                        x2, flow_f, height_im, width_im, self.args.div_flow
+                        x2, flow_f, height_im, width_im, self.div_flow
                     )
                     x1_warp = self.warping_layer(
-                        x1, flow_b, height_im, width_im, self.args.div_flow
+                        x1, flow_b, height_im, width_im, self.div_flow
                     )
 
                 # correlation
@@ -159,7 +166,7 @@ class IRRPWC(BaseModel):
                 out_corr_relu_f = self.leakyRELU(out_corr_f)
                 out_corr_relu_b = self.leakyRELU(out_corr_b)
 
-                if l != self.args.output_level:
+                if l != self.output_level:
                     x1_1by1 = self.conv_1x1[l](x1)
                     x2_1by1 = self.conv_1x1[l](x2)
                 else:
@@ -168,10 +175,10 @@ class IRRPWC(BaseModel):
 
                 # concat and estimate flow
                 flow_f = rescale_flow(
-                    flow_f, self.args.div_flow, width_im, height_im, to_local=True
+                    flow_f, self.div_flow, width_im, height_im, to_local=True
                 )
                 flow_b = rescale_flow(
-                    flow_b, self.args.div_flow, width_im, height_im, to_local=True
+                    flow_b, self.div_flow, width_im, height_im, to_local=True
                 )
 
                 x_intm_f, flow_res_f = self.flow_estimators(
@@ -211,16 +218,16 @@ class IRRPWC(BaseModel):
                 img1_resize = upsample2d_as(x1_raw, flow_f, mode="bilinear")
                 img2_resize = upsample2d_as(x2_raw, flow_b, mode="bilinear")
                 flow_cont_f = rescale_flow(
-                    flow_cont_f, self.args.div_flow, width_im, height_im, to_local=False
+                    flow_cont_f, self.div_flow, width_im, height_im, to_local=False
                 )
                 flow_cont_b = rescale_flow(
-                    flow_cont_b, self.args.div_flow, width_im, height_im, to_local=False
+                    flow_cont_b, self.div_flow, width_im, height_im, to_local=False
                 )
                 img2_warp = self.warping_layer(
-                    img2_resize, flow_cont_f, height_im, width_im, self.args.div_flow
+                    img2_resize, flow_cont_f, height_im, width_im, self.div_flow
                 )
                 img1_warp = self.warping_layer(
-                    img1_resize, flow_cont_b, height_im, width_im, self.args.div_flow
+                    img1_resize, flow_cont_b, height_im, width_im, self.div_flow
                 )
 
                 # flow refine
@@ -232,18 +239,18 @@ class IRRPWC(BaseModel):
                 )
 
                 flow_f = rescale_flow(
-                    flow_f, self.args.div_flow, width_im, height_im, to_local=False
+                    flow_f, self.div_flow, width_im, height_im, to_local=False
                 )
                 flow_b = rescale_flow(
-                    flow_b, self.args.div_flow, width_im, height_im, to_local=False
+                    flow_b, self.div_flow, width_im, height_im, to_local=False
                 )
 
                 # occ refine
                 x2_1by1_warp = self.warping_layer(
-                    x2_1by1, flow_f, height_im, width_im, self.args.div_flow
+                    x2_1by1, flow_f, height_im, width_im, self.div_flow
                 )
                 x1_1by1_warp = self.warping_layer(
-                    x1_1by1, flow_b, height_im, width_im, self.args.div_flow
+                    x1_1by1, flow_b, height_im, width_im, self.div_flow
                 )
 
                 occ_f = self.refine_occ(
@@ -262,19 +269,19 @@ class IRRPWC(BaseModel):
                 flows.append([flow_f, flow_b])
 
                 x2_warp = self.warping_layer(
-                    x2, flow_f, height_im, width_im, self.args.div_flow
+                    x2, flow_f, height_im, width_im, self.div_flow
                 )
                 x1_warp = self.warping_layer(
-                    x1, flow_b, height_im, width_im, self.args.div_flow
+                    x1, flow_b, height_im, width_im, self.div_flow
                 )
                 flow_b_warp = self.warping_layer(
-                    flow_b, flow_f, height_im, width_im, self.args.div_flow
+                    flow_b, flow_f, height_im, width_im, self.div_flow
                 )
                 flow_f_warp = self.warping_layer(
-                    flow_f, flow_b, height_im, width_im, self.args.div_flow
+                    flow_f, flow_b, height_im, width_im, self.div_flow
                 )
 
-                if l != self.args.num_levels - 1:
+                if l != self.num_levels - 1:
                     x1_in = self.conv_1x1_1(x1)
                     x2_in = self.conv_1x1_1(x2)
                     x1_w_in = self.conv_1x1_1(x1_warp)
@@ -295,11 +302,11 @@ class IRRPWC(BaseModel):
                 occs.append([occ_f, occ_b])
 
         flow_f_up = upsample2d_as(flow_f, x1_raw, mode="bilinear") * (
-            1.0 / self.args.div_flow
+            1.0 / self.div_flow
         )
         flow_f_up = self.postprocess_predictions(flow_f_up, image_resizer, is_flow=True)
         flow_b_up = upsample2d_as(flow_b, x1_raw, mode="bilinear") * (
-            1.0 / self.args.div_flow
+            1.0 / self.div_flow
         )
         flow_b_up = self.postprocess_predictions(flow_b_up, image_resizer, is_flow=True)
         occ_f_up = upsample2d_as(torch.sigmoid(occ_f), x1_raw, mode="bilinear")
@@ -322,3 +329,9 @@ class IRRPWC(BaseModel):
             outputs["flows_b"] = flow_b_up[:, None]
             outputs["occs_b"] = occ_b_up[:, None]
         return outputs
+
+
+@register_model
+@trainable
+class irr_pwc(IRRPWC):
+    pass

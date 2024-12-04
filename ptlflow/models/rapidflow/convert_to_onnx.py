@@ -1,7 +1,7 @@
 """Validate optical flow estimation performance on standard datasets."""
 
 # =============================================================================
-# Copyright 2021 Henrique Morimitsu
+# Copyright 2024 Henrique Morimitsu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@
 # =============================================================================
 
 import sys
-from argparse import ArgumentParser
 from pathlib import Path
 
+from jsonargparse import ArgumentParser
+from loguru import logger
 import torch
 import torch.onnx
 
@@ -27,29 +28,17 @@ this_dir = Path(__file__).parent.resolve()
 sys.path.insert(0, str(this_dir.parent.parent.parent))
 
 from ptlflow import get_model, load_checkpoint
-from ptlflow.models.rapidflow.rapidflow import RAPIDFlow
+from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
+from ptlflow.utils.registry import RegisteredModel
 
 
 def _init_parser() -> ArgumentParser:
-    parser = ArgumentParser()
+    parser = ArgumentParser(add_help=False)
     parser.add_argument(
-        "model",
-        type=str,
-        choices=(
-            "rapidflow",
-            "rapidflow_it1",
-            "rapidflow_it2",
-            "rapidflow_it3",
-            "rapidflow_it6",
-            "rapidflow_it12",
-        ),
-        help="Name of the model to use.",
-    )
-    parser.add_argument(
-        "--checkpoint",
+        "--ckpt_path",
         type=str,
         default=None,
-        help="Path to the checkpoint to be loaded. It can also be one of the following names: \{chairs, things, sintel, kitti\}, in which case the respective pretrained checkpoint will be downloaded.",
+        help="Path to the checkpoint to be loaded. It can also be one of the following names: {chairs, things, sintel, kitti}, in which case the respective pretrained checkpoint will be downloaded.",
     )
     parser.add_argument(
         "--output_path",
@@ -61,7 +50,7 @@ def _init_parser() -> ArgumentParser:
         "--input_size",
         type=int,
         nargs=2,
-        default=(384, 1280),
+        default=[384, 1280],
         help="Size of the input image.",
     )
     return parser
@@ -86,31 +75,60 @@ def fuse_checkpoint_next1d_layers(state_dict):
     return fused_sd
 
 
-def load_model(args):
-    model = get_model(args.model, args=args)
-    ckpt = load_checkpoint(args.checkpoint, RAPIDFlow, "rapidflow")
+def load_model(cfg):
+    ckpt_path = cfg.ckpt_path
+    cfg.ckpt_path = None  # This is to avoid letting get_model to load the ckpt
+    model = get_model(cfg.model_name, args=cfg)
+    # Since we set fuse_next1d_weights to True in the model,
+    # the ckpt 1D layers also need to be fused before loading
+    ckpt = load_checkpoint(ckpt_path, model.__class__)
     state_dict = fuse_checkpoint_next1d_layers(ckpt["state_dict"])
     model.load_state_dict(state_dict, strict=True)
     return model
 
 
-if __name__ == "__main__":
-    parser = _init_parser()
-    parser = RAPIDFlow.add_model_specific_args(parser)
-    args = parser.parse_args()
-    args.corr_mode = "allpairs"
-    args.fuse_next1d_weights = True
-    args.simple_io = True
+def _show_v04_warning():
+    ignore_args = ["-h", "--help", "--model", "--config"]
+    for arg in ignore_args:
+        if arg in sys.argv:
+            return
 
-    model = load_model(args)
-    sample_inputs = torch.randn(1, 2, 3, args.input_size[0], args.input_size[1])
+    logger.warning(
+        "Since v0.4, it is now necessary to inform the model using the --model argument. For example, use: python infer.py --model raft --ckpt_path things"
+    )
+
+
+if __name__ == "__main__":
+    _show_v04_warning()
+
+    parser = _init_parser()
+
+    cli = PTLFlowCLI(
+        model_class=RegisteredModel,
+        subclass_mode_model=True,
+        parser_kwargs={"parents": [parser]},
+        run=False,
+        parse_only=False,
+        auto_configure_optimizers=False,
+    )
+
+    cfg = cli.config
+    cfg.model.init_args.corr_mode = "allpairs"
+    cfg.model.init_args.fuse_next1d_weights = True
+    cfg.model.init_args.simple_io = True
+    cfg.model_name = cfg.model.class_path.split(".")[-1]
+
+    model = load_model(cfg)
+
+    # model = get_model(cfg.model_name, args=cfg)
+    sample_inputs = torch.randn(1, 2, 3, cfg.input_size[0], cfg.input_size[1])
     if torch.cuda.is_available():
         model = model.cuda()
         sample_inputs = sample_inputs.cuda()
 
-    output_dir = Path(args.output_path)
+    output_dir = Path(cfg.output_path)
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = str(output_dir / f"{args.model}.onnx")
+    output_path = str(output_dir / f"{cfg.model_name}.onnx")
     torch.onnx.export(
         model, sample_inputs, output_path, verbose=False, opset_version=16
     )

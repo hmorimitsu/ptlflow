@@ -16,28 +16,28 @@
 # limitations under the License.
 # =============================================================================
 
-import argparse
-import logging
+from jsonargparse import ArgumentParser, Namespace
 import os
 from pathlib import Path
 import sys
 import time
 from typing import Optional, Tuple, Union
 
+from loguru import logger
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import torch
 from tqdm import tqdm
+import yaml
 
 import ptlflow
-from ptlflow import get_model_reference
 from ptlflow.models.base_model.base_model import BaseModel
+from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
+from ptlflow.utils.registry import RegisteredModel
 from ptlflow.utils.timer import Timer
 from ptlflow.utils.utils import (
-    config_logging,
     count_parameters,
-    get_list_of_available_models_list,
     make_divisible,
 )
 
@@ -55,28 +55,24 @@ TABLE_KEYS_LEGENDS = {
 TABLE_KEYS = list(TABLE_KEYS_LEGENDS.keys())
 TABLE_LEGENDS = [TABLE_KEYS_LEGENDS[x] for x in TABLE_KEYS]
 
-config_logging()
-
 from torch.profiler import profile, record_function, ProfilerActivity
 
 try:
     import pynvml
 except ImportError:
     pynvml = None
-    logging.warning("pynvml is not installed, GPU memory usage will not be measured.")
+    logger.warning("pynvml is not installed, GPU memory usage will not be measured.")
 
 
-def _init_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
+def _init_parser() -> ArgumentParser:
+    parser = ArgumentParser(add_help=False)
     parser.add_argument(
-        "model",
-        type=str,
-        default="all",
-        choices=["all", "select"] + get_list_of_available_models_list(),
-        help=("Path to a csv file with the speed results."),
+        "--all",
+        action="store_true",
+        help="If set, run validation on all available models.",
     )
     parser.add_argument(
-        "--selection",
+        "--select",
         type=str,
         nargs="+",
         default=None,
@@ -84,6 +80,12 @@ def _init_parser() -> argparse.ArgumentParser:
             "Used in combination with model=select. The select mode can be used to run the validation on multiple models "
             "at once. Put a list of model names here separated by spaces."
         ),
+    )
+    parser.add_argument(
+        "--ckpt_path",
+        type=str,
+        default=None,
+        help=("Path to a ckpt file for the chosen model."),
     )
     parser.add_argument(
         "--exclude",
@@ -122,7 +124,7 @@ def _init_parser() -> argparse.ArgumentParser:
         "--input_size",
         type=int,
         nargs="+",
-        default=(500, 1000),
+        default=[500, 1000],
         help=(
             "Resolution of the input to forward."
             "Must provide an even number of values."
@@ -178,19 +180,24 @@ def _init_parser() -> argparse.ArgumentParser:
         type=str,
         nargs="+",
         choices=("fp16", "fp32"),
-        default=("fp32",),
+        default=["fp32"],
         help="Datatypes to use during benchmark.",
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=1,
     )
 
     return parser
 
 
-def benchmark(args: argparse.Namespace, device_handle) -> pd.DataFrame:
+def benchmark(args: Namespace, device_handle) -> pd.DataFrame:
     """Run the benchmark on all models.
 
     Parameters
     ----------
-    args : argparse.Namespace
+    args : Namespace
         Arguments for configuring the benchmark.
 
     Returns
@@ -216,18 +223,24 @@ def benchmark(args: argparse.Namespace, device_handle) -> pd.DataFrame:
     output_path.mkdir(parents=True, exist_ok=True)
 
     model_args = args
-    if args.model == "all":
+    available_model_names = ptlflow.get_model_names()
+    if args.all:
         model_names = ptlflow.models_dict.keys()
         model_args = None
-    elif args.model == "select":
-        if args.selection is None:
-            raise ValueError(
-                "When select is chosen, model names must be provided to --selection."
-            )
-        model_names = args.selection
+    elif args.select is not None and len(args.select) > 0:
+        for name in args.select:
+            assert name in available_model_names
+        model_names = args.select
         model_args = None
     else:
-        model_names = [args.model]
+        model_names = [args.model.class_path.split(".")[-1]]
+
+    exclude = args.exclude
+    if exclude is None:
+        exclude = []
+    else:
+        for name in exclude:
+            assert name in available_model_names
 
     assert (len(args.input_size) % 2) == 0
 
@@ -237,10 +250,6 @@ def benchmark(args: argparse.Namespace, device_handle) -> pd.DataFrame:
 
     for isize in range(0, len(args.input_size), 2):
         input_size = args.input_size[isize : isize + 2]
-
-        exclude = args.exclude
-        if exclude is None:
-            exclude = []
 
         for mname in tqdm(model_names):
             if mname in exclude:
@@ -362,7 +371,7 @@ def benchmark(args: argparse.Namespace, device_handle) -> pd.DataFrame:
                         }
                     )
                 except Exception as e:  # noqa: B902
-                    logging.warning(
+                    logger.warning(
                         "Skipping model %s with datatype %s due to exception %s",
                         mname,
                         dtype_str,
@@ -373,12 +382,10 @@ def benchmark(args: argparse.Namespace, device_handle) -> pd.DataFrame:
                 new_df = pd.DataFrame(new_df_dict)
                 df = pd.concat([df, new_df], ignore_index=True)
                 df = df.round(3)
-                df.to_csv(
-                    output_path / f"model_benchmark-{args.model}.csv", index=False
-                )
+                df.to_csv(output_path / f"model_benchmark-{mname}.csv", index=False)
                 save_plot(
                     output_path,
-                    args.model,
+                    mname,
                     df,
                     args.plot_axes,
                     args.plot_log_x,
@@ -406,7 +413,7 @@ def count_flops(model, inputs):
 
 @torch.no_grad()
 def estimate_inference_time(
-    args: argparse.Namespace,
+    args: Namespace,
     model: BaseModel,
     input_size: Tuple[int, int],
     dtype_str: str,
@@ -415,7 +422,7 @@ def estimate_inference_time(
 
     Parameters
     ----------
-    args : argparse.Namespace
+    args : Namespace
         Arguments for configuring the benchmark.
     model : BaseModel
         The model to perform the estimation.
@@ -430,7 +437,7 @@ def estimate_inference_time(
     for i in range(args.num_samples + 1):
         inputs = {
             "images": torch.rand(
-                1,
+                args.batch_size,
                 2,
                 3,
                 make_divisible(input_size[0], model.output_stride),
@@ -448,7 +455,7 @@ def estimate_inference_time(
         model(inputs)
         if i > 0:
             timer.toc()
-            time_vals.append(timer.total())
+            time_vals.append(timer.total() / args.batch_size)
     return time_vals
 
 
@@ -521,22 +528,53 @@ def save_plot(
         out_name = f"benchmark_plot-{model_name}-{plot_axes[0]}-{plot_axes[1]}.html"
         out_path = Path(output_dir) / out_name
         fig.write_html(out_path)
-        logging.info(
-            "Saved plot between %s and %s at: %s", plot_axes[0], plot_axes[1], out_path
+        logger.info(
+            "Saved plot between {} and {} at: {}", plot_axes[0], plot_axes[1], out_path
         )
 
 
+def _show_v04_warning():
+    ignore_args = ["-h", "--help", "--model", "--config", "--all", "--select"]
+    for arg in ignore_args:
+        if arg in sys.argv:
+            return
+
+    logger.warning(
+        "Since v0.4, it is now necessary to inform the model using the --model argument. For example, use: python infer.py --model raft --ckpt_path things"
+    )
+
+
 if __name__ == "__main__":
+    _show_v04_warning()
+
     parser = _init_parser()
 
-    # TODO: It is ugly that the model has to be gotten from the argv rather than the argparser.
-    # However, I do not see another way, since the argparser requires the model to load some of the args.
-    FlowModel = None
-    if len(sys.argv) > 1 and sys.argv[1] not in ["-h", "--help", "all", "select"]:
-        FlowModel = get_model_reference(sys.argv[1])
-        parser = FlowModel.add_model_specific_args(parser)
+    is_benchmark_list = False
+    if "--config" in sys.argv:
+        config_file_idx = sys.argv.index("--config") + 1
+        with open(sys.argv[config_file_idx], "r") as f:
+            config = yaml.safe_load(f)
+        if config["all"] or config["select"] is not None:
+            is_benchmark_list = True
 
-    args = parser.parse_args()
+    if "--all" in sys.argv or "--select" in sys.argv:
+        is_benchmark_list = True
+
+    if is_benchmark_list:
+        model_class = None
+        subclass_mode_model = False
+    else:
+        model_class = RegisteredModel
+        subclass_mode_model = True
+
+    cli = PTLFlowCLI(
+        model_class=model_class,
+        subclass_mode_model=subclass_mode_model,
+        parser_kwargs={"parents": [parser]},
+        run=False,
+        parse_only=False,
+        auto_configure_optimizers=False,
+    )
 
     device_handle = None
     if pynvml is not None:
@@ -548,19 +586,21 @@ if __name__ == "__main__":
         pynvml.nvmlInit()
         device_handle = pynvml.nvmlDeviceGetHandleByIndex(device_id)
 
-    if args.csv_path is None:
-        df = benchmark(args, device_handle)
+    cfg = cli.config
+
+    if cfg.csv_path is None:
+        df = benchmark(cfg, device_handle)
     else:
-        df = pd.read_csv(args.csv_path)
-        Path(args.output_path).mkdir(parents=True, exist_ok=True)
+        df = pd.read_csv(cfg.csv_path)
+        Path(cfg.output_path).mkdir(parents=True, exist_ok=True)
         save_plot(
-            args.output_path,
-            args.model,
+            cfg.output_path,
+            Path(cfg.csv_path).stem,
             df,
-            args.plot_axes,
-            args.plot_log_x,
-            args.plot_log_y,
-            args.datatypes[0],
+            cfg.plot_axes,
+            cfg.plot_log_x,
+            cfg.plot_log_y,
+            cfg.datatypes[0],
         )
-    print(f"Results saved to {str(args.output_path)}.")
+    print(f"Results saved to {str(cfg.output_path)}.")
     print(df)

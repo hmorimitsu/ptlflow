@@ -26,11 +26,11 @@ Once you have downloaded the script, you can generate the test predictions as fo
 
 .. code-block:: bash
 
-    python test.py raft_small --pretrained_ckpt things --test_dataset sintel kitti-2012 kitti-2015
+    python test.py --model raft_small --ckpt_path things --data.test_dataset kitti-2015 --save_viz
 
 This is just an example using the ``raft_small`` model loaded with the weights pretrained on the FlyingThings3D dataset,
 but you should use your own model when making a submission. In this example, we are generating predictions
-for three datasets: MPI-Sintel (both clean and final splits), KITTI 2012, and KITTI 2015. If you want to use
+for the KITTI 2015 dataset. If you want to use
 different datasets, then adapt the ``--test_dataset`` arguments accordingly.
 
 Visualizing the outputs during prediction
@@ -41,7 +41,7 @@ This can be useful as a qualitative sanity check to make sure the predictions ar
 
 .. code-block:: bash
 
-    python test.py raft_small --pretrained_ckpt things --test_dataset sintel kitti-2012 kitti-2015 --show
+    python test.py --model raft_small --ckpt_path things --data.test_dataset kitti-2015 --show
 
 Outputs
 =======

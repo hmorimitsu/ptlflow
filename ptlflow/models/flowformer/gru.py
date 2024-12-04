@@ -74,13 +74,13 @@ class SepConvGRU(nn.Module):
 
 
 class BasicMotionEncoder(nn.Module):
-    def __init__(self, args):
+    def __init__(self, only_global, query_latent_dim):
         super(BasicMotionEncoder, self).__init__()
-        if args.only_global:
+        if only_global:
             print("[Decoding with only global cost]")
-            cor_planes = args.query_latent_dim
+            cor_planes = query_latent_dim
         else:
-            cor_planes = 81 + args.query_latent_dim
+            cor_planes = 81 + query_latent_dim
         self.convc1 = nn.Conv2d(cor_planes, 256, 1, padding=0)
         self.convc2 = nn.Conv2d(256, 192, 3, padding=1)
         self.convf1 = nn.Conv2d(2, 128, 7, padding=3)
@@ -99,10 +99,11 @@ class BasicMotionEncoder(nn.Module):
 
 
 class BasicUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=128, input_dim=128):
+    def __init__(self, only_global, query_latent_dim, hidden_dim=128):
         super(BasicUpdateBlock, self).__init__()
-        self.args = args
-        self.encoder = BasicMotionEncoder(args)
+        self.encoder = BasicMotionEncoder(
+            only_global=only_global, query_latent_dim=query_latent_dim
+        )
         self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=128 + hidden_dim)
         self.flow_head = FlowHead(hidden_dim, hidden_dim=256)
 
@@ -128,10 +129,11 @@ from .gma import Aggregate
 
 
 class GMAUpdateBlock(nn.Module):
-    def __init__(self, args, hidden_dim=128):
+    def __init__(self, only_global, query_latent_dim, hidden_dim=128):
         super().__init__()
-        self.args = args
-        self.encoder = BasicMotionEncoder(args)
+        self.encoder = BasicMotionEncoder(
+            only_global=only_global, query_latent_dim=query_latent_dim
+        )
         self.gru = SepConvGRU(
             hidden_dim=hidden_dim, input_dim=128 + hidden_dim + hidden_dim
         )
@@ -143,7 +145,7 @@ class GMAUpdateBlock(nn.Module):
             nn.Conv2d(256, 64 * 9, 1, padding=0),
         )
 
-        self.aggregator = Aggregate(args=self.args, dim=128, dim_head=128, heads=1)
+        self.aggregator = Aggregate(dim=128, dim_head=128, heads=1)
 
     def forward(self, net, inp, corr, flow, attention):
         motion_features = self.encoder(flow, corr)

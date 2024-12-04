@@ -1,6 +1,7 @@
 """
 Portions of this code copyright 2017, Clement Pinard
 """
+
 from argparse import Namespace
 
 import torch
@@ -12,22 +13,39 @@ from .flownet_base import FlowNetBase
 
 
 class FlowNetFusion(FlowNetBase):
-    def __init__(self, args: Namespace):
-        args.loss_start_scale = 1
-        args.loss_num_scales = 3
-        super(FlowNetFusion, self).__init__(args)
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        input_channels: int = 6,
+        batch_norm: bool = False,
+        loss_start_scale: int = 1,
+        loss_num_scales: int = 3,
+        loss_base_weight: float = 0.32,
+        loss_norm: str = "L2",
+        **kwargs,
+    ):
+        super(FlowNetFusion, self).__init__(
+            div_flow=div_flow,
+            input_channels=input_channels,
+            batch_norm=batch_norm,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
 
-        self.conv0 = conv(self.args.batch_norm, 11, 64)
-        self.conv1 = conv(self.args.batch_norm, 64, 64, stride=2)
-        self.conv1_1 = conv(self.args.batch_norm, 64, 128)
-        self.conv2 = conv(self.args.batch_norm, 128, 128, stride=2)
-        self.conv2_1 = conv(self.args.batch_norm, 128, 128)
+        self.conv0 = conv(self.batch_norm, 11, 64)
+        self.conv1 = conv(self.batch_norm, 64, 64, stride=2)
+        self.conv1_1 = conv(self.batch_norm, 64, 128)
+        self.conv2 = conv(self.batch_norm, 128, 128, stride=2)
+        self.conv2_1 = conv(self.batch_norm, 128, 128)
 
         self.deconv1 = deconv(128, 32)
         self.deconv0 = deconv(162, 16)
 
-        self.inter_conv1 = i_conv(self.args.batch_norm, 162, 32)
-        self.inter_conv0 = i_conv(self.args.batch_norm, 82, 16)
+        self.inter_conv1 = i_conv(self.batch_norm, 162, 32)
+        self.inter_conv0 = i_conv(self.batch_norm, 82, 16)
 
         self.predict_flow2 = predict_flow(128)
         self.predict_flow1 = predict_flow(32)

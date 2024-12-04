@@ -1,0 +1,28 @@
+# lightning.pytorch==2.4.0
+seed_everything: true
+trainer:
+  max_epochs: 8
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+ckpt_path: /path/to/chairs.ckpt  # Change to the ckpt resulting from raft-train1-chairs
+model:
+  class_path: ptlflow.models.raft
+  init_args:
+    corr_levels: 4
+    corr_radius: 4
+    dropout: 0.0
+    gamma: 0.8
+    max_flow: 400.0
+    iters: 12
+    alternate_corr: false
+    lr: 0.000125
+    wdecay: 0.0001
+    warm_start: false
+data:
+  train_dataset: things
+  val_dataset: sintel-final-val+kitti-2015-val
+  train_batch_size: 6
+  train_num_workers: 4
+  train_crop_size: [400, 720]
+  train_transform_cuda: false
+  train_transform_fp16: false

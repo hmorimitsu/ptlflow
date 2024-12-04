@@ -1,5 +1,3 @@
-from argparse import Namespace
-
 from einops import rearrange
 import torch
 import torch.nn as nn
@@ -11,23 +9,61 @@ from .submodules import *
 from .flownet_base import FlowNetBase
 
 
+from ptlflow.utils.registry import register_model, trainable
+
+
 class FlowNetCS(FlowNetBase):
     pretrained_checkpoints = {
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flownetcs-things-4bdecffa.ckpt"
     }
 
-    def __init__(self, args: Namespace):
-        args.input_channels = 12
-        super(FlowNetCS, self).__init__(args)
+    def __init__(
+        self,
+        div_flow: float = 20.0,
+        input_channels: int = 12,
+        batch_norm: bool = False,
+        loss_start_scale: int = 4,
+        loss_num_scales: int = 5,
+        loss_base_weight: float = 0.32,
+        loss_norm: str = "L2",
+        **kwargs,
+    ):
+        super(FlowNetCS, self).__init__(
+            div_flow=div_flow,
+            input_channels=input_channels,
+            batch_norm=batch_norm,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
 
-        self.args = args
         self.rgb_max = 1
 
         # First Block (FlowNetC)
-        self.flownetc = FlowNetC(args)
+        self.flownetc = FlowNetC(
+            div_flow=div_flow,
+            input_channels=input_channels,
+            batch_norm=batch_norm,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
 
         # Block (FlowNetS)
-        self.flownets_1 = FlowNetS(args)
+        self.flownets_1 = FlowNetS(
+            div_flow=div_flow,
+            input_channels=input_channels,
+            batch_norm=batch_norm,
+            loss_start_scale=loss_start_scale,
+            loss_num_scales=loss_num_scales,
+            loss_base_weight=loss_base_weight,
+            loss_norm=loss_norm,
+            **kwargs,
+        )
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -102,7 +138,7 @@ class FlowNetCS(FlowNetBase):
                 inputs["images"][:, 0],
                 inputs["images"][:, 1],
                 resampled_img1,
-                flownetc_flow / self.args.div_flow,
+                flownetc_flow / self.div_flow,
                 norm_diff_img0,
             ),
             dim=1,
@@ -119,3 +155,9 @@ class FlowNetCS(FlowNetBase):
         inputs["images"] = orig_images
 
         return flownets1_preds
+
+
+@register_model
+@trainable
+class flownetcs(FlowNetCS):
+    pass

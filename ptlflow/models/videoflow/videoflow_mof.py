@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ptlflow.utils.registry import register_model
 from .Networks.encoders import twins_svt_large, convnext_Xlarge_4x, convnext_base_2x
 from .Networks.MOFNetStack.corr import CorrBlock, AlternateCorrBlock
 from .utils import coords_grid
@@ -19,71 +20,91 @@ class VideoFlowMOF(BaseModel):
         "things_288960": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/videoflow_mof-things_288960noise-0615a42e.ckpt",
     }
 
-    def __init__(self, args: Namespace) -> None:
-        super().__init__(args=args, loss_fn=None, output_stride=8)
+    def __init__(
+        self,
+        corr_levels: int = 4,
+        corr_radius: int = 4,
+        cnet: str = "twins",
+        fnet: str = "twins",
+        gma: str = "GMA-SK2",
+        pretrain: bool = True,
+        corr_fn: str = "default",
+        decoder_depth: int = 32,
+        feat_dim: int = 256,
+        Tfusion: str = "stack",
+        down_ratio: int = 8,
+        context_3D: bool = False,
+        cost_heads_num: int = 1,
+        **kwargs,
+    ) -> None:
+        super().__init__(loss_fn=None, output_stride=8, **kwargs)
 
-        self.hidden_dim = hdim = self.args.feat_dim // 2
-        self.context_dim = cdim = self.args.feat_dim // 2
+        self.corr_levels = corr_levels
+        self.corr_radius = corr_radius
+        self.cnet = cnet
+        self.fnet = fnet
+        self.gma = gma
+        self.pretrain = pretrain
+        self.corr_fn = corr_fn
+        self.decoder_depth = decoder_depth
+        self.feat_dim = feat_dim
+        self.Tfusion = Tfusion
+        self.down_ratio = down_ratio
+        self.context_3D = context_3D
+        self.cost_heads_num = cost_heads_num
 
-        args.corr_radius = 4
+        self.hidden_dim = self.feat_dim // 2
+        self.context_dim = self.feat_dim // 2
 
         # feature network, context network, and update block
-        if args.cnet == "twins":
+        if cnet == "twins":
             print("[Using twins as context encoder]")
-            self.cnet = twins_svt_large(pretrained=self.args.pretrain)
-        elif args.cnet == "convnext_Xlarge_4x":
+            self.cnet = twins_svt_large(pretrained=self.pretrain)
+        elif cnet == "convnext_Xlarge_4x":
             print("[Using convnext_Xlarge_4x as context encoder]")
-            self.cnet = convnext_Xlarge_4x(pretrained=self.args.pretrain)
-        elif args.cnet == "convnext_base_2x":
+            self.cnet = convnext_Xlarge_4x(pretrained=self.pretrain)
+        elif cnet == "convnext_base_2x":
             print("[Using convnext_base_2x as context encoder]")
-            self.cnet = convnext_base_2x(pretrained=self.args.pretrain)
+            self.cnet = convnext_base_2x(pretrained=self.pretrain)
 
-        if args.fnet == "twins":
+        if fnet == "twins":
             print("[Using twins as feature encoder]")
-            self.fnet = twins_svt_large(pretrained=self.args.pretrain)
-        elif args.fnet == "convnext_Xlarge_4x":
+            self.fnet = twins_svt_large(pretrained=self.pretrain)
+        elif fnet == "convnext_Xlarge_4x":
             print("[Using convnext_Xlarge_4x as feature encoder]")
-            self.fnet = convnext_Xlarge_4x(pretrained=self.args.pretrain)
-        elif args.fnet == "convnext_base_2x":
+            self.fnet = convnext_Xlarge_4x(pretrained=self.pretrain)
+        elif fnet == "convnext_base_2x":
             print("[Using convnext_base_2x as feature encoder]")
-            self.fnet = convnext_base_2x(pretrained=self.args.pretrain)
+            self.fnet = convnext_base_2x(pretrained=self.pretrain)
 
-        hidden_dim_ratio = 256 // args.feat_dim
+        hidden_dim_ratio = 256 // feat_dim
 
-        if self.args.Tfusion == "stack":
+        if self.Tfusion == "stack":
             print("[Using stack.]")
-            self.args.cost_heads_num = 1
+            self.cost_heads_num = 1
             from .Networks.MOFNetStack.stack import (
                 SKUpdateBlock6_Deep_nopoolres_AllDecoder2,
             )
 
             self.update_block = SKUpdateBlock6_Deep_nopoolres_AllDecoder2(
-                args=self.args, hidden_dim=128 // hidden_dim_ratio
+                feat_dim=feat_dim,
+                down_ratio=down_ratio,
+                corr_radius=corr_radius,
+                corr_levels=corr_levels,
+                cost_heads_num=cost_heads_num,
+                hidden_dim=128 // hidden_dim_ratio,
             )
-        # elif self.args.Tfusion == 'resstack':
-        #     print("[Using resstack.]")
-        #     self.args.cost_heads_num = 1
-        #     from .resstack import SKUpdateBlock6_Deep_nopoolres_AllDecoder2
-        #     self.update_block = SKUpdateBlock6_Deep_nopoolres_AllDecoder2(args=self.args, hidden_dim=128)
-        # elif self.args.Tfusion == 'stackcat':
-        #     print("[Using stackcat.]")
-        #     self.args.cost_heads_num = 1
-        #     from .stackcat import SKUpdateBlock6_Deep_nopoolres_AllDecoder2
-        #     self.update_block = SKUpdateBlock6_Deep_nopoolres_AllDecoder2(args=self.args, hidden_dim=128)
 
-        print("[Using corr_fn {}]".format(self.args.corr_fn))
-
-        gma_down_ratio = 256 // args.feat_dim
+        print("[Using corr_fn {}]".format(self.corr_fn))
 
         self.att = Attention(
-            args=self.args,
             dim=128 // hidden_dim_ratio,
             heads=1,
             max_pos_size=160,
             dim_head=128 // hidden_dim_ratio,
         )
 
-        if self.args.context_3D:
+        if self.context_3D:
             print("[Using 3D Conv on context feature.]")
             self.context_3D = nn.Sequential(
                 nn.Conv3d(256, 256, 3, stride=1, padding=1),
@@ -95,29 +116,6 @@ class VideoFlowMOF(BaseModel):
             )
 
         self.has_showed_warning = False
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--corr_levels", type=int, default=4)
-        parser.add_argument("--corr_radius", type=int, default=4)
-        parser.add_argument(
-            "--cnet", type=str, choices=("twins", "basicencoder"), default="twins"
-        )
-        parser.add_argument(
-            "--fnet", type=str, choices=("twins", "basicencoder"), default="twins"
-        )
-        parser.add_argument("--no_pretrain", action="store_false", dest="pretrain")
-        parser.add_argument(
-            "--corr_fn", type=str, choices=("default", "efficient"), default="default"
-        )
-        parser.add_argument("--decoder_depth", type=int, default=32)
-        parser.add_argument("--feat_dim", type=int, default=256)
-        parser.add_argument("--Tfusion", type=str, choices=("stack",), default="stack")
-        parser.add_argument("--down_ratio", type=int, default=8)
-        parser.add_argument("--context_3D", action="store_true")
-        return parser
 
     def initialize_flow(self, img, bs, down_ratio):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
@@ -171,7 +169,7 @@ class VideoFlowMOF(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
-        down_ratio = self.args.down_ratio
+        down_ratio = self.down_ratio
 
         images = self._check_input_shape(inputs["images"].clone())
         N_orig = images.shape[1]
@@ -215,9 +213,9 @@ class VideoFlowMOF(BaseModel):
             B, N, -1, H // down_ratio, W // down_ratio
         )
 
-        if self.args.corr_fn == "default":
+        if self.corr_fn == "default":
             corr_fn = CorrBlock
-        elif self.args.corr_fn == "efficient":
+        elif self.corr_fn == "efficient":
             corr_fn = AlternateCorrBlock
 
         forward_corr_fn = corr_fn(
@@ -227,8 +225,8 @@ class VideoFlowMOF(BaseModel):
             fmaps[:, 2:N, ...].reshape(
                 B * (N - 2), -1, H // down_ratio, W // down_ratio
             ),
-            num_levels=self.args.corr_levels,
-            radius=self.args.corr_radius,
+            num_levels=self.corr_levels,
+            radius=self.corr_radius,
         )
         backward_corr_fn = corr_fn(
             fmaps[:, 1 : N - 1, ...].reshape(
@@ -237,12 +235,12 @@ class VideoFlowMOF(BaseModel):
             fmaps[:, 0 : N - 2, ...].reshape(
                 B * (N - 2), -1, H // down_ratio, W // down_ratio
             ),
-            num_levels=self.args.corr_levels,
-            radius=self.args.corr_radius,
+            num_levels=self.corr_levels,
+            radius=self.corr_radius,
         )
 
         cnet = self.cnet(images[:, 1 : N - 1, ...].reshape(B * (N - 2), 3, H, W))
-        if self.args.context_3D:
+        if self.context_3D:
             # print("!@!@@#!@#!@")
             cnet = cnet.reshape(B, N - 2, -1, H // 2, W // 2).permute(0, 2, 1, 3, 4)
             cnet = self.context_3D(cnet) + cnet
@@ -266,7 +264,7 @@ class VideoFlowMOF(BaseModel):
 
         motion_hidden_state = None
 
-        for itr in range(self.args.decoder_depth):
+        for itr in range(self.decoder_depth):
             forward_coords1 = forward_coords1.detach()
             backward_coords1 = backward_coords1.detach()
 
@@ -366,3 +364,8 @@ class VideoFlowMOF(BaseModel):
                 self.has_showed_warning = True
             images = torch.cat([images[:, :1], images], 1)
         return images
+
+
+@register_model
+class videoflow_mof(VideoFlowMOF):
+    pass

@@ -47,7 +47,7 @@ class Compose(object):
         transforms_list : Sequence[object]
             A sequence of transforms to be applied.
         """
-        self.transforms_list = transforms_list
+        self.transforms_list = [t for t in transforms_list if t is not None]
 
     def __call__(
         self, inputs: Dict[str, Union[np.ndarray, Sequence[np.ndarray]]]
@@ -133,6 +133,177 @@ class ToTensor(object):
                 v = v.astype(np.float32) / 255.0
             v = v.transpose(0, 3, 1, 2)
             inputs[k] = torch.from_numpy(v).to(device=self.device, dtype=self.dtype)
+        return inputs
+
+
+class GenerateFBCheckFlowOcclusion(object):
+    """Generate occlusion masks based on forward/backward flow consistency.
+
+    In other words, a pixel p is considered occluded when \|Ff(p) + Fb(p + F(f))\|_2 > threshold,
+    where Ff and Fb get the forward and backward flow vectors of a pixel.
+    """
+
+    def __init__(
+        self,
+        threshold: float = 0.0,
+        forward_flow_key: str = "flows",
+        backward_flow_key: str = "flows_b",
+        forward_occlusion_key: str = "occs",
+        backward_occlusion_key: str = "occs_b",
+        compute_backward_occlusion: bool = True,
+    ) -> None:
+        """Initialize ColorJitter.
+
+        Parameters
+        ----------
+        threshold : float, default 0.0
+            A pixel is considered occluded if \|Ff(p) + Fb(p + F(f))\|_2 > threshold.
+        forward_flow_key : str, default "flows"
+            The name of the input dict entry that stores the forward flow.
+        backward_flow_key : str, default "flows_b"
+            The name of the input dict entry that stores the backward flow.
+        forward_occlusion_key : str, default "occs"
+            The name that will be added to the input dict to store the calculated occlusion masks for the forward flow.
+        backward_occlusion_key : str, default "occs"
+            The name that will be added to the input dict to store the calculated occlusion masks for the backward flow.
+        compute_backward_occlusion : bool, default True
+            If False, the occlusion mask is calculated only for the forward flow.
+        """
+        self.threshold = threshold
+        self.forward_flow_key = forward_flow_key
+        self.backward_flow_key = backward_flow_key
+        self.forward_occlusion_key = forward_occlusion_key
+        self.backward_occlusion_key = backward_occlusion_key
+        self.compute_backward_occlusion = compute_backward_occlusion
+
+    def __call__(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """Perform the transformation on the inputs.
+
+        Parameters
+        ----------
+        inputs : Dict[str, torch.Tensor]
+            Elements to be transformed. Each element is a 4D tensor NCHW.
+
+        Returns
+        -------
+        Dict[str, torch.Tensor]
+            The inputs transformed by this operation.
+        """
+        assert self.forward_flow_key in inputs
+        assert self.backward_flow_key in inputs
+        flow_f = inputs[self.forward_flow_key]
+        flow_b = inputs[self.backward_flow_key]
+        b, c, h, w = flow_f.shape
+
+        coords = self._coords_grid(b, h, w, dtype=flow_f.dtype, device=flow_f.device)
+        flow_b_warped, oob_mask_f = self._bilinear_sampler(flow_b, coords + flow_f)
+        diff_f = torch.norm(flow_f + flow_b_warped, p=2, dim=1, keepdim=True)
+        inputs[self.forward_occlusion_key] = (
+            (diff_f > self.threshold) | oob_mask_f
+        ).float()
+
+        if self.compute_backward_occlusion:
+            flow_f_warped, oob_mask_b = self._bilinear_sampler(flow_f, coords + flow_b)
+            diff_b = torch.norm(flow_b + flow_f_warped, p=2, dim=1, keepdim=True)
+            inputs[self.backward_occlusion_key] = (
+                (diff_b > self.threshold) | oob_mask_b
+            ).float()
+
+        return inputs
+
+    def _bilinear_sampler(self, img, coords):
+        # Code adapted from RAFT: https://github.com/princeton-vl/RAFT
+        H, W = img.shape[-2:]
+        xgrid, ygrid = coords.split([1, 1], dim=1)
+        xgrid = 2 * xgrid / (W - 1) - 1
+        ygrid = 2 * ygrid / (H - 1) - 1
+
+        grid = torch.cat([xgrid, ygrid], dim=1)
+        img = F.grid_sample(img, grid.permute(0, 2, 3, 1), align_corners=True)
+
+        mask = (xgrid < -1) | (ygrid < -1) | (xgrid > 1) | (ygrid > 1)
+        return img, mask
+
+    def _coords_grid(self, batch, ht, wd, dtype, device):
+        # Code adapted from RAFT: https://github.com/princeton-vl/RAFT
+        coords = torch.meshgrid(
+            torch.arange(ht, dtype=dtype, device=device),
+            torch.arange(wd, dtype=dtype, device=device),
+            indexing="ij",
+        )
+        coords = torch.stack(coords[::-1], dim=0)
+        return coords[None].repeat(batch, 1, 1, 1)
+
+
+class CenterCrop(object):
+    """Applies center crop to the inputs."""
+
+    def __init__(
+        self,
+        crop_size: Optional[Tuple[int, int]] = None,
+        occlusion_keys: Union[KeysView, Sequence[str]] = ("occs", "occs_b"),
+        valid_key: str = "valids",
+        ignore_keys: Optional[Sequence[str]] = None,
+    ) -> None:
+        """Initialize RandomScaleAndCrop.
+
+        Parameters
+        ----------
+        crop_size : Optional[Tuple[int, int]], optional
+            If provided, crop the inputs to this size (h, w).
+        occlusion_keys : Union[KeysView, Sequence[str]], default ['occs', 'occs_b']
+            Indicate which of the input keys correspond to occlusion mask tensors.
+        valid_keys : str, default 'valids'
+            The name of the key in inputs that contains the binary mask indicating which pixels are valid.
+            Only used when sparse=True.
+        """
+        self.crop_size = crop_size
+        self.occlusion_keys = list(occlusion_keys)
+        self.valid_key = valid_key
+        self.ignore_keys = ignore_keys
+
+    def __call__(  # noqa: C901
+        self, inputs: Dict[str, torch.Tensor]
+    ) -> Dict[str, torch.Tensor]:
+        """Perform the transformation on the inputs.
+
+        Parameters
+        ----------
+        inputs : Dict[str, torch.Tensor]
+            Elements to be transformed. Each element is a 4D tensor NCHW.
+
+        Returns
+        -------
+        Dict[str, torch.Tensor]
+            The inputs transformed by this operation.
+
+        Raises
+        ------
+        NotImplementedError
+            If trying to use time scale.
+        """
+        h, w = inputs[self.valid_key].shape[2:4]
+        y_crop = (h - self.crop_size[0]) // 2
+        x_crop = (w - self.crop_size[1]) // 2
+
+        for k, v in inputs.items():
+            if k not in self.ignore_keys:
+                v = v[
+                    :,
+                    :,
+                    y_crop : y_crop + self.crop_size[0],
+                    x_crop : x_crop + self.crop_size[1],
+                ]
+            inputs[k] = v
+
+        # Update occlusion masks for out-of-bounds flows
+        for k, v in inputs.items():
+            if self.ignore_keys is None or k not in self.ignore_keys:
+                try:
+                    i = self.occlusion_keys.index(k)
+                    inputs[k] = _update_oob_flows(v, inputs[self.flow_keys[i]])
+                except ValueError:
+                    pass
         return inputs
 
 
@@ -989,6 +1160,7 @@ class Resize(object):
         flow_keys: Union[KeysView, Sequence[str]] = ("flows", "flows_b"),
         sparse: bool = False,
         valid_key: str = "valids",
+        ignore_keys: Optional[Union[KeysView, Sequence[str]]] = None,
     ) -> None:
         """Initialize Resize.
 
@@ -1009,6 +1181,8 @@ class Resize(object):
         valid_keys : str, default 'valids'
             The name of the key in inputs that contains the binary mask indicating which pixels are valid.
             Only used when sparse=True.
+        ignore_keys : Optional[Union[KeysView, Sequence[str]]]
+            If not None, remove these keys from the inputs_keys.
         """
         self.size = size
         self.scale = scale
@@ -1016,6 +1190,7 @@ class Resize(object):
         self.flow_keys = list(flow_keys)
         self.sparse = sparse
         self.valid_key = valid_key
+        self.ignore_keys = ignore_keys
 
     def __call__(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Perform the transformation on the inputs.
@@ -1041,6 +1216,7 @@ class Resize(object):
                 self.flow_keys,
                 self.sparse,
                 self.valid_key,
+                ignore_keys=self.ignore_keys,
             )
         return inputs
 
@@ -1082,6 +1258,7 @@ def _resize(
     flow_keys: Union[KeysView, Sequence[str]],
     sparse: bool,
     valid_key: str,
+    ignore_keys: Optional[Sequence[str]] = None,
 ):
     """Resize inputs to a target size. Set sparse=True when the valid mask has holes.
     This ensures that the resized valid mask does not interpolate the valid positions.
@@ -1116,7 +1293,7 @@ def _resize(
         valids = inputs[valid_key]
         n, k, h, w = valids.shape
         hs, ws = target_size
-        scale_factor = torch.Tensor(
+        scale_factor = torch.tensor(
             [float(ws) / w, float(hs) / h], device=valids.device
         )
         valids_flat = rearrange(valids, "n k h w -> n (k h w)")
@@ -1151,7 +1328,7 @@ def _resize(
         inputs[valid_key] = valids_out
 
         for k, v in inputs.items():
-            if k != valid_key:
+            if k != valid_key and (ignore_keys is None or k not in ignore_keys):
                 if k in binary_keys or k in flow_keys:
                     v_out = torch.zeros(
                         v.shape[0], v.shape[1], hs, ws, dtype=v.dtype, device=v.device
@@ -1163,9 +1340,9 @@ def _resize(
                             v_valid = v_valid * scale_factor
                         v_valid = v_valid[inbounds_list[i]]
                         v_valid = rearrange(v_valid, "n k -> k n")
-                        v_out[
-                            i, :, xy_scaled_list[i][1], xy_scaled_list[i][0]
-                        ] = v_valid
+                        v_out[i, :, xy_scaled_list[i][1], xy_scaled_list[i][0]] = (
+                            v_valid
+                        )
                     v = v_out
                 else:
                     v = F.interpolate(
@@ -1174,20 +1351,21 @@ def _resize(
             inputs[k] = v
     else:
         for k, v in inputs.items():
-            h, w = v.shape[-2:]
-            if k in binary_keys:
-                v = F.interpolate(v, size=target_size, mode="nearest")
-            else:
-                v = F.interpolate(
-                    v, size=target_size, mode="bilinear", align_corners=True
-                )
+            if ignore_keys is None or k not in ignore_keys:
+                h, w = v.shape[-2:]
+                if k in binary_keys:
+                    v = F.interpolate(v, size=target_size, mode="nearest")
+                else:
+                    v = F.interpolate(
+                        v, size=target_size, mode="bilinear", align_corners=True
+                    )
 
-            if k in flow_keys:
-                scale_mult = torch.Tensor(
-                    [float(target_size[1]) / w, float(target_size[0]) / h],
-                    device=v.device,
-                )[None, :, None, None]
-                v = v * scale_mult
+                if k in flow_keys:
+                    scale_mult = torch.tensor(
+                        [float(target_size[1]) / w, float(target_size[0]) / h],
+                        device=v.device,
+                    )[None, :, None, None]
+                    v = v * scale_mult
 
             inputs[k] = v
 

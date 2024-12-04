@@ -164,35 +164,39 @@ class ConvexMask(nn.Module):
 
 
 class MotionEncoderPartial(nn.Module):
-    def __init__(self, args):
+    def __init__(
+        self,
+        corr_levels: int,
+        corr_range: int,
+        dec_motion_chs: int,
+        cache_pkconv_weights: bool,
+    ):
         super(MotionEncoderPartial, self).__init__()
-
-        self.args = args
 
         c_hidden = 256
         c_out = 192
         f_hidden = 128
         f_out = 64
 
-        cor_planes = args.corr_levels * (2 * args.corr_range + 1) ** 2
+        cor_planes = corr_levels * (2 * corr_range + 1) ** 2
         self.convc1 = PKConv2d(
-            cor_planes, c_hidden, 1, padding=0, cache_weights=args.cache_pkconv_weights
+            cor_planes, c_hidden, 1, padding=0, cache_weights=cache_pkconv_weights
         )
         self.convc2 = PKConv2d(
-            c_hidden, c_out, 3, padding=1, cache_weights=args.cache_pkconv_weights
+            c_hidden, c_out, 3, padding=1, cache_weights=cache_pkconv_weights
         )
 
         self.convf1 = PKConv2d(
-            2, f_hidden, 7, padding=3, cache_weights=args.cache_pkconv_weights
+            2, f_hidden, 7, padding=3, cache_weights=cache_pkconv_weights
         )
         self.convf2 = PKConv2d(
-            f_hidden, f_out, 3, padding=1, cache_weights=args.cache_pkconv_weights
+            f_hidden, f_out, 3, padding=1, cache_weights=cache_pkconv_weights
         )
 
         in_ch = f_out + c_out
-        out_ch = args.dec_motion_chs - 2
+        out_ch = dec_motion_chs - 2
         self.conv = PKConv2d(
-            in_ch, out_ch, 3, padding=1, cache_weights=args.cache_pkconv_weights
+            in_ch, out_ch, 3, padding=1, cache_weights=cache_pkconv_weights
         )
 
         self.act = nn.ReLU()
@@ -214,37 +218,61 @@ class MotionEncoderPartial(nn.Module):
 
 
 class UpdatePartialBlock(nn.Module):
-    def __init__(self, args):
+    def __init__(
+        self,
+        pyramid_ranges: tuple[int, int],
+        corr_levels: int,
+        corr_range: int,
+        net_chs_fixed: int,
+        inp_chs_fixed: int,
+        group_norm_num_groups: int,
+        use_norm_affine: bool,
+        dec_motion_chs: int,
+        dec_gru_depth: int,
+        dec_gru_iters: int,
+        dec_gru_mlp_ratio: float,
+        use_upsample_mask: bool,
+        upmask_gradient_scale: float,
+        cache_pkconv_weights: bool,
+    ):
         super(UpdatePartialBlock, self).__init__()
-        self.args = args
-        self.encoder = MotionEncoderPartial(args)
+
+        self.use_upsample_mask = use_upsample_mask
+        self.upmask_gradient_scale = upmask_gradient_scale
+
+        self.encoder = MotionEncoderPartial(
+            corr_levels=corr_levels,
+            corr_range=corr_range,
+            dec_motion_chs=dec_motion_chs,
+            cache_pkconv_weights=cache_pkconv_weights,
+        )
         self.gru_list = nn.ModuleList(
             [
                 PKConvSLKGRU(
-                    hidden_dim=args.net_chs_fixed,
-                    input_dim=args.dec_motion_chs + args.inp_chs_fixed,
-                    use_norm_affine=args.use_norm_affine,
-                    num_groups=args.group_norm_num_groups,
-                    depth=args.dec_gru_depth,
-                    mlp_ratio=args.dec_gru_mlp_ratio,
-                    cache_pkconv_weights=args.cache_pkconv_weights,
+                    hidden_dim=net_chs_fixed,
+                    input_dim=dec_motion_chs + inp_chs_fixed,
+                    use_norm_affine=use_norm_affine,
+                    num_groups=group_norm_num_groups,
+                    depth=dec_gru_depth,
+                    mlp_ratio=dec_gru_mlp_ratio,
+                    cache_pkconv_weights=cache_pkconv_weights,
                 )
-                for _ in range(args.dec_gru_iters)
+                for _ in range(dec_gru_iters)
             ]
         )
 
         self.flow_head = FlowHeadPartial(
-            args.net_chs_fixed,
+            net_chs_fixed,
             hidden_dim=256,
-            cache_pkconv_weights=args.cache_pkconv_weights,
+            cache_pkconv_weights=cache_pkconv_weights,
         )
 
-        if self.args.use_upsample_mask:
-            pred_stride = min(self.args.pyramid_ranges)
+        if self.use_upsample_mask:
+            pred_stride = min(pyramid_ranges)
             self.mask = ConvexMask(
-                args.net_chs_fixed,
+                net_chs_fixed,
                 pred_stride,
-                cache_pkconv_weights=args.cache_pkconv_weights,
+                cache_pkconv_weights=cache_pkconv_weights,
             )
 
     def forward(self, net, inp, corr, flow):
@@ -258,7 +286,7 @@ class UpdatePartialBlock(nn.Module):
         delta_flow = self.flow_head(net)
 
         mask = None
-        if self.args.use_upsample_mask:
-            mask = self.args.upmask_gradient_scale * self.mask(net)
+        if self.use_upsample_mask:
+            mask = self.upmask_gradient_scale * self.mask(net)
 
         return delta_flow, net, mask

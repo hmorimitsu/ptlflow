@@ -3,9 +3,7 @@ implementation of the PWC-DC network for optical flow estimation by Sun et al., 
 Jinwei Gu and Zhile Ren
 """
 
-from argparse import ArgumentParser, Namespace
-from pathlib import Path
-from typing import Dict
+from typing import Optional, Sequence
 
 import torch
 import torch.nn as nn
@@ -16,20 +14,19 @@ import os
 os.environ["PYTHON_EGG_CACHE"] = "tmp/"  # a writable directory
 import numpy as np
 import math
-import pdb
-import time
 
+from ptlflow.utils.registry import register_model, trainable
 from .submodule import pspnet_s, pspnet, conv
 from .conv4d import sepConv4d, butterfly4D
 from ..base_model.base_model import BaseModel
 
 
 class VCNLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, maxdisp, fac, train_batch_size):
         super(VCNLoss, self).__init__()
-        self.maxdisp = args.maxdisp
-        self.fac = args.fac
-        self.bs = args.train_batch_size
+        self.maxdisp = maxdisp
+        self.fac = fac
+        self.bs = train_batch_size
 
         self.warpx = WarpModule()
 
@@ -288,12 +285,22 @@ class VCNSmall(BaseModel):
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn_small-things-2f19af2d.ckpt",
     }
 
-    def __init__(self, args, md=[4, 4, 4, 4, 4]):
+    def __init__(
+        self,
+        fac: float = 1.0,
+        maxdisp: int = 256,
+        md: Sequence[int] = [4, 4, 4, 4, 4],
+        train_batch_size: Optional[int] = None,
+        **kwargs,
+    ):
         super(VCNSmall, self).__init__(
-            args=args, loss_fn=VCNLoss(args), output_stride=64
+            loss_fn=VCNLoss(maxdisp, fac, train_batch_size),
+            output_stride=64,
+            **kwargs,
         )
         self.md = md
-        self.fac = self.args.fac
+        self.fac = fac
+        self.maxdisp = maxdisp
         use_entropy = True
         withbn = True
 
@@ -453,14 +460,6 @@ class VCNSmall(BaseModel):
                 m.weight.data.normal_(0, math.sqrt(2.0 / n))
                 if hasattr(m.bias, "data"):
                     m.bias.data.zero_()
-
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--fac", type=float, default=1.0)
-        parser.add_argument("--maxdisp", type=int, default=256)
-        return parser
 
     # @profile
     def corr(self, refimg_fea, targetimg_fea, maxdisp, fac=1):
@@ -875,8 +874,21 @@ class VCN(VCNSmall):
         "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/vcn-kitti-3f6d9f0b.ckpt",
     }
 
-    def __init__(self, args, md=[4, 4, 4, 4, 4]):
-        super(VCN, self).__init__(args=args, md=md)
+    def __init__(
+        self,
+        fac: float = 1.0,
+        maxdisp: int = 256,
+        md: Sequence[int] = [4, 4, 4, 4, 4],
+        train_batch_size: Optional[int] = None,
+        **kwargs,
+    ):
+        super(VCN, self).__init__(
+            fac=fac,
+            maxdisp=maxdisp,
+            md=md,
+            train_batch_size=train_batch_size,
+            **kwargs,
+        )
         use_entropy = True
         withbn = True
 
@@ -1349,3 +1361,15 @@ class VCN(VCNSmall):
             outputs["flows"] = flow2[:, None] * 4
 
         return outputs
+
+
+@register_model
+@trainable
+class vcn(VCN):
+    pass
+
+
+@register_model
+@trainable
+class vcn_small(VCNSmall):
+    pass

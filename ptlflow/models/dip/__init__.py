@@ -1,1 +1,1 @@
-from .dip import DIP as Model
+from .dip import *

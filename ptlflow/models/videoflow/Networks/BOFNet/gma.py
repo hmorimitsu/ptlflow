@@ -33,14 +33,12 @@ class Attention(nn.Module):
     def __init__(
         self,
         *,
-        args,
         dim,
         max_pos_size=100,
         heads=4,
         dim_head=128,
     ):
         super().__init__()
-        self.args = args
         self.heads = heads
         self.scale = dim_head**-0.5
         inner_dim = heads * dim_head
@@ -77,13 +75,11 @@ class Attention(nn.Module):
 class Aggregate(nn.Module):
     def __init__(
         self,
-        args,
         dim,
         heads=4,
         dim_head=128,
     ):
         super().__init__()
-        self.args = args
         self.heads = heads
         self.scale = dim_head**-0.5
         inner_dim = heads * dim_head
