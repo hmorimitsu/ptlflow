@@ -37,8 +37,8 @@ model:
 data:
   train_dataset: things
   val_dataset: sintel-final-val+kitti-2015-val
-  train_batch_size: 6
-  train_num_workers: 3
+  train_batch_size: 4
+  train_num_workers: 2
   train_crop_size: [384, 704]
   train_transform_cuda: false
   train_transform_fp16: false
