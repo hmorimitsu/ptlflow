@@ -1,7 +1,7 @@
 # lightning.pytorch==2.4.0
 seed_everything: true
 trainer:
-  max_epochs: 45
+  max_epochs: 10
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0
   devices: 0,
@@ -36,7 +36,7 @@ model:
 data:
   train_dataset: chairs
   val_dataset: sintel-final-val+kitti-2015-val
-  train_batch_size: 1
+  train_batch_size: 8
   train_num_workers: 4
   train_crop_size: [352, 480]
   train_transform_cuda: false
