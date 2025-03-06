@@ -1,6 +1,8 @@
 # lightning.pytorch==2.4.0
 seed_everything: true
 ckpt_path: /path/to/sintel.ckpt  # Change to the ckpt resulting from rapidflow-train3-sintel
+lr: 0.000125
+wdecay: 0.00001
 trainer:
   max_epochs: 300
   check_val_every_n_epoch: 10
@@ -32,8 +34,6 @@ model:
     simple_io: false
     gamma: 0.85
     max_flow: 400
-    lr: 0.000125
-    wdecay: 0.00001
     warm_start: false
 data:
   train_dataset: kitti-2015

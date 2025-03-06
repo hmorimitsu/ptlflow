@@ -29,6 +29,8 @@ from ptlflow.utils.registry import RegisteredModel
 
 def _init_parser():
     parser = ArgumentParser(add_help=False)
+    parser.add_argument("--lr", type=float, default=None)
+    parser.add_argument("--wdecay", type=float, default=None)
     parser.add_argument("--ckpt_path", type=str, default=None)
     parser.add_argument("--project", type=str, default="ptlflow")
     parser.add_argument("--version", type=str, default=None)
@@ -155,6 +157,8 @@ def cli_main():
 
     cfg.trainer.logger = trainer_logger
     cfg.trainer.callbacks = callbacks
+    cfg.model.init_args.lr = cfg.lr
+    cfg.model.init_args.wdecay = cfg.wdecay
     cli = PTLFlowCLI(
         model_class=RegisteredModel,
         subclass_mode_model=True,
