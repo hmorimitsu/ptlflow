@@ -64,6 +64,8 @@ class FlowDataModule(pl.LightningDataModule):
         tartanair_root_dir: Optional[str] = None,
         spring_root_dir: Optional[str] = None,
         kubric_root_dir: Optional[str] = None,
+        middlebury_st_root_dir: Optional[str] = None,
+        viper_root_dir: Optional[str] = None,
         dataset_config_path: str = "./datasets.yaml",
     ):
         super().__init__()
@@ -89,6 +91,8 @@ class FlowDataModule(pl.LightningDataModule):
         self.tartanair_root_dir = tartanair_root_dir
         self.spring_root_dir = spring_root_dir
         self.kubric_root_dir = kubric_root_dir
+        self.middlebury_st_root_dir = middlebury_st_root_dir
+        self.viper_root_dir = viper_root_dir
         self.dataset_config_path = dataset_config_path
 
         self.predict_dataset_parsed = None
