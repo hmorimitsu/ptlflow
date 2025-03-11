@@ -372,7 +372,7 @@ def benchmark(args: Namespace, device_handle) -> pd.DataFrame:
                     )
                 except Exception as e:  # noqa: B902
                     logger.warning(
-                        "Skipping model %s with datatype %s due to exception %s",
+                        "Skipping model {} with datatype {} due to exception {}",
                         mname,
                         dtype_str,
                         e,
