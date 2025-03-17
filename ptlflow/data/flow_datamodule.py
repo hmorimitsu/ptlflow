@@ -939,6 +939,7 @@ class FlowDataModule(pl.LightningDataModule):
         sequence_position = "first"
         reverse_only = False
         subsample = False
+        is_image_4k = False
         side_names = []
         fbocc_transform = False
         for v in args:
@@ -956,6 +957,8 @@ class FlowDataModule(pl.LightningDataModule):
                 sequence_position = v.split("_")[1]
             elif v == "sub":
                 subsample = True
+            elif v == "4k":
+                is_image_4k = True
             elif v == "left":
                 side_names.append("left")
             elif v == "right":
@@ -1016,6 +1019,7 @@ class FlowDataModule(pl.LightningDataModule):
             sequence_position=sequence_position,
             reverse_only=reverse_only,
             subsample=subsample,
+            is_image_4k=is_image_4k,
         )
         return dataset
 

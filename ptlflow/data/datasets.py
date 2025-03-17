@@ -25,6 +25,7 @@ from einops import rearrange
 from loguru import logger
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Dataset
 from ptlflow.utils import flow_utils
 
@@ -1662,7 +1663,6 @@ class SpringDataset(BaseFlowDataset):
         reverse_only: bool = False,
         subsample: bool = False,
         is_image_4k: bool = False,
-        image_4k_split_dir_suffix: str = "_4k",
     ) -> None:
         """Initialize SintelDataset.
 
@@ -1705,11 +1705,6 @@ class SpringDataset(BaseFlowDataset):
             If False, and is_image_4k is True, then the groundtruth is returned in its original 4D-shaped 4K resolution, but the flow values are doubled.
         is_image_4k : bool, default False
             If True, assumes the input images will be provided in 4K resolution, instead of the original 2K.
-        image_4k_split_dir_suffix : str, default "_4k"
-            Only used when is_image_4k == True. It indicates the suffix to add to the split folder name where the 4k images are located.
-            For example, by default, the 4K images need to be located inside folders called "train_4k" and/or "test/4k".
-            The structure of these folders should be the same as the original "train" and "test".
-            The "*_4k" folders only need to contain the image directories, the groundtruth will still be loaded from the original locations.
         """
         if isinstance(side_names, str):
             side_names = [side_names]
@@ -1731,7 +1726,6 @@ class SpringDataset(BaseFlowDataset):
         self.sequence_position = sequence_position
         self.subsample = subsample
         self.is_image_4k = is_image_4k
-        self.image_4k_split_dir_suffix = image_4k_split_dir_suffix
 
         if self.is_image_4k:
             assert not self.subsample
@@ -1758,17 +1752,9 @@ class SpringDataset(BaseFlowDataset):
             for side in side_names:
                 for direcs in directions:
                     rev = direcs[0] == "BW"
-                    img_split_dir_name = (
-                        f"{split_dir}{self.image_4k_split_dir_suffix}"
-                        if self.is_image_4k
-                        else split_dir
-                    )
                     image_paths = sorted(
                         (
-                            Path(self.root_dir)
-                            / img_split_dir_name
-                            / seq_name
-                            / f"frame_{side}"
+                            Path(self.root_dir) / split_dir / seq_name / f"frame_{side}"
                         ).glob("*.png"),
                         reverse=rev,
                     )
@@ -1883,12 +1869,38 @@ class SpringDataset(BaseFlowDataset):
             if self.transform is not None:
                 inputs = self.transform(inputs)
         elif self.is_image_4k:
+            inputs["images"] = [
+                cv.resize(img, None, fx=2, fy=2, interpolation=cv.INTER_CUBIC)
+                for img in inputs["images"]
+            ]
             if self.transform is not None:
                 inputs = self.transform(inputs)
             if "flows" in inputs:
                 inputs["flows"] = 2 * inputs["flows"]
                 if self.get_backward:
                     inputs["flows_b"] = 2 * inputs["flows_b"]
+
+                process_keys = [("flows", "valids")]
+                if self.get_backward:
+                    process_keys.append(("flows_b", "valids_b"))
+
+                for flow_key, valid_key in process_keys:
+                    flow = inputs[flow_key]
+                    flow_stack = rearrange(
+                        flow, "b c (h nh) (w nw) -> b (nh nw) c h w", nh=2, nw=2
+                    )
+                    flow_stack4 = flow_stack.repeat(1, 4, 1, 1, 1)
+                    flow_stack4 = rearrange(
+                        flow_stack4, "b (m n) c h w -> b m n c h w", m=4
+                    )
+                    diff = flow_stack[:, :, None] - flow_stack4
+                    diff = rearrange(diff, "b m n c h w -> b (m n) c h w")
+                    diff = torch.sqrt(torch.pow(diff, 2).sum(2))
+                    max_diff, _ = diff.max(1)
+                    max_diff = F.interpolate(
+                        max_diff[:, None], scale_factor=2, mode="nearest"
+                    )
+                    inputs[valid_key] = (max_diff < 1.0).float()
         else:
             if self.transform is not None:
                 inputs = self.transform(inputs)
