@@ -69,18 +69,25 @@ class BaseModel(pl.LightningModule):
         lr: Optional[float] = None,
         wdecay: Optional[float] = None,
         warm_start: bool = False,
+        metric_interpolate_pred_to_target_size: bool = False,
     ) -> None:
         """Initialize BaseModel.
 
         Parameters
         ----------
-        args : Namespace
-            A namespace with the required arguments. Typically, this can be gotten from add_model_specific_args().
-        loss_fn : Callable
-            A function to be used to compute the loss for the training. The input of this function must match the output of the
-            forward() method. The output of this function must be a tensor with a single value.
         output_stride : int
             How many times the output of the network is smaller than the input.
+        loss_fn : Optional[Callable]
+            A function to be used to compute the loss for the training. The input of this function must match the output of the
+            forward() method. The output of this function must be a tensor with a single value.
+        lr : Optional[float]
+            The learning rate to be used for training the model. If not provided, it will be set as 1e-4.
+        wdecay : Optional[float]
+            The weight decay to be used for training the model. If not provided, it will be set as 1e-4.
+        warm_start : bool, default False
+            If True, use warm start to initialize the flow prediction. The warm_start strategy was presented by the RAFT method and forward interpolates the prediction from the last frame.
+        metric_interpolate_pred_to_target_size : bool, default False
+            If True, the prediction is bilinearly interpolated to match the target size during metric calculation, if their sizes are different.
         """
         super(BaseModel, self).__init__()
 
@@ -89,13 +96,19 @@ class BaseModel(pl.LightningModule):
         self.lr = lr
         self.wdecay = wdecay
         self.warm_start = warm_start
+        self.metric_interpolate_pred_to_target_size = (
+            metric_interpolate_pred_to_target_size
+        )
 
         self.train_size = None
         self.train_avg_length = None
 
         self.extra_params = None
 
-        self.train_metrics = FlowMetrics(prefix="train/")
+        self.train_metrics = FlowMetrics(
+            prefix="train/",
+            interpolate_pred_to_target_size=self.metric_interpolate_pred_to_target_size,
+        )
         self.val_metrics = nn.ModuleList()
         self.val_dataset_names = []
 
@@ -132,6 +145,7 @@ class BaseModel(pl.LightningModule):
     def preprocess_images(
         self,
         images: torch.Tensor,
+        stride: Optional[int] = None,
         bgr_add: Union[float, Tuple[float, float, float], np.ndarray, torch.Tensor] = 0,
         bgr_mult: Union[
             float, Tuple[float, float, float], np.ndarray, torch.Tensor
@@ -201,7 +215,7 @@ class BaseModel(pl.LightningModule):
         if bgr_to_rgb:
             images = torch.flip(images, [-3])
 
-        stride = self.output_stride
+        stride = self.output_stride if stride is None else stride
         if target_size is not None:
             stride = None
 
@@ -371,7 +385,10 @@ class BaseModel(pl.LightningModule):
         """
         if len(self.val_metrics) <= dataloader_idx:
             self.val_metrics.append(
-                FlowMetrics(prefix="val/").to(device=batch["flows"].device)
+                FlowMetrics(
+                    prefix="val/",
+                    interpolate_pred_to_target_size=self.metric_interpolate_pred_to_target_size,
+                ).to(device=batch["flows"].device)
             )
             self.val_dataset_names.append(None)
 

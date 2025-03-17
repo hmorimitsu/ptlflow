@@ -236,6 +236,9 @@ def validate(
         if args.fp16:
             model = model.half()
 
+    if args.scale_factor is not None and args.scale_factor != 1.0:
+        model.metric_interpolate_pred_to_target_size = True
+
     data_module.setup("validate")
     dataloaders = data_module.val_dataloader()
     dataloaders = {
