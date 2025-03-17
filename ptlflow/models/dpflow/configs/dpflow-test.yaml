@@ -1,0 +1,59 @@
+# lightning.pytorch==2.4.0
+output_path: outputs/test
+show: false
+max_forward_side: null
+scale_factor: null
+max_show_side: 1000
+save_viz: true
+model:
+  class_path: ptlflow.models.dpflow
+  init_args:
+    iters_per_level: 4
+    detach_flow: true
+    use_norm_affine: false
+    group_norm_num_groups: 8
+    corr_mode: allpairs
+    corr_levels: 1
+    corr_range: 4
+    activation_function: orig
+    enc_network: cgu_bidir_dual
+    enc_norm_type: group
+    enc_depth: 4
+    enc_mlp_ratio: 2.0
+    enc_mlp_in_kernel_size: 1
+    enc_mlp_out_kernel_size: 1
+    enc_hidden_chs:
+    - 64
+    - 96
+    - 128
+    enc_num_out_stages: 1
+    enc_out_1x1_chs: '384'
+    dec_gru_norm_type: layer
+    dec_gru_iters: 1
+    dec_gru_depth: 4
+    dec_gru_mlp_ratio: 2.0
+    dec_gru_mlp_in_kernel_size: 1
+    dec_gru_mlp_out_kernel_size: 1
+    dec_net_chs: 128
+    dec_inp_chs: 128
+    dec_motion_chs: 128
+    dec_flow_kernel_size: 7
+    dec_flow_head_chs: 256
+    dec_motenc_corr_hidden_chs: 256
+    dec_motenc_corr_out_chs: 192
+    dec_motenc_flow_hidden_chs: 128
+    dec_motenc_flow_out_chs: 64
+    use_upsample_mask: true
+    upmask_gradient_scale: 1.0
+    cgu_mlp_dw_kernel_size: 7
+    cgu_fusion_gate_activation: gelu
+    cgu_mlp_use_dw_conv: true
+    cgu_mlp_activation_function: gelu
+    cgu_layer_scale_init_value: 0.01
+    loss: laplace
+    gamma: 0.8
+    max_flow: 400.0
+    use_var: true
+    var_min: 0.0
+    var_max: 10.0
+    warm_start: true
