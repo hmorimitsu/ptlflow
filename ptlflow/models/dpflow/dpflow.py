@@ -91,6 +91,14 @@ class SequenceLoss(nn.Module):
 
 
 class DPFlow(BaseModel):
+    pretrained_checkpoints = {
+        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dpflow-chairs-f94e717a.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dpflow-kitti-4e97eac6.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dpflow-sintel-b44b072c.ckpt",
+        "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dpflow-spring-69bac7fa.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/dpflow-things-2012b5d6.ckpt",
+    }
+
     def __init__(
         self,
         pyramid_levels: Optional[int] = None,
