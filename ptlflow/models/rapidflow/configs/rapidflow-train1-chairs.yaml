@@ -1,5 +1,7 @@
 # lightning.pytorch==2.4.0
 seed_everything: true
+lr: 0.0004
+wdecay: 0.0001
 trainer:
   max_epochs: 10
   accumulate_grad_batches: 1
@@ -30,8 +32,6 @@ model:
     simple_io: false
     gamma: 0.8
     max_flow: 400
-    lr: 0.0004
-    wdecay: 0.0001
     warm_start: false
 data:
   train_dataset: chairs

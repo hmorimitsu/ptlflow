@@ -20,10 +20,12 @@ compute basic metrics for occlusion, motion boundary and flow confidence estimat
 # limitations under the License.
 # =============================================================================
 
-from typing import Dict
+from typing import Dict, Sequence
 
-from torchmetrics import Metric
+import numpy as np
 import torch
+import torch.nn.functional as F
+from torchmetrics import Metric
 
 
 class FlowMetrics(Metric):
@@ -48,6 +50,7 @@ class FlowMetrics(Metric):
         average_mode: str = "epoch_mean",
         ema_decay: float = 0.99,
         f1_mode: str = "macro",
+        interpolate_pred_to_target_size: bool = False,
     ) -> None:
         """Initialize FlowMetrics.
 
@@ -65,6 +68,8 @@ class FlowMetrics(Metric):
             How to calculate the f1-score. Accepts one of these options {binary, macro, weighted}. If binary, then the f1-score
             is calculated only for the positive pixels. If macro, then the f1-score is the average of positive and negative
             scores. If weighted, then the average is weighted according to the number of positive/negative samples.
+        interpolate_pred_to_target_size : bool, default False
+            If True, the prediction is bilinearly interpolated to match the target size, if their sizes are different.
         """
         super().__init__(dist_sync_on_step=dist_sync_on_step)
 
@@ -75,6 +80,7 @@ class FlowMetrics(Metric):
         self.ema_decay = ema_decay
         self.f1_mode = f1_mode
         self.ema_max_count = min(100, int(1.0 / (1.0 - ema_decay)))
+        self.interpolate_pred_to_target_size = interpolate_pred_to_target_size
 
         self.add_state("epe", default=torch.tensor(0).float(), dist_reduce_fx="sum")
         self.add_state(
@@ -150,8 +156,30 @@ class FlowMetrics(Metric):
             prev_weight = self.ema_decay
             next_weight = 1.0 - self.ema_decay
 
+        metric_preds = {}
+        if self.interpolate_pred_to_target_size:
+            for k, v in preds.items():
+                if isinstance(v, torch.Tensor):
+                    v, orig_shape = self._to_bchw_shape(v)
+                    target_size = targets["flows"].shape[-2:]
+                    v = F.interpolate(
+                        v, target_size, mode="bilinear", align_corners=True
+                    )
+                    new_shape = list(orig_shape[:-2]) + list(target_size)
+                    v = v.view(*new_shape)
+
+                    if "flow" in k:
+                        scale_y = float(target_size[-2]) / orig_shape[-2]
+                        scale_x = float(target_size[-1]) / orig_shape[-1]
+                        v[..., 0, :, :] *= scale_x
+                        v[..., 1, :, :] *= scale_y
+
+                metric_preds[k] = v
+        else:
+            metric_preds = preds
+
         batch_size = self._get_batch_size(targets["flows"])
-        flow_pred = self._fix_shape(preds["flows"], batch_size)
+        flow_pred = self._fix_shape(metric_preds["flows"], batch_size)
         flow_target = self._fix_shape(targets["flows"], batch_size)
 
         valid_target = targets.get("valids")
@@ -208,24 +236,24 @@ class FlowMetrics(Metric):
             )
             self.include_occlusion = True
 
-            if preds.get("occs") is not None:
-                occlusion_pred = self._fix_shape(preds["occs"], batch_size)
+            if metric_preds.get("occs") is not None:
+                occlusion_pred = self._fix_shape(metric_preds["occs"], batch_size)
                 occ_f1 = self._f1_score(
                     occlusion_pred, occlusion_target, mode=self.f1_mode
                 )
                 self.used_keys.extend([("occ_f1", "occ_f1", "valid_target")])
 
-        if preds.get("mbs") is not None and targets.get("mbs") is not None:
-            mb_pred = self._fix_shape(preds["mbs"], batch_size)
+        if metric_preds.get("mbs") is not None and targets.get("mbs") is not None:
+            mb_pred = self._fix_shape(metric_preds["mbs"], batch_size)
             mb_target = self._fix_shape(targets["mbs"], batch_size)
             mb_f1 = self._f1_score(mb_pred, mb_target, mode=self.f1_mode)
             self.used_keys.extend([("mb_f1", "mb_f1", "valid_target")])
 
-        if preds.get("confs") is not None:
+        if metric_preds.get("confs") is not None:
             conf_target = torch.exp(
                 -torch.pow(flow_target - flow_pred, 2).sum(dim=1, keepdim=True)
             )
-            conf_pred = self._fix_shape(preds["confs"], batch_size)
+            conf_pred = self._fix_shape(metric_preds["confs"], batch_size)
             conf_f1 = self._f1_score(conf_pred, conf_target, mode=self.f1_mode)
             self.used_keys.extend([("conf_f1", "conf_f1", "valid_target")])
 
@@ -379,6 +407,22 @@ class FlowMetrics(Metric):
                 tensor.shape[5],
             )
         return tensor
+
+    def _to_bchw_shape(self, tensor) -> tuple[torch.Tensor, Sequence[int]]:
+        orig_shape = tensor.shape
+        if len(tensor.shape) == 2:
+            tensor = tensor[None, None]
+        elif len(tensor.shape) == 3:
+            tensor = tensor[None]
+        elif len(tensor.shape) > 4:
+            batch_size = int(np.prod(orig_shape[:-3]))
+            tensor = tensor.view(
+                batch_size,
+                tensor.shape[-3],
+                tensor.shape[-2],
+                tensor.shape[-1],
+            )
+        return tensor, orig_shape
 
     def _get_batch_size(self, flow_tensor: torch.Tensor) -> int:
         if len(flow_tensor.shape) < 4:

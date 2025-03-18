@@ -17,10 +17,10 @@ jobs:
       fail-fast: false
       matrix:
         pytorch: [
+          'torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cpu',
           'torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu',
           'torch==2.4.1 torchvision==0.19.1 --index-url https://download.pytorch.org/whl/cpu',
           'torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cpu',
-          'torch==2.2.2 torchvision==0.17.2 --index-url https://download.pytorch.org/whl/cpu',
         ]
 
     steps:

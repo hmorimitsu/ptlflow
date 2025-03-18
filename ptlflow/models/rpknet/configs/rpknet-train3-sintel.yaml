@@ -1,6 +1,8 @@
 # lightning.pytorch==2.4.0
 seed_everything: true
 ckpt_path: /path/to/things.ckpt  # Change to the ckpt resulting from rpknet-train2-things
+lr: 0.000125
+wdecay: 0.00001
 trainer:
   max_epochs: 5
   accumulate_grad_batches: 1
@@ -42,8 +44,6 @@ model:
     cache_pkconv_weights: false
     gamma: 0.85
     max_flow: 400
-    lr: 0.000125
-    wdecay: 0.00001
     warm_start: false
 data:
   train_dataset: sintel_finetune

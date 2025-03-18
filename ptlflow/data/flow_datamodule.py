@@ -64,6 +64,8 @@ class FlowDataModule(pl.LightningDataModule):
         tartanair_root_dir: Optional[str] = None,
         spring_root_dir: Optional[str] = None,
         kubric_root_dir: Optional[str] = None,
+        middlebury_st_root_dir: Optional[str] = None,
+        viper_root_dir: Optional[str] = None,
         dataset_config_path: str = "./datasets.yaml",
     ):
         super().__init__()
@@ -89,6 +91,8 @@ class FlowDataModule(pl.LightningDataModule):
         self.tartanair_root_dir = tartanair_root_dir
         self.spring_root_dir = spring_root_dir
         self.kubric_root_dir = kubric_root_dir
+        self.middlebury_st_root_dir = middlebury_st_root_dir
+        self.viper_root_dir = viper_root_dir
         self.dataset_config_path = dataset_config_path
 
         self.predict_dataset_parsed = None
@@ -935,6 +939,7 @@ class FlowDataModule(pl.LightningDataModule):
         sequence_position = "first"
         reverse_only = False
         subsample = False
+        is_image_4k = False
         side_names = []
         fbocc_transform = False
         for v in args:
@@ -952,6 +957,8 @@ class FlowDataModule(pl.LightningDataModule):
                 sequence_position = v.split("_")[1]
             elif v == "sub":
                 subsample = True
+            elif v == "4k":
+                is_image_4k = True
             elif v == "left":
                 side_names.append("left")
             elif v == "right":
@@ -1012,6 +1019,7 @@ class FlowDataModule(pl.LightningDataModule):
             sequence_position=sequence_position,
             reverse_only=reverse_only,
             subsample=subsample,
+            is_image_4k=is_image_4k,
         )
         return dataset
 

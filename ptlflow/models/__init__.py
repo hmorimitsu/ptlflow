@@ -3,6 +3,7 @@ from .craft import *
 from .csflow import *
 from .dicl import *
 from .dip import *
+from .dpflow import *
 from .fastflownet import *
 from .flow1d import *
 from .flowformer import *

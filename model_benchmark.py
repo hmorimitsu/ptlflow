@@ -36,10 +36,7 @@ from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
 from ptlflow.utils.registry import RegisteredModel
 from ptlflow.utils.timer import Timer
-from ptlflow.utils.utils import (
-    count_parameters,
-    make_divisible,
-)
+from ptlflow.utils.utils import count_parameters
 
 NUM_COMMON_COLUMNS = 6
 TABLE_KEYS_LEGENDS = {
@@ -302,8 +299,8 @@ def benchmark(args: Namespace, device_handle) -> pd.DataFrame:
                             1,
                             2,
                             3,
-                            make_divisible(input_size[0], model.output_stride),
-                            make_divisible(input_size[1], model.output_stride),
+                            input_size[0],
+                            input_size[1],
                         )
                     }
 
@@ -372,7 +369,7 @@ def benchmark(args: Namespace, device_handle) -> pd.DataFrame:
                     )
                 except Exception as e:  # noqa: B902
                     logger.warning(
-                        "Skipping model %s with datatype %s due to exception %s",
+                        "Skipping model {} with datatype {} due to exception {}",
                         mname,
                         dtype_str,
                         e,
@@ -440,8 +437,8 @@ def estimate_inference_time(
                 args.batch_size,
                 2,
                 3,
-                make_divisible(input_size[0], model.output_stride),
-                make_divisible(input_size[1], model.output_stride),
+                input_size[0],
+                input_size[1],
             )
         }
         if torch.cuda.is_available():

@@ -1,6 +1,8 @@
 # lightning.pytorch==2.4.0
 seed_everything: true
 ckpt_path: /path/to/chairs.ckpt  # Change to the ckpt resulting from rpknet-train1-chairs
+lr: 0.000125
+wdecay: 0.0001
 trainer:
   max_epochs: 80
   accumulate_grad_batches: 1
@@ -42,8 +44,6 @@ model:
     cache_pkconv_weights: false
     gamma: 0.8
     max_flow: 400
-    lr: 0.000125
-    wdecay: 0.0001
     warm_start: false
 data:
   train_dataset: things

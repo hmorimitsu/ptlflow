@@ -19,9 +19,8 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Union
 
-import numpy as np
 import pandas as pd
 import plotly.express as px
 

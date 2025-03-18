@@ -236,7 +236,9 @@ def load_checkpoint(ckpt_path: str, model_ref: BaseModel) -> Dict[str, Any]:
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     if Path(ckpt_path).exists():
-        ckpt = torch.load(ckpt_path, map_location=torch.device(device))
+        ckpt = torch.load(
+            ckpt_path, map_location=torch.device(device), weights_only=True
+        )
     else:
         model_dir = Path(hub.get_dir()) / "checkpoints"
         ckpt = hub.load_state_dict_from_url(
@@ -244,6 +246,7 @@ def load_checkpoint(ckpt_path: str, model_ref: BaseModel) -> Dict[str, Any]:
             model_dir=model_dir,
             map_location=torch.device(device),
             check_hash=True,
+            weights_only=True,
         )
     return ckpt
 
