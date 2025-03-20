@@ -62,6 +62,15 @@ DIP
 
 - Model names: ``dip``
 
+DPFlow
+------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/dpflow>`__
+
+- Paper: **DPFlow: Adaptive Optical Flow Estimation with a Dual-Pyramid Framework** - `https://arxiv.org/abs/2503.14880 <https://arxiv.org/abs/2503.14880>`_
+
+- Model names: ``dpflow``
+
 FastFlownet
 -----------
 
@@ -426,6 +435,15 @@ STaRFlow
 - Reference code: `https://github.com/pgodet/star_flow <https://github.com/pgodet/star_flow>`_
 
 - Model names: ``starflow``
+
+StreamFlow
+------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/streamflow>`__
+
+- Paper: **StreamFlow: Streamlined Multi-Frame Optical Flow Estimation for Video Sequences** - `https://arxiv.org/abs/2311.17099 <https://arxiv.org/abs/2311.17099>`_
+
+- Model names: ``streamflow``
 
 VCN
 ---

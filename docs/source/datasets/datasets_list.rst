@@ -65,6 +65,13 @@ Paper: **Kubric: A scalable dataset generator** - `https://arxiv.org/abs/2203.03
 
 Dataset link: `https://github.com/google-research/kubric <https://github.com/google-research/kubric>`_
 
+Kubric-NK
+---------
+
+Paper: **DPFlow: Adaptive Optical Flow Estimation with a Dual-Pyramid Framework** - `https://arxiv.org/abs/2503.14880 <https://arxiv.org/abs/2503.14880>`_
+
+Dataset link: `https://github.com/hmorimitsu/kubric-nk <https://github.com/hmorimitsu/kubric-nk>`_
+
 Middlebury
 ----------
 
