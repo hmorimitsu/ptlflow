@@ -24,6 +24,17 @@ This is still under development, so some things may not work as intended. I plan
 
 ## What's new
 
+###  - v0.4.1
+
+- Added new models:
+  - DPFlow [https://arxiv.org/abs/2503.14880](https://arxiv.org/abs/2503.14880)
+  - StreamFlow [https://arxiv.org/abs/2311.17099](https://arxiv.org/abs/2311.17099)
+- Additions / fixes:
+  - Add 4K read mode for Spring dataset
+  - Add missing arguments for Middlebury-ST and VIPER datasets
+  - Fix RAFT config files
+  - Fix RAPIDFlow config files
+
 ###  - v0.4.0
 
 Major update to support Lightning 2 (finally!). However, it also introduces breaking changes from the previous v0.3 code. See the details below.
@@ -92,6 +103,7 @@ Major update to support Lightning 2 (finally!). However, it also introduces brea
 - CSFlow [https://arxiv.org/abs/2202.00909](https://arxiv.org/abs/2202.00909)
 - DICL-Flow [https://arxiv.org/abs/2010.14851](https://arxiv.org/abs/2010.14851)
 - DIP [https://arxiv.org/abs/2204.00330](https://arxiv.org/abs/2204.00330)
+- DPFlow [https://arxiv.org/abs/2503.14880](https://arxiv.org/abs/2503.14880)
 - FastFlowNet [https://arxiv.org/abs/2103.04524](https://arxiv.org/abs/2103.04524)
 - Flow1D [https://arxiv.org/abs/2103.04524](https://arxiv.org/abs/2103.04524)
 - FlowFormer [https://arxiv.org/abs/2203.16194](https://arxiv.org/abs/2203.16194)
@@ -126,6 +138,7 @@ Major update to support Lightning 2 (finally!). However, it also introduces brea
 - SKFlow [https://arxiv.org/abs/2205.14623](https://arxiv.org/abs/2205.14623)
 - SplatFlow [https://arxiv.org/abs/2306.08887](https://arxiv.org/abs/2306.08887)
 - STaRFlow [https://arxiv.org/abs/2007.05481](https://arxiv.org/abs/2007.05481)
+- StreamFlow [https://arxiv.org/abs/2311.17099](https://arxiv.org/abs/2311.17099)
 - VCN [https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf](https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf)
 - VideoFlow [https://arxiv.org/abs/2303.08340](https://arxiv.org/abs/2303.08340)
 
