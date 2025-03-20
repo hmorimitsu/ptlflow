@@ -87,15 +87,21 @@ def bilinear_sampler(img, coords, mode="bilinear", mask=False):
     return img
 
 
-def coords_grid(batch, ht, wd):
-    coords = torch.meshgrid(torch.arange(ht), torch.arange(wd))
-    coords = torch.stack(coords[::-1], dim=0).float()
+def coords_grid(batch, ht, wd, dtype, device):
+    coords = torch.meshgrid(
+        torch.arange(ht, dtype=dtype, device=device),
+        torch.arange(wd, dtype=dtype, device=device),
+    )
+    coords = torch.stack(coords[::-1], dim=0)
     return coords[None].expand(batch, -1, -1, -1)
 
 
-def coords_grid_y_first(batch, ht, wd):
+def coords_grid_y_first(batch, ht, wd, dtype, device):
     """Place y grid before x grid"""
-    coords = torch.meshgrid(torch.arange(ht), torch.arange(wd))
+    coords = torch.meshgrid(
+        torch.arange(ht, dtype=dtype, device=device),
+        torch.arange(wd, dtype=dtype, device=device),
+    )
     coords = torch.stack(coords, dim=0).int()
     return coords[None].expand(batch, -1, -1, -1)
 

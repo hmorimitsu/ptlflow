@@ -28,8 +28,8 @@ class CorrBlock:
         out_pyramid = []
         for i in range(self.num_levels):
             corr = self.corr_pyramid[i]
-            dx = torch.linspace(-r, r, 2 * r + 1)  # shape: [9]
-            dy = torch.linspace(-r, r, 2 * r + 1)  # shape: [9]
+            dx = torch.linspace(-r, r, 2 * r + 1, dtype=coords.dtype)  # shape: [9]
+            dy = torch.linspace(-r, r, 2 * r + 1, dtype=coords.dtype)  # shape: [9]
             delta = torch.stack(torch.meshgrid(dy, dx), axis=-1).to(
                 coords.device
             )  # shape: [9, 9, 2]
@@ -43,7 +43,7 @@ class CorrBlock:
             out_pyramid.append(corr)
 
         out = torch.cat(out_pyramid, dim=-1)
-        return out.permute(0, 3, 1, 2).contiguous().float()
+        return out.permute(0, 3, 1, 2).contiguous()
 
     @staticmethod
     def corr(fmap1, fmap2):
@@ -53,7 +53,7 @@ class CorrBlock:
 
         corr = torch.matmul(fmap1.transpose(1, 2), fmap2)
         corr = corr.view(batch, ht, wd, 1, ht, wd)
-        return corr / torch.sqrt(torch.tensor(dim).float())
+        return corr / torch.sqrt(torch.tensor(dim))
 
 
 if __name__ == "__main__":
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
         corr = torch.matmul(fmap1.transpose(1, 2), fmap2)
         corr = corr.view(batch, ht, wd, 1, ht, wd)
-        return corr / torch.sqrt(torch.tensor(dim).float())
+        return corr / torch.sqrt(torch.tensor(dim))
 
     fmap1 = torch.randn(2, 3, 32, 32).cuda()
     fmap2 = torch.randn(2, 3, 32, 32).cuda() + torch.randn(2, 3, 32, 32).cuda() * 10

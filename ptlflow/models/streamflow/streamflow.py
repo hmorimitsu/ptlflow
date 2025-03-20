@@ -44,10 +44,10 @@ class SequenceLoss(nn.Module):
 
 class StreamFlow(BaseModel):
     pretrained_checkpoints = {
-        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/streamflow-kitti-.ckpt",
-        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/streamflow-sintel-.ckpt",
-        "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/streamflow-sintel-.ckpt",
-        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/streamflow-things-.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/streamflow-kitti-eaafa6ed.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/streamflow-sintel-af557e5e.ckpt",
+        "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/streamflow-spring-092f8a17.ckpt",
+        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/streamflow-things-c640255a.ckpt",
     }
 
     def __init__(
@@ -117,7 +117,9 @@ class StreamFlow(BaseModel):
     def initialize_flow(self, img, ratio=8):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         N, C, H, W = img.shape
-        coords0 = coords_grid(N, H // ratio, W // ratio).to(img.device)
+        coords0 = coords_grid(
+            N, H // ratio, W // ratio, dtype=img.dtype, device=img.device
+        )
 
         # optical flow computed as difference: flow = coords1 - coords0
         return coords0
@@ -153,7 +155,7 @@ class StreamFlow(BaseModel):
         cdim = self.context_dim
 
         # run the feature network
-        fmaps = self.fnet(images).float()
+        fmaps = self.fnet(images)
         cnets = self.cnet(images[:, :-1])
 
         corr_fns = [
