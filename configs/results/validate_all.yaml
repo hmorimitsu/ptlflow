@@ -4,7 +4,7 @@
 all: true
 select: null
 exclude: null
-ckpt_path: things
+ckpt_path: null
 output_path: outputs/validate
 write_outputs: false
 show: false
@@ -18,12 +18,14 @@ fp16: false
 seq_val_mode: all
 write_individual_metrics: false
 epe_clip: 5.0
+metric_exclude:
+  - wauc
 seed_everything: true
 data:
   predict_dataset: null
   test_dataset: null
   train_dataset: null
-  val_dataset: sintel-clean+sintel-final+kitti-2015
+  val_dataset: sintel-clean-occ+sintel-final-occ+kitti-2015-occ
   train_batch_size: null
   train_num_workers: 4
   train_crop_size: null

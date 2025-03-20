@@ -18,6 +18,7 @@ fp16: false
 seq_val_mode: all
 write_individual_metrics: false
 epe_clip: 5.0
+metric_exclude: null
 seed_everything: true
 data:
   predict_dataset: null
