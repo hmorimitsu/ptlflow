@@ -25,7 +25,7 @@ data:
   predict_dataset: null
   test_dataset: null
   train_dataset: null
-  val_dataset: sintel-clean-occ+sintel-final-occ+kitti-2015-occ
+  val_dataset: sintel-clean-occ+sintel-final-occ+kitti-2012+kitti-2015
   train_batch_size: null
   train_num_workers: 4
   train_crop_size: null
