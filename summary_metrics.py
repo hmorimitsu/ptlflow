@@ -80,6 +80,11 @@ def _init_parser() -> argparse.ArgumentParser:
             "the file from --metrics_path."
         ),
     )
+    parser.add_argument(
+        "--save_plots",
+        action="store_true",
+        default=None,
+    )
 
     return parser
 
@@ -207,7 +212,7 @@ def summarize(args: argparse.Namespace) -> None:
     with open(args.output_dir / f"{file_name}.md", "w") as f:
         df.to_markdown(f)
 
-    if len(args.chosen_metrics) == 2:
+    if args.save_plots and len(args.chosen_metrics) == 2:
         save_plots(args, df)
 
 

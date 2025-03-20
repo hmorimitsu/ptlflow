@@ -273,9 +273,12 @@ class BaseFlowDataset(Dataset):
         elif sequence_position == "last":
             begin_pad = sequence_length - 2
             end_pad = 0
+        elif sequence_position == "all":
+            begin_pad = 0
+            end_pad = 0
         else:
             raise ValueError(
-                f"Invalid sequence_position. Must be one of ('first', 'middle', 'last'). Received: {sequence_position}"
+                f"Invalid sequence_position. Must be one of ('first', 'middle', 'last', 'all'). Received: {sequence_position}"
             )
         for _ in range(begin_pad):
             paths_list.insert(0, paths_list[0])
@@ -729,7 +732,8 @@ class FlyingThings3DDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         super().__init__(
             dataset_name="FlyingThings3D",
@@ -889,8 +893,15 @@ class FlyingThings3DDataset(BaseFlowDataset):
                                             sequence_position,
                                         )
 
+                                step_size = (
+                                    (self.sequence_length - 1)
+                                    if sequence_position == "all"
+                                    else 1
+                                )
                                 for i in range(
-                                    len(image_paths) - self.sequence_length + 1
+                                    0,
+                                    len(image_paths) - self.sequence_length + 1,
+                                    step_size,
                                 ):
                                     self.img_paths.append(
                                         image_paths[i : i + self.sequence_length]
@@ -1023,7 +1034,8 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         super().__init__(
             dataset_name="FlyingThings3DSubset",
@@ -1083,7 +1095,14 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
                             flow_group = self._extend_paths_list(
                                 flow_group, sequence_length, sequence_position
                             )
-                            for i in range(len(flow_group) - self.sequence_length + 2):
+                            step_size = (
+                                (self.sequence_length - 1)
+                                if sequence_position == "all"
+                                else 1
+                            )
+                            for i in range(
+                                0, len(flow_group) - self.sequence_length + 2, step_size
+                            ):
                                 flow_paths = flow_group[
                                     i : i + self.sequence_length - 1
                                 ]
@@ -1257,7 +1276,8 @@ class Hd1kDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         super().__init__(
             dataset_name="HD1K",
@@ -1311,7 +1331,8 @@ class Hd1kDataset(BaseFlowDataset):
             seq_img_names = self._extend_paths_list(
                 seq_img_names, sequence_length, sequence_position
             )
-            for i in range(len(seq_img_names) - self.sequence_length + 1):
+            step_size = (self.sequence_length - 1) if sequence_position == "all" else 1
+            for i in range(0, len(seq_img_names) - self.sequence_length + 1, step_size):
                 self.img_paths.append(
                     [
                         Path(root_dir) / split_dir / "image_2" / (n + ".png")
@@ -1530,7 +1551,8 @@ class SintelDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         if isinstance(pass_names, str):
             pass_names = [pass_names]
@@ -1609,7 +1631,13 @@ class SintelDataset(BaseFlowDataset):
                             occ_paths, sequence_length, sequence_position
                         )
                         assert len(occ_paths) == len(flow_paths)
-                for i in range(len(image_paths) - self.sequence_length + 1):
+
+                step_size = (
+                    (self.sequence_length - 1) if sequence_position == "all" else 1
+                )
+                for i in range(
+                    0, len(image_paths) - self.sequence_length + 1, step_size
+                ):
                     self.img_paths.append(image_paths[i : i + self.sequence_length])
                     if len(flow_paths) > 0:
                         self.flow_paths.append(
@@ -1695,7 +1723,8 @@ class SpringDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         reverse_only : bool, default False
             If True, only uses the backward samples, discarding the forward ones.
         subsample : bool, default False
@@ -1796,7 +1825,12 @@ class SpringDataset(BaseFlowDataset):
                                 flow_paths
                             ), f"{seq_name}, {side}: {len(image_paths)-1} vs {len(flow_paths)}"
 
-                    for i in range(len(image_paths) - self.sequence_length + 1):
+                    step_size = (
+                        (self.sequence_length - 1) if sequence_position == "all" else 1
+                    )
+                    for i in range(
+                        0, len(image_paths) - self.sequence_length + 1, step_size
+                    ):
                         self.img_paths.append(image_paths[i : i + self.sequence_length])
                         if len(flow_paths) > 0:
                             self.flow_paths.append(
@@ -1974,7 +2008,8 @@ class TartanAirDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         if isinstance(difficulties, str):
             difficulties = [difficulties]
@@ -2024,7 +2059,13 @@ class TartanAirDataset(BaseFlowDataset):
                             occ_paths, sequence_length, sequence_position
                         )
                         assert len(occ_paths) == len(flow_paths)
-                    for i in range(len(image_paths) - self.sequence_length + 1):
+
+                    step_size = (
+                        (self.sequence_length - 1) if sequence_position == "all" else 1
+                    )
+                    for i in range(
+                        0, len(image_paths) - self.sequence_length + 1, step_size
+                    ):
                         self.img_paths.append(image_paths[i : i + self.sequence_length])
                         if len(flow_paths) > 0:
                             self.flow_paths.append(
@@ -2274,7 +2315,8 @@ class MonkaaDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         super().__init__(
             dataset_name="Monkaa",
@@ -2345,7 +2387,14 @@ class MonkaaDataset(BaseFlowDataset):
                                 flow_b_paths, sequence_length, sequence_position
                             )
 
-                        for i in range(len(image_paths) - self.sequence_length + 1):
+                        step_size = (
+                            (self.sequence_length - 1)
+                            if sequence_position == "all"
+                            else 1
+                        )
+                        for i in range(
+                            0, len(image_paths) - self.sequence_length + 1, step_size
+                        ):
                             self.img_paths.append(
                                 image_paths[i : i + self.sequence_length]
                             )
@@ -2435,7 +2484,8 @@ class KubricDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         super().__init__(
             dataset_name=f"Kubric",
@@ -2481,7 +2531,8 @@ class KubricDataset(BaseFlowDataset):
                     back_flow_paths
                 ), f"{seq_name}: {len(image_paths)-1} vs {len(back_flow_paths)}"
 
-            for i in range(len(image_paths) - self.sequence_length + 1):
+            step_size = (self.sequence_length - 1) if sequence_position == "all" else 1
+            for i in range(0, len(image_paths) - self.sequence_length + 1, step_size):
                 self.img_paths.append(image_paths[i : i + self.sequence_length])
                 if len(flow_paths) > 0:
                     self.flow_paths.append(flow_paths[i : i + self.sequence_length - 1])

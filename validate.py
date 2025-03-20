@@ -157,6 +157,13 @@ def _init_parser() -> ArgumentParser:
         default=5.0,
         help=("Maximum EPE value to before clipping. Used for EPE visualization."),
     )
+    parser.add_argument(
+        "--metric_exclude",
+        type=str,
+        default=None,
+        nargs="+",
+        help=("Names of metrics to not be included in the saved results."),
+    )
     return parser
 
 
@@ -487,7 +494,14 @@ def validate_one_dataloader(
 
     metrics_mean = {}
     for k, v in metrics_sum.items():
-        metrics_mean[k] = v / len(dataloader)
+        is_exclude = False
+        if args.metric_exclude is not None:
+            for ex_metric in args.metric_exclude:
+                if ex_metric in k:
+                    is_exclude = True
+                    break
+        if not is_exclude:
+            metrics_mean[k] = v / len(dataloader)
     return metrics_mean
 
 

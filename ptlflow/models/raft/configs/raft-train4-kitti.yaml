@@ -1,5 +1,7 @@
 # lightning.pytorch==2.4.0
 seed_everything: true
+lr: 0.0001
+wdecay: 0.00001
 trainer:
   max_epochs: 1500
   check_val_every_n_epoch: 50
@@ -16,8 +18,6 @@ model:
     max_flow: 400.0
     iters: 12
     alternate_corr: false
-    lr: 0.0001
-    wdecay: 0.00001
     warm_start: false
 data:
   train_dataset: kitti-2015

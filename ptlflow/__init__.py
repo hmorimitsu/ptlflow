@@ -16,7 +16,7 @@
 # limitations under the License.
 # =============================================================================
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional

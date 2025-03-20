@@ -16,6 +16,11 @@ dicl-things-20bc573d.ckpt,ckpt_things.pth.tar,
 dip-kitti-b0b678b4.ckpt,DIP_kitti.pth,https://github.com/zihuazheng/DIP
 dip-sintel-7abeb652.ckpt,DIP_sintel.pth,
 dip-things-688d52a0.ckpt,DIP_things.pth,
+dpflow-chairs-f94e717a.ckpt,Original,PTLFlow
+dpflow-kitti-4e97eac6.ckpt,Original,
+dpflow-sintel-b44b072c.ckpt,Original,
+dpflow-spring-69bac7fa.ckpt,Original,
+dpflow-things-2012b5d6.ckpt,Original,
 fastflownet-chairs-89e7a48e.ckpt,fastflownet_chairs.pth,https://github.com/ltkong218/FastFlowNet
 fastflownet-kitti-6d3526a8.ckpt,fastflownet_ft_kitti.pth,
 fastflownet-mix-fd9b8c0d.ckpt,fastflownet_ft_mix.pth,
@@ -163,6 +168,10 @@ splatflow-kitti-2aa8e145.ckpt,kitti.pth,https://github.com/wwsource/SplatFLow
 starflow-kitti-34b9a3ed.ckpt,StarFlow_kitti,https://github.com/pgodet/star_flow
 starflow-sintel-3c06b844.ckpt,StarFlow_sintel,
 starflow-things-d3966a93.ckpt,StarFlow_things,
+streamflow-things-c640255a.ckpt,streamflow-things.pth,https://github.com/littlespray/StreamFlow
+streamflow-kitti-eaafa6ed.ckpt,streamflow-kitti.pth,
+streamflow-sintel-af557e5e.ckpt,streamflow-sintel.pth,
+streamflow-spring-092f8a17.ckpt,streamflow-spring.pth,
 unimatch-mixdata-9d7c1e4d.ckpt,gmflow-scale1-mixdata-train320x576-4c3a6e9a.pth,https://github.com/autonomousvision/unimatch
 unimatch-things-2433864a.ckpt,gmflow-scale1-things-e9887eda.pth,
 unimatch_scale2-mixdata-b514dde2.ckpt,gmflow-scale2-mixdata-train320x576-9ff1c094.pth,

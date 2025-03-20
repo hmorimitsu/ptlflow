@@ -1,7 +1,7 @@
 einops<0.9
 h5py<3.13
 kaleido<0.3
-lightning[pytorch-extra]>=2.1,<2.5
+lightning[pytorch-extra]>=2.1,<2.6
 loguru<0.8
 opencv-python<4.11
 pandas<2.3
