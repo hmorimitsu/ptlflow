@@ -222,7 +222,7 @@ def benchmark(args: Namespace, device_handle) -> pd.DataFrame:
     model_args = args
     available_model_names = ptlflow.get_model_names()
     if args.all:
-        model_names = ptlflow.models_dict.keys()
+        model_names = ptlflow._models_dict.keys()
         model_args = None
     elif args.select is not None and len(args.select) > 0:
         for name in args.select:
