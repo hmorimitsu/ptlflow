@@ -59,7 +59,7 @@ def conv4d(data, filters, bias=None, permute_filters=True, use_half=False):
             stride=1,
             padding=padding,
         )
-        # convolve with upper/lower channels of filter (at postions [:padding] [padding+1:])
+        # convolve with upper/lower channels of filter (at positions [:padding] [padding+1:])
         for p in range(1, padding + 1):
             output[i, :, :, :, :, :] = output[i, :, :, :, :, :] + F.conv3d(
                 data_padded[i + padding - p, :, :, :, :, :],
