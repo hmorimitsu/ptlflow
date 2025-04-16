@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lightning: ["2.1.4", "2.2.5", "2.3.3", "2.4.0", "2.5.0"]
+        lightning: ["2.1.4", "2.2.5", "2.3.3", "2.4.0", "2.5.1"]
 
     steps:
       - uses: actions/checkout@v4
