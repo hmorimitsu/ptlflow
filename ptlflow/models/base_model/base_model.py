@@ -596,33 +596,24 @@ class BaseModel(pl.LightningModule):
             dataset_name = inputs_meta["dataset_name"][0].lower()
 
         log_metrics = {}
-        has_train = False
-        has_val = False
         for k, v in metrics.items():
             if k.startswith("val/"):
                 k = k[4:]
 
+            if dataset_name is not None:
+                log_metrics[f"val_{dataset_name}/full/{k}"] = v
+            else:
+                log_metrics[f"val/full/{k}"] = v
+
             if inputs_meta is not None and inputs_meta.get("is_val") is not None:
                 if inputs_meta["is_val"][0]:
                     split = "val"
-                    has_val = True
                 else:
                     split = "train"
-                    has_train = True
 
                 if dataset_name is not None:
                     log_metrics[f"val_{dataset_name}/{split}/{k}"] = v
                 else:
                     log_metrics[f"val/{split}/{k}"] = v
-
-        if has_train and has_val:
-            for k, v in metrics.items():
-                if k.startswith("val/"):
-                    k = k[4:]
-
-                if dataset_name is not None:
-                    log_metrics[f"val_{dataset_name}/full/{k}"] = v
-                else:
-                    log_metrics[f"val/full/{k}"] = v
 
         return log_metrics
