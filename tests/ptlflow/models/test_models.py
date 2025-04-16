@@ -122,11 +122,10 @@ def test_forward_fp16() -> None:
             model = model.eval()
             model = model.half()
 
-            s = make_divisible(256, model.output_stride)
             num_images = 2
             if mname in ["videoflow_bof", "videoflow_mof"]:
                 num_images = 3
-            inputs = {"images": torch.rand(1, num_images, 3, s, s)}
+            inputs = {"images": torch.rand(1, num_images, 3, 256, 256)}
 
             if torch.cuda.is_available():
                 model = model.cuda()
