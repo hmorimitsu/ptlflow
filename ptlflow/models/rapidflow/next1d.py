@@ -111,7 +111,7 @@ class FusedConv1d(pl.LightningModule):
             x = F.conv2d(
                 input,
                 self.weight_h,
-                self.bias,
+                None,
                 self.stride,
                 (0, self.padding),
                 self.dilation,

@@ -27,6 +27,7 @@ from lightning.pytorch.utilities.rank_zero import rank_zero_warn
 
 class PTLFlowCLI(LightningCLI):
     parser_class = LightningArgumentParser
+
     def __init__(
         self,
         model_class: Optional[
