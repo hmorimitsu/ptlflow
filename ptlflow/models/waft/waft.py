@@ -126,7 +126,7 @@ class WAFT(BaseModel):
         network_backbone: str = "vits",
         gamma: float = 0.8,
         max_flow: float = 400,
-        iters: int = 32,
+        iters: int = 5,
         var_min: float = 0,
         var_max: float = 10,
         **kwargs,
