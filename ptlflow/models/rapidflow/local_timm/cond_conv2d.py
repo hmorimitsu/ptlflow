@@ -1,4 +1,4 @@
-""" PyTorch Conditionally Parameterized Convolution (CondConv)
+"""PyTorch Conditionally Parameterized Convolution (CondConv)
 
 Paper: CondConv: Conditionally Parameterized Convolutions for Efficient Inference
 (https://arxiv.org/abs/1904.04971)

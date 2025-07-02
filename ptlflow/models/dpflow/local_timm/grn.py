@@ -1,4 +1,4 @@
-""" Global Response Normalization Module
+"""Global Response Normalization Module
 
 Based on the GRN layer presented in
 `ConvNeXt-V2 - Co-designing and Scaling ConvNets with Masked Autoencoders` - https://arxiv.org/abs/2301.00808

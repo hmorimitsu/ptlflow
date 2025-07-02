@@ -1,4 +1,4 @@
-""" Activation Factory
+"""Activation Factory
 Hacked together by / Copyright 2020 Ross Wightman
 """
 

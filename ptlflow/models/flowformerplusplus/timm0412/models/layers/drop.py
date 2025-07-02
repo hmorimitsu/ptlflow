@@ -1,4 +1,4 @@
-""" DropBlock, DropPath
+"""DropBlock, DropPath
 
 PyTorch implementations of DropBlock and DropPath (Stochastic Depth) regularization layers.
 

@@ -1,4 +1,4 @@
-""" Padding Helpers
+"""Padding Helpers
 
 Hacked together by / Copyright 2020 Ross Wightman
 """

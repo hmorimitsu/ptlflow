@@ -1,4 +1,4 @@
-""" PyTorch Feature Extraction Helpers
+"""PyTorch Feature Extraction Helpers
 
 A collection of classes, functions, modules to help extract features from models
 and provide a common interface for describing them.

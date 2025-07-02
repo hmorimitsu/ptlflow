@@ -1,4 +1,4 @@
-""" AvgPool2d w/ Same Padding
+"""AvgPool2d w/ Same Padding
 
 Hacked together by / Copyright 2020 Ross Wightman
 """
