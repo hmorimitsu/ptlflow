@@ -47,7 +47,9 @@ class SequenceLoss(nn.Module):
 
 class FlowAnything(BaseModel):
     pretrained_checkpoints = {
-        "": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/",
+        "mixed288": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow_anything-mixed288-821b5025.ckpt",
+        "mixed432": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow_anything-mixed432-0beef53e.ckpt",
+        "mixed_tskh432": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/flow_anything-mixed_tskh432-4786f170.ckpt",
     }
 
     def __init__(

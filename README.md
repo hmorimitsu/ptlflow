@@ -24,6 +24,13 @@ This is still under development, so some things may not work as intended. I plan
 
 ## What's new
 
+###  - v0.4.2
+
+- Added new models:
+  - Flow-Anything [https://arxiv.org/abs/2506.07740](https://arxiv.org/abs/2506.07740)
+  - MEMFOF [https://arxiv.org/abs/2506.23151](https://arxiv.org/abs/2506.23151)
+  - WAFT [https://arxiv.org/abs/2506.21526](https://arxiv.org/abs/2506.21526)
+
 ###  - v0.4.1
 
 - Added new models:
@@ -106,6 +113,7 @@ Major update to support Lightning 2 (finally!). However, it also introduces brea
 - DPFlow [https://arxiv.org/abs/2503.14880](https://arxiv.org/abs/2503.14880)
 - FastFlowNet [https://arxiv.org/abs/2103.04524](https://arxiv.org/abs/2103.04524)
 - Flow1D [https://arxiv.org/abs/2103.04524](https://arxiv.org/abs/2103.04524)
+- Flow-Anything [https://arxiv.org/abs/2506.07740](https://arxiv.org/abs/2506.07740)
 - FlowFormer [https://arxiv.org/abs/2203.16194](https://arxiv.org/abs/2203.16194)
 - FlowFormer++ [https://arxiv.org/abs/2303.01237](https://arxiv.org/abs/2303.01237)
 - FlowNet [https://arxiv.org/abs/1504.06852](https://arxiv.org/abs/1504.06852)
@@ -124,6 +132,7 @@ Major update to support Lightning 2 (finally!). However, it also introduces brea
 - MaskFlownet [https://arxiv.org/abs/2003.10955](https://arxiv.org/abs/2003.10955)
 - MatchFlow [https://arxiv.org/abs/2303.08384](https://arxiv.org/abs/2303.08384)
 - MemFlow [https://arxiv.org/abs/2404.04808](https://arxiv.org/abs/2404.04808)
+- MEMFOF [https://arxiv.org/abs/2506.23151](https://arxiv.org/abs/2506.23151)
 - MS-RAFT+ [https://arxiv.org/abs/2210.16900](https://arxiv.org/abs/2210.16900)
 - NeuFlow v1 [https://arxiv.org/abs/2403.10425](https://arxiv.org/abs/2403.10425)
 - NeuFlow v2 [https://arxiv.org/abs/2408.10161](https://arxiv.org/abs/2408.10161)
@@ -141,6 +150,7 @@ Major update to support Lightning 2 (finally!). However, it also introduces brea
 - StreamFlow [https://arxiv.org/abs/2311.17099](https://arxiv.org/abs/2311.17099)
 - VCN [https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf](https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf)
 - VideoFlow [https://arxiv.org/abs/2303.08340](https://arxiv.org/abs/2303.08340)
+- WAFT [https://arxiv.org/abs/2506.21526](https://arxiv.org/abs/2506.21526)
 
 Read more details about the models on [https://ptlflow.readthedocs.io/en/latest/models/models_list.html](https://ptlflow.readthedocs.io/en/latest/models/models_list.html).
 

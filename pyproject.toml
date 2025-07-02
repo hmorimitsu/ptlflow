@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ptlflow"
-version = "0.4.1"
+version = "0.4.2"
 authors = [
     {name = "Henrique Morimitsu", email = "henriquem87@gmail.com"},
 ]
