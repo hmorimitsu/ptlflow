@@ -38,3 +38,4 @@ from .streamflow import *
 from .unimatch import *
 from .vcn import *
 from .videoflow import *
+from .waft import *
