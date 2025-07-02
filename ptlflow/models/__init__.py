@@ -6,6 +6,7 @@ from .dip import *
 from .dpflow import *
 from .fastflownet import *
 from .flow1d import *
+from .flow_anything import *
 from .flowformer import *
 from .flowformerplusplus import *
 from .flownet import *
