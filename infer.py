@@ -232,7 +232,7 @@ def infer(args: Namespace, model: BaseModel) -> None:
 
 
 def init_input(
-    input_path: Union[str, List[str]]
+    input_path: Union[str, List[str]],
 ) -> Tuple[cv.VideoCapture, List[Path], int, np.ndarray]:
     """Initialize the required variable to start loading the inputs.
 

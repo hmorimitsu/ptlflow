@@ -1,4 +1,4 @@
-""" Create Conv2d Factory Method
+"""Create Conv2d Factory Method
 
 Hacked together by / Copyright 2020 Ross Wightman
 """

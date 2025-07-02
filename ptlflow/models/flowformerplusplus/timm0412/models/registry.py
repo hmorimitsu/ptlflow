@@ -1,4 +1,4 @@
-""" Model Registry
+"""Model Registry
 Hacked together by / Copyright 2020 Ross Wightman
 """
 

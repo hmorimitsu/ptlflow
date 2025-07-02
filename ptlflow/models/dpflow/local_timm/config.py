@@ -1,5 +1,4 @@
-""" Model / Layer Config singleton state
-"""
+"""Model / Layer Config singleton state"""
 
 import os
 import warnings

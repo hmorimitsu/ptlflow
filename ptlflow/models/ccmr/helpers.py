@@ -1,4 +1,4 @@
-""" Layer/Module Helpers
+"""Layer/Module Helpers
 Hacked together by / Copyright 2020 Ross Wightman
 """
 

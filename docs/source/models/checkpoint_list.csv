@@ -31,6 +31,9 @@ flow1d-things-bcd92815.ckpt,flow1d_things-fd4bee1f.pth,
 flow1d-sintel-28a093d3.ckpt,flow1d_sintel-276ce58e.pth,
 flow1d-kitti-803a0181.ckpt,flow1d_kitti-04b1caa2.pth,
 flow1d-highres-7ab476dc.ckpt,flow1d_highres-e0b98d7e.pth,
+flow_anything-mixed288-821b5025.ckpt,FA-C-T-Mixed288x960.pth,https://github.com/Sharpiless/Flow-Anything
+flow_anything-mixed432-0beef53e.ckpt,FA-C-T-Mixed432x960.pth,
+flow_anything-mixed_tskh432-4786f170.ckpt,FA-C-T-Mixed-TSKH432x960.pth,
 flowformer-chairs-84881320.ckpt,chairs.pth,https://github.com/drinkingcoder/FlowFormer-Official
 flowformer-kitti-d4225180.ckpt,kitti.pth,
 flowformer-sintel-cce498f8.ckpt,sintel.pth,
@@ -112,6 +115,12 @@ memflow_t-things-6028d89f.ckpt,MemFlowNet_T_things.pth,
 memflow_t-things_kitti-542e0a1c.ckpt,MemFlowNet_T_things_kitti.pth,
 memflow_t-sintel-d2df0424.ckpt,MemFlowNet_T_sintel.pth,
 memflow_t-kitti-9eeabb65.ckpt,MemFlowNet_T_kitti.pth,
+memfof-tartan-7ca03da2.ckpt,model.safetensors,https://huggingface.co/egorchistov/MEMFOF-Tartan
+memfof-things-11146736.ckpt,model.safetensors,https://huggingface.co/egorchistov/MEMFOF-Tartan-T
+memfof-tskh-6fb0c129.ckpt,model.safetensors,https://huggingface.co/egorchistov/MEMFOF-Tartan-T-TSKH
+memfof-kitti-ed27d6f1.ckpt,model.safetensors,https://huggingface.co/egorchistov/MEMFOF-Tartan-T-TSKH-kitti
+memfof-sintel-cbb45e24.ckpt,model.safetensors,https://huggingface.co/egorchistov/MEMFOF-Tartan-T-TSKH-sintel
+memfof-spring-f8a968f7.ckpt,model.safetensors,https://huggingface.co/egorchistov/MEMFOF-Tartan-T-TSKH-spring
 ms_raft_plus-mixed-2bb01f62.ckpt,mixed.pth,https://github.com/cv-stuttgart/MS_RAFT_plus
 neuflow-things-c402aa7a.ckpt,neuflow_things.pth,https://github.com/neufieldrobotics/neuflow
 neuflow-sintel-0d969ea2.ckpt,neuflow_sintel.pth,
@@ -194,3 +203,12 @@ videoflow_mof-kitti-293b4f59.ckpt,MOF_kitti.pth,
 videoflow_mof-sintel-739e4d3a.ckpt,MOF_sintel.pth,
 videoflow_mof-things_288960noise-0615a42e.ckpt,MOF_things_288960noise.pth,
 videoflow_mof-things-e24551af.ckpt,MOF_things.pth,
+waft-chairs-16b9cbc4.ckpt,chairs.pth,https://github.com/princeton-vl/WAFT
+waft-things-24bd04dc.ckpt,chairs-things.pth,
+waft-tar-48597867.ckpt,tar.pth,
+waft-tar-c-49c9625b.ckpt,tar-c.pth,
+waft-tar-c-t-eaa5c133.ckpt,tar-c-t.pth,
+waft-tar-c-t-kitti-e5004e90.ckpt,tar-c-t-kitti.pth,
+waft-tar-c-t-sintel-e582a3e6.ckpt,tar-c-t-sintel.pth,
+waft-tar-c-t-spring-540p-590939bf.ckpt,tar-c-t-spring-540p.pth,
+waft-tar-c-t-spring-1080p-56700f83.ckpt,tar-c-t-spring-1080p.pth,

@@ -1,4 +1,4 @@
-""" Vision Transformer (ViT) in PyTorch
+"""Vision Transformer (ViT) in PyTorch
 
 A PyTorch implement of Vision Transformers as described in:
 

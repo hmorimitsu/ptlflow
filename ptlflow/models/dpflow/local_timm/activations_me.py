@@ -1,4 +1,4 @@
-""" Activations (memory-efficient w/ custom autograd)
+"""Activations (memory-efficient w/ custom autograd)
 
 A collection of activations fn and modules with a common interface so that they can
 easily be swapped. All have an `inplace` arg even if not used.

@@ -6,6 +6,7 @@ from .dip import *
 from .dpflow import *
 from .fastflownet import *
 from .flow1d import *
+from .flow_anything import *
 from .flowformer import *
 from .flowformerplusplus import *
 from .flownet import *
@@ -20,6 +21,7 @@ from .llaflow import *
 from .maskflownet import *
 from .matchflow import *
 from .memflow import *
+from .memfof import *
 from .ms_raft_plus import *
 from .neuflow import *
 from .neuflow2 import *
@@ -38,3 +40,4 @@ from .streamflow import *
 from .unimatch import *
 from .vcn import *
 from .videoflow import *
+from .waft import *
