@@ -30,7 +30,7 @@ model:
     corr_mode: allpairs
     upgate_norm_type: group
     use_norm_affine: false
-    group_norm_num_groups: 4
+    group_norm_num_groups: 8
     corr_levels: 1
     corr_range: 4
     enc_norm_type: group
