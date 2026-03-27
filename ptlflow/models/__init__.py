@@ -10,6 +10,7 @@ from .flow_anything import *
 from .flowformer import *
 from .flowformerplusplus import *
 from .flownet import *
+from .flowseek import *
 from .gma import *
 from .gmflow import *
 from .gmflownet import *
