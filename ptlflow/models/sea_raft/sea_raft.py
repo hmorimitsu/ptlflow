@@ -197,6 +197,8 @@ class SEARAFT(BaseModel):
         flow_8x = flow_update[:, :2]
         info_8x = flow_update[:, 2:]
         flow_up, info_up = self.upsample_data(flow_8x, info_8x, weight_update)
+        flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
+        info_up = self.postprocess_predictions(info_up, image_resizer, is_flow=False)
         flow_predictions.append(flow_up)
         info_predictions.append(info_up)
 
