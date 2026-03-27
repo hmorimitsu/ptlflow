@@ -1,11 +1,10 @@
 import torch
 import math
 import timm
-import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .backbone.depthanythingv2 import DepthAnythingFeature
+from .backbone.waft_a1_dav2 import DepthAnythingFeature
 from .backbone.vit import VisionTransformer, MODEL_CONFIGS
 
 from .utils import coords_grid, bilinear_sampler
@@ -40,16 +39,16 @@ class ResNet18Deconv(nn.Module):
         self.feature_dims = [64, 128, 256, 512]
         self.ds1 = resconv(inp, 64, k=7, s=2)
         self.conv1 = timm.create_model(
-            "resnet18.a3_in1k", pretrained=True, features_only=True
+            "resnet18.a3_in1k", pretrained=False, features_only=True
         ).layer1
         self.conv2 = timm.create_model(
-            "resnet18.a3_in1k", pretrained=True, features_only=True
+            "resnet18.a3_in1k", pretrained=False, features_only=True
         ).layer2
         self.conv3 = timm.create_model(
-            "resnet18.a3_in1k", pretrained=True, features_only=True
+            "resnet18.a3_in1k", pretrained=False, features_only=True
         ).layer3
         self.conv4 = timm.create_model(
-            "resnet18.a3_in1k", pretrained=True, features_only=True
+            "resnet18.a3_in1k", pretrained=False, features_only=True
         ).layer4
         self.up_4 = nn.ConvTranspose2d(
             512, 256, kernel_size=2, stride=2, padding=0, bias=True
@@ -107,7 +106,7 @@ class SequenceLoss(nn.Module):
         return flow_loss
 
 
-class WAFT(BaseModel):
+class WAFTa1(BaseModel):
     pretrained_checkpoints = {
         "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft-chairs-16b9cbc4.ckpt",
         "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft-things-24bd04dc.ckpt",
@@ -206,24 +205,15 @@ class WAFT(BaseModel):
 
         return up_flow.reshape(N, 2, 2 * H, 2 * W), up_info.reshape(N, C, 2 * H, 2 * W)
 
-    def normalize_image(self, img):
-        """
-        @img: (B,C,H,W) in range 0-255, RGB order
-        """
-        tf = torchvision.transforms.Normalize(
-            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], inplace=False
-        )
-        return tf(img / 255.0).contiguous()
-
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
         images, image_resizer = self.preprocess_images(
             inputs["images"],
-            bgr_add=-0.5,
-            bgr_mult=2.0,
+            bgr_add=[-0.406, -0.456, -0.485],
+            bgr_mult=[1 / 0.225, 1 / 0.224, 1 / 0.229],
             bgr_to_rgb=True,
             resize_mode="pad",
-            pad_mode="replicate",
+            pad_mode="constant",
             pad_two_side=True,
         )
 
@@ -302,5 +292,5 @@ class WAFT(BaseModel):
 
 
 @register_model
-class waft(WAFT):
+class waft_dav2_a1(WAFTa1):
     pass

@@ -13,7 +13,6 @@ import logging
 from torch import Tensor
 from torch import nn
 
-
 logger = logging.getLogger("dinov2")
 
 
