@@ -28,8 +28,13 @@ This is still under development, so some things may not work as intended. I plan
 
 - Added new models:
   - Flow-Anything [https://arxiv.org/abs/2506.07740](https://arxiv.org/abs/2506.07740)
+  - FlowSeek [https://arxiv.org/abs/2509.05297](https://arxiv.org/abs/2509.05297)
   - MEMFOF [https://arxiv.org/abs/2506.23151](https://arxiv.org/abs/2506.23151)
+  - ReCoVEr [https://arxiv.org/abs/2510.13317](https://arxiv.org/abs/2510.13317)
   - WAFT [https://arxiv.org/abs/2506.21526](https://arxiv.org/abs/2506.21526)
+- Additions / fixes:
+  - Fix compatibility with Lightning < 2.7
+  - Add support to log to SwanLab
 
 ###  - v0.4.1
 
@@ -118,6 +123,7 @@ Major update to support Lightning 2 (finally!). However, it also introduces brea
 - FlowFormer++ [https://arxiv.org/abs/2303.01237](https://arxiv.org/abs/2303.01237)
 - FlowNet [https://arxiv.org/abs/1504.06852](https://arxiv.org/abs/1504.06852)
 - FlowNet2 [https://arxiv.org/abs/1612.01925](https://arxiv.org/abs/1612.01925)
+- FlowSeek [https://arxiv.org/abs/2509.05297](https://arxiv.org/abs/2509.05297)
 - GMA [https://arxiv.org/abs/2104.02409](https://arxiv.org/abs/2104.02409)
 - GMFlow [https://arxiv.org/abs/2111.13680](https://arxiv.org/abs/2111.13680)
 - GMFlow+, UniMatch [https://arxiv.org/abs/2211.05783](https://arxiv.org/abs/2211.05783)
@@ -139,6 +145,7 @@ Major update to support Lightning 2 (finally!). However, it also introduces brea
 - PWCNet [https://arxiv.org/abs/1709.02371](https://arxiv.org/abs/1709.02371)
 - RAFT [https://arxiv.org/abs/2003.12039](https://arxiv.org/abs/2003.12039)
 - RAPIDFlow [https://hmorimitsu.com/publication/2024-icra-rapidflow/](https://hmorimitsu.com/publication/2024-icra-rapidflow/)
+- ReCoVEr [https://arxiv.org/abs/2510.13317](https://arxiv.org/abs/2510.13317)
 - RPKNet [https://hmorimitsu.com/publication/2024-aaai-rpknet](https://hmorimitsu.com/publication/2024-aaai-rpknet)
 - ScopeFlow [https://arxiv.org/abs/2002.10770](https://arxiv.org/abs/2002.10770)
 - SCV [https://arxiv.org/abs/2104.02166](https://arxiv.org/abs/2104.02166)
