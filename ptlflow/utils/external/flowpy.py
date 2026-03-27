@@ -215,7 +215,7 @@ def replace_nans(array, value=0):
     return array, nan_mask
 
 
-def flow_write(output_file, flow, format=None):
+def flow_write(output_file, flow, format=None, png_flow_mult=64.0):
     """
     Writes optical flow to file.
 
@@ -240,13 +240,13 @@ def flow_write(output_file, flow, format=None):
     output_format = guess_extension(output_file, override=format)
 
     with FileManager(output_file, "wb") as f:
-        if output_format == "png":
-            flow_write_png(f, flow)
+        if "png" in output_format:
+            flow_write_png(f, flow, mult=png_flow_mult)
         else:
             flow_write_flo(f, flow)
 
 
-def flow_read(input_file, format=None):
+def flow_read(input_file, format=None, png_flow_mult=64.0):
     """
     Reads optical flow from file
 
@@ -287,8 +287,8 @@ def flow_read(input_file, format=None):
     input_format = guess_extension(input_file, override=format)
 
     with FileManager(input_file, "rb") as f:
-        if input_format == "png":
-            output = flow_read_png(f)
+        if "png" in input_format:
+            output = flow_read_png(f, mult=png_flow_mult)
         else:
             output = flow_read_flo(f)
 
@@ -323,20 +323,20 @@ def flow_write_flo(f, flow):
     image.astype(np.float32).tofile(f)
 
 
-def flow_read_png(f):
+def flow_read_png(f, mult):
     width, height, stream, *_ = png.Reader(f).read()
 
     file_content = np.concatenate(list(stream)).reshape((height, width, 3))
     flow, valid = file_content[..., 0:2], file_content[..., 2]
 
-    flow = (flow.astype(np.float32) - 2**15) / 64.0
+    flow = (flow.astype(np.float32) - 2**15) / mult
 
     flow[~valid.astype(bool)] = np.nan
 
     return flow
 
 
-def flow_write_png(f, flow):
+def flow_write_png(f, flow, mult):
     SENTINEL = 0.0  # Only here to look like original KITTI files
     height, width, _ = flow.shape
     flow_copy = flow.copy()
@@ -344,7 +344,7 @@ def flow_write_png(f, flow):
     valid = ~(np.isnan(flow[..., 0]) | np.isnan(flow[..., 1]))
     flow_copy[~valid] = SENTINEL
 
-    flow_copy = (flow_copy * 64.0 + 2**15).astype(np.uint16)
+    flow_copy = (flow_copy * mult + 2**15).astype(np.uint16)
     image = np.dstack((flow_copy, valid))
 
     writer = png.Writer(width, height, bitdepth=16, greyscale=False)
