@@ -141,6 +141,17 @@ Flownet
 
 - Model names: ``flownets``, ``flownetc``, ``flownet2``, ``flownetcs``, ``flownetcss``, ``flownetsd``
 
+FlowSeek
+--------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/flowseek>`__
+
+- Paper: **FlowSeek: Optical Flow Made Easier with Depth Foundation Models and Motion Bases** - `https://arxiv.org/abs/2509.05297 <https://arxiv.org/abs/2509.05297>`_
+
+- Reference code: `https://github.com/mattpoggi/flowseek <https://github.com/mattpoggi/flowseek>`_
+
+- Model names: ``flowseek_t``, ``flowseek_m``
+
 GMA
 ---
 
@@ -372,6 +383,17 @@ RAPIDFlow
 
 - Model names: ``rapidflow``, ``rapidflow_it1``, ``rapidflow_it2``, ``rapidflow_it3``, ``rapidflow_it6``, ``rapidflow_it12``
 
+ReCoVEr
+-------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/recover>`__
+
+- Paper: **Removing Cost Volumes from Optical Flow Estimators** - `https://arxiv.org/abs/2510.13317 <https://arxiv.org/abs/2510.13317>`_
+
+- Reference code: `https://github.com/visinf/recover <https://github.com/visinf/recover>`_
+
+- Model names: ``recover_cx``, ``recover_mn``, ``recover_rn``
+
 RPKNet
 ------
 
@@ -498,4 +520,4 @@ WAFT
 
 - Reference code: `https://github.com/princeton-vl/WAFT <https://github.com/princeton-vl/WAFT>`__
 
-- Model name: ``waft``
+- Model name: ``waft_dav2_a1``, ``waft_dav2_a2``, ``waft_dinov3_a2``, ``waft_twins_a2``
