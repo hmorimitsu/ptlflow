@@ -20,7 +20,6 @@ import lightning.pytorch as pl
 
 from ptlflow.models.base_model.base_model import BaseModel
 
-
 _models_dict = {}
 _trainable_models = []
 _ptlflow_trained_models = []

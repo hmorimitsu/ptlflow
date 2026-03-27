@@ -11,7 +11,6 @@ from PIL import Image
 import h5py
 import cv2 as cv
 
-
 FLO_TAG_FLOAT = (
     202021.25  # first 4 bytes in flo file; check for this when READING the file
 )
@@ -186,7 +185,7 @@ def readPngFlow(filepath):
     flow_object = png.Reader(filename=filepath)
     flow_direct = flow_object.asDirect()
     flow_data = list(flow_direct[2])
-    (w, h) = flow_direct[3]["size"]
+    w, h = flow_direct[3]["size"]
     flow = np.zeros((h, w, 3), dtype=np.float64)
     for i in range(len(flow_data)):
         flow[i, :, 0] = flow_data[i][0::3]
@@ -373,7 +372,7 @@ def readPngDisp(filepath):
     image_object = png.Reader(filename=filepath)
     image_direct = image_object.asDirect()
     image_data = list(image_direct[2])
-    (w, h) = image_direct[3]["size"]
+    w, h = image_direct[3]["size"]
     channel = len(image_data[0]) // w
     if channel != 1:
         raise IOError("read png disp: assumed channels to be 1!")

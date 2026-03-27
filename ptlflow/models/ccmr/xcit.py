@@ -8,6 +8,7 @@ https://github.com/open-mmlab/mmsegmentation
 https://github.com/rwightman/pytorch-image-models/tree/master/timm
 https://github.com/facebookresearch/deit/
 """
+
 import math
 from functools import partial
 import torch

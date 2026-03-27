@@ -1,7 +1,6 @@
 from setuptools import setup
 from torch.utils.cpp_extension import CppExtension, BuildExtension, CUDAExtension
 
-
 setup(
     name="GANet",
     ext_modules=[
