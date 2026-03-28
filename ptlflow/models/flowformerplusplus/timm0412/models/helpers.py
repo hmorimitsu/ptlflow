@@ -23,7 +23,6 @@ from .hub import (
 )
 from .layers import Conv2dSame, Linear
 
-
 _logger = logging.getLogger(__name__)
 
 

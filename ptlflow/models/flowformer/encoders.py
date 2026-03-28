@@ -5,7 +5,7 @@ import numpy as np
 
 
 class twins_svt_large(nn.Module):
-    def __init__(self, pretrained=True):
+    def __init__(self, pretrained=False):
         super().__init__()
         self.svt = timm.create_model("twins_svt_large", pretrained=pretrained)
 
@@ -73,7 +73,7 @@ class twins_svt_large(nn.Module):
 
 
 class twins_svt_large_context(nn.Module):
-    def __init__(self, pretrained=True):
+    def __init__(self, pretrained=False):
         super().__init__()
         self.svt = timm.create_model("twins_svt_large_context", pretrained=pretrained)
 

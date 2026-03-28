@@ -115,6 +115,10 @@ def flow_read(
         return read_kubric_flow(input_data[0], input_data[1])
     elif format is not None and format == "viper_npz":
         return read_viper_flow(input_data)
+    elif (format is not None and format == "png128") or str(input_data).endswith(
+        "png128"
+    ):
+        return flowpy.flow_read(input_data, format, png_flow_mult=128.0)
     else:
         return flowpy.flow_read(input_data, format)
 
@@ -150,6 +154,10 @@ def flow_write(
         np.save(output_file, flow)
     elif format is not None and format == "viper_npz":
         return write_viper_flow(output_file, flow)
+    elif (format is not None and format == "png128") or str(output_file).endswith(
+        "png128"
+    ):
+        flowpy.flow_write(output_file, flow, format, png_flow_mult=128.0)
     else:
         flowpy.flow_write(output_file, flow, format)
 

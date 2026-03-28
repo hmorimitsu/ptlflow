@@ -1,3 +1,6 @@
+from typing import Literal
+
+import numpy as np
 import torch
 import math
 import timm
@@ -5,7 +8,9 @@ import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .backbone.depthanythingv2 import DepthAnythingFeature
+from .backbone.twins import TwinsFeatureEncoder
+from .backbone.waft_a2_dav2 import DepthAnythingFeature
+from .backbone.dinov3 import DinoV3Feature
 from .backbone.vit import VisionTransformer, MODEL_CONFIGS
 
 from .utils import coords_grid, bilinear_sampler
@@ -39,18 +44,10 @@ class ResNet18Deconv(nn.Module):
         super(ResNet18Deconv, self).__init__()
         self.feature_dims = [64, 128, 256, 512]
         self.ds1 = resconv(inp, 64, k=7, s=2)
-        self.conv1 = timm.create_model(
-            "resnet18.a3_in1k", pretrained=True, features_only=True
-        ).layer1
-        self.conv2 = timm.create_model(
-            "resnet18.a3_in1k", pretrained=True, features_only=True
-        ).layer2
-        self.conv3 = timm.create_model(
-            "resnet18.a3_in1k", pretrained=True, features_only=True
-        ).layer3
-        self.conv4 = timm.create_model(
-            "resnet18.a3_in1k", pretrained=True, features_only=True
-        ).layer4
+        self.conv1 = resconv(64, 64, k=3, s=1)
+        self.conv2 = resconv(64, 128, k=3, s=2)
+        self.conv3 = resconv(128, 256, k=3, s=2)
+        self.conv4 = resconv(256, 512, k=3, s=2)
         self.up_4 = nn.ConvTranspose2d(
             512, 256, kernel_size=2, stride=2, padding=0, bias=True
         )
@@ -107,23 +104,11 @@ class SequenceLoss(nn.Module):
         return flow_loss
 
 
-class WAFT(BaseModel):
-    pretrained_checkpoints = {
-        "chairs": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft-chairs-16b9cbc4.ckpt",
-        "things": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft-things-24bd04dc.ckpt",
-        "tar": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft-tar-48597867.ckpt",
-        "tar-c": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft-tar-c-49c9625b.ckpt",
-        "tar-c-t": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft-tar-c-t-eaa5c133.ckpt",
-        "tar-c-t-kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft-tar-c-t-kitti-e5004e90.ckpt",
-        "tar-c-t-sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft-tar-c-t-sintel-e582a3e6.ckpt",
-        "tar-c-t-spring-540p": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft-tar-c-t-spring-540p-590939bf.ckpt",
-        "tar-c-t-spring-1080p": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft-tar-c-t-spring-1080p-56700f83.ckpt",
-    }
-
+class WAFTa2(BaseModel):
     def __init__(
         self,
-        dav2_backbone: str = "vits",
-        network_backbone: str = "vits",
+        feature_encoder: Literal["dav2", "dinov3", "twins"] = "twins",
+        iterative_module: Literal["vits"] = "vits",
         gamma: float = 0.8,
         max_flow: float = 400,
         iters: int = 5,
@@ -131,63 +116,73 @@ class WAFT(BaseModel):
         var_max: float = 10,
         **kwargs,
     ) -> None:
+        if feature_encoder == "dav2":
+            output_stride = 112
+        else:
+            output_stride = 64
+
         super().__init__(
-            output_stride=112, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+            output_stride=output_stride, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
         )
 
         self.iters = iters
         self.var_min = var_min
         self.var_max = var_max
 
-        self.da_feature = self.freeze_(DepthAnythingFeature(encoder=dav2_backbone))
-        self.pretrain_dim = self.da_feature.model_configs[dav2_backbone]["features"]
-        self.network_dim = MODEL_CONFIGS[network_backbone]["features"]
+        if feature_encoder == "twins":
+            self.encoder = TwinsFeatureEncoder(frozen=True)
+            self.factor = 32
+        elif feature_encoder == "dav2":
+            self.encoder = DepthAnythingFeature(
+                model_name="vits", pretrained=False, lvl=-3
+            )
+            self.factor = 112
+        elif feature_encoder == "dinov3":
+            self.encoder = DinoV3Feature(model_name="vits", lvl=-3)
+            self.factor = 16
+        else:
+            raise ValueError(f"Unknown feature encoder: {feature_encoder}")
+
+        self.pretrain_dim = self.encoder.output_dim
+        self.fnet = ResNet18Deconv(3, self.pretrain_dim)
+        self.iter_dim = MODEL_CONFIGS[iterative_module]["features"]
         self.refine_net = VisionTransformer(
-            network_backbone, self.network_dim, patch_size=8
+            iterative_module, self.iter_dim, patch_size=8
         )
-        self.fnet = ResNet18Deconv(self.pretrain_dim // 2 + 3, 64)
         self.fmap_conv = nn.Conv2d(
-            self.pretrain_dim // 2 + 64,
-            self.network_dim,
+            self.pretrain_dim * 2,
+            self.iter_dim,
             kernel_size=1,
             stride=1,
             padding=0,
             bias=True,
         )
         self.hidden_conv = nn.Conv2d(
-            self.network_dim * 2,
-            self.network_dim,
+            self.iter_dim * 2,
+            self.iter_dim,
             kernel_size=1,
             stride=1,
             padding=0,
             bias=True,
         )
         self.warp_linear = nn.Conv2d(
-            3 * self.network_dim + 2, self.network_dim, 1, 1, 0, bias=True
+            3 * self.iter_dim + 2, self.iter_dim, 1, 1, 0, bias=True
         )
         self.refine_transform = nn.Conv2d(
-            self.network_dim // 2 * 3, self.network_dim, 1, 1, 0, bias=True
+            self.iter_dim // 2 * 3, self.iter_dim, 1, 1, 0, bias=True
         )
         self.upsample_weight = nn.Sequential(
             # convex combination of 3x3 patches
-            nn.Conv2d(self.network_dim, 2 * self.network_dim, 3, padding=1, bias=True),
+            nn.Conv2d(self.iter_dim, 2 * self.iter_dim, 3, padding=1, bias=True),
             nn.ReLU(inplace=True),
-            nn.Conv2d(2 * self.network_dim, 4 * 9, 1, padding=0, bias=True),
+            nn.Conv2d(2 * self.iter_dim, 4 * 9, 1, padding=0, bias=True),
         )
         self.flow_head = nn.Sequential(
             # flow(2) + weight(2) + log_b(2)
-            nn.Conv2d(self.network_dim, 2 * self.network_dim, 3, padding=1, bias=True),
+            nn.Conv2d(self.iter_dim, 2 * self.iter_dim, 3, padding=1, bias=True),
             nn.ReLU(inplace=True),
-            nn.Conv2d(2 * self.network_dim, 6, 1, padding=0, bias=True),
+            nn.Conv2d(2 * self.iter_dim, 6, 1, padding=0, bias=True),
         )
-
-    def freeze_(self, model):
-        model = model.eval()
-        for p in model.parameters():
-            p.requires_grad = False
-        for p in model.buffers():
-            p.requires_grad = False
-        return model
 
     def upsample_data(self, flow, info, mask):
         N, C, H, W = info.shape
@@ -206,53 +201,39 @@ class WAFT(BaseModel):
 
         return up_flow.reshape(N, 2, 2 * H, 2 * W), up_info.reshape(N, C, 2 * H, 2 * W)
 
-    def normalize_image(self, img):
-        """
-        @img: (B,C,H,W) in range 0-255, RGB order
-        """
-        tf = torchvision.transforms.Normalize(
-            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], inplace=False
-        )
-        return tf(img / 255.0).contiguous()
-
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
         images, image_resizer = self.preprocess_images(
             inputs["images"],
-            bgr_add=-0.5,
-            bgr_mult=2.0,
+            bgr_add=[-0.406, -0.456, -0.485],
+            bgr_mult=[1 / 0.225, 1 / 0.224, 1 / 0.229],
             bgr_to_rgb=True,
             resize_mode="pad",
-            pad_mode="replicate",
+            pad_mode="constant",
             pad_two_side=True,
         )
 
         image1 = images[:, 0]
         image2 = images[:, 1]
 
-        N, _, H, W = image1.shape
-        # initial feature
-        da_feature1 = self.da_feature(image1)
-        da_feature2 = self.da_feature(image2)
-        fmap1_feats = self.fnet(torch.cat([da_feature1["out"], image1], dim=1))
-        fmap2_feats = self.fnet(torch.cat([da_feature2["out"], image2], dim=1))
-        da_feature1_2x = F.interpolate(
-            da_feature1["out"], scale_factor=0.5, mode="bilinear", align_corners=True
-        )
-        da_feature2_2x = F.interpolate(
-            da_feature2["out"], scale_factor=0.5, mode="bilinear", align_corners=True
-        )
-        fmap1_2x = self.fmap_conv(torch.cat([fmap1_feats[0], da_feature1_2x], dim=1))
-        fmap2_2x = self.fmap_conv(torch.cat([fmap2_feats[0], da_feature2_2x], dim=1))
-        net = self.hidden_conv(torch.cat([fmap1_2x, fmap2_2x], dim=1))
-        flow_2x = torch.zeros(N, 2, H // 2, W // 2).to(image1.device)
-
         flow_predictions = []
         info_predictions = []
+        N, _, H, W = image1.shape
+        fmap1_pretrain = self.encoder(image1)
+        fmap2_pretrain = self.encoder(image2)
+        fmap1_img = self.fnet(image1)[0]
+        fmap2_img = self.fnet(image2)[0]
+        fmap1_2x = self.fmap_conv(torch.cat([fmap1_pretrain, fmap1_img], dim=1))
+        fmap2_2x = self.fmap_conv(torch.cat([fmap2_pretrain, fmap2_img], dim=1))
+        net = self.hidden_conv(torch.cat([fmap1_2x, fmap2_2x], dim=1))
+        flow_2x = torch.zeros(
+            N, 2, H // 2, W // 2, device=image1.device, dtype=image1.dtype
+        )
         for itr in range(self.iters):
             flow_2x = flow_2x.detach()
             coords2 = (
-                coords_grid(N, H // 2, W // 2, device=image1.device) + flow_2x
+                coords_grid(N, H // 2, W // 2, device=image1.device, dtype=image1.dtype)
+                + flow_2x
             ).detach()
             warp_2x = bilinear_sampler(fmap2_2x, coords2.permute(0, 2, 3, 1))
             refine_inp = self.warp_linear(
@@ -302,5 +283,39 @@ class WAFT(BaseModel):
 
 
 @register_model
-class waft(WAFT):
-    pass
+class waft_dav2_a2(WAFTa2):
+    pretrained_checkpoints = {
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dav2_a2-kitti-d26dfae3.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dav2_a2-sintel-b346e853.ckpt",
+        "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dav2_a2-spring-04a4560e.ckpt",
+        "zero_shot": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dav2_a2-zero_shot-4d51a008.ckpt",
+    }
+
+    def __init__(self, feature_encoder="dav2", **kwargs):
+        super().__init__(feature_encoder, **kwargs)
+
+
+@register_model
+class waft_dinov3_a2(WAFTa2):
+    pretrained_checkpoints = {
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dinov3_a2-kitti-b0720be7.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dinov3_a2-sintel-144f3861.ckpt",
+        "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dinov3_a2-spring-adb46820.ckpt",
+        "zero_shot": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dinov3_a2-zero_shot-834176f4.ckpt",
+    }
+
+    def __init__(self, feature_encoder="dinov3", **kwargs):
+        super().__init__(feature_encoder, **kwargs)
+
+
+@register_model
+class waft_twins_a2(WAFTa2):
+    pretrained_checkpoints = {
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_twins_a2-kitti-f2861761.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_twins_a2-sintel-c3348f5f.ckpt",
+        "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_twins_a2-spring-c201ca50.ckpt",
+        "zero_shot": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_twins_a2-zero_shot-f81e2579.ckpt",
+    }
+
+    def __init__(self, feature_encoder="twins", **kwargs):
+        super().__init__(feature_encoder, **kwargs)

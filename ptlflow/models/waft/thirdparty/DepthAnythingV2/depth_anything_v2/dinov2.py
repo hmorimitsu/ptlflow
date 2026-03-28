@@ -24,7 +24,6 @@ from .dinov2_layers import (
     NestedTensorBlock as Block,
 )
 
-
 logger = logging.getLogger("dinov2")
 
 

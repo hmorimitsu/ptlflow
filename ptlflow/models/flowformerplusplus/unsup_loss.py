@@ -1,7 +1,6 @@
 import torch
 import torch.nn.functional as F
 
-
 MAX_FLOW = 400
 
 

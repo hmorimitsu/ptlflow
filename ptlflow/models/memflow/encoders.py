@@ -4,9 +4,9 @@ import numpy as np
 
 
 class twins_svt_large(nn.Module):
-    def __init__(self, pretrained=True, del_layers=True):
+    def __init__(self, pretrained=False, del_layers=True):
         super().__init__()
-        self.svt = timm.create_model("twins_svt_large", pretrained=True)
+        self.svt = timm.create_model("twins_svt_large", pretrained=pretrained)
 
         if del_layers:
             del self.svt.head
@@ -95,7 +95,7 @@ class twins_svt_large(nn.Module):
 
 
 class convnext_large(nn.Module):
-    def __init__(self, pretrained=True):
+    def __init__(self, pretrained=False):
         super().__init__()
         self.convnext = timm.create_model("convnext_large", pretrained=pretrained)
 
@@ -119,7 +119,7 @@ class convnext_large(nn.Module):
 
 
 class convnext_Xlarge_4x(nn.Module):
-    def __init__(self, pretrained=True, del_layers=True):
+    def __init__(self, pretrained=False, del_layers=True):
         super().__init__()
         self.convnext = timm.create_model(
             "convnext_xlarge_in22k", pretrained=pretrained
@@ -138,7 +138,7 @@ class convnext_Xlarge_4x(nn.Module):
 
 
 class convnext_base_2x(nn.Module):
-    def __init__(self, pretrained=True, del_layers=True):
+    def __init__(self, pretrained=False, del_layers=True):
         super().__init__()
         self.convnext = timm.create_model("convnext_base_in22k", pretrained=pretrained)
 

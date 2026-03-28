@@ -35,12 +35,12 @@ DATASET = "overfit"
 EXCLUDE_MODELS = [
     "matchflow",
     "matchflow_raft",
-    "memfof",
     "scv4",
     "scv8",
     "separableflow",
     "splatflow",
     "streamflow",
+    "waft_dinov3_a2",
 ]  # Has additional requirements
 
 EXCLUDE_MODELS_FP16 = [
@@ -48,12 +48,12 @@ EXCLUDE_MODELS_FP16 = [
     "lcv_raft_small",
     "matchflow",
     "matchflow_raft",
-    "memfof",
     "scv4",
     "scv8",
     "separableflow",
     "splatflow",
     "streamflow",
+    "waft_dinov3_a2",
 ]  # Some operations do not support fp16
 
 MODEL_ARGS = {
@@ -91,10 +91,14 @@ def test_forward() -> None:
         model = ptlflow.get_model(mname, args=args)
         model = model.eval()
 
+        out_stride = model.output_stride
+        if out_stride is None:
+            out_stride = 64
+        s = make_divisible(256, out_stride)
         num_images = 2
-        if mname in ["videoflow_bof", "videoflow_mof"]:
+        if mname in ["videoflow_bof", "videoflow_mof", "memfof"]:
             num_images = 3
-        inputs = {"images": torch.rand(1, num_images, 3, 256, 256)}
+        inputs = {"images": torch.rand(1, num_images, 3, s, s)}
 
         if torch.cuda.is_available():
             model = model.cuda()
@@ -124,10 +128,14 @@ def test_forward_fp16() -> None:
             model = model.eval()
             model = model.half()
 
+            out_stride = model.output_stride
+            if out_stride is None:
+                out_stride = 64
+            s = make_divisible(256, out_stride)
             num_images = 2
-            if mname in ["videoflow_bof", "videoflow_mof"]:
+            if mname in ["videoflow_bof", "videoflow_mof", "memfof"]:
                 num_images = 3
-            inputs = {"images": torch.rand(1, num_images, 3, 256, 256)}
+            inputs = {"images": torch.rand(1, num_images, 3, s, s)}
 
             if torch.cuda.is_available():
                 model = model.cuda()

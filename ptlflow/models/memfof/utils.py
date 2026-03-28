@@ -184,6 +184,7 @@ def fill_invalid_slow(flow, valid):
 
 
 def forward_interpolate(flow):
+    dtype = flow.dtype
     flow = flow.detach().cpu().numpy()
     dx, dy = flow[0], flow[1]
 
@@ -213,7 +214,7 @@ def forward_interpolate(flow):
     )
 
     flow = np.stack([flow_x, flow_y], axis=0)
-    return torch.from_numpy(flow).float()
+    return torch.from_numpy(flow).to(dtype=dtype)
 
 
 def bilinear_sampler(img, coords, mode="bilinear", mask=False):
@@ -228,16 +229,16 @@ def bilinear_sampler(img, coords, mode="bilinear", mask=False):
 
     if mask:
         mask = (xgrid > -1) & (ygrid > -1) & (xgrid < 1) & (ygrid < 1)
-        return img, mask.float()
+        return img, mask.to(dtype=img.dtype)
 
     return img
 
 
-def coords_grid(batch, ht, wd, device):
+def coords_grid(batch, ht, wd, device, dtype):
     coords = torch.meshgrid(
         torch.arange(ht, device=device), torch.arange(wd, device=device), indexing="ij"
     )
-    coords = torch.stack(coords[::-1], dim=0).float()
+    coords = torch.stack(coords[::-1], dim=0).to(dtype=dtype)
     return coords[None].repeat(batch, 1, 1, 1)
 
 

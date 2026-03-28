@@ -28,7 +28,6 @@ from ptlflow.data.flow_transforms import ToTensor
 from ptlflow.utils import flow_utils
 from ptlflow.utils.utils import InputPadder
 
-
 # Results at scale_factor=0.66
 reference_accuracy = {
     "craft_things_flyingchairs": 0.720,

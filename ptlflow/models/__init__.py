@@ -10,6 +10,7 @@ from .flow_anything import *
 from .flowformer import *
 from .flowformerplusplus import *
 from .flownet import *
+from .flowseek import *
 from .gma import *
 from .gmflow import *
 from .gmflownet import *
@@ -28,6 +29,7 @@ from .neuflow2 import *
 from .pwcnet import *
 from .raft import *
 from .rapidflow import *
+from .recover import *
 from .rpknet import *
 from .sea_raft import *
 from .scopeflow import *

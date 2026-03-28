@@ -3,7 +3,6 @@ import torch
 import math
 import torch.nn as nn
 import torch.nn.functional as F
-from huggingface_hub import PyTorchModelHubMixin
 from torchvision.models import (
     ResNet34_Weights,
     WeightsEnum,
@@ -11,7 +10,7 @@ from torchvision.models import (
 
 from .update import GMAUpdateBlock
 from .corr import CorrBlock
-from .utils import coords_grid, InputPadder
+from .utils import coords_grid
 from .extractor import ResNetFPN16x
 from .layer import conv3x3
 from .gma import Attention
@@ -131,9 +130,9 @@ class MEMFOF(BaseModel):
         B, _, _, H, W = inputs["images"].shape
 
         if "flows" in inputs:
-            flow_gt = inputs["flows"][:, 0]
+            flow_gt = inputs["flows"]
         else:
-            flow_gts = torch.zeros(B, 2, 2, H, W, device=inputs["images"].device)
+            flow_gt = torch.zeros(B, 2, 2, H, W, device=inputs["images"].device)
 
         images, image_resizer = self.preprocess_images(
             inputs["images"],
@@ -149,7 +148,9 @@ class MEMFOF(BaseModel):
         flow_predictions = []
         info_predictions = []
 
-        dilation = torch.ones(B, 1, H // 16, W // 16, device=images.device)
+        dilation = torch.ones(
+            B, 1, H // 16, W // 16, device=images.device, dtype=images.dtype
+        )
 
         # run the context network
         cnet = self.cnet(torch.cat([images[:, 0], images[:, 1], images[:, 2]], dim=1))
@@ -207,10 +208,12 @@ class MEMFOF(BaseModel):
             flow_16x_23 = flow_16x_23.detach()
 
             coords21 = (
-                coords_grid(B, H, W, device=images.device) + flow_16x_21
+                coords_grid(B, H, W, device=images.device, dtype=images.dtype)
+                + flow_16x_21
             ).detach()
             coords23 = (
-                coords_grid(B, H, W, device=images.device) + flow_16x_23
+                coords_grid(B, H, W, device=images.device, dtype=images.dtype)
+                + flow_16x_23
             ).detach()
 
             corr_21 = corr_fn_21(coords21, dilation=dilation)

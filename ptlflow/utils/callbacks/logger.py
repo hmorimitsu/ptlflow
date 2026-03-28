@@ -36,6 +36,12 @@ import torch.nn.functional as F
 from torchvision.utils import make_grid
 
 try:
+    import swanlab
+    from swanlab.integration.pytorch_lightning import SwanLabLogger
+except ImportError:
+    swanlab = None
+
+try:
     import wandb
 except ImportError:
     wandb = None
@@ -117,6 +123,10 @@ class LoggerCallback(Callback):
             elif isinstance(logger, WandbLogger) and wandb is not None:
                 title_wb = title.replace("/", "-")
                 image_wb = wandb.Image(image_npy)
+                logger.experiment.log({title_wb: image_wb})
+            elif swanlab is not None and isinstance(logger, SwanLabLogger):
+                title_wb = title.replace("/", "-")
+                image_wb = swanlab.Image((255 * image_npy).astype(np.uint8))
                 logger.experiment.log({title_wb: image_wb})
 
     def on_train_batch_end(

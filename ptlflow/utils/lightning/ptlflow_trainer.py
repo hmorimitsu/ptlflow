@@ -320,7 +320,10 @@ class PTLFlowTrainer(pl.Trainer):
         self._checkpoint_connector = _PTLFlowCheckpointConnector(self)
 
     def _run(
-        self, model: "pl.LightningModule", ckpt_path: Optional[_PATH] = None
+        self,
+        model: "pl.LightningModule",
+        ckpt_path: Optional[_PATH] = None,
+        weights_only: Optional[bool] = None,
     ) -> Optional[Union[_EVALUATE_OUTPUT, _PREDICT_OUTPUT]]:
         if self.state.fn == TrainerFn.FITTING:
             min_epochs, max_epochs = _parse_loop_limits(
@@ -369,7 +372,9 @@ class PTLFlowTrainer(pl.Trainer):
             log.debug(
                 f"{self.__class__.__name__}: restoring module and callbacks from checkpoint path: {ckpt_path}"
             )
-            self._checkpoint_connector._restore_modules_and_callbacks(ckpt_path, model)
+            self._checkpoint_connector._restore_modules_and_callbacks(
+                ckpt_path, weights_only
+            )
 
         # reset logger connector
         self._logger_connector.reset_results()
@@ -383,7 +388,9 @@ class PTLFlowTrainer(pl.Trainer):
             call._call_callback_hooks(self, "on_fit_start")
             call._call_lightning_module_hook(self, "on_fit_start")
 
-        _log_hyperparams(self)
+        # only log hparams if enabled
+        if self.enable_autolog_hparams:
+            _log_hyperparams(self)
 
         if self.strategy.restore_checkpoint_after_setup:
             log.debug(

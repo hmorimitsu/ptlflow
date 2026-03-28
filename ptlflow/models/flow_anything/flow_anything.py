@@ -96,7 +96,7 @@ class FlowAnything(BaseModel):
             input_dim=6,
             output_dim=2 * self.dim,
             norm_layer=nn.BatchNorm2d,
-            init_weight=True,
+            init_weight=False,
             block_dims=block_dims,
             initial_dim=initial_dim,
             pretrain=pretrain,
@@ -121,7 +121,7 @@ class FlowAnything(BaseModel):
                 input_dim=3,
                 output_dim=self.output_dim,
                 norm_layer=nn.BatchNorm2d,
-                init_weight=True,
+                init_weight=False,
                 block_dims=block_dims,
                 initial_dim=initial_dim,
                 pretrain=pretrain,
@@ -173,16 +173,19 @@ class FlowAnything(BaseModel):
         image1 = images[:, 0]
         image2 = images[:, 1]
 
-        N, _, H, W = image1.shape
         if "flows" in inputs:
             flow_gt = inputs["flows"][:, 0]
         else:
+            N, _, _, H, W = inputs["images"].shape
             flow_gt = torch.zeros(N, 2, H, W, device=image1.device)
 
         flow_predictions = []
         info_predictions = []
 
-        dilation = torch.ones(N, 1, H // 8, W // 8, device=image1.device)
+        N, _, _, H, W = images.shape
+        dilation = torch.ones(
+            N, 1, H // 8, W // 8, device=image1.device, dtype=image1.dtype
+        )
         # run the context network
         cnet = self.cnet(torch.cat([image1, image2], dim=1))
         cnet = self.init_conv(cnet)
@@ -213,7 +216,9 @@ class FlowAnything(BaseModel):
         for itr in range(self.iters):
             N, _, H, W = flow_8x.shape
             flow_8x = flow_8x.detach()
-            coords2 = (coords_grid(N, H, W, device=image1.device) + flow_8x).detach()
+            coords2 = (
+                coords_grid(N, H, W, device=image1.device, dtype=image1.dtype) + flow_8x
+            ).detach()
             corr = corr_fn(coords2, dilation=dilation)
             net = self.update_block(net, context, corr, flow_8x)
             flow_update = self.flow_head(net)

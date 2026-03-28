@@ -320,7 +320,7 @@ class MatchingModel(nn.Module):
         feats_c = self.backbone(x)
         B, _, H, W = feats_c.shape
 
-        (feat_c0, feat_c1) = feats_c.split(B // 2)
+        feat_c0, feat_c1 = feats_c.split(B // 2)
 
         # 2. coarse-level loftr module
         if self.training:

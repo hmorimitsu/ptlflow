@@ -98,7 +98,7 @@ class SEARAFT(BaseModel):
             input_dim=6,
             output_dim=2 * self.dim,
             norm_layer=nn.BatchNorm2d,
-            init_weight=True,
+            init_weight=False,
         )
 
         # conv for iter 0 results
@@ -123,7 +123,7 @@ class SEARAFT(BaseModel):
                 input_dim=3,
                 output_dim=self.output_dim,
                 norm_layer=nn.BatchNorm2d,
-                init_weight=True,
+                init_weight=False,
             )
             self.update_block = BasicUpdateBlock(
                 corr_channel=self.corr_channel,
@@ -180,7 +180,7 @@ class SEARAFT(BaseModel):
         if "flows" in inputs:
             flow_gt = inputs["flows"][:, 0]
         else:
-            N, _, H, W = image1.shape
+            N, _, _, H, W = inputs["images"].shape
             flow_gt = torch.zeros(N, 2, H, W, device=image1.device)
 
         flow_predictions = []
@@ -197,6 +197,8 @@ class SEARAFT(BaseModel):
         flow_8x = flow_update[:, :2]
         info_8x = flow_update[:, 2:]
         flow_up, info_up = self.upsample_data(flow_8x, info_8x, weight_update)
+        flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
+        info_up = self.postprocess_predictions(info_up, image_resizer, is_flow=False)
         flow_predictions.append(flow_up)
         info_predictions.append(info_up)
 
