@@ -29,7 +29,7 @@ class VideoFlowBOF(BaseModel):
         cnet: str = "twins",
         fnet: str = "twins",
         gma: str = "GMA-SK2",
-        pretrain: bool = True,
+        pretrain: bool = False,
         corr_fn: str = "default",
         decoder_depth: int = 32,
         cost_heads_num: int = 1,

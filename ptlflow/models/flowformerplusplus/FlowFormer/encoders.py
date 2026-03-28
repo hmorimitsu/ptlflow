@@ -7,7 +7,7 @@ import numpy as np
 
 
 class twins_svt_large(nn.Module):
-    def __init__(self, pretrained=True, del_layers=True):
+    def __init__(self, pretrained=False, del_layers=True):
         super().__init__()
         self.svt = timm.create_model("twins_svt_large", pretrained=pretrained)
 
@@ -98,7 +98,7 @@ class twins_svt_large(nn.Module):
 
 
 class twins_svt_large_context(nn.Module):
-    def __init__(self, pretrained=True):
+    def __init__(self, pretrained=False):
         super().__init__()
         self.svt = timm.create_model("twins_svt_large_context", pretrained=pretrained)
 
@@ -128,7 +128,7 @@ class twins_svt_large_context(nn.Module):
 
 
 class convnext_large(nn.Module):
-    def __init__(self, pretrained=True):
+    def __init__(self, pretrained=False):
         super().__init__()
         self.convnext = timm.create_model("convnext_large", pretrained=pretrained)
 
@@ -152,7 +152,7 @@ class convnext_large(nn.Module):
 
 
 class nat_base(nn.Module):
-    def __init__(self, pretrained=True):
+    def __init__(self, pretrained=False):
         super().__init__()
         self.nat = timm.create_model("nat_base", pretrained=pretrained)
 

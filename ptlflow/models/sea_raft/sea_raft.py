@@ -98,7 +98,7 @@ class SEARAFT(BaseModel):
             input_dim=6,
             output_dim=2 * self.dim,
             norm_layer=nn.BatchNorm2d,
-            init_weight=True,
+            init_weight=False,
         )
 
         # conv for iter 0 results
@@ -123,7 +123,7 @@ class SEARAFT(BaseModel):
                 input_dim=3,
                 output_dim=self.output_dim,
                 norm_layer=nn.BatchNorm2d,
-                init_weight=True,
+                init_weight=False,
             )
             self.update_block = BasicUpdateBlock(
                 corr_channel=self.corr_channel,

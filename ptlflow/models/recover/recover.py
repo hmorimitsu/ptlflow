@@ -136,7 +136,7 @@ class ReCoVEr(BaseModel):
             input_dim=3,
             output_dim=self.output_dim,
             norm_layer=nn.BatchNorm2d,
-            init_weight=True,
+            init_weight=False,
         )
         self.update_block = BasicUpdateBlock(
             corr_channel=self.corr_channel, num_blocks=num_blocks, hdim=dim, cdim=dim
