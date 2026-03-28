@@ -41,6 +41,7 @@ def iter_spatial_correlation_sample(
     padding: Union[int, Tuple[int, int]] = 0,
     dilation: Union[int, Tuple[int, int]] = 1,
     dilation_patch: Union[int, Tuple[int, int]] = 1,
+    chunk_size: Optional[int] = None,
 ) -> torch.Tensor:
     """Apply spatial correlation sampling from input1 to input2 using iteration in PyTorch.
 
@@ -103,30 +104,80 @@ def iter_spatial_correlation_sample(
         input1 = F.pad(input1, (padding[1], padding[1], padding[0], padding[0]))
         input2 = F.pad(input2, (padding[1], padding[1], padding[0], padding[0]))
 
-    input2 = F.pad(
-        input2,
-        (
-            dilation_patch[1] * ((patch_size[1] - 1) // 2),
-            dilation_patch[1] * (patch_size[1] // 2),
-            dilation_patch[0] * ((patch_size[0] - 1) // 2),
-            dilation_patch[0] * (patch_size[0] // 2),
-        ),
-    )
-
-    b, _, h, w = input1.shape
+    b, c, h, w = input2.shape
     input1 = input1[:, :, :: stride[0], :: stride[1]]
     sh, sw = input1.shape[2:4]
-    corr = torch.zeros(b, patch_size[0], patch_size[1], sh, sw).to(
+
+    coords_grid = torch.meshgrid(torch.arange(h), torch.arange(w), indexing="ij")
+    coords = torch.stack(coords_grid[::-1], dim=0).to(
         dtype=input1.dtype, device=input1.device
     )
+    coords = coords[None].repeat(b, 1, 1, 1)
 
-    for i in range(0, patch_size[0] * dilation_patch[0], dilation_patch[0]):
-        for j in range(0, patch_size[1] * dilation_patch[1], dilation_patch[1]):
-            p2 = input2[:, :, i : i + h, j : j + w]
-            p2 = p2[:, :, :: stride[0], :: stride[1]]
-            corr[:, i // dilation_patch[0], j // dilation_patch[1]] = (input1 * p2).sum(
-                dim=1
-            )
+    _, _, hc, wc = coords.shape
+
+    cx = 2 * coords[:, 0] / (w - 1) - 1
+    cy = 2 * coords[:, 1] / (h - 1) - 1
+
+    offset = (
+        dilation_patch[0] * ((patch_size[0] - 1) // 2),
+        dilation_patch[1] * ((patch_size[1] - 1) // 2),
+    )
+
+    offsets_y = torch.arange(
+        0,
+        patch_size[0] * dilation_patch[0],
+        dilation_patch[0],
+        dtype=input1.dtype,
+        device=input1.device,
+    )
+    offsets_x = torch.arange(
+        0,
+        patch_size[1] * dilation_patch[1],
+        dilation_patch[1],
+        dtype=input1.dtype,
+        device=input1.device,
+    )
+
+    offsets_y = 2 * (offsets_y - offset[0]) / float(h - 1)
+    offsets_x = 2 * (offsets_x - offset[1]) / float(w - 1)
+
+    grid_y, grid_x = torch.meshgrid(offsets_y, offsets_x, indexing="ij")
+    grid_y = grid_y.reshape(-1)
+    grid_x = grid_x.reshape(-1)
+
+    num_patches = len(grid_y)
+    if chunk_size is None:
+        chunk_size = num_patches
+
+    corr_chunks = []
+    for start_idx in range(0, num_patches, chunk_size):
+        end_idx = min(start_idx + chunk_size, num_patches)
+        current_chunk = end_idx - start_idx
+
+        chunk_dy = grid_y[start_idx:end_idx].view(-1, 1, 1)
+        chunk_dx = grid_x[start_idx:end_idx].view(-1, 1, 1)
+
+        cx_chunk = cx.unsqueeze(0) + chunk_dx.unsqueeze(1)
+        cy_chunk = cy.unsqueeze(0) + chunk_dy.unsqueeze(1)
+
+        chunk_grid = torch.stack([cx_chunk, cy_chunk], dim=-1).view(
+            current_chunk * b, hc, wc, 2
+        )
+
+        input2_chunk = input2.repeat(current_chunk, 1, 1, 1)
+        p2_chunk = F.grid_sample(
+            input2_chunk, chunk_grid, mode="bilinear", align_corners=True
+        )
+        p2_chunk = p2_chunk.view(current_chunk, b, c, hc, wc)
+        p2_chunk = p2_chunk[:, :, :, :: stride[0], :: stride[1]]
+
+        c_out = (input1.unsqueeze(0) * p2_chunk).sum(dim=2)
+        c_out = c_out.permute(1, 0, 2, 3)
+        corr_chunks.append(c_out)
+
+    corr_flat = torch.cat(corr_chunks, dim=1)
+    corr = corr_flat.view(b, patch_size[0], patch_size[1], sh, sw)
 
     return corr
 
@@ -142,6 +193,7 @@ class IterSpatialCorrelationSampler(nn.Module):
         padding: Union[int, Tuple[int, int]] = 0,
         dilation: Union[int, Tuple[int, int]] = 1,
         dilation_patch: Union[int, Tuple[int, int]] = 1,
+        chunk_size: Optional[int] = None,
     ) -> None:
         """Initialize IterSpatialCorrelationSampler.
 
@@ -167,6 +219,7 @@ class IterSpatialCorrelationSampler(nn.Module):
         self.padding = padding
         self.dilation = dilation
         self.dilation_patch = dilation_patch
+        self.chunk_size = chunk_size
 
     def forward(self, input1: torch.Tensor, input2: torch.Tensor) -> torch.Tensor:
         """Compute the correlation sampling from input1 to input2.
@@ -192,6 +245,7 @@ class IterSpatialCorrelationSampler(nn.Module):
             padding=self.padding,
             dilation=self.dilation,
             dilation_patch=self.dilation_patch,
+            chunk_size=self.chunk_size,
         )
 
 
@@ -231,6 +285,7 @@ def iter_translated_spatial_correlation_sample(
     dilation: Union[int, Tuple[int, int]] = 1,
     dilation_patch: Union[int, Tuple[int, int]] = 1,
     coords_grid: Optional[torch.Tensor] = None,
+    chunk_size: Optional[int] = None,
 ) -> torch.Tensor:
     """Apply spatial correlation sampling with translation from input1 to input2 using iteration in PyTorch.
 
@@ -311,17 +366,16 @@ def iter_translated_spatial_correlation_sample(
         input1 = F.pad(input1, (padding[1], padding[1], padding[0], padding[0]))
         input2 = F.pad(input2, (padding[1], padding[1], padding[0], padding[0]))
 
-    b, _, h, w = input2.shape
+    b, c, h, w = input2.shape
     input1 = input1[:, :, :: stride[0], :: stride[1]]
     sh, sw = input1.shape[2:4]
-    corr = torch.zeros(b, patch_size[0], patch_size[1], sh, sw).to(
-        dtype=input1.dtype, device=input1.device
-    )
 
     if coords is None:
         if coords_grid is None:
             coords_grid = _init_coords_grid(flow)
         coords = coords_grid + flow
+
+    _, _, hc, wc = coords.shape
 
     cx = 2 * coords[:, 0] / (w - 1) - 1
     cy = 2 * coords[:, 1] / (h - 1) - 1
@@ -331,20 +385,60 @@ def iter_translated_spatial_correlation_sample(
         dilation_patch[1] * ((patch_size[1] - 1) // 2),
     )
 
-    for i in range(0, patch_size[0] * dilation_patch[0], dilation_patch[0]):
-        for j in range(0, patch_size[1] * dilation_patch[1], dilation_patch[1]):
-            grid = torch.stack(
-                [
-                    cx + 2 * (j - offset[1]) / float(w - 1),
-                    cy + 2 * (i - offset[0]) / float(h - 1),
-                ],
-                dim=-1,
-            )
-            p2 = F.grid_sample(input2, grid, mode="bilinear", align_corners=True)
-            p2 = p2[:, :, :: stride[0], :: stride[1]]
-            corr[:, i // dilation_patch[0], j // dilation_patch[1]] = (input1 * p2).sum(
-                dim=1
-            )
+    offsets_y = torch.arange(
+        0,
+        patch_size[0] * dilation_patch[0],
+        dilation_patch[0],
+        dtype=input1.dtype,
+        device=input1.device,
+    )
+    offsets_x = torch.arange(
+        0,
+        patch_size[1] * dilation_patch[1],
+        dilation_patch[1],
+        dtype=input1.dtype,
+        device=input1.device,
+    )
+
+    offsets_y = 2 * (offsets_y - offset[0]) / float(h - 1)
+    offsets_x = 2 * (offsets_x - offset[1]) / float(w - 1)
+
+    grid_y, grid_x = torch.meshgrid(offsets_y, offsets_x, indexing="ij")
+    grid_y = grid_y.reshape(-1)
+    grid_x = grid_x.reshape(-1)
+
+    num_patches = len(grid_y)
+    if chunk_size is None:
+        chunk_size = num_patches
+
+    corr_chunks = []
+    for start_idx in range(0, num_patches, chunk_size):
+        end_idx = min(start_idx + chunk_size, num_patches)
+        current_chunk = end_idx - start_idx
+
+        chunk_dy = grid_y[start_idx:end_idx].view(-1, 1, 1)
+        chunk_dx = grid_x[start_idx:end_idx].view(-1, 1, 1)
+
+        cx_chunk = cx.unsqueeze(0) + chunk_dx.unsqueeze(1)
+        cy_chunk = cy.unsqueeze(0) + chunk_dy.unsqueeze(1)
+
+        chunk_grid = torch.stack([cx_chunk, cy_chunk], dim=-1).view(
+            current_chunk * b, hc, wc, 2
+        )
+
+        input2_chunk = input2.repeat(current_chunk, 1, 1, 1)
+        p2_chunk = F.grid_sample(
+            input2_chunk, chunk_grid, mode="bilinear", align_corners=True
+        )
+        p2_chunk = p2_chunk.view(current_chunk, b, c, hc, wc)
+        p2_chunk = p2_chunk[:, :, :, :: stride[0], :: stride[1]]
+
+        c_out = (input1.unsqueeze(0) * p2_chunk).sum(dim=2)
+        c_out = c_out.permute(1, 0, 2, 3)
+        corr_chunks.append(c_out)
+
+    corr_flat = torch.cat(corr_chunks, dim=1)
+    corr = corr_flat.view(b, patch_size[0], patch_size[1], sh, sw)
 
     return corr
 
@@ -366,6 +460,7 @@ class IterTranslatedSpatialCorrelationSampler(nn.Module):
         padding: Union[int, Tuple[int, int]] = 0,
         dilation: Union[int, Tuple[int, int]] = 1,
         dilation_patch: Union[int, Tuple[int, int]] = 1,
+        chunk_size: Optional[int] = None,
     ) -> None:
         """Initialize IterTranslatedSpatialCorrelationSampler.
 
@@ -391,6 +486,7 @@ class IterTranslatedSpatialCorrelationSampler(nn.Module):
         self.padding = padding
         self.dilation = dilation
         self.dilation_patch = dilation_patch
+        self.chunk_size = chunk_size
 
         self.coords_grid = None
 
@@ -436,6 +532,7 @@ class IterTranslatedSpatialCorrelationSampler(nn.Module):
             dilation=self.dilation,
             dilation_patch=self.dilation_patch,
             coords_grid=self.coords_grid,
+            chunk_size=self.chunk_size,
         )
 
 
@@ -454,6 +551,7 @@ class IterativeCorrBlock(nn.Module):
         fmap2: torch.Tensor,
         radius: int = 1,
         num_levels: int = 1,
+        chunk_size: Optional[int] = None,
     ):
         """Initialize IterativeCorrBlock.
 
@@ -472,6 +570,7 @@ class IterativeCorrBlock(nn.Module):
 
         self.patch_size = 2 * radius + 1
         self.num_levels = num_levels
+        self.chunk_size = chunk_size
 
         self.pyramid = [(fmap1, fmap2)]
         for _ in range(self.num_levels):
@@ -507,6 +606,7 @@ class IterativeCorrBlock(nn.Module):
                 input2=fmap2_i,
                 coords=coords_i,
                 patch_size=self.patch_size,
+                chunk_size=self.chunk_size,
             )
             corr = rearrange(corr, "b c d h w -> b (d c) h w")
             corr_list.append(corr)
