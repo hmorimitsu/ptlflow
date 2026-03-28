@@ -110,7 +110,7 @@ class FlowSeek(BaseModel):
         #         f"weights/depth_anything_v2_%s.pth" % da_size, map_location="cpu"
         #     )
         # )
-        self.dav2 = self.dav2.cuda().eval()
+        self.dav2 = self.dav2.eval()
         for param in self.dav2.parameters():
             param.requires_grad = False
 
@@ -196,8 +196,8 @@ class FlowSeek(BaseModel):
         v = v - cy
         u = u.unsqueeze(0).unsqueeze(0)
         v = v.unsqueeze(0).unsqueeze(0)
-        u = u.repeat(B, 1, 1, 1).cuda()
-        v = v.repeat(B, 1, 1, 1).cuda()
+        u = u.repeat(B, 1, 1, 1)
+        v = v.repeat(B, 1, 1, 1)
 
         aspect_ratio = W / H
 
