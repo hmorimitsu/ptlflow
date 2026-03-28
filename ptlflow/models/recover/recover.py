@@ -186,13 +186,15 @@ class ReCoVEr(BaseModel):
             flow_gt = inputs["flows"][:, 0]
         else:
             N, _, H, W = image1.shape
-            flow_gt = torch.zeros(N, 2, H, W, device=image1.device)
+            flow_gt = torch.zeros(N, 2, H, W, device=image1.device, dtype=image1.dtype)
 
         flow_predictions = []
         info_predictions = []
 
         N, _, H, W = image1.shape
-        dilation = torch.ones(N, 1, H // 8, W // 8, device=image1.device)
+        dilation = torch.ones(
+            N, 1, H // 8, W // 8, device=image1.device, dtype=image1.dtype
+        )
         # run the context network
         cnet = self.cnet(torch.cat([image1, image2], dim=1))
         cnet = self.init_conv(cnet)
@@ -231,7 +233,10 @@ class ReCoVEr(BaseModel):
 
             if not self.disable_cost:
                 coords2 = (
-                    (coords_grid(N, H, W, device=image1.device) + flow_8x)
+                    (
+                        coords_grid(N, H, W, device=image1.device, dtype=image1.dtype)
+                        + flow_8x
+                    )
                     .type(image1.dtype)
                     .detach()
                 )
