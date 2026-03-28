@@ -219,6 +219,13 @@ def benchmark(args: Namespace, device_handle) -> pd.DataFrame:
     output_path = Path(args.output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
+    if args.all:
+        output_suffix = "all"
+    elif args.select is not None and len(args.select) > 0:
+        output_suffix = "select"
+    else:
+        output_suffix = None
+
     model_args = args
     available_model_names = ptlflow.get_model_names()
     if args.all:
@@ -379,7 +386,10 @@ def benchmark(args: Namespace, device_handle) -> pd.DataFrame:
                 new_df = pd.DataFrame(new_df_dict)
                 df = pd.concat([df, new_df], ignore_index=True)
                 df = df.round(3)
-                df.to_csv(output_path / f"model_benchmark-{mname}.csv", index=False)
+                csv_suffix = output_suffix if output_suffix is not None else mname
+                df.to_csv(
+                    output_path / f"model_benchmark-{csv_suffix}.csv", index=False
+                )
                 save_plot(
                     output_path,
                     mname,
