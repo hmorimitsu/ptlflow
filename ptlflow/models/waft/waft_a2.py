@@ -226,11 +226,14 @@ class WAFTa2(BaseModel):
         fmap1_2x = self.fmap_conv(torch.cat([fmap1_pretrain, fmap1_img], dim=1))
         fmap2_2x = self.fmap_conv(torch.cat([fmap2_pretrain, fmap2_img], dim=1))
         net = self.hidden_conv(torch.cat([fmap1_2x, fmap2_2x], dim=1))
-        flow_2x = torch.zeros(N, 2, H // 2, W // 2).to(image1.device)
+        flow_2x = torch.zeros(
+            N, 2, H // 2, W // 2, device=image1.device, dtype=image1.dtype
+        )
         for itr in range(self.iters):
             flow_2x = flow_2x.detach()
             coords2 = (
-                coords_grid(N, H // 2, W // 2, device=image1.device) + flow_2x
+                coords_grid(N, H // 2, W // 2, device=image1.device, dtype=image1.dtype)
+                + flow_2x
             ).detach()
             warp_2x = bilinear_sampler(fmap2_2x, coords2.permute(0, 2, 3, 1))
             refine_inp = self.warp_linear(
