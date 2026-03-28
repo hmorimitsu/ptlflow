@@ -255,7 +255,6 @@ class FlowSeek(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
-        N, _, _, H, W = inputs["images"].shape
 
         images_res, _ = self.preprocess_images(
             inputs["images"],
@@ -272,6 +271,13 @@ class FlowSeek(BaseModel):
 
         im1_path1, depth1 = self.dav2.forward(image1_res)
         im2_path1, _ = self.dav2.forward(image2_res)
+
+        N, _, _, H, W = inputs["images"].shape
+
+        if "flows" in inputs:
+            flow_gt = inputs["flows"][:, 0]
+        else:
+            flow_gt = torch.zeros(N, 2, H, W, device=image1_res.device)
 
         im1_path1 = F.interpolate(
             im1_path1, (H, W), mode="bilinear", align_corners=False
@@ -388,9 +394,9 @@ class FlowSeek(BaseModel):
                 # Small b Component
                 log_b[:, 1] = torch.clamp(raw_b[:, 1], min=var_min, max=0)
                 # term2: [N, 2, m, H, W]
-                term2 = (
-                    (inputs["flows"][:, 0] - flow_predictions[i]).abs().unsqueeze(2)
-                ) * (torch.exp(-log_b).unsqueeze(1))
+                term2 = ((flow_gt - flow_predictions[i]).abs().unsqueeze(2)) * (
+                    torch.exp(-log_b).unsqueeze(1)
+                )
                 # term1: [N, m, H, W]
                 term1 = weight - math.log(2) - log_b
                 nf_loss = torch.logsumexp(

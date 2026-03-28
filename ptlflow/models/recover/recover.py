@@ -185,7 +185,7 @@ class ReCoVEr(BaseModel):
         if "flows" in inputs:
             flow_gt = inputs["flows"][:, 0]
         else:
-            N, _, H, W = image1.shape
+            N, _, _, H, W = inputs["images"].shape
             flow_gt = torch.zeros(N, 2, H, W, device=image1.device, dtype=image1.dtype)
 
         flow_predictions = []

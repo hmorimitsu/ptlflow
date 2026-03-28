@@ -130,9 +130,9 @@ class MEMFOF(BaseModel):
         B, _, _, H, W = inputs["images"].shape
 
         if "flows" in inputs:
-            flow_gt = inputs["flows"][:, 0]
+            flow_gt = inputs["flows"]
         else:
-            flow_gts = torch.zeros(B, 2, 2, H, W, device=inputs["images"].device)
+            flow_gt = torch.zeros(B, 2, 2, H, W, device=inputs["images"].device)
 
         images, image_resizer = self.preprocess_images(
             inputs["images"],

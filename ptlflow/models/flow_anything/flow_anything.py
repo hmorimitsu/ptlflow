@@ -173,15 +173,16 @@ class FlowAnything(BaseModel):
         image1 = images[:, 0]
         image2 = images[:, 1]
 
-        N, _, H, W = image1.shape
         if "flows" in inputs:
             flow_gt = inputs["flows"][:, 0]
         else:
-            flow_gt = torch.zeros(N, 2, H, W, device=image1.device, dtype=image1.dtype)
+            N, _, _, H, W = inputs["images"].shape
+            flow_gt = torch.zeros(N, 2, H, W, device=image1.device)
 
         flow_predictions = []
         info_predictions = []
 
+        N, _, _, H, W = images.shape
         dilation = torch.ones(
             N, 1, H // 8, W // 8, device=image1.device, dtype=image1.dtype
         )
