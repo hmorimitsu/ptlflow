@@ -149,6 +149,9 @@ class FlowMetrics(Metric):
         targets : dict[str, torch.Tensor]
             The groundtruth of the predictions.
         """
+        preds = self._convert_dict_to_metrics_dtype(preds)
+        targets = self._convert_dict_to_metrics_dtype(targets)
+
         if self.average_mode == "epoch_mean":
             prev_weight = 1.0
             next_weight = 1.0
@@ -329,6 +332,22 @@ class FlowMetrics(Metric):
             tensor = tensor.sum()
         else:
             tensor = tensor.mean()
+        return tensor
+
+    def _convert_dict_to_metrics_dtype(
+        self, tensors: Dict[str, torch.Tensor]
+    ) -> Dict[str, torch.Tensor]:
+        converted = {}
+        for key, value in tensors.items():
+            if isinstance(value, torch.Tensor):
+                converted[key] = self._to_metrics_dtype(value)
+            else:
+                converted[key] = value
+        return converted
+
+    def _to_metrics_dtype(self, tensor: torch.Tensor) -> torch.Tensor:
+        if tensor.is_floating_point() and tensor.dtype != torch.float32:
+            return tensor.float()
         return tensor
 
     def _f1_score(
