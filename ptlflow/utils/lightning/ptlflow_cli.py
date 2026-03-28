@@ -120,7 +120,11 @@ class PTLFlowCLI(LightningCLI):
 
             self._set_seed()
 
-            self._add_instantiators()
+            if hasattr(self, "_add_instantiators") and callable(
+                getattr(self, "_add_instantiators")
+            ):
+                self._add_instantiators()
+
             self.before_instantiate_classes()
             self.instantiate_classes()
 
