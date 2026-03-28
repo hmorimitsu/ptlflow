@@ -282,10 +282,10 @@ class WAFTa2(BaseModel):
 @register_model
 class waft_dav2_a2(WAFTa2):
     pretrained_checkpoints = {
-        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dav2_a2_kitti-d26dfae3.ckpt",
-        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dav2_a2_sintel-b346e853.ckpt",
-        "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dav2_a2_spring-04a4560e.ckpt",
-        "zero_shot": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dav2_a2_zero_shot-4d51a008.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dav2_a2-kitti-d26dfae3.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dav2_a2-sintel-b346e853.ckpt",
+        "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dav2_a2-spring-04a4560e.ckpt",
+        "zero_shot": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dav2_a2-zero_shot-4d51a008.ckpt",
     }
 
     def __init__(self, feature_encoder="dav2", **kwargs):
@@ -295,10 +295,10 @@ class waft_dav2_a2(WAFTa2):
 @register_model
 class waft_dinov3_a2(WAFTa2):
     pretrained_checkpoints = {
-        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dinov3_a2_kitti-b0720be7.ckpt",
-        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dinov3_a2_sintel-144f3861.ckpt",
-        "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dinov3_a2_spring-adb46820.ckpt",
-        "zero_shot": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dinov3_a2_zero_shot-834176f4.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dinov3_a2-kitti-b0720be7.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dinov3_a2-sintel-144f3861.ckpt",
+        "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dinov3_a2-spring-adb46820.ckpt",
+        "zero_shot": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_dinov3_a2-zero_shot-834176f4.ckpt",
     }
 
     def __init__(self, feature_encoder="dinov3", **kwargs):
@@ -308,10 +308,10 @@ class waft_dinov3_a2(WAFTa2):
 @register_model
 class waft_twins_a2(WAFTa2):
     pretrained_checkpoints = {
-        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_twins_a2_kitti-f2861761.ckpt",
-        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_twins_a2_sintel-c3348f5f.ckpt",
-        "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_twins_a2_spring-c201ca50.ckpt",
-        "zero_shot": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_twins_a2_zero_shot-f81e2579.ckpt",
+        "kitti": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_twins_a2-kitti-f2861761.ckpt",
+        "sintel": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_twins_a2-sintel-c3348f5f.ckpt",
+        "spring": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_twins_a2-spring-c201ca50.ckpt",
+        "zero_shot": "https://github.com/hmorimitsu/ptlflow/releases/download/weights1/waft_twins_a2-zero_shot-f81e2579.ckpt",
     }
 
     def __init__(self, feature_encoder="twins", **kwargs):
