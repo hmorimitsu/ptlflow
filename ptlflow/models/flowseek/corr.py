@@ -2,15 +2,10 @@
 # Copyright (c) 2024, Princeton Vision & Learning Lab
 # Licensed under the BSD 3-Clause License
 
+import math
 import torch
 import torch.nn.functional as F
 from .utils import bilinear_sampler
-
-try:
-    import alt_cuda_corr
-except:
-    # alt_cuda_corr is not compiled
-    pass
 
 
 def coords_feature(fmap, b, x, y):
@@ -19,7 +14,7 @@ def coords_feature(fmap, b, x, y):
     b = b.long()
     x = torch.clamp(x, 0, W - 1).long()
     y = torch.clamp(y, 0, H - 1).long()
-    res = fmap[b, :, y, x] * mask.float().unsqueeze(1)
+    res = fmap[b, :, y, x] * mask.to(dtype=fmap.dtype).unsqueeze(1)
     return res
 
 
@@ -46,7 +41,7 @@ def coords_corr(corr, idx, b, x, y):
     idx = idx.long()
     x = torch.clamp(x, 0, W - 1).long()
     y = torch.clamp(y, 0, H - 1).long()
-    res = corr[b, idx[:, 2], idx[:, 1], y, x] * mask.float()
+    res = corr[b, idx[:, 2], idx[:, 1], y, x] * mask.to(dtype=corr.dtype)
     print(mask.requires_grad, x.requires_grad, y.requires_grad, res.requires_grad)
     return res
 
@@ -93,15 +88,17 @@ class CorrBlock:
         batch, h1, w1, _ = coords.shape
 
         if dilation is None:
-            dilation = torch.ones(batch, 1, h1, w1, device=coords.device)
+            dilation = torch.ones(
+                batch, 1, h1, w1, device=coords.device, dtype=coords.dtype
+            )
 
         # print(dilation.max(), dilation.mean(), dilation.min())
         out_pyramid = []
         for i in range(self.num_levels):
             corr = self.corr_pyramid[i]
             device = coords.device
-            dx = torch.linspace(-r, r, 2 * r + 1, device=device)
-            dy = torch.linspace(-r, r, 2 * r + 1, device=device)
+            dx = torch.linspace(-r, r, 2 * r + 1, device=device, dtype=coords.dtype)
+            dy = torch.linspace(-r, r, 2 * r + 1, device=device, dtype=coords.dtype)
             delta = torch.stack(torch.meshgrid(dy, dx), axis=-1)
             delta_lvl = delta.view(1, 2 * r + 1, 2 * r + 1, 2)
             delta_lvl = delta_lvl * dilation.view(batch * h1 * w1, 1, 1, 1)
@@ -112,7 +109,7 @@ class CorrBlock:
             out_pyramid.append(corr)
 
         out = torch.cat(out_pyramid, dim=-1)
-        out = out.permute(0, 3, 1, 2).contiguous().float()
+        out = out.permute(0, 3, 1, 2).contiguous().to(dtype=coords.dtype)
         return out
 
     @staticmethod
@@ -123,7 +120,7 @@ class CorrBlock:
         fmap2 = fmap2.view(batch, num_head, dim // num_head, h2 * w2)
         corr = fmap1.transpose(2, 3) @ fmap2
         corr = corr.reshape(batch, num_head, h1, w1, h2, w2).permute(0, 2, 3, 1, 4, 5)
-        return corr / torch.sqrt(torch.tensor(dim).float())
+        return corr / math.sqrt(dim)
 
 
 # class CorrBlock:

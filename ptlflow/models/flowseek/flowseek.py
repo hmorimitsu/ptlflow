@@ -187,9 +187,10 @@ class FlowSeek(BaseModel):
         assert C == 1
         cx = 0.5
         cy = 0.5
+        dtype = disp.dtype
 
-        ys = torch.linspace(0.5 / H, 1.0 - 0.5 / H, H)
-        xs = torch.linspace(0.5 / W, 1.0 - 0.5 / W, W)
+        ys = torch.linspace(0.5 / H, 1.0 - 0.5 / H, H, dtype=dtype)
+        xs = torch.linspace(0.5 / W, 1.0 - 0.5 / W, W, dtype=dtype)
         u, v = torch.meshgrid(xs, ys, indexing="xy")
         u = u - cx
         v = v - cy
@@ -230,8 +231,8 @@ class FlowSeek(BaseModel):
     def initialize_flow(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords2 - coords1"""
         N, C, H, W = img.shape
-        coords1 = coords_grid(N, H // 8, W // 8, device=img.device)
-        coords2 = coords_grid(N, H // 8, W // 8, device=img.device)
+        coords1 = coords_grid(N, H // 8, W // 8, device=img.device, dtype=img.dtype)
+        coords2 = coords_grid(N, H // 8, W // 8, device=img.device, dtype=img.dtype)
         return coords1, coords2
 
     def upsample_data(self, flow, info, mask):
@@ -300,7 +301,9 @@ class FlowSeek(BaseModel):
         info_predictions = []
 
         N, _, H, W = image1.shape
-        dilation = torch.ones(N, 1, H // 8, W // 8, device=image1.device)
+        dilation = torch.ones(
+            N, 1, H // 8, W // 8, device=image1.device, dtype=image1.dtype
+        )
 
         # run the context network
         cnet_inputs = torch.cat([image1, image2], dim=1)
@@ -349,7 +352,9 @@ class FlowSeek(BaseModel):
         for itr in range(self.iters):
             N, _, H, W = flow_8x.shape
             flow_8x = flow_8x.detach()
-            coords2 = (coords_grid(N, H, W, device=image1.device) + flow_8x).detach()
+            coords2 = (
+                coords_grid(N, H, W, device=image1.device, dtype=image1.dtype) + flow_8x
+            ).detach()
             corr = corr_fn(coords2, dilation=dilation)
             net = self.update_block(net, context, corr, flow_8x)
             flow_update = self.flow_head(net)
