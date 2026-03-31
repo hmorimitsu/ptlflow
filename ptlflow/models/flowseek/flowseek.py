@@ -188,9 +188,10 @@ class FlowSeek(BaseModel):
         cx = 0.5
         cy = 0.5
         dtype = disp.dtype
+        device = disp.device
 
-        ys = torch.linspace(0.5 / H, 1.0 - 0.5 / H, H, dtype=dtype)
-        xs = torch.linspace(0.5 / W, 1.0 - 0.5 / W, W, dtype=dtype)
+        ys = torch.linspace(0.5 / H, 1.0 - 0.5 / H, H, dtype=dtype, device=device)
+        xs = torch.linspace(0.5 / W, 1.0 - 0.5 / W, W, dtype=dtype, device=device)
         u, v = torch.meshgrid(xs, ys, indexing="xy")
         u = u - cx
         v = v - cy
