@@ -251,7 +251,7 @@ class RAPIDFlow(BaseModel):
 
         cnet_pyramid = self.cnet(x1_raw)
 
-        pred_stride = min(self.pyramid_ranges)
+        pred_stride = min(8, min(self.pyramid_ranges))
 
         start_level, output_level = self.pyramid_levels
         pass_pyramid1 = x1_pyramid[start_level : output_level + 1]
@@ -370,13 +370,13 @@ class RAPIDFlow(BaseModel):
                             out_flow = up_flow
                         else:
                             out_flow = self.upsample_flow(out_flow, mask, pred_stride)
-                    else:
-                        out_flow = F.interpolate(
-                            out_flow,
-                            [x1_raw.shape[-2], x1_raw.shape[-1]],
-                            mode="bilinear",
-                            align_corners=True,
-                        )
+
+                    out_flow = F.interpolate(
+                        out_flow,
+                        [x1_raw.shape[-2], x1_raw.shape[-1]],
+                        mode="bilinear",
+                        align_corners=True,
+                    )
                 elif l == (output_level - start_level) and k == (
                     iters_per_level[l] - 1
                 ):
@@ -399,13 +399,13 @@ class RAPIDFlow(BaseModel):
                             out_flow = up_flow
                         else:
                             out_flow = self.upsample_flow(out_flow, mask, pred_stride)
-                    else:
-                        out_flow = F.interpolate(
-                            out_flow,
-                            [x1_raw.shape[-2], x1_raw.shape[-1]],
-                            mode="bilinear",
-                            align_corners=True,
-                        )
+
+                    out_flow = F.interpolate(
+                        out_flow,
+                        [x1_raw.shape[-2], x1_raw.shape[-1]],
+                        mode="bilinear",
+                        align_corners=True,
+                    )
                 out_flow = self.postprocess_predictions(
                     out_flow, image_resizer, is_flow=True
                 )
