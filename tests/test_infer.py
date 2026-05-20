@@ -29,14 +29,14 @@ TEST_MODEL = "raft_small"
 
 def test_infer(tmp_path: Path) -> None:
     _create_images(tmp_path)
+    input_paths = [str(tmp_path / "img1.png"), str(tmp_path / "img2.png")]
 
     model_ref = ptlflow.get_model_reference(TEST_MODEL)
 
     parser = ArgumentParser(parents=[infer._init_parser()])
     parser.add_class_arguments(model_ref, "model")
-    args = parser.parse_args([])
+    args = parser.parse_args(["--input_path", *input_paths])
 
-    args.input_path = [str(tmp_path / "img1.png"), str(tmp_path / "img2.png")]
     args.write_outputs = True
     args.output_path = tmp_path
 
