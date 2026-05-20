@@ -131,7 +131,7 @@ class UpdateBlock(nn.Module):
 
         self.flow_head = FlowHead(dec_net_chs, hidden_dim=256)
 
-        pred_stride = min(pyramid_ranges) if use_upsample_mask else 8
+        pred_stride = min(8, min(pyramid_ranges)) if use_upsample_mask else 8
         self.mask = nn.Sequential(
             nn.Conv2d(dec_net_chs, dec_net_chs * 2, 3, padding=1),
             nn.ReLU(inplace=True),
