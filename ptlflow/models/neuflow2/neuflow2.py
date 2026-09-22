@@ -222,7 +222,7 @@ class NeuFlow2(BaseModel):
             inputs["images"],
             bgr_add=[0.0, 0.0, 0.0],
             bgr_mult=[1.0, 1.0, 1.0],
-            bgr_to_rgb=False,
+            bgr_to_rgb=True,  # upstream Neuflow_v2 is trained with RGB
             resize_mode="interpolation",
             interpolation_align_corners=False,
         )
