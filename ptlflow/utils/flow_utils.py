@@ -88,7 +88,7 @@ def flow_read(
     input_data: Sequence[Any], str, Path or IO
         Path of the file to read or a sequence containing the path and extra information.
     format: str, optional
-        Specify in what format the flow is read, accepted formats: "flo", "flo5", "kubric_png", "npz", "pfm", "png".
+        Specify in what format the flow is read, accepted formats: "flo", "flo5", "kubric_png", "viper_npz", "npy", "pfm", "png", "png128".
         If None, it is guessed from the file extension.
 
     Returns
@@ -139,7 +139,7 @@ def flow_write(
         flow[..., 0] should be the x-displacement
         flow[..., 1] should be the y-displacement
     format: str, optional
-        Specify in what format the flow is written, accepted formats: "png" or "flo"
+        Specify in what format the flow is written, accepted formats: "flo", "flo5", "viper_npz", "npy", "pfm", "png", "png128".
         If None, it is guessed on the file extension
 
     See Also
@@ -227,8 +227,12 @@ def fb_check(
     assert len(forward_flow.shape) == 4
 
     coords = torch.meshgrid(
-        torch.arange(forward_flow.shape[-2], dtype=torch.float32),
-        torch.arange(forward_flow.shape[-1], dtype=torch.float32),
+        torch.arange(
+            forward_flow.shape[-2], dtype=forward_flow.dtype, device=forward_flow.device
+        ),
+        torch.arange(
+            forward_flow.shape[-1], dtype=forward_flow.dtype, device=forward_flow.device
+        ),
         indexing="ij",
     )
     coords = torch.stack(coords[::-1], dim=0)[None]
