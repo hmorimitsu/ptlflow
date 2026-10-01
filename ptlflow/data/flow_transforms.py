@@ -1105,13 +1105,19 @@ class RandomRotate(object):
 
                 if k in self.binary_keys:
                     v[t::2] = F.grid_sample(
-                        v[t::2], rot_grid[: v[t::2].shape[0]], mode="nearest"
+                        v[t::2],
+                        rot_grid[: v[t::2].shape[0]],
+                        mode="nearest",
+                        align_corners=True,
                     )
                 else:
                     if k in self.flow_keys:
                         if self.sparse:
                             v[t::2] = F.grid_sample(
-                                v[t::2], rot_grid[: v[t::2].shape[0]], mode="nearest"
+                                v[t::2],
+                                rot_grid[: v[t::2].shape[0]],
+                                mode="nearest",
+                                align_corners=True,
                             )
                         else:
                             v[t::2] = F.grid_sample(
