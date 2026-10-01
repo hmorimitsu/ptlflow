@@ -282,6 +282,40 @@ def write_middlebury_st(
     logger.info("Created dataset on {}.", str(root_dir))
 
 
+def write_monkaa(
+    root_dir: Union[str, Path], img_size: Tuple[int, int] = (540, 960)
+) -> None:
+    """Generate a dummy version of the Monkaa dataset.
+
+    The original dataset is available at:
+
+    https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html
+
+    Parameters
+    ----------
+    root_dir : Union[str, Path]
+        Path to the directory where the dummy dataset will be created.
+    img_size : Tuple[int, int], default (540, 960)
+        The size of the images inside of this dataset.
+    """
+    img = np.random.randint(0, 256, img_size + (3,), np.uint8)
+    flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
+
+    root_dir = Path(root_dir) / "monkaa"
+    img_dir = root_dir / "frames_cleanpass" / "sequence" / "left"
+    img_dir.mkdir(parents=True, exist_ok=True)
+    cv.imwrite(str(img_dir / "0000.png"), img)
+    cv.imwrite(str(img_dir / "0001.png"), img)
+
+    for direc in ["into_future", "into_past"]:
+        flow_dir = root_dir / "optical_flow" / "sequence" / direc / "left"
+        flow_dir.mkdir(parents=True, exist_ok=True)
+        for num in range(2):
+            flow_utils.flow_write(flow_dir / f"{num:04d}.pfm", flow)
+
+    logger.info("Created dataset on {}.", str(root_dir))
+
+
 def write_sintel(
     root_dir: Union[str, Path], img_size: Tuple[int, int] = (436, 1024)
 ) -> None:
