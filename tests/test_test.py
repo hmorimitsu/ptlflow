@@ -58,3 +58,48 @@ def test_test(tmp_path: Path) -> None:
         assert (tmp_path / dname / dpath).exists()
 
     shutil.rmtree(tmp_path)
+
+
+def test_test_max_forward_side_downscales(tmp_path: Path, monkeypatch) -> None:
+    model = ptlflow.get_model(TEST_MODEL)
+
+    data_parser = ArgumentParser()
+    data_parser.add_class_arguments(FlowDataModule, "data")
+    data_args = data_parser.parse_args([])
+    data_args.data.test_dataset = "kitti-2015"
+    data_args.data.kitti_2015_root_dir = str(tmp_path / "KITTI/2015")
+
+    data_parser = ArgumentParser(exit_on_error=False)
+    data_parser.add_argument("--data", type=FlowDataModule)
+    data_cfg = data_parser.parse_object({"data": data_args.data})
+    datamodule = data_parser.instantiate_classes(data_cfg).data
+    datamodule.setup("test")
+
+    parser = ArgumentParser(parents=[test._init_parser()])
+    args = parser.parse_args([])
+    args.output_path = str(tmp_path)
+
+    write_kitti(tmp_path)  # dummy KITTI images are 375x1242
+
+    # spy on the IOAdapter to check the scale factor given to the model
+    recorded_scales = []
+    real_io_adapter = test.IOAdapter
+
+    class SpyIOAdapter(real_io_adapter):
+        def __init__(self, *io_args, **io_kwargs):
+            recorded_scales.append(io_kwargs.get("target_scale_factor"))
+            super().__init__(*io_args, **io_kwargs)
+
+    monkeypatch.setattr(test, "IOAdapter", SpyIOAdapter)
+
+    args.max_forward_side = 500
+    test.test(args, model, datamodule)
+
+    # the larger side (1242) must be downscaled to 500, so the factor is < 1
+    assert len(recorded_scales) > 0
+    for scale in recorded_scales:
+        assert scale is not None
+        assert scale < 1.0
+        assert scale == 500.0 / 1242
+
+    shutil.rmtree(tmp_path)

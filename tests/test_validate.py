@@ -18,6 +18,8 @@ from pathlib import Path
 import shutil
 
 from jsonargparse import ArgumentParser
+import torch
+from torch.utils.data import DataLoader, Dataset
 
 import ptlflow
 from ptlflow.data.flow_datamodule import FlowDataModule
@@ -73,3 +75,56 @@ def test_validate(tmp_path: Path) -> None:
         assert (tmp_path / dname / "flows" / (dpath + ".png")).exists()
 
     shutil.rmtree(tmp_path)
+
+
+class _FakeFlowDataset(Dataset):
+    def __len__(self) -> int:
+        return 4
+
+    def __getitem__(self, idx: int) -> dict:
+        torch.manual_seed(idx)
+        return {
+            "images": torch.rand(2, 3, 64, 64),
+            "flows": torch.rand(1, 2, 64, 64) * 4,
+            "valids": torch.ones(1, 1, 64, 64),
+            "meta": {
+                "dataset_name": "fake",
+                "split_name": "val",
+                "image_paths": ["img_a.png", "img_b.png"],
+            },
+        }
+
+
+class _FakeModel:
+    output_stride = 8
+
+    def eval(self):
+        return self
+
+    def validation_step(self, inputs, batch_idx, dataloader_idx):
+        return {
+            "preds": {"flows": inputs["flows"]},
+            "metrics": {
+                "val/epe": torch.tensor(float(batch_idx + 1)),
+                "val/flall": torch.tensor(0.0),
+                "val/wauc": torch.tensor(100.0),
+                "val/px1": torch.tensor(1.0),
+            },
+        }
+
+
+def test_validate_one_dataloader_max_samples(tmp_path: Path) -> None:
+    parser = ArgumentParser(parents=[validate._init_parser()])
+    args = parser.parse_args([])
+    args.output_path = str(tmp_path)
+    args.model_name = "fake"
+    args.max_samples = 2
+
+    dataloader = DataLoader(_FakeFlowDataset(), batch_size=1)
+    metrics = validate.validate_one_dataloader(
+        args, _FakeModel(), dataloader, 0, "fake"
+    )
+
+    # batches 0 and 1 are processed, so the epe mean must be (1 + 2) / 2,
+    # and NOT divided by the total dataloader length (4)
+    assert metrics["val/epe"] == 1.5
