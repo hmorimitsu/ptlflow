@@ -191,7 +191,7 @@ def test_one_dataloader(
             scale_factor = (
                 None
                 if args.max_forward_side is None
-                else float(args.max_forward_side) / min(inputs["images"].shape[-2:])
+                else float(args.max_forward_side) / max(inputs["images"].shape[-2:])
             )
 
         io_adapter = IOAdapter(
@@ -344,4 +344,4 @@ if __name__ == "__main__":
     model = cli.model
     model = ptlflow.restore_model(model, cfg.ckpt_path)
 
-    metrics_df = test(cfg, model, datamodule)
+    test(cfg, model, datamodule)
