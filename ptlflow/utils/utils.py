@@ -195,12 +195,17 @@ class InputScaler(object):
             The rescaled input.
         """
         x_shape = x.shape
-        x = x.view(-1, x.shape[-3], x.shape[-2], x.shape[-1])
+        x = x.reshape(-1, x.shape[-3], x.shape[-2], x.shape[-1])
+        align_corners = (
+            self.interpolation_align_corners
+            if self.interpolation_mode in ("linear", "bilinear", "bicubic", "trilinear")
+            else None
+        )
         x = F.interpolate(
             x,
             size=size,
             mode=self.interpolation_mode,
-            align_corners=self.interpolation_align_corners,
+            align_corners=align_corners,
         )
 
         if is_flow:
@@ -209,7 +214,7 @@ class InputScaler(object):
 
         new_shape = list(x_shape)
         new_shape[-2], new_shape[-1] = x.shape[-2], x.shape[-1]
-        x = x.view(new_shape)
+        x = x.reshape(new_shape)
         return x
 
 
