@@ -172,7 +172,7 @@ def load_dataframe(args):
             columns={c: c.lower() for c in benchmark_df.columns}, inplace=True
         )
     metrics_df = None
-    if args.benchmark_csv_path is not None:
+    if args.metrics_csv_path is not None:
         metrics_df = pd.read_csv(args.metrics_csv_path)
         metrics_df.rename(
             columns={c: c.lower() for c in metrics_df.columns}, inplace=True
