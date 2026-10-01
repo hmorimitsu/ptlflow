@@ -125,7 +125,7 @@ def cli_main():
                     + ":.2f}_{epoch}",
                     "save_weights_only": False,
                     "save_top_k": cfg.train_ckpt_topk,
-                    "monitor": "train/loss_epoch",
+                    "monitor": cfg.train_ckpt_metric,
                 },
             }
         )
@@ -133,7 +133,7 @@ def cli_main():
     if cfg.infer_ckpt_topk > 0:
         assert (
             cfg.infer_ckpt_metric is not None
-        ), "You must provide a metric name for --infer_ckpt_topk_metric"
+        ), "You must provide a metric name for --infer_ckpt_metric"
         callbacks.append(
             {
                 "class_path": "lightning.pytorch.callbacks.model_checkpoint.ModelCheckpoint",
