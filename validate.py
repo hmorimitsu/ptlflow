@@ -377,6 +377,7 @@ def validate_one_dataloader(
         The average metric values for this dataloader.
     """
     metrics_sum = {}
+    num_processed_batches = 0
 
     metrics_individual = None
     if args.write_individual_metrics:
@@ -390,6 +391,7 @@ def validate_one_dataloader(
 
     with tqdm(dataloader) as tdl:
         for i, inputs in enumerate(tdl):
+            num_processed_batches += 1
             if args.scale_factor is not None:
                 scale_factor = args.scale_factor
             else:
@@ -501,7 +503,7 @@ def validate_one_dataloader(
                     is_exclude = True
                     break
         if not is_exclude:
-            metrics_mean[k] = v / len(dataloader)
+            metrics_mean[k] = v / max(1, num_processed_batches)
     return metrics_mean
 
 
