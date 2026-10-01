@@ -348,6 +348,10 @@ class AutoFlowDataset(BaseFlowDataset):
             remove_names = val_names
         elif split == "val":
             remove_names = [p.stem for p in sample_paths if p.stem not in val_names]
+        else:
+            raise ValueError(
+                f"Invalid split {split}. It must be one of ['train', 'val', 'trainval']."
+            )
 
         # Keep only data from the correct split
         self.img_paths = [
@@ -365,7 +369,7 @@ class AutoFlowDataset(BaseFlowDataset):
         self.metadata = [
             {
                 "image_paths": [str(p) for p in paths],
-                "is_val": paths[0].stem in val_names,
+                "is_val": paths[0].parent.stem in val_names,
                 "misc": "",
                 "is_seq_start": True,
             }
@@ -464,7 +468,7 @@ class FlyingChairsDataset(BaseFlowDataset):
         self.metadata = [
             {
                 "image_paths": [str(p) for p in paths],
-                "is_val": paths[0].stem in val_names,
+                "is_val": paths[0].stem.split("_")[0] in val_names,
                 "misc": "",
                 "is_seq_start": True,
             }
@@ -2327,7 +2331,6 @@ class MonkaaDataset(BaseFlowDataset):
             get_occlusion_mask=False,
             get_motion_boundary_mask=False,
             get_backward=get_backward,
-            get_semantic_segmentation_labels=False,
             get_meta=get_meta,
         )
         self.root_dir = root_dir
