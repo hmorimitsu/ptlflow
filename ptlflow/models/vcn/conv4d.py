@@ -1,14 +1,9 @@
-import pdb
 import torch.nn as nn
-import math
 import torch
-from torch.nn.parameter import Parameter
 import torch.nn.functional as F
-from torch.nn import Module
 from torch.nn.modules.conv import _ConvNd
 from torch.nn.modules.utils import _quadruple
 from torch.autograd import Variable
-from torch.nn import Conv2d
 
 
 def conv4d(data, filters, bias=None, permute_filters=True, use_half=False):

@@ -439,7 +439,6 @@ class CostAggregation(nn.Module):
         x = self.conv2a(x)
         rem2 = x
         x = self.conv3a(x)
-        rem3 = x
 
         x = self.deconv3a(x, rem2)
         rem2 = x

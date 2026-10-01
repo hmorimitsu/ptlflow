@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import timm
 from einops import rearrange
-from torch import nn
 from timm.layers import to_2tuple
 
 

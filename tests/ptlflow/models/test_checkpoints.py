@@ -15,7 +15,7 @@
 # =============================================================================
 
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict
 
 import cv2 as cv
 import numpy as np
@@ -428,7 +428,7 @@ def test_ckpt_exists() -> None:
             parser = model_ref.add_model_specific_args()
             args = parser.parse_args([])
 
-            model = ptlflow.get_model(mname, cname, args)
+            ptlflow.get_model(mname, cname, args)
 
 
 @pytest.mark.skip(reason="Requires to download all checkpoints. Just run occasionally.")
@@ -477,7 +477,7 @@ def test_accuracy() -> None:
                     print(f"    '{id_str}': {epe:.03f},")
 
 
-def _load_data() -> Dict[str, Dict[str, torch.Tensor]]:
+def _load_data() -> Dict[str, Dict[str, Any]]:
     data = {}
     transform = ToTensor()
 

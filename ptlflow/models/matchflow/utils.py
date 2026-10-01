@@ -4,8 +4,6 @@ import torch.nn.functional as F
 import numpy as np
 from scipy import interpolate
 
-# from torch_scatter import scatter_softmax, scatter_add
-
 
 class InputPadder:
     """Pads images such that dimensions are divisible by 32"""
@@ -137,28 +135,6 @@ def coords_grid_y_first(batch, ht, wd):
     coords = torch.meshgrid(torch.arange(ht), torch.arange(wd), indexing="ij")
     coords = torch.stack(coords, dim=0).int()
     return coords[None].expand(batch, -1, -1, -1)
-
-
-def soft_argmax(corr_me, B, H1, W1):
-    # Implement soft argmin
-    coords, feats = corr_me.decomposed_coordinates_and_features
-
-    # Computing soft argmin
-    flow_pred = torch.zeros(B, 2, H1, W1).to(corr_me.device)
-    for batch, (coord, feat) in enumerate(zip(coords, feats)):
-        coord_img_1 = coord[:, :2].to(corr_me.device)
-        coord_img_2 = coord[:, 2:].to(corr_me.device)
-        # relative positions (flow hypotheses)
-        rel_pos = coord_img_2 - coord_img_1
-        # augmented indices
-        aug_coord_img_1 = (coord_img_1[:, 0:1] * W1 + coord_img_1[:, 1:2]).long()
-        # run softmax on the score
-        weight = scatter_softmax(feat, aug_coord_img_1, dim=0)
-        rel_pos_weighted = weight * rel_pos
-        out = scatter_add(rel_pos_weighted, aug_coord_img_1, dim=0)
-        # Need to permute (y, x) to (x, y) for flow
-        flow_pred[batch] = out[:, [1, 0]].view(H1, W1, 2).permute(2, 0, 1)
-    return flow_pred
 
 
 def upflow8(flow, mode="bilinear"):

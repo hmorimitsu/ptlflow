@@ -233,7 +233,7 @@ def infer(args: Namespace, model: BaseModel) -> None:
 
 def init_input(
     input_path: Union[str, List[str]],
-) -> Tuple[cv.VideoCapture, List[Path], int, np.ndarray]:
+) -> Tuple[Optional[cv.VideoCapture], Optional[List[Path]], int, Optional[np.ndarray]]:
     """Initialize the required variable to start loading the inputs.
 
     This function will detect which type of input_path was given (list of images, folder of images, video, or webcam).
@@ -246,7 +246,7 @@ def init_input(
 
     Returns
     -------
-    tuple[cv.VideoCapture, List[Path], int, np.ndarray]
+    tuple[Optional[cv.VideoCapture], Optional[List[Path]], int, Optional[np.ndarray]]
         The initialized variables
         - a cv.VideoCapture if the input is a video OR
         - a list of paths to the images otherwise,
@@ -380,8 +380,8 @@ def write_outputs(
 
 
 def _read_image(
-    cap: cv.VideoCapture, img_paths: List[Union[str, Path]], i: int
-) -> Tuple[np.ndarray, str, bool]:
+    cap: Optional[cv.VideoCapture], img_paths: List[Union[str, Path]], i: int
+) -> Tuple[Optional[np.ndarray], Optional[str], str, bool]:
     if cap is not None:
         is_img_valid, img = cap.read()
         img_dir_name = None

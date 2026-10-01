@@ -14,7 +14,6 @@ from .utils import (
     compute_interpolation_weights,
 )
 from .knn import knn_faiss_raw
-from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):

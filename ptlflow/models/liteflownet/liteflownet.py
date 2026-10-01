@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 try:
     from spatial_correlation_sampler import SpatialCorrelationSampler
@@ -292,7 +292,9 @@ class LiteFlowNet(BaseModel):
             nn.Conv2d(32, 64, 1, 1, 0), nn.LeakyReLU(0.1, inplace=True)
         )
 
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(
+        self, inputs: Dict[str, torch.Tensor]
+    ) -> Dict[str, Union[torch.Tensor, List[torch.Tensor]]]:
         # The original implementation uses different BGR means for im1 and im2
         # Here, we use the same for both to make it simpler
         images, image_resizer = self.preprocess_images(
@@ -326,7 +328,7 @@ class LiteFlowNet(BaseModel):
         flow = F.interpolate(flow, scale_factor=2, mode="bilinear", align_corners=False)
         flow = self.postprocess_predictions(flow, image_resizer, is_flow=True)
 
-        outputs = {}
+        outputs: Dict[str, Union[torch.Tensor, List[torch.Tensor]]] = {}
         if self.training:
             outputs["flow_preds"] = flow_preds
             outputs["flows"] = flow[:, None]

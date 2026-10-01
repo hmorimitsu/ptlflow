@@ -9,6 +9,8 @@ class ResidualConvUnit(nn.Module):
 
         Args:
             features (int): number of features
+            activation (nn.Module): activation layer
+            bn (bool): set True to use batch normalization after the convolutions
         """
         super().__init__()
 
@@ -87,6 +89,12 @@ class FeatureFusionBlock(nn.Module):
 
         Args:
             features (int): number of features
+            activation (nn.Module): activation layer
+            deconv (bool): set True to use deconvolution for upsampling
+            bn (bool): set True to use batch normalization in the residual units
+            expand (bool): set True to expand the output channels
+            align_corners (bool): align_corners argument for the upsampling interpolation
+            size (tuple): size of the output image
         """
         super(FeatureFusionBlock, self).__init__()
 

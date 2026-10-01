@@ -92,6 +92,9 @@ class PTLFlowCLI(LightningCLI):
             run: Whether subcommands should be added to run a :class:`~lightning.pytorch.trainer.trainer.Trainer`
                 method. If set to ``False``, the trainer and model classes will be instantiated only.
             parse_only: If set to ``True``, the CLI acts as a parser only. The classes are not instantiated.
+            auto_configure_optimizers: Whether the optimizers should be automatically configured from the model
+                arguments.
+            ignore_sys_argv: Whether to ignore extra arguments in ``sys.argv`` when ``args`` is provided.
         """
         self.save_config_callback = save_config_callback
         self.save_config_kwargs = save_config_kwargs or {}

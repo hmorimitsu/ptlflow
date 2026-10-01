@@ -23,7 +23,6 @@ class NLF(nn.Module):
     def forward(self, x, g):
         N, D1, D2, H, W = x.shape
         x = x.reshape(N, D1 * D2, H, W).contiguous()
-        rem = x
         k1, k2, k3, k4 = torch.split(g, (5, 5, 5, 5), 1)
         #        k1, k2, k3, k4 = self.getweights(x)
         k1 = F.normalize(k1, p=1, dim=1)

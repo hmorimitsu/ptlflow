@@ -83,9 +83,8 @@ def test_test_max_forward_side_downscales(tmp_path: Path, monkeypatch) -> None:
 
     # spy on the IOAdapter to check the scale factor given to the model
     recorded_scales = []
-    real_io_adapter = test.IOAdapter
 
-    class SpyIOAdapter(real_io_adapter):
+    class SpyIOAdapter(test.IOAdapter):
         def __init__(self, *io_args, **io_kwargs):
             recorded_scales.append(io_kwargs.get("target_scale_factor"))
             super().__init__(*io_args, **io_kwargs)

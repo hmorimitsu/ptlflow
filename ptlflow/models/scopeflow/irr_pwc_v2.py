@@ -167,8 +167,6 @@ class ScopeFlow(BaseModel):
         x2_pyramid = cur_x2 + [x2_raw]
 
         # Set output data structures
-        output_dict = {}
-        output_dict_eval = {}
         flows = []
         occs = []
 

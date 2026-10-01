@@ -271,7 +271,6 @@ class MMPrivateOutput(nn.Module):
     def forward(self, x, shortcut):
         x = self.group_linear(x)
         # x_comb: [B0, 1792*4, U]. Residual connection.
-        x_comb = x + shortcut
         shape_4d = (x.shape[0], self.num_modes, self.feat_dim, x.shape[2])
         # x_comb_4d, x_drop_4d: [B0, 4, U, 1792].
         x_comb_4d = x.view(shape_4d).permute([0, 1, 3, 2])
@@ -704,7 +703,6 @@ class SelfAttVisPosTrans(nn.Module):
 
         # reshape x_trans to the input shape.
         if not self.out_attn_only:
-            x_trans_shape = x_trans.shape
             x_trans = x_trans.permute(0, 2, 1).reshape(x.shape)
 
         return x_trans
@@ -726,7 +724,6 @@ class LearnedSinuPosEmbedder(nn.Module):
         print0("Learnable Sinusoidal positional encoding")
 
     def forward(self, pos_normed):
-        pos_embed_sum = 0
         pos_embed0 = self.pos_fc(pos_normed)
         pos_embed_sin = torch.sin(self.omega * pos_embed0[:, :, 0::2])
         pos_embed_cos = torch.cos(self.omega * pos_embed0[:, :, 1::2])

@@ -82,7 +82,7 @@ class GlobalSimilar(nn.Module):
         self.to_qk = nn.Conv2d(dim, dim * 2, 1, bias=False)
 
     def forward(self, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, _b, _c, _h, _w = self.heads, *fmap.shape
 
         q, k = self.to_qk(fmap).chunk(2, dim=1)
         q, k = map(lambda t: rearrange(t, "b (h d) x y -> b h x y d", h=heads), (q, k))
@@ -110,7 +110,7 @@ class LocalSimilar(nn.Module):
         self.to_qk = nn.Conv2d(dim, dim * 2, 1, bias=False)
 
     def forward(self, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, _b, _c, _h, _w = self.heads, *fmap.shape
 
         # pos_enc = PositionEmbeddingSine(num_pos_feats=c//2)
         # fmap = fmap + pos_enc(fmap)
@@ -144,7 +144,7 @@ class GSA(nn.Module):
         self.gamma = nn.Parameter(torch.zeros(1))
 
     def forward(self, attn, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, _b, _c, h, w = self.heads, *fmap.shape
 
         v = self.to_v(fmap)
         v = rearrange(v, "b (h d) x y -> b h (x y) d", h=heads)
@@ -171,7 +171,7 @@ class ShiftLSA(nn.Module):
         self.to_f2 = nn.Conv2d(dim, dim, 1, bias=False)
 
     def forward(self, attn, fmap, fmap2):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, b, _c, h, w = self.heads, *fmap.shape
 
         f1 = self.to_f1(fmap)
         f1s = PatchExtra(f1, self.size)  # b c l h w
@@ -200,7 +200,7 @@ class LSA(nn.Module):
         # self.bias = nn.Parameter(torch.ones(5,5))
 
     def forward(self, attn, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, _b, _c, h, w = self.heads, *fmap.shape
 
         # pos_enc = PositionEmbeddingSine(num_pos_feats=c//2)
         # position = pos_enc(fmap)

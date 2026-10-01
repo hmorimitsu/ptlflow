@@ -126,6 +126,8 @@ class QTAttA(nn.Module):
             queries: Query pyramid [N, C, H, W]
             keys: Key pyramid [N, C, H, W]
             values: Value pyramid [N, C, H, W]
+            q_mask: Currently not used.
+            kv_mask: Currently not used.
         Returns:
             message: (N, C, H, W)
         """
@@ -291,6 +293,8 @@ class QTAttB(nn.Module):
             queries: Query pyramid [N, C, H, W]
             keys: Key pyramid [N, C, H, W]
             values: Value pyramid [N, C, H, W]
+            q_mask: Currently not used.
+            kv_mask: Currently not used.
         Returns:
             message: (N, C, H, W)
         """

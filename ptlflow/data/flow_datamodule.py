@@ -14,7 +14,7 @@
 # limitations under the License.
 # =============================================================================
 
-from typing import Optional
+from typing import List, Optional, Tuple, cast
 
 import lightning.pytorch as pl
 from loguru import logger
@@ -254,7 +254,7 @@ class FlowDataModule(pl.LightningDataModule):
     def _parse_dataset_selection(
         self,
         dataset_selection: str,
-    ) -> list[tuple[str, int]]:
+    ) -> List[Tuple[int, str, ...]]:
         """Parse the input string into the selected dataset and their multipliers and parameters.
 
         For example, 'chairs-train+3*sintel-clean-trainval+kitti-2012-train*5' will be parsed into
@@ -269,8 +269,8 @@ class FlowDataModule(pl.LightningDataModule):
 
         Returns
         -------
-        List[Tuple[str, int]]
-            The parsed choice of datasets and their number of repetitions.
+        List[Tuple[int, str, ...]]
+            The parsed choice of datasets. Each tuple contains the number of repetitions, the dataset name, and any extra dataset parameters.
 
         Raises
         ------
@@ -299,7 +299,7 @@ class FlowDataModule(pl.LightningDataModule):
                     "The specified dataset string {:} is invalid. Check the BaseModel.parse_dataset_selection() documentation "
                     "to see how to write a valid selection string."
                 )
-        return datasets
+        return cast(List[Tuple[int, str, ...]], datasets)
 
     def _get_model_output_stride(self):
         if hasattr(self, "trainer") and self.trainer is not None:

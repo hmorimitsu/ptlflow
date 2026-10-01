@@ -17,7 +17,7 @@
 # =============================================================================
 
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 try:
     from neptune.new.types import File as NeptuneFile
@@ -97,7 +97,9 @@ class LoggerCallback(Callback):
         self.val_collect_image_idx = {}
         self.val_images = {}
 
-    def log_image(self, title: str, image: torch.Tensor, pl_module: BaseModel) -> None:
+    def log_image(
+        self, title: str, image: Optional[torch.Tensor], pl_module: BaseModel
+    ) -> None:
         """Log the image in all of the pl_module loggers.
 
         Note, however, that not all loggers may be able to log images.
@@ -111,6 +113,8 @@ class LoggerCallback(Callback):
         pl_module : BaseModel
             An instance of the optical flow model to get the logger from.
         """
+        if image is None:
+            return
         image_npy = image.permute(1, 2, 0).numpy()
 
         for logger in pl_module.loggers:
@@ -427,7 +431,7 @@ class LoggerCallback(Callback):
 
     def _make_image_grid(
         self, dl_images: Dict[str, List[torch.Tensor]]
-    ) -> torch.Tensor:
+    ) -> Optional[torch.Tensor]:
         """Transform a bunch of images into a single one by adding them to a grid.
 
         Parameters

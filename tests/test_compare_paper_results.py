@@ -14,7 +14,6 @@
 # limitations under the License.
 # =============================================================================
 
-from argparse import Namespace
 from pathlib import Path
 import shutil
 

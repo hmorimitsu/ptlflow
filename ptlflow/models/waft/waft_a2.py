@@ -1,10 +1,7 @@
 from typing import Literal
 
-import numpy as np
 import torch
 import math
-import timm
-import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 

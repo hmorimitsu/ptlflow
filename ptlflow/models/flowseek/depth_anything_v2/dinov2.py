@@ -93,7 +93,6 @@ class DinoVisionTransformer(nn.Module):
             ffn_bias (bool): enable bias for ffn if True
             drop_path_rate (float): stochastic depth rate
             drop_path_uniform (bool): apply uniform drop rate across blocks
-            weight_init (str): weight init scheme
             init_values (float): layer-scale init values
             embed_layer (nn.Module): patch embedding layer
             act_layer (nn.Module): MLP activation layer
@@ -346,7 +345,7 @@ class DinoVisionTransformer(nn.Module):
         reshape: bool = False,
         return_class_token: bool = False,
         norm=True,
-    ) -> Tuple[Union[torch.Tensor, Tuple[torch.Tensor]]]:
+    ) -> Union[Tuple[torch.Tensor, ...], Tuple[Tuple[torch.Tensor, torch.Tensor], ...]]:
         if self.chunked_blocks:
             outputs = self._get_intermediate_layers_chunked(x, n)
         else:

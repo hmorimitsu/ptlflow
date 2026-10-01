@@ -112,29 +112,6 @@ class ConvAtt(nn.Module):
         return attn * u
 
 
-class SKBlock(nn.Module):
-    def __init__(self, input_dim, hidden_dim):
-        super().__init__()
-
-        self.proj_1 = nn.Conv2d(input_dim, hidden_dim, 3, padding=1)
-
-        self.conv_s = nn.Conv2d(hidden_dim, hidden_dim, 3, padding=1, groups=hidden_dim)
-        self.conv_l = nn.Conv2d(
-            hidden_dim, hidden_dim, 15, padding=7, groups=hidden_dim
-        )
-        self.conv_pw = nn.Conv2d(hidden_dim, hidden_dim, 1, padding=0)
-
-    def forward(self, x):
-        x = self.proj_1(x)
-        shortcut = x.clone()
-        x = shortcut + self.conv_s(x)
-        shortcut = x.clone()
-        x = shortcut + self.conv_l(x)
-        short_cut = x.clone()
-        x = shortcut + sefl.conv_pw(x)
-        return x
-
-
 class ConvAttWoGRUBlock(nn.Module):
     def __init__(self, hidden_dim=128):
         super(ConvAttWoGRUBlock, self).__init__()
@@ -208,7 +185,7 @@ class SKBlock(nn.Module):
         x = shortcut + self.conv_s(x)
         shortcut = x.clone()
         x = shortcut + self.conv_l(x)
-        short_cut = x.clone()
+        x.clone()
         x = shortcut + self.conv_pw(x)
         return x
 
@@ -395,9 +372,6 @@ class ConvAttWoGRUMOnlyGMAUpdateBlock(nn.Module):
         # scale mask to balence gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
-
-
-from .gma import Aggregate
 
 
 class ConvAttWoGRUGMAUpdateBlock(nn.Module):

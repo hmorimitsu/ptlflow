@@ -27,7 +27,7 @@ Some operations are adapted from the following sources:
 
 from collections.abc import KeysView
 import random
-from typing import Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 from einops import rearrange
 import numpy as np
@@ -51,7 +51,7 @@ class Compose(object):
 
     def __call__(
         self, inputs: Dict[str, Union[np.ndarray, Sequence[np.ndarray]]]
-    ) -> Dict[str, torch.Tensor]:
+    ) -> Dict[str, Union[np.ndarray, Sequence[np.ndarray]]]:
         """Perform the transformation on the inputs.
 
         Parameters
@@ -61,7 +61,7 @@ class Compose(object):
 
         Returns
         -------
-        Dict[str, torch.Tensor]
+        Dict[str, Union[np.ndarray, Sequence[np.ndarray]]]
             The inputs transformed by this operation.
         """
         for t in self.transforms_list:
@@ -103,7 +103,7 @@ class ToTensor(object):
 
     def __call__(
         self, inputs: Dict[str, Union[np.ndarray, Sequence[np.ndarray]]]
-    ) -> Dict[str, torch.Tensor]:
+    ) -> Dict[str, Any]:
         """Perform the transformation on the inputs.
 
         Parameters
@@ -113,7 +113,7 @@ class ToTensor(object):
 
         Returns
         -------
-        Dict[str, torch.Tensor]
+        Dict[str, Any]
             The inputs transformed by this operation.
         """
         valid_keys = _get_valid_keys(inputs.keys(), self.use_keys, self.ignore_keys)
@@ -137,7 +137,7 @@ class ToTensor(object):
 
 
 class GenerateFBCheckFlowOcclusion(object):
-    """Generate occlusion masks based on forward/backward flow consistency.
+    r"""Generate occlusion masks based on forward/backward flow consistency.
 
     In other words, a pixel p is considered occluded when \|Ff(p) + Fb(p + F(f))\|_2 > threshold,
     where Ff and Fb get the forward and backward flow vectors of a pixel.
@@ -152,7 +152,7 @@ class GenerateFBCheckFlowOcclusion(object):
         backward_occlusion_key: str = "occs_b",
         compute_backward_occlusion: bool = True,
     ) -> None:
-        """Initialize ColorJitter.
+        r"""Initialize GenerateFBCheckFlowOcclusion.
 
         Parameters
         ----------

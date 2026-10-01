@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 
 
-from .features import FeatureListNet, FeatureDictNet, FeatureHookNet
+from .features import FeatureListNet, FeatureHookNet
 from .hub import (
     has_hf_hub,
     download_cached_file,
@@ -237,7 +237,7 @@ def load_pretrained(
                 _logger.info(
                     f"Converted input conv {input_conv_name} pretrained weights from 3 to {in_chans} channel(s)"
                 )
-            except NotImplementedError as e:
+            except NotImplementedError:
                 del state_dict[weight_name]
                 strict = False
                 _logger.warning(

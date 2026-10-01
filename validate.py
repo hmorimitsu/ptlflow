@@ -376,7 +376,7 @@ def validate_one_dataloader(
     Dict[str, float]
         The average metric values for this dataloader.
     """
-    metrics_sum = {}
+    metrics_sum: Dict[str, float] = {}
     num_processed_batches = 0
 
     metrics_individual = None
@@ -494,7 +494,7 @@ def validate_one_dataloader(
         )
         logger.info("Saved individual metrics to: {}", csv_path)
 
-    metrics_mean = {}
+    metrics_mean: Dict[str, float] = {}
     for k, v in metrics_sum.items():
         is_exclude = False
         if args.metric_exclude is not None:

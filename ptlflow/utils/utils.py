@@ -335,7 +335,7 @@ def release_gpu(tensors_dict: Dict[str, Any]) -> Dict[str, Any]:
 
 def tensor_dict_to_numpy(
     tensor_dict: Dict[str, torch.Tensor], padder: Optional[InputPadder] = None
-) -> Dict[str, np.ndarray]:
+) -> Dict[str, Any]:
     """Convert all tensors into numpy format, changing the shape from CHW to HWC.
 
     If "flows" is available, then a color representation "flows_viz" is added to the outputs.
@@ -349,8 +349,8 @@ def tensor_dict_to_numpy(
 
     Returns
     -------
-    dict[str, np.ndarray]
-        The torch.Tensor entries from tensor_dict converted to numpy format.
+    Dict[str, Any]
+        The torch.Tensor entries from tensor_dict converted to numpy format. The other entries are kept unchanged.
     """
     npy_dict = {}
     for k, v in tensor_dict.items():
@@ -479,5 +479,4 @@ def forward_interpolate_batch(prev_flow: torch.Tensor) -> torch.Tensor:
                 dtype=prev_flow.dtype, device=prev_flow.device
             )
         )
-    forward_flow = torch.stack(forward_flow, 0)
-    return forward_flow
+    return torch.stack(forward_flow, 0)

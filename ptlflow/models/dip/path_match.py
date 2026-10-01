@@ -2,12 +2,6 @@ import torch
 import torch.nn.functional as F
 from .utils import coords_grid
 
-try:
-    import alt_cuda_corr
-except:
-    # alt_cuda_corr is not compiled
-    pass
-
 
 class PathMatch:
     def __init__(self, fmap1, fmap2):
@@ -57,7 +51,6 @@ class PathMatch:
         return out_corrs
 
     def inverse_propagation(self, flow):
-        corrs = []
         temp_coord = self.coords + flow
         map2_warp = self.warp(temp_coord, self.shift_map2, self.H, self.W)
 

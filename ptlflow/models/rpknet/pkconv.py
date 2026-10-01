@@ -15,7 +15,7 @@
 # =============================================================================
 
 import math
-from typing import Optional
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -35,7 +35,7 @@ def pkconv2d(
     out_ch: Optional[int] = None,
     return_weights: bool = False,
     skip_slicing: bool = False,
-) -> torch.Tensor:
+) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]]:
     bounded_groups = min(groups, x.shape[1])
 
     if skip_slicing:

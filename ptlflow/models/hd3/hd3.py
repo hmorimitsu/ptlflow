@@ -239,11 +239,6 @@ class HD3(BaseModel):
                 curr_vect = torch.clamp(curr_vect, max=0)
             ms_pred.append([prob_map, curr_vect * 2 ** (self.downsample - l), up_feat])
 
-            if l < self.levels - 1:
-                up_curr_vect = 2 * F.interpolate(
-                    curr_vect, scale_factor=2, mode="bilinear", align_corners=True
-                )
-
         ms_prob = [l[0] for l in ms_pred]
         ms_vect = [l[1] for l in ms_pred]
 

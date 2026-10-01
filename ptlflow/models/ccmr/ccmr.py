@@ -9,7 +9,6 @@ from .update import BasicUpdateBlock
 from .extractor import BasicEncoder_resconv, Basic_Context_Encoder_resconv
 from .corr import get_corr_block
 from .utils import coords_grid, upflow2
-from .update import BasicUpdateBlock
 from .xcit import XCiT
 
 from ptlflow.utils.registry import register_model

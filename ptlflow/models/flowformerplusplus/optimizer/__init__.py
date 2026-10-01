@@ -54,7 +54,6 @@ def build_optimizer(model, config):
                     "lr": lr * factor,
                 },
             ]
-            full = [n for n, _ in model.named_parameters()]
             return torch.optim.AdamW(
                 param_dicts, lr=lr, weight_decay=config.adamw_decay, eps=config.epsilon
             )

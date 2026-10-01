@@ -163,7 +163,6 @@ class NATwins(nn.Module):
 
         embed_dim = dim
         mlp_ratio = 4
-        ws = 7
         sr_ratio = 4
         dpr = droppath
         drop_rate = dropout

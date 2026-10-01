@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional, Tuple, Union
 
 try:
     from spatial_correlation_sampler import SpatialCorrelationSampler
@@ -96,7 +96,7 @@ class FlowFieldDeformation(nn.Module):
 
     def forward(
         self, feats: torch.Tensor, flow: torch.Tensor, conf: torch.Tensor
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         conf = self.up_conf(conf)
         flow = self.up_flow(flow)
 
@@ -272,7 +272,9 @@ class SubPixel(nn.Module):
 
         self.warp = WarpingLayer()
 
-    def forward(self, feats: torch.Tensor, flow: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, feats: torch.Tensor, flow: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         feat_warped = self.warp(
             feats[:, 1], flow, feats.shape[-2], feats.shape[-1], 1.0 / self.mult
         )
@@ -359,7 +361,7 @@ class Regularization(nn.Module):
 
     def forward(
         self, images: torch.Tensor, feats: torch.Tensor, flow: torch.Tensor
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], torch.Tensor]:
         img2_warped = self.warp(
             images[:, 1], flow, images.shape[-2], images.shape[-1], 1.0 / self.mult
         )
@@ -513,16 +515,9 @@ class LiteFlowNet3(BaseModel):
         else:
             self.up_flow = nn.ConvTranspose2d(2, 2, 8, 4, 2, bias=False, groups=2)
 
-    @staticmethod
-    def add_model_specific_args(parent_parser=None):
-        parent_parser = BaseModel.add_model_specific_args(parent_parser)
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--div_flow", type=float, default=20.0)
-        parser.add_argument("--use_pseudo_regularization", action="store_true")
-        parser.add_argument("--use_s_version", action="store_true")
-        return parser
-
-    def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(
+        self, inputs: Dict[str, torch.Tensor]
+    ) -> Dict[str, Union[torch.Tensor, List[torch.Tensor]]]:
         # The original implementation uses different BGR means for im1 and im2
         # Here, we use the same for both to make it simpler
         images, image_resizer = self.preprocess_images(
@@ -577,7 +572,7 @@ class LiteFlowNet3(BaseModel):
         )
         conf = self.postprocess_predictions(conf, image_resizer, is_flow=False)
 
-        outputs = {}
+        outputs: Dict[str, Union[torch.Tensor, List[torch.Tensor]]] = {}
         if self.training:
             outputs["flow_preds"] = flow_preds
             outputs["conf_preds"] = conf_preds

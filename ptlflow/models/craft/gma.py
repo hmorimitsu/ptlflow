@@ -69,7 +69,7 @@ class Attention(nn.Module):
         self.pos_embed_weight = 1.0
 
     def forward(self, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, _b, _c, _h, _w = self.heads, *fmap.shape
 
         # q, k: [8, 128, 46, 62]
         q, k = self.to_qk(fmap).chunk(2, dim=1)
@@ -122,7 +122,7 @@ class Aggregate(nn.Module):
             self.project = None
 
     def forward(self, attn, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, _b, _c, h, w = self.heads, *fmap.shape
 
         v = self.to_v(fmap)
         v = rearrange(v, "b (h d) x y -> b h (x y) d", h=heads)

@@ -205,7 +205,6 @@ def photo_loss_fn(image1, warped_image, mask_level0):
 
 
 def cal_unsup_loss(image1, image2, flow_forward, flow_backward, gamma):
-    max_flow = MAX_FLOW
     n_predictions = len(flow_forward)
     flow_loss = 0.0
 

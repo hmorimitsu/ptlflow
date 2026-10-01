@@ -18,7 +18,7 @@
 
 import math
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import cv2 as cv
 from einops import rearrange
@@ -126,7 +126,7 @@ class BaseFlowDataset(Dataset):
 
         self.is_two_file_flow = False
 
-    def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:  # noqa: C901
+    def __getitem__(self, index: int) -> Dict[str, Any]:  # noqa: C901
         """Retrieve and return one input.
 
         Parameters
@@ -136,7 +136,7 @@ class BaseFlowDataset(Dataset):
 
         Returns
         -------
-        Dict[str, torch.Tensor]
+        Dict[str, Any]
             The retrieved input. This dict may contain the following keys, depending on the initialization choices:
             ['images', 'flows', 'mbs', 'occs', 'valids', 'flows_b', 'mbs_b', 'occs_b', 'valids_b', 'meta'].
             Except for 'meta', all the values are 4D tensors with shape NCHW. Notice that N does not correspond to the batch
@@ -221,7 +221,7 @@ class BaseFlowDataset(Dataset):
         self,
         flow_paths: Sequence[str],
         flow_format: Optional[str] = None,
-    ) -> Tuple[List[np.ndarray], List[Optional[np.ndarray]]]:
+    ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         flows = []
         valids = []
         for path in flow_paths:
@@ -1864,7 +1864,7 @@ class SpringDataset(BaseFlowDataset):
 
         self._log_status()
 
-    def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:  # noqa: C901
+    def __getitem__(self, index: int) -> Dict[str, Any]:  # noqa: C901
         """Retrieve and return one input.
 
         Parameters
@@ -1874,7 +1874,7 @@ class SpringDataset(BaseFlowDataset):
 
         Returns
         -------
-        Dict[str, torch.Tensor]
+        Dict[str, Any]
             The retrieved input. This dict may contain the following keys, depending on the initialization choices:
             ['images', 'flows', 'mbs', 'occs', 'valids', 'flows_b', 'mbs_b', 'occs_b', 'valids_b', 'meta'].
             Except for 'meta', all the values are 4D tensors with shape NCHW. Notice that N does not correspond to the batch

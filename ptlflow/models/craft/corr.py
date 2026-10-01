@@ -95,7 +95,7 @@ class CorrBlockSingleScale(nn.Module):
         corr = CorrBlock.corr(fmap1, fmap2)
         batch, h1, w1, dim, h2, w2 = corr.shape
         if self.do_corr_global_norm:
-            corr_3d = corr.permute(0, 3, 1, 2, 4, 5).view(B, dim, -1)
+            corr_3d = corr.permute(0, 3, 1, 2, 4, 5).view(batch, dim, -1)
             corr_normed = F.layer_norm(corr_3d, (corr_3d.shape[2],), eps=1e-12)
             corr = corr_normed.view(batch, dim, h1, w1, h2, w2).permute(
                 0, 2, 3, 1, 4, 5

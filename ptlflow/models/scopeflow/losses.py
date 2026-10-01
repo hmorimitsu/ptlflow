@@ -193,7 +193,6 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel(nn.Module):
 
             # from tensorboard import summary
             # self.writer = summary(args.save)
-            from matplotlib.pyplot import hist
 
             self.perc = Percentile()
             print("Starting MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel loss percentile!")

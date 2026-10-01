@@ -2,12 +2,6 @@ import torch
 import torch.nn.functional as F
 from .utils import bilinear_sampler
 
-try:
-    import alt_cuda_corr
-except:
-    # alt_cuda_corr is not compiled
-    pass
-
 
 def coords_feature(fmap, b, x, y):
     H, W = fmap.shape[2:]
@@ -53,12 +47,11 @@ def bilinear_sampling_corr(corr, idx1, idx2):
     # reshape idx: [M * n_points, (bhw)]
     idx1 = idx1.unsqueeze(1).repeat(1, n_points, 1).view(-1, 3)
     idx2 = idx2.view(-1, 3)
-    device = corr.device
     offset = idx2 - idx2.floor()
     dx, dy = offset[:, 1], offset[:, 2]
     b = idx2[:, 0].long()
     x0, y0 = idx2[:, 1].floor(), idx2[:, 2].floor()
-    x1, y1 = x0 + 1, y0 + 1
+    _x1, _y1 = x0 + 1, y0 + 1
     f00 = (1 - dy) * (1 - dx) * coords_corr(corr, idx1, b, x0, y0)
     # f01 = (1 - dy) * dx * coords_corr(corr, idx1, b, x0, y1)
     # f10 = dy * (1 - dx) * coords_corr(corr, idx1, b, x1, y0)

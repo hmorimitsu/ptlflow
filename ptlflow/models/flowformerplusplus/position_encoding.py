@@ -1,4 +1,3 @@
-from loguru import logger
 import math
 import torch
 from torch import nn
@@ -12,6 +11,7 @@ class PositionEncodingSine(nn.Module):
     def __init__(self, d_model, max_shape=(256, 256)):
         """
         Args:
+            d_model (int): number of features channels in the encoding
             max_shape (tuple): for 1/8 featmap, the max length of 256 corresponds to 2048 pixels
         """
         super().__init__()
@@ -47,6 +47,7 @@ class LinearPositionEncoding(nn.Module):
     def __init__(self, d_model, max_shape=(256, 256)):
         """
         Args:
+            d_model (int): number of features channels in the encoding
             max_shape (tuple): for 1/8 featmap, the max length of 256 corresponds to 2048 pixels
         """
         super().__init__()
@@ -85,6 +86,7 @@ class LearnedPositionEncoding(nn.Module):
     def __init__(self, d_model, max_shape=(80, 80)):
         """
         Args:
+            d_model (int): number of features channels in the encoding
             max_shape (tuple): for 1/8 featmap, the max length of 256 corresponds to 2048 pixels
         """
         super().__init__()

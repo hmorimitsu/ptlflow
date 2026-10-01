@@ -124,7 +124,6 @@ class DIP(BaseModel):
         for i in range(max_layers - 1):
             if (curr_fmap1.shape[2] < min_width) and (curr_fmap1.shape[3] < min_width):
                 break
-            down_scale = 2 ** (i + 1)
             curr_fmap1 = F.avg_pool2d(curr_fmap1, 2, stride=2)
             curr_fmap2 = F.avg_pool2d(curr_fmap2, 2, stride=2)
             curr_cnet = F.avg_pool2d(curr_cnet, 2, stride=2)
@@ -174,7 +173,7 @@ class DIP(BaseModel):
             s_flow = scale * F.interpolate(
                 init_flow, size=new_size, mode="bilinear", align_corners=True
             )
-            initail_flow_max = 2 ** (auto_layer + 1) * 1.0
+            2 ** (auto_layer + 1) * 1.0
             noise = self.random_init_flow(
                 s_fmap1, max_offset=16, test_mode=(not self.training)
             )

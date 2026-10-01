@@ -86,7 +86,7 @@ class _PTLFlowCheckpointConnector(_CheckpointConnector):
         )
         with pl_legacy_patch():
             loaded_checkpoint = self.trainer.strategy.load_checkpoint(checkpoint_path)
-        if not "pytorch-lightning_version" in loaded_checkpoint:
+        if "pytorch-lightning_version" not in loaded_checkpoint:
             loaded_checkpoint["pytorch-lightning_version"] = "1.9.5"
         self._loaded_checkpoint = _pl_migrate_checkpoint(
             loaded_checkpoint, checkpoint_path

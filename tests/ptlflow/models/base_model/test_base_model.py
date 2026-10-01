@@ -101,7 +101,6 @@ def test_validation_step_accumulates_metrics() -> None:
 
     # after the epoch ends, the accumulated value is the mean
     model.on_validation_epoch_end()
-    metrics = None  # the metrics were reset by on_validation_epoch_end
 
 
 def test_on_validation_epoch_end_with_empty_dataloader() -> None:

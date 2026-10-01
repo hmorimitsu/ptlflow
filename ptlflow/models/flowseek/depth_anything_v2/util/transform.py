@@ -37,6 +37,9 @@ class Resize(object):
                 "upper_bound": Output will be at max as large as the given size. (Output size might be smaller than given size.)
                 "minimal": Scale as least as possible.  (Output size might be smaller than given size.)
                 Defaults to "lower_bound".
+            image_interpolation_method (int, optional):
+                OpenCV interpolation method used to resize the image.
+                Defaults to cv2.INTER_AREA.
         """
         self.__width = width
         self.__height = height

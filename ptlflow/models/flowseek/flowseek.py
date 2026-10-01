@@ -9,7 +9,7 @@ from ptlflow.utils.registry import register_model
 from .depth_anything_v2.dpt import DepthAnythingV2
 from .update import BasicUpdateBlock
 from .corr import CorrBlock
-from .utils import coords_grid, InputPadder
+from .utils import coords_grid
 from .extractor import ResNetFPN
 from .layer import conv3x3
 from ..base_model.base_model import BaseModel

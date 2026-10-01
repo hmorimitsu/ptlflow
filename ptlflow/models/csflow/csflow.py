@@ -281,7 +281,7 @@ class StripCrossCorrMap_v2(nn.Module):
         for ly in self.children():
             if isinstance(ly, nn.Conv2d):
                 nn.init.kaiming_normal_(ly.weight, a=1)
-                if not ly.bias is None:
+                if ly.bias is not None:
                     nn.init.constant_(ly.bias, 0)
 
     def get_params(self):
@@ -289,7 +289,7 @@ class StripCrossCorrMap_v2(nn.Module):
         for name, module in self.named_modules():
             if isinstance(module, (nn.Linear, nn.Conv2d)):
                 wd_params.append(module.weight)
-                if not module.bias is None:
+                if module.bias is not None:
                     nowd_params.append(module.bias)
             elif isinstance(module, torch.nn.BatchNorm2d):
                 nowd_params += list(module.parameters())
@@ -322,7 +322,7 @@ class ConvBNReLU(nn.Module):
         for ly in self.children():
             if isinstance(ly, nn.Conv2d):
                 nn.init.kaiming_normal_(ly.weight, a=1)
-                if not ly.bias is None:
+                if ly.bias is not None:
                     nn.init.constant_(ly.bias, 0)
 
 
@@ -366,7 +366,6 @@ def interp(x, dest):
 
 class BasicEncoder(nn.Module):
     def __init__(self, output_dim=128, norm_fn="batch", dropout=0.0):
-        from torch.nn.modules.utils import _pair
 
         super(BasicEncoder, self).__init__()
         self.norm_fn = norm_fn

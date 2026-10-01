@@ -27,7 +27,6 @@ import math
 import logging
 from functools import partial
 from collections import OrderedDict
-from copy import deepcopy
 
 import torch
 import torch.nn as nn
@@ -359,6 +358,7 @@ class VisionTransformer(nn.Module):
             drop_path_rate (float): stochastic depth rate
             embed_layer (nn.Module): patch embedding layer
             norm_layer: (nn.Module): normalization layer
+            act_layer (nn.Module): activation layer
             weight_init: (str): weight init scheme
         """
         super().__init__()

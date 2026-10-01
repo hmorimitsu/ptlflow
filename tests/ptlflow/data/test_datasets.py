@@ -29,7 +29,6 @@ from ptlflow.data.datasets import (
     Hd1kDataset,
     KittiDataset,
     KubricDataset,
-    MiddleburyDataset,
     MiddleburySTDataset,
     MonkaaDataset,
     SintelDataset,

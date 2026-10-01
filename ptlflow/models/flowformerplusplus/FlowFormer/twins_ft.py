@@ -13,10 +13,8 @@ Code/weights from https://github.com/Meituan-AutoML/Twins, original copyright/li
 # Written by Xinjie Li, Xiangxiang Chu
 # --------------------------------------------------------
 import math
-from multiprocessing.sharedctypes import Value
 import numpy as np
-from copy import deepcopy
-from typing import Optional, Tuple
+from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -166,7 +164,7 @@ def interpolate_pos_embed(model, checkpoint_model, remove_index=True):
     ]
     for table_key in relative_position_bias_table_keys:
         table_pretrained = checkpoint_model[table_key]
-        if not table_key in model.state_dict():
+        if table_key not in model.state_dict():
             print(f"Key {table_key} not in model")
             continue
         table_current = model.state_dict()[table_key]

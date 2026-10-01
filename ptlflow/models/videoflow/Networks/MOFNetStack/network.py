@@ -2,13 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .update import GMAUpdateBlock
 from ..encoders import twins_svt_large, convnext_Xlarge_4x, convnext_base_2x
-from .corr import CorrBlock, OLCorrBlock, AlternateCorrBlock
-from ...utils.utils import bilinear_sampler, coords_grid, upflow8
-from .gma import Attention, Aggregate
-
-from torchvision.utils import save_image
+from .corr import CorrBlock, AlternateCorrBlock
+from ...utils.utils import coords_grid
+from .gma import Attention
 
 autocast = torch.cuda.amp.autocast
 
@@ -18,8 +15,8 @@ class MOFNet(nn.Module):
         super().__init__()
         self.cfg = cfg
 
-        self.hidden_dim = hdim = self.cfg.feat_dim // 2
-        self.context_dim = cdim = self.cfg.feat_dim // 2
+        self.hidden_dim = self.cfg.feat_dim // 2
+        self.context_dim = self.cfg.feat_dim // 2
 
         cfg.corr_radius = 4
 
@@ -72,8 +69,6 @@ class MOFNet(nn.Module):
         #     self.update_block = SKUpdateBlock6_Deep_nopoolres_AllDecoder2(args=self.cfg, hidden_dim=128)
 
         print("[Using corr_fn {}]".format(self.cfg.corr_fn))
-
-        gma_down_ratio = 256 // cfg.feat_dim
 
         self.att = Attention(
             args=self.cfg,

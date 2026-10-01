@@ -2,8 +2,6 @@
 Portions of this code copyright 2017, Clement Pinard
 """
 
-from argparse import Namespace
-
 import torch
 import torch.nn as nn
 from torch.nn import init
