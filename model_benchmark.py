@@ -424,8 +424,8 @@ def estimate_inference_time(
     model: BaseModel,
     input_size: Tuple[int, int],
     dtype_str: str,
-) -> float:
-    """Compute the average forward time for one model.
+) -> list:
+    """Compute the time of each inference run for one model.
 
     Parameters
     ----------
@@ -436,8 +436,8 @@ def estimate_inference_time(
 
     Returns
     -------
-    float
-        The average time of the runs.
+    list
+        The time of each measured run.
     """
     timer = Timer("inference")
     time_vals = []
