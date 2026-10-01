@@ -338,8 +338,8 @@ class BaseModel(pl.LightningModule):
 
             - 'loss': torch.Tensor, containing the loss value. Required by Pytorch Lightning for the optimization step.
 
-            - 'dataset_name': str, a string representing the name of the dataset from where this batch came from. Used only for
-              logging purposes.
+            - 'dataset_name': list[str], a list with the names of the datasets from where this batch came from. Used only
+              for logging purposes.
         """
         preds = self(batch)
         self.last_inputs = batch
@@ -432,11 +432,19 @@ class BaseModel(pl.LightningModule):
     def on_validation_epoch_end(self) -> None:
         for i in range(len(self.val_metrics)):
             metrics = self.val_metrics[i].compute()
+            if self.val_dataset_names[i] is None:
+                # No batch was seen for this dataloader, so the dataset
+                # name is unknown. Just reset the metrics and move on.
+                self.val_metrics[i].reset()
+                continue
             dset_name = self.val_dataset_names[i].lower()
+            # The dataset name may contain a split suffix (e.g. kitti_2015-val),
+            # which must be removed to look for the main metric of the dataset.
+            dset_key = dset_name.split("-")[0]
             for name, val in metrics.items():
                 main_metric = (
-                    DATASET_MAIN_METRIC[dset_name]
-                    if dset_name in DATASET_MAIN_METRIC
+                    DATASET_MAIN_METRIC[dset_key]
+                    if dset_key in DATASET_MAIN_METRIC
                     else "epe"
                 )
                 main_metric = f"val/{main_metric}"
