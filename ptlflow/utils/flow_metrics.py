@@ -391,8 +391,8 @@ class FlowMetrics(Metric):
         target_bin = target_bin.view(*dims[:-2], -1)
 
         tp = (pred_bin * target_bin).sum(dim=-1)
-        fp = ((1 - pred_bin) * target_bin).sum(dim=-1)
-        fn = (pred_bin * (1 - target_bin)).sum(dim=-1)
+        fp = (pred_bin * (1 - target_bin)).sum(dim=-1)
+        fn = ((1 - pred_bin) * target_bin).sum(dim=-1)
 
         eps = torch.finfo(pred.dtype).eps
         precision = tp / (tp + fp + eps)
