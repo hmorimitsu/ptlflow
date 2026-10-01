@@ -75,8 +75,10 @@ class Timer(object):
         self.num_global_tocs = 0
 
     def reset(self) -> None:
-        """Zero the total time counter."""
+        """Zero the total time and the toc counters."""
         self.total_time = 0.0
+        self.has_tic = False
+        self.num_tocs = 0
 
     def tic(self) -> None:
         """Start to count the elapsed time."""
@@ -104,7 +106,7 @@ class Timer(object):
             The average time in milliseconds.
         """
         num_tocs = self.num_global_tocs if self.num_global_tocs > 0 else self.num_tocs
-        return self.total() / max(1, num_tocs - 1)
+        return self.total() / max(1, num_tocs)
 
     def total(self) -> float:
         """Return the total time since the last reset().
@@ -189,10 +191,11 @@ class TimerManager(object):
         self.timers = {}
 
     def reset(self) -> None:
-        """Restart the total time counter of all timers."""
+        """Restart the total time and toc counters of all timers."""
         self.num_global_tocs = 0
         for _, t in self.timers.items():
             t.reset()
+            t.num_global_tocs = 0
 
     def write_to_log(self, header: str = "") -> None:
         """Write the timers to the log file.
@@ -215,7 +218,7 @@ class TimerManager(object):
         fh.setLevel(logging.INFO)
         self.logger.addHandler(fh)
 
-    def __getitem__(self, key: Union[str, Tuple[str, int]]) -> None:
+    def __getitem__(self, key: Union[str, Tuple[str, int]]) -> Timer:
         indent_level = 0
         if isinstance(key, tuple) or isinstance(key, list):
             indent_level = key[1]
