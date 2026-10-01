@@ -242,10 +242,11 @@ class CenterCrop(object):
         self,
         crop_size: Optional[Tuple[int, int]] = None,
         occlusion_keys: Union[KeysView, Sequence[str]] = ("occs", "occs_b"),
+        flow_keys: Union[KeysView, Sequence[str]] = ("flows", "flows_b"),
         valid_key: str = "valids",
         ignore_keys: Optional[Sequence[str]] = None,
     ) -> None:
-        """Initialize RandomScaleAndCrop.
+        """Initialize CenterCrop.
 
         Parameters
         ----------
@@ -253,12 +254,16 @@ class CenterCrop(object):
             If provided, crop the inputs to this size (h, w).
         occlusion_keys : Union[KeysView, Sequence[str]], default ['occs', 'occs_b']
             Indicate which of the input keys correspond to occlusion mask tensors.
+        flow_keys : Union[KeysView, Sequence[str]], default ['flows', 'flows_b']
+            Indicate which of the input keys correspond to optical flow tensors.
+            The size of the first flow tensor is used as the input size.
         valid_keys : str, default 'valids'
             The name of the key in inputs that contains the binary mask indicating which pixels are valid.
             Only used when sparse=True.
         """
         self.crop_size = crop_size
         self.occlusion_keys = list(occlusion_keys)
+        self.flow_keys = list(flow_keys)
         self.valid_key = valid_key
         self.ignore_keys = ignore_keys
 
@@ -282,12 +287,12 @@ class CenterCrop(object):
         NotImplementedError
             If trying to use time scale.
         """
-        h, w = inputs[self.valid_key].shape[2:4]
+        h, w = inputs[self.flow_keys[0]].shape[2:4]
         y_crop = (h - self.crop_size[0]) // 2
         x_crop = (w - self.crop_size[1]) // 2
 
         for k, v in inputs.items():
-            if k not in self.ignore_keys:
+            if self.ignore_keys is None or k not in self.ignore_keys:
                 v = v[
                     :,
                     :,
@@ -902,8 +907,10 @@ class RandomTranslate(object):
             Indicate which of the input keys correspond to occlusion mask tensors.
         """
         self.translation = translation
-        if not isinstance(translation, tuple) or isinstance(translation, list):
+        if not isinstance(translation, (tuple, list)):
             self.translation = (translation, translation)
+        else:
+            self.translation = tuple(translation)
         self.flow_keys = flow_keys
         self.occlusion_keys = occlusion_keys
 
@@ -1121,9 +1128,6 @@ class RandomRotate(object):
                             mode="bilinear",
                             align_corners=True,
                         )
-
-                if k in self.flow_keys:
-                    v[t::2] = rotate_flow(v[t::2], angle)
 
                 inputs[k] = v
 
