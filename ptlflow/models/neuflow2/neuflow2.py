@@ -30,14 +30,15 @@ class SequenceLoss(nn.Module):
         n_predictions = len(flow_preds)
         flow_loss = 0.0
 
-        # exlude invalid pixels and extremely large diplacements
+        # exclude invalid pixels and extremely large displacements
         mag = torch.sum(flow_gt**2, dim=1, keepdim=True).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
 
         weights = [0.2, 1]
         for i in range(n_predictions):
+            i_weight = weights[min(i, len(weights) - 1)]
             i_loss = (flow_preds[i] - flow_gt).abs()
-            flow_loss += weights[i] * (valid * i_loss).mean()
+            flow_loss += i_weight * (valid * i_loss).mean()
 
         return flow_loss
 
@@ -207,6 +208,9 @@ class NeuFlow2(BaseModel):
             dtype=torch.half if amp else torch.float,
         )
 
+        self._bhwd_key = (batch_size, height, width, str(device), amp)
+        self.has_init_bhwd = True
+
     def split_features(self, features, context_dim, feature_dim):
         context, features = torch.split(features, [context_dim, feature_dim], dim=1)
 
@@ -232,7 +236,13 @@ class NeuFlow2(BaseModel):
 
         flow_list = []
 
-        if not self.has_init_bhwd:
+        if not self.has_init_bhwd or self._bhwd_key != (
+            img0.shape[0],
+            img0.shape[2],
+            img0.shape[3],
+            str(img0.device),
+            img0.dtype == torch.float16,
+        ):
             self.init_bhwd(
                 img0.shape[0],
                 img0.shape[2],

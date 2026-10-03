@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model
+from ptlflow.utils.registry import register_model, trainable
 from .update import BasicUpdateBlock
 from .corr import CorrBlock
 from .utils import coords_grid
@@ -29,7 +29,7 @@ class SequenceLoss(nn.Module):
         n_predictions = len(flow_preds)
 
         flow_loss = 0.0
-        # exlude invalid pixels and extremely large diplacements
+        # exclude invalid pixels and extremely large displacements
         mag = torch.sum(flow_gt**2, dim=1, keepdim=True).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
         for i in range(n_predictions):
@@ -133,13 +133,6 @@ class FlowAnything(BaseModel):
                 corr_channel=self.corr_channel,
             )
 
-    def initialize_flow(self, img):
-        """Flow is represented as difference between two coordinate grids flow = coords2 - coords1"""
-        N, C, H, W = img.shape
-        coords1 = coords_grid(N, H // 8, W // 8, device=img.device)
-        coords2 = coords_grid(N, H // 8, W // 8, device=img.device)
-        return coords1, coords2
-
     def upsample_data(self, flow, info, mask):
         """Upsample [H/8, W/8, C] -> [H, W, C] using convex combination"""
         N, C, H, W = info.shape
@@ -234,8 +227,8 @@ class FlowAnything(BaseModel):
             flow_predictions.append(flow_up)
             info_predictions.append(info_up)
 
-        if not self.training:
-            # exlude invalid pixels and extremely large diplacements
+        if self.training:
+            # exclude invalid pixels and extremely large displacements
             nf_predictions = []
             for i in range(len(info_predictions)):
                 if not self.use_var:
@@ -276,5 +269,6 @@ class FlowAnything(BaseModel):
 
 
 @register_model
+@trainable
 class flow_anything(FlowAnything):
     pass

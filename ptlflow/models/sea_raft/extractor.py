@@ -29,6 +29,7 @@ class ResNetFPN(nn.Module):
         self.input_dim = input_dim
         # Class Variable
         self.in_planes = initial_dim
+        block_dims = list(block_dims)
         for i in range(len(block_dims)):
             block_dims[i] = int(block_dims[i] * ratio)
         # Networks

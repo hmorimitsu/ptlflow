@@ -80,10 +80,6 @@ class ScopeFlow(BaseModel):
         ] + ["occ"] * 3
 
         # Init sizes
-        self.search_range = 4
-        self.num_chs = [3, 16, 32, 64, 96, 128, 196]
-        self.output_level = 4
-        self.num_levels = 7
         self.ch_proj_size = 32
         self.min_layer = len(self.num_chs) - self.output_level - 1
 
@@ -318,7 +314,7 @@ class ScopeFlow(BaseModel):
 
     def freeze_random_weights(self):
         self.freezed_params = random.sample(
-            self.pwc_groups, random.randrange(1, len(self.pwc_groups) / 2)
+            self.pwc_groups, random.randrange(1, len(self.pwc_groups) // 2)
         )
         self._freeze(verify=True)
 
@@ -561,7 +557,7 @@ class ScopeFlow(BaseModel):
 
         occ_f = self.refine_occ(occ_cont_f.detach(), x1_1by1, x1_1by1 - x2_1by1_warp)
         occ_b = self.refine_occ(occ_cont_b.detach(), x2_1by1, x2_1by1 - x1_1by1_warp)
-        return occ_f, occ_cont_f, occ_b, occ_cont_f
+        return occ_f, occ_cont_f, occ_b, occ_cont_b
 
     def occ_upsampling(
         self, l, x1, x2, flow_f, flow_b, occ_f, occ_b, height_im, width_im

@@ -5,8 +5,8 @@ from .layer import BasicBlock, conv1x1
 
 class ResNetFPN(nn.Module):
     """
-    ResNet18, output resolution is 1/8.
-    Each block has 2 layers.
+    ResNet18 or ResNet34 backbone, output resolution is 1/8.
+    Each block has 2 layers (ResNet18) or more (ResNet34).
     """
 
     def __init__(
@@ -27,6 +27,7 @@ class ResNetFPN(nn.Module):
         self.input_dim = input_dim
         # Class Variable
         self.in_planes = initial_dim
+        block_dims = list(block_dims)
         for i in range(len(block_dims)):
             block_dims[i] = int(block_dims[i] * ratio)
         # Networks
