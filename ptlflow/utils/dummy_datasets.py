@@ -82,7 +82,7 @@ def write_flying_chairs(
     img_size : Tuple[int, int], default (384, 512)
         The size of the images inside of this dataset.
     """
-    img = np.random.randint(0, 256, img_size + (3,))
+    img = np.random.randint(0, 256, img_size + (3,), np.uint8)
     flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
 
     root_dir = Path(root_dir) / "FlyingChairs_release"
@@ -151,7 +151,7 @@ def write_hd1k(
     img_size : Tuple[int, int], default (1080, 2560)
         The size of the images inside of this dataset.
     """
-    img = np.random.randint(0, 256, img_size)
+    img = np.random.randint(0, 256, img_size, np.uint8)
     flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
 
     root_dir = Path(root_dir) / "HD1K"
@@ -190,7 +190,7 @@ def write_kitti(
     img_size : Tuple[int, int], default (375, 1242)
         The size of the images inside of this dataset.
     """
-    img = np.random.randint(0, 256, img_size)
+    img = np.random.randint(0, 256, img_size, np.uint8)
     flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
 
     root_dir = Path(root_dir) / "KITTI"
@@ -266,10 +266,10 @@ def write_middlebury_st(
     ----------
     root_dir : Union[str, Path]
         Path to the directory where the dummy dataset will be created.
-    img_size : Tuple[int, int], default (436, 1024)
+    img_size : Tuple[int, int], default (2000, 2800)
         The size of the images inside of this dataset.
     """
-    img = np.random.randint(0, 256, img_size)
+    img = np.random.randint(0, 256, img_size, np.uint8)
     flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
 
     root_dir = Path(root_dir) / "middlebury_st" / "sequence"
@@ -332,7 +332,7 @@ def write_sintel(
     img_size : Tuple[int, int], default (436, 1024)
         The size of the images inside of this dataset.
     """
-    img = np.random.randint(0, 256, img_size)
+    img = np.random.randint(0, 256, img_size, np.uint8)
     flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
     mask = np.random.randint(0, 2, img_size, np.uint8) * 255
 
@@ -374,10 +374,10 @@ def write_spring(
     img_size : Tuple[int, int], default (1080, 1920)
         The size of the images inside of this dataset.
     """
-    img = np.random.randint(0, 256, img_size)
+    img = np.random.randint(0, 256, img_size, np.uint8)
     flow = np.ones((2 * img_size[0], 2 * img_size[1], 2), np.float32)
     if write_4k_image:
-        img_4k = np.random.randint(0, 256, (2 * img_size[0], 2 * img_size[1]))
+        img_4k = np.random.randint(0, 256, (2 * img_size[0], 2 * img_size[1]), np.uint8)
 
     root_dir = Path(root_dir) / "spring"
     for split in ["train", "test"]:
@@ -417,10 +417,10 @@ def write_tartanair(
     ----------
     root_dir : Union[str, Path]
         Path to the directory where the dummy dataset will be created.
-    img_size : Tuple[int, int], default (436, 1024)
+    img_size : Tuple[int, int], default (480, 640)
         The size of the images inside of this dataset.
     """
-    img = np.random.randint(0, 256, img_size)
+    img = np.random.randint(0, 256, img_size, np.uint8)
     flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
     mask = np.random.randint(0, 2, img_size, np.uint8) * 255
 
@@ -455,7 +455,7 @@ def write_things(  # noqa: C901
     img_size : Tuple[int, int], default (540, 960)
         The size of the images inside of this dataset.
     """
-    img = np.random.randint(0, 256, img_size)
+    img = np.random.randint(0, 256, img_size, np.uint8)
     flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
     mask = np.random.randint(0, 2, img_size, np.uint8) * 255
 
@@ -541,7 +541,7 @@ def write_things_subset(
     img_size : Tuple[int, int], default (540, 960)
         The size of the images inside of this dataset.
     """
-    img = np.random.randint(0, 256, img_size)
+    img = np.random.randint(0, 256, img_size, np.uint8)
     flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
     mask = np.random.randint(0, 2, img_size, np.uint8) * 255
 
@@ -599,7 +599,7 @@ def write_viper(
     img_size : Tuple[int, int], default (1080, 1920)
         The size of the images inside of this dataset.
     """
-    img = np.random.randint(0, 256, img_size)
+    img = np.random.randint(0, 256, img_size, np.uint8)
     flow = np.random.rand(img_size[0], img_size[1], 2).astype(np.float32)
 
     root_dir = Path(root_dir) / "viper"

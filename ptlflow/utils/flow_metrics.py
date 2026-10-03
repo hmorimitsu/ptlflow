@@ -20,7 +20,7 @@ compute basic metrics for occlusion, motion boundary and flow confidence estimat
 # limitations under the License.
 # =============================================================================
 
-from typing import Dict, Sequence
+from typing import Dict, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -64,7 +64,7 @@ class FlowMetrics(Metric):
             How the final metric is averaged. It can be either 'epoch_mean' or 'ema' (exponential moving average).
         ema_decay : float, default 0.99
             The decay to be applied if average_mode is 'ema'.
-        f1_mode : float, default 'macro'
+        f1_mode : str, default 'macro'
             How to calculate the f1-score. Accepts one of these options {binary, macro, weighted}. If binary, then the f1-score
             is calculated only for the positive pixels. If macro, then the f1-score is the average of positive and negative
             scores. If weighted, then the average is weighted according to the number of positive/negative samples.
@@ -366,14 +366,14 @@ class FlowMetrics(Metric):
                 target_pos = target_pos.view(
                     target_pos.shape[0], target_pos.shape[1], -1
                 )
-                n_pos = target_pos.sum(dim=2)[:, :, None, None]
+                n_pos = target_pos.sum(dim=2)[:, :, None]
                 w_pos = n_pos / target_pos.shape[2]
 
                 target_neg = (target <= 0.5).float()
                 target_neg = target_neg.view(
                     target_neg.shape[0], target_neg.shape[1], -1
                 )
-                n_neg = target_neg.sum(dim=2)[:, :, None, None]
+                n_neg = target_neg.sum(dim=2)[:, :, None]
                 w_neg = n_neg / target_neg.shape[2]
 
                 f1_weighted = w_pos * f1_pos + w_neg * f1_neg
@@ -427,7 +427,7 @@ class FlowMetrics(Metric):
             )
         return tensor
 
-    def _to_bchw_shape(self, tensor) -> tuple[torch.Tensor, Sequence[int]]:
+    def _to_bchw_shape(self, tensor) -> Tuple[torch.Tensor, Sequence[int]]:
         orig_shape = tensor.shape
         if len(tensor.shape) == 2:
             tensor = tensor[None, None]
@@ -450,7 +450,7 @@ class FlowMetrics(Metric):
             return flow_tensor.shape[0]
         elif len(flow_tensor.shape) == 5:
             return flow_tensor.shape[0] * flow_tensor.shape[1]
-        elif len(flow_tensor.shape) == 6:
+        else:
             return flow_tensor.shape[0]
 
     def _compute_total_wauc(
