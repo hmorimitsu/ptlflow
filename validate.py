@@ -143,7 +143,8 @@ def _init_parser() -> ArgumentParser:
         default="all",
         choices=("all", "first", "middle", "last"),
         help=(
-            "Used only when the model predicts outputs for more than one frame. Select which predictions will be used for evaluation."
+            "Used only when the model predicts outputs for more than one frame. Select which predictions will be used to "
+            "generate the outputs (e.g., visualizations). The metrics are always computed using all the predictions."
         ),
     )
     parser.add_argument(
@@ -227,6 +228,8 @@ def validate(
         Arguments to configure the model and the validation.
     model : BaseModel
         The model to be used for validation.
+    data_module : FlowDataModule
+        The datamodule that will provide the validation dataloaders.
 
     Returns
     -------
@@ -313,6 +316,10 @@ def validate_list_of_models(args: Namespace, data_module: FlowDataModule) -> Non
                 logger.info("Checkpoint: {}", cname)
 
                 model_id = f"{mname}_{cname}"
+                if args.max_forward_side is not None:
+                    model_id += f"_maxside{args.max_forward_side}"
+                if args.scale_factor is not None:
+                    model_id += f"_scale{args.scale_factor}"
                 output_path = Path(args.output_path) / model_id
 
                 local_args = deepcopy(args)
@@ -345,7 +352,7 @@ def validate_list_of_models(args: Namespace, data_module: FlowDataModule) -> Non
                     cname,
                     e,
                 )
-                break
+                continue
 
 
 @torch.no_grad()
@@ -366,7 +373,7 @@ def validate_one_dataloader(
         The model to be used for validation.
     dataloader : DataLoader
         The dataloader for the validation.
-    dataloader_idx : index
+    dataloader_idx : int
         The index of this dataloader.
     dataloader_name : str
         A string to identify this dataloader.
@@ -378,6 +385,7 @@ def validate_one_dataloader(
     """
     metrics_sum: Dict[str, float] = {}
     num_processed_batches = 0
+    dataloader_suffix = ""
 
     metrics_individual = None
     if args.write_individual_metrics:
@@ -426,7 +434,7 @@ def validate_one_dataloader(
                 if args.seq_val_mode == "first":
                     k = 0
                 elif args.seq_val_mode == "middle":
-                    k = inputs["images"].shape[1] // 2
+                    k = inputs["flows"].shape[1] // 2
                 elif args.seq_val_mode == "last":
                     k = inputs["flows"].shape[1] - 1
                 for key, val in inputs.items():
@@ -438,6 +446,9 @@ def validate_one_dataloader(
                         inputs[key] = val[:, k : k + 2]
                     elif isinstance(val, torch.Tensor) and len(val.shape) == 5:
                         inputs[key] = val[:, k : k + 1]
+                for key, val in preds.items():
+                    if isinstance(val, torch.Tensor) and len(val.shape) == 5:
+                        preds[key] = val[:, k : k + 1]
 
             metrics = outputs["metrics"]
             for k in metrics.keys():
@@ -483,7 +494,7 @@ def validate_one_dataloader(
 
     if args.write_individual_metrics:
         ind_df = pd.DataFrame(metrics_individual)
-        args.output_path.mkdir(parents=True, exist_ok=True)
+        Path(args.output_path).mkdir(parents=True, exist_ok=True)
         csv_path = (
             Path(args.output_path)
             / f"{dataloader_name}{dataloader_suffix}_epe_flall.csv"
@@ -600,7 +611,7 @@ def _show_v04_warning():
             return
 
     logger.warning(
-        "Since v0.4, it is now necessary to inform the model using the --model argument. For example, use: python infer.py --model raft --ckpt_path things"
+        "Since v0.4, it is now necessary to inform the model using the --model argument. For example, use: python validate.py --model raft"
     )
 
 
@@ -614,7 +625,7 @@ if __name__ == "__main__":
         config_file_idx = sys.argv.index("--config") + 1
         with open(sys.argv[config_file_idx], "r") as f:
             config = yaml.safe_load(f)
-        if config["all"] or config["select"] is not None:
+        if config.get("all") or config.get("select") is not None:
             is_validate_list = True
 
     if "--all" in sys.argv or "--select" in sys.argv:

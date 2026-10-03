@@ -73,7 +73,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--not_write_outputs",
         action="store_false",
-        help="If set, the model outputs are saved to disk.",
+        help="If set, the model outputs are NOT saved to disk.",
         dest="write_outputs",
     )
     parser.add_argument(
@@ -343,7 +343,7 @@ def write_outputs(
     flow_format: str,
     img_dir_name: Optional[str] = None,
 ) -> None:
-    """Show the images on the screen.
+    """Save the model outputs to disk.
 
     Parameters
     ----------

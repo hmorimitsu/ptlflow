@@ -4,7 +4,7 @@ The reduced version is created by selecting a subset of columns.
 
 It can also create a plot between two chosen metrics.
 
-Tha parsing of this script is tightly connected to how the results are output by validate.py.
+The parsing of this script is tightly connected to how the results are output by validate.py.
 """
 
 # =============================================================================
@@ -138,8 +138,8 @@ def save_plots(args: argparse.Namespace, df: pd.DataFrame) -> None:
                     metric_pairs[dataset_name] = {}
                 metric_pairs[dataset_name][cmet] = col
 
+    # "others" must be the last group, since it is computed from the union of all the previous groups
     ckpt_groups = ["all", "chairs", "kitti", "sintel", "things", "others"]
-    assert ckpt_groups[-1] == "others"  # others must be the last element
 
     not_others = None
     for cgroup in ckpt_groups:
@@ -159,9 +159,12 @@ def save_plots(args: argparse.Namespace, df: pd.DataFrame) -> None:
                 not_others = not_others | belong_to_group
             group_df = df[belong_to_group]
             color = group_df.columns[0]
-            symbol = group_df.columns[0]
+            symbol = group_df.columns[1]
 
         for dataset_name, col_pair_dict in metric_pairs.items():
+            if len(col_pair_dict) < len(args.chosen_metrics):
+                # This dataset does not have all the chosen metrics, so it cannot be plotted
+                continue
             col1, col2 = col_pair_dict.values()
             fig = px.scatter(
                 group_df,

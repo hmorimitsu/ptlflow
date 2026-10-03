@@ -217,7 +217,7 @@ def _show_v04_warning():
             return
 
     logger.warning(
-        "Since v0.4, it is now necessary to inform the model using the --model argument. For example, use: python infer.py --model raft --ckpt_path things"
+        "Since v0.4, it is now necessary to inform the model using the --model argument. For example, use: python train.py --model raft"
     )
 
 
