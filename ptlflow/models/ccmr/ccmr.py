@@ -17,7 +17,7 @@ from ..base_model.base_model import BaseModel
 
 try:
     import alt_cuda_corr
-except:
+except ImportError:
     alt_cuda_corr = None
 
 

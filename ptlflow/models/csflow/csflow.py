@@ -23,7 +23,7 @@ class SequenceLoss(nn.Module):
         n_predictions = len(flow_preds)
         flow_loss = 0.0
 
-        # exlude invalid pixels and extremely large diplacements
+        # exclude invalid pixels and extremely large displacements
         mag = torch.sum(flow_gt**2, dim=1, keepdim=True).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
 
@@ -350,7 +350,7 @@ class BasicUpdateBlock(nn.Module):
         net = self.gru(net, inp)
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 

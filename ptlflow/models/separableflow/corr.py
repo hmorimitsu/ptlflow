@@ -10,7 +10,7 @@ except (ModuleNotFoundError, ImportError):
 
 try:
     import alt_cuda_corr
-except:
+except ImportError:
     # alt_cuda_corr is not compiled
     pass
 

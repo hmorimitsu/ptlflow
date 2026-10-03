@@ -122,7 +122,7 @@ class SKBlock_Temporal(nn.Module):
 
 #         delta_flow = self.flow_head(net)
 
-#         # scale mask to balence gradients
+#         # scale mask to balance gradients
 #         mask = .25 * self.mask(net)
 #         return net, mask, delta_flow
 
@@ -585,7 +585,7 @@ class SKUpdateBlock6_Deep_nopoolres_AllDecoder(nn.Module):
 
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -844,7 +844,7 @@ class SKFlow_Temporal2(nn.Module):
         nets = self.gru(torch.cat([nets, inp_cats], dim=1))
         delta_flows = self.flow_head(nets)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)  # b (t c) h w
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -905,7 +905,7 @@ class SKUpdateBlock_TAM(nn.Module):
         nets = self.gru(torch.cat([nets, inp_cats], dim=1))
         delta_flows = self.flow_head(nets)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)  # b (t c) h w
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -991,7 +991,7 @@ class SKUpdateBlock_TAM_v3(nn.Module):
             rearrange(nets, "(B T) C H W -> B (T C) H W", T=T)
         )  # (b t) c h w => b (t c) h w
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -1058,7 +1058,7 @@ class SKUpdateBlock_TAM_v3_noinit(nn.Module):
             rearrange(nets, "(B T) C H W -> B (T C) H W", T=T)
         )  # (b t) c h w => b (t c) h w
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -1129,7 +1129,7 @@ class SKUpdateBlock_TAM_ParamAblation(nn.Module):
             rearrange(nets, "(B T) C H W -> B (T C) H W", B=B)
         )  # (b t) c h w => b (t c) h w
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -1196,7 +1196,7 @@ class SKUpdateBlock_TAM_v7(nn.Module):
             rearrange(nets, "(B T) C H W -> B (T C) H W", B=B)
         )  # (b t) c h w => b (t c) h w
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -1265,7 +1265,7 @@ class SKUpdateBlock_TAM_v8(nn.Module):
             rearrange(nets, "(B T) C H W -> B (T C) H W", B=B)
         )  # (b t) c h w => b (t c) h w
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -1335,7 +1335,7 @@ class SKUpdateBlock_TAM_v4(nn.Module):
         )
         delta_flows = self.flow_head(nets)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)  # b (t c) h w
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -1401,7 +1401,7 @@ class SKUpdateBlock_TAM_v5(nn.Module):
             rearrange(nets, "(B T) C H W -> B (T C) H W", B=B)
         )  # (b t) c h w => b (t c) h w
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(rearrange(nets, "(B T) C H W -> B (T C) H W", B=B))
 
         masks = rearrange(masks, "B (T C) H W -> B T C H W", T=T)
@@ -1468,7 +1468,7 @@ class SKUpdateBlock_TAM_v6(nn.Module):
             rearrange(nets, "(B T) C H W -> B (T C) H W", B=B)
         )  # (b t) c h w => b (t c) h w
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -1568,7 +1568,7 @@ class Bi_SKUpdateBlock_TAM(nn.Module):
         nets = self.gru(torch.cat([nets, inp_cats], dim=1))
         delta_flows = self.flow_head(nets)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -1627,7 +1627,7 @@ class SKFlow_TMM(nn.Module):
         nets = self.gru(torch.cat([nets, inp_cats], dim=1))
         delta_flows = self.flow_head(nets)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -1744,7 +1744,7 @@ class SKFlow_TMM3(nn.Module):
         # delta_flows = self.flow_head(rearrange(nets, '(B T) C H W -> B T C H W', T=T))
         delta_flows = self.flow_head(nets)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -1806,7 +1806,7 @@ class SKFlow_Temporal3(nn.Module):
         nets = self.gru(torch.cat([nets, inp_cats], dim=1))
         delta_flows = self.flow_head(nets)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)  # b (t c) h w
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -1868,7 +1868,7 @@ class SKFlow_Temporal4(nn.Module):
         nets = self.gru(torch.cat([nets, inp_cats], dim=1))
         delta_flows = self.flow_head(nets)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)  # b (t c) h w
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -1930,7 +1930,7 @@ class SKFlow_Temporal(nn.Module):
         nets = rearrange(nets, "(B T) C H W -> B T C H W", B=B, T=T)
         delta_flows = self.temporal_flow_head(nets)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         nets = rearrange(nets, "B T C H W -> (B T) C H W")
         masks = 0.25 * self.mask(nets)
 
@@ -2025,7 +2025,7 @@ class SKFlowDecoder_MMBank(nn.Module):
 
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -2079,7 +2079,7 @@ class SKFlowDecoder_planB(nn.Module):
 
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -2265,7 +2265,7 @@ class BasicUpdateBlock(nn.Module):
         net = self.gru(net, inp)
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -2291,7 +2291,7 @@ class RAFTDeepUpdateBlock(nn.Module):
         net = self.gru(net, inp)
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -2317,7 +2317,7 @@ class GMADeepUpdateBlock(nn.Module):
         net = self.gru(net, inp)
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -2457,7 +2457,7 @@ class SKUpdateBlock_CBAM(nn.Module):
 
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -2531,7 +2531,7 @@ class GMAUpdateBlock_TAM_v7(nn.Module):
             rearrange(nets, "(B T) C H W -> B (T C) H W", B=B)
         )  # (b t) c h w => b (t c) h w
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -2610,7 +2610,7 @@ class GMAUpdateBlock_TAM_ablation(nn.Module):
             rearrange(nets, "(B T) C H W -> B (T C) H W", B=B)
         )  # (b t) c h w => b (t c) h w
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         masks = 0.25 * self.mask(nets)
 
         masks = rearrange(masks, "(B T) C H W -> B T C H W", B=B, T=T)
@@ -2655,7 +2655,7 @@ class GMAUpdateBlock(nn.Module):
         # plot_featmap(motion_features_global.cpu().squeeze(0), '/mnt/cloud_disk/ssk/playground/GMA-main/nips-figs/RAFTGMA/487-motion_feature_global')
         # plot_featmap(net.cpu().squeeze(0), '/mnt/cloud_disk/ssk/playground/GMA-main/nips-figs/RAFTGMA/487-net')
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -2693,7 +2693,7 @@ class RAFTUpdateBlock(nn.Module):
         # plot_featmap(motion_features_global.cpu().squeeze(0), '/mnt/cloud_disk/ssk/playground/GMA-main/nips-figs/RAFTGMA/487-motion_feature_global')
         # plot_featmap(net.cpu().squeeze(0), '/mnt/cloud_disk/ssk/playground/GMA-main/nips-figs/RAFTGMA/487-net')
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -2720,7 +2720,7 @@ class MFUpdateBlock(nn.Module):
 
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -2791,7 +2791,7 @@ class MFSKFlowUpdateBlock(nn.Module):
 
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -2841,7 +2841,7 @@ class MFRAFTUpdateBlock(nn.Module):
         # Attentional update
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -2883,7 +2883,7 @@ class MFGMAUpdateBlock(nn.Module):
 
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -2930,7 +2930,7 @@ class ControlMFSKIIUpdateBlock(nn.Module):
         delta_flow = self.flow_head(net)
         delta_flow = self.zero_conv1(delta_flow)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         mask = self.zero_conv2(mask)
         return net, mask, delta_flow

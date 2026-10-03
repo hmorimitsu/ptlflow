@@ -140,7 +140,7 @@ class BasicUpdateBlock(nn.Module):
         delta_flow = self.flow_head(net)
 
         if self.learn_upsample and upsample:
-            # scale mask to balence gradients following RAFT
+            # scale mask to balance gradients following RAFT
             mask = 0.25 * self.mask(net)
         else:
             mask = None

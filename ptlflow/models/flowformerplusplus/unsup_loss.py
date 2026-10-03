@@ -237,7 +237,7 @@ def sequence_loss(flow_preds, flow_gt, valid, cfg):
     flow_loss = 0.0
     flow_gt_thresholds = [5, 10, 20]
 
-    # exlude invalid pixels and extremely large diplacements
+    # exclude invalid pixels and extremely large displacements
     mag = torch.sum(flow_gt**2, dim=1).sqrt()
     valid = (valid >= 0.5) & (mag < max_flow)
 

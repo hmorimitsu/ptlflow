@@ -148,6 +148,6 @@ class BasicUpdateBlock(nn.Module):
 
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow

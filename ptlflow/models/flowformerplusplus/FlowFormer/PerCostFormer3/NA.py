@@ -21,7 +21,7 @@ try:
         verbose=False,
     )
     print("[Finished 2/2]")
-except:
+except ImportError:
     print("Failed to load nat cuda")
     exit()
 

@@ -154,7 +154,7 @@ class SKUpdateBlock6_Deep_nopoolres_AllDecoder2(nn.Module):
 
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -193,7 +193,7 @@ class SKUpdateBlock6_Deep_nopoolres_AllDecoder2_Mem(nn.Module):
         net = self.gru(torch.cat([net, inp_cat], dim=1))
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -235,7 +235,7 @@ class SKUpdateBlock6_Deep_nopoolres_AllDecoder2_Mem_skflow(nn.Module):
         net = self.gru(torch.cat([net, inp_cat], dim=1))
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -249,7 +249,7 @@ class SKUpdateBlock6_Deep_nopoolres_AllDecoder2_Mem_skflow(nn.Module):
 
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -294,6 +294,6 @@ class SKUpdateBlock6_Deep_nopoolres_AllDecoder2_Mem_predict(nn.Module):
         net = self.gru_new(inp_cat)
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow

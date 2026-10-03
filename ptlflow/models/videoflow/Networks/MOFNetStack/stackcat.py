@@ -191,6 +191,6 @@ class SKUpdateBlock6_Deep_nopoolres_AllDecoder2(nn.Module):
 
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 100.0 * self.mask(net)
         return net, motion_hidden_state, mask, delta_flow
