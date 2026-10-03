@@ -8,12 +8,11 @@ PTLFlow - PyTorch Lightning Optical Flow
 ========================================
 
 Welcome to the PTLFlow documentation for the code at `https://github.com/hmorimitsu/ptlflow <https://github.com/hmorimitsu/ptlflow>`_. 
-This is an unified platform built on PyTorch Lightning for
+This is a unified platform built on PyTorch Lightning for
 training and testing deep optical flow models. The modular design of systems in PyTorch Lightning
-is ideal for putting lots of models together while keeping each of them well contained
+is ideal for putting lots of models together while keeping each of them well contained.
 
-PTLFlow is still in early development, so there are only a few models available at the moment,
-but hopefully the list of models will grow soon.
+PTLFlow is under active development and the list of available models keeps growing.
 
 Here you will find some basic steps on how to use PTLFlow for training and testing some optical flow models.
 This documentation also contains validation results of each model in some common benchmarks.
@@ -33,7 +32,7 @@ If you want to use it for a different purpose, then you should check by yourself
 
 The results presented by the models in this platform are not guaranteed to match the official results
 (in either accuracy or speed). If you need to reproduce the official results for some model, then you should
-use the its original code.
+use its original code.
 You can see how the results of the models in PTLFlow compare to the original papers in :ref:`paper-ptlflow-metrics`.
 
 .. toctree::

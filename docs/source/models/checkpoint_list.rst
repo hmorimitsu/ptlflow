@@ -2,7 +2,7 @@
 Checkpoint List
 ===============
 
-The table below lists the available checkpoints and show what are their original counterparts.
+The table below lists the available checkpoints and shows what their original counterparts are.
 
 .. csv-table::
     :file: checkpoint_list.csv

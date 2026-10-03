@@ -26,21 +26,22 @@ Suppose you create a new model called ``MyModel``. The code below is an example 
         }
 
         def __init__(
+            self,
             my_arg1: int = 0,  # an example of an int argument
             my_arg2: Sequence[float] = (0.0, 1.0, 2.0),  # an example of a list of floats
             my_arg3: Optional[int] = None,  # an example of an optional int argument
             **kwargs,  # Add this to receive the other arguments from BaseModel
         ) -> None:
-            # 5. Call the parent constructor.
+            # 4. Call the parent constructor.
             super(MyModel, self).__init__(
                 loss_fn=my_model_loss,  # Can be None, if there is no loss function
                 output_stride=64,  # Or another value, depends on the stride of your model
                 **kwargs,
             )
 
-            # Define your model Here
+            # Define your model here
 
-        # 7. Define the forward function
+        # 6. Define the forward function
         def forward(
             self,
             inputs: Dict[str, torch.Tensor]
@@ -62,8 +63,8 @@ Suppose you create a new model called ``MyModel``. The code below is an example 
             )
 
             # Get the pair of images.
-            image1 = inputs['images'][:, 0]
-            image2 = inputs['images'][:, 1]
+            image1 = images[:, 0]
+            image2 = images[:, 1]
 
             # Define your forward here
 
@@ -77,7 +78,7 @@ Suppose you create a new model called ``MyModel``. The code below is an example 
             }
             return preds
 
-        # 8. BaseModel already define optimizers, dataloaders, training steps, etc.
+        # 7. BaseModel already defines optimizers, dataloaders, training steps, etc.
         # However, if you want to use different ones, you should create methods overriding those steps.
         # Check the PyTorch Lightning documentation for more details about which methods are required:
         # https://lightning.ai/docs/pytorch/stable/starter/introduction.html
@@ -87,7 +88,7 @@ Then do the following steps:
 
 1. Create a folder with your model name inside the ``models`` folder. For example, you could create a folder ``ptlflow/models/my_model``.
    All the files related to this model should be inside this folder, including: definition of the model, loss function, and
-   anything else required to run the model
+   anything else required to run the model.
 
 2. Put the code file in the folder, for example in ``ptlflow/models/my_model/my_model.py``.
 
@@ -118,26 +119,26 @@ Then do the following steps:
     class MyModel(BaseModel):
     # Your model definition, as described above...
 
-    # Create a lower caps name for your model and register it by decorating it with @register_model
+    # Create a lowercase name for your model and register it by decorating it with @register_model
     @register_model
     @trainable  # Optional. Only add if your model can be trained (i.e. offer a loss function and differentiable operations)
     @ptlflow_trained  # Optional. Only add if your model was trained using PTLFlow's training script
     class my_model(MyModel):
         pass
 
- This should be all. Now your model can be used as any other one inside the platform.
+This should be all. Now your model can be used as any other one inside the platform.
 
 Detailed explanation
 ====================
 
-Here, the numbered topics in the code above will be explained in more details.
+Here, the numbered topics in the code above will be explained in more detail.
 
 .. _new-model-loss-function:
 
 1. Loss function
 ----------------
 
-If you want to train you model, you need to define a loss function for it. The loss can either
+If you want to train your model, you need to define a loss function for it. The loss can either
 be a simple function or an ``torch.nn.Module`` (in which case you define the loss calculation in
 the ``forward`` method). Assuming you use a simple function, it should have the following signature:
 
@@ -156,7 +157,7 @@ the ``forward`` method). Assuming you use a simple function, it should have the 
 ------------
 
 BaseModel implements the most common requirements for training, validating, and logging optical flow models.
-Several parts of PTLFlow assume we are handing a model which follows the specification from BaseModel.
+Several parts of PTLFlow assume we are handling a model which follows the specification from BaseModel.
 Therefore, it is recommended that your model inherits from BaseModel and keep its outputs consistent with it.
 That being said, the common configuration from BaseModel may not serve your model well. In this case,
 you should just override the required methods from BaseModel with the setting you need. See :ref:`new-model-methods` for more details.
@@ -210,7 +211,7 @@ The outputs must have the following entries:
 - Optionally, other keys with the same names and shapes as those from the input dataset.
 
 - Any other outputs which are specific to your model. These are ignored by other parts
-  of PTLFLow, but it may be used, for example, in your loss function. Remember that the output
+  of PTLFlow, but it may be used, for example, in your loss function. Remember that the output
   of the forward will be the input of the loss function.
 
 .. _new-model-methods:

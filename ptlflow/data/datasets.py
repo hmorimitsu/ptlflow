@@ -49,7 +49,7 @@ class BaseFlowDataset(Dataset):
         More than two paths can also be added in case the model is able to use more images for estimating the flow.
     flow_paths : list[list[str]]
         Similar structure to img_paths. However, the inner list must have exactly one element less than img_paths.
-        For example, if an entry of img_paths is composed of two paths, then an entry of flow_list should be a list with a
+        For example, if an entry of img_paths is composed of two paths, then an entry of flow_paths should be a list with a
         single path, corresponding to the optical flow from the first image to the second.
     occ_paths : list[list[str]]
         Paths to the occlusion masks, follows the same structure as flow_paths. It can be left empty if not available.
@@ -57,7 +57,7 @@ class BaseFlowDataset(Dataset):
         Paths to the motion boundary masks, follows the same structure as flow_paths. It can be left empty if not available.
     flow_b_paths : list[list[str]]
         The same as flow_paths, but it corresponds to the backward flow. This list must be in the same order as flow_paths.
-        For example, flow_b_paths[i] must be backward flow of flow_paths[i]. It can be left empty if backard flows are not
+        For example, flow_b_paths[i] must be backward flow of flow_paths[i]. It can be left empty if backward flows are not
         available.
     occ_b_paths : list[list[str]]
         Backward occlusion mask paths, read occ_paths and flow_b_paths above.
@@ -249,7 +249,7 @@ class BaseFlowDataset(Dataset):
     def _log_status(self) -> None:
         if self.__len__() == 0:
             logger.warning(
-                "No samples were found for {} dataset. Be sure to update the dataset path in datasets.yml, "
+                "No samples were found for {} dataset. Be sure to update the dataset path in datasets.yaml, "
                 "or provide the path by the argument --[dataset_name]_root_dir.",
                 self.dataset_name,
             )

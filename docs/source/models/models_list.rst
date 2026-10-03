@@ -346,7 +346,7 @@ NeuFlow v2
 
 `[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/neuflow2>`__
 
-- Paper: **NeuFlow v2: Push High-Efficiency Optical Flow To the Limit** - `https://arxiv.org/abs/2408.10161 <hhttps://arxiv.org/abs/2408.10161>`_
+- Paper: **NeuFlow v2: Push High-Efficiency Optical Flow To the Limit** - `https://arxiv.org/abs/2408.10161 <https://arxiv.org/abs/2408.10161>`_
 
 - Reference code: `https://github.com/neufieldrobotics/NeuFlow_v2 <https://github.com/neufieldrobotics/NeuFlow_v2>`_
 
@@ -381,7 +381,7 @@ RAPIDFlow
 
 - Paper: **RAPIDFlow: Recurrent Adaptable Pyramids with Iterative Decoding for Efficient Optical Flow Estimation** - `https://hmorimitsu.com/publication/2024-icra-rapidflow/ <https://hmorimitsu.com/publication/2024-icra-rapidflow/>`_
 
-- Model names: ``rapidflow``, ``rapidflow_it1``, ``rapidflow_it2``, ``rapidflow_it3``, ``rapidflow_it6``, ``rapidflow_it12``
+- Model names: ``rapidflow``, ``rapidflow_it1``, ``rapidflow_it2``, ``rapidflow_it3``, ``rapidflow_it6``
 
 ReCoVEr
 -------
@@ -481,7 +481,7 @@ STaRFlow
 - Model names: ``starflow``
 
 StreamFlow
-------
+-----------
 
 `[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/streamflow>`__
 
@@ -507,7 +507,7 @@ VideoFlow
 
 - Paper: **Videoflow: Exploiting temporal cues for multi-frame optical flow estimation** - `https://arxiv.org/abs/2303.08340 <https://arxiv.org/abs/2303.08340>`_
 
-- Reference code: `https://github.com/XiaoyuShi97/VideoFlow <hhttps://github.com/XiaoyuShi97/VideoFlow>`_
+- Reference code: `https://github.com/XiaoyuShi97/VideoFlow <https://github.com/XiaoyuShi97/VideoFlow>`_
 
 - Model names: ``videoflow_bof``, ``videoflow_mof``
 
@@ -520,4 +520,4 @@ WAFT
 
 - Reference code: `https://github.com/princeton-vl/WAFT <https://github.com/princeton-vl/WAFT>`__
 
-- Model name: ``waft_dav2_a1``, ``waft_dav2_a2``, ``waft_dinov3_a2``, ``waft_twins_a2``
+- Model names: ``waft_dav2_a1``, ``waft_dav2_a2``, ``waft_dinov3_a2``, ``waft_twins_a2``

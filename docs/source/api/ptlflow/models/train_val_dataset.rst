@@ -5,8 +5,8 @@ train_dataset and val_dataset
 =============================
 
 The datasets used both in training and validation (see :ref:`training` and :ref:`validation`)
-can be selected by providing a special composed string to either ``--train_dataset`` or
-``--val_dataset``. Here we will provide some more explanations about this string and
+can be selected by providing a special composed string to either ``--data.train_dataset`` or
+``--data.val_dataset``. Here we will provide some more explanations about this string and
 show some examples of valid and invalid options.
 
     Obs: the explanation below concerns the default behavior of :ref:`base-model`.
@@ -37,12 +37,12 @@ of their respective datasets.
 A split can be informed as well. Typically, the splits will admit of the values in
 {train, val, trainval, test}. Not all datasets offer test splits.
 If you want to know about the train/val splits of each dataset, check the validation text files at
-`https://github.com/hmorimitsu/ptlflow/tree/master/ptlflow/data <https://github.com/hmorimitsu/ptlflow/tree/master/ptlflow/data>`__.
+`https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/data <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/data>`__.
 Splits are separated using the ``-`` (dash) symbol. With splits, our example would become ``chairs-train+10*sintel-trainval``.
 Note that ``sintel*10-trainval`` would be invalid, as the multiplier cannot be in the middle of the dataset arguments.
 
 Finally, some datasets may use one or more extra arguments. Each argument is also separated
-by ``-`` symbols. For example, the Sintel dataset admit a pass name which can be ``clean`` or ``final``
+by ``-`` symbols. For example, the Sintel dataset admits a pass name which can be ``clean`` or ``final``
 as an additional argument. KITTI also accepts ``2012`` or ``2015`` as arguments. So we could have
 ``chairs-train+10*sintel-clean-trainval``.
 
