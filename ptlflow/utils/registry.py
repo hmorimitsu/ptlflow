@@ -15,6 +15,7 @@
 # =============================================================================
 
 import sys
+from typing import Type
 
 import lightning.pytorch as pl
 
@@ -29,7 +30,7 @@ class RegisteredModel(pl.LightningModule):
     pass
 
 
-def register_model(model_class: BaseModel) -> BaseModel:
+def register_model(model_class: Type[BaseModel]) -> Type[BaseModel]:
     # lookup containing module
     model_dir = ".".join(model_class.__module__.split(".")[:-1])
     mod = sys.modules[model_dir]
@@ -46,11 +47,11 @@ def register_model(model_class: BaseModel) -> BaseModel:
     return registered_class
 
 
-def trainable(model_class: BaseModel) -> BaseModel:
+def trainable(model_class: Type[BaseModel]) -> Type[BaseModel]:
     _trainable_models.append(model_class.__name__)
     return model_class
 
 
-def ptlflow_trained(model_class: BaseModel) -> BaseModel:
+def ptlflow_trained(model_class: Type[BaseModel]) -> Type[BaseModel]:
     _ptlflow_trained_models.append(model_class.__name__)
     return model_class

@@ -20,7 +20,7 @@ import logging
 import math
 from argparse import ArgumentParser
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
@@ -59,7 +59,8 @@ class InputPadder(_InputPadder):
         size : Optional[Tuple[int, int]], optional
             The desired size after scaling defined as (height, width). If not provided, then scale_factor will be used instead.
         two_side_pad : bool, default True
-            If True, half of the padding goes to left/top and the rest to right/bottom. Otherwise, all the padding goes to the bottom right.
+            If True, half of the padding goes to left/top and the rest to right/bottom. Otherwise, all the height padding
+            goes to the bottom, and the width padding is still split between left and right.
         pad_mode : str, default "replicate"
             How to pad the input. Must be one of the values accepted by the 'mode' argument of torch.nn.functional.pad.
         pad_value : float, default 0.0
@@ -282,17 +283,6 @@ def count_parameters(model: torch.nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-def get_list_of_available_models_list() -> List[str]:
-    """Return a list of the names of the available models.
-
-    Returns
-    -------
-    list[str]
-        The list with the model names.
-    """
-    return sorted(ptlflow.models_dict.keys())
-
-
 def make_divisible(v: int, div: int) -> int:
     """Decrease a number v until it is divisible by div.
 
@@ -329,7 +319,6 @@ def release_gpu(tensors_dict: Dict[str, Any]) -> Dict[str, Any]:
     for k, v in tensors_dict.items():
         if isinstance(v, torch.Tensor):
             tensors_dict[k] = v.detach().cpu()
-            del v
     return tensors_dict
 
 
@@ -337,8 +326,6 @@ def tensor_dict_to_numpy(
     tensor_dict: Dict[str, torch.Tensor], padder: Optional[InputPadder] = None
 ) -> Dict[str, Any]:
     """Convert all tensors into numpy format, changing the shape from CHW to HWC.
-
-    If "flows" is available, then a color representation "flows_viz" is added to the outputs.
 
     Parameters
     ----------
@@ -440,8 +427,8 @@ def bgr_val_as_tensor(
         )
     elif isinstance(bgr_val, (tuple, list)):
         assert len(bgr_val) == 3
-        bgr_val = torch.Tensor(bgr_val).to(
-            dtype=reference_tensor.dtype, device=reference_tensor.device
+        bgr_val = torch.tensor(
+            bgr_val, dtype=reference_tensor.dtype, device=reference_tensor.device
         )
     elif isinstance(bgr_val, (int, float)):
         bgr_val = (

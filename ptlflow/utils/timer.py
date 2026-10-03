@@ -22,7 +22,7 @@ from typing import Union, Tuple
 
 try:
     import torch
-except NameError:
+except ImportError:
     torch = None
 
 
@@ -70,8 +70,6 @@ class Timer(object):
         self.name = name
         self.indent_level = indent_level
         self.reset()
-
-        self.num_tocs = 0
         self.num_global_tocs = 0
 
     def reset(self) -> None:
@@ -103,7 +101,7 @@ class Timer(object):
         Returns
         -------
         float
-            The average time in milliseconds.
+            The average time in seconds.
         """
         num_tocs = self.num_global_tocs if self.num_global_tocs > 0 else self.num_tocs
         return self.total() / max(1, num_tocs)
@@ -114,7 +112,7 @@ class Timer(object):
         Returns
         -------
         float
-            The total time in milliseconds.
+            The total time in seconds.
         """
         return self.total_time
 

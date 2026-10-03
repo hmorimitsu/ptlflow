@@ -586,7 +586,7 @@ class IterativeCorrBlock(nn.Module):
         coords : torch.Tensor
             The addition (optical flow + coords_grid) to translate the points from input1. The coords values should be represented in number of pixels
             (do not provide normalized values, e.g. between -1 and 1). It should be a 4D tensor (b, 2, h, w), where
-            coords[:, 0] represent the x axis and flow[:, 1] the y axis.
+            coords[:, 0] represent the x axis and coords[:, 1] the y axis.
 
         Returns
         -------

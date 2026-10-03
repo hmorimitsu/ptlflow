@@ -20,9 +20,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 try:
-    from neptune.new.types import File as NeptuneFile
+    from neptune.types import File as NeptuneFile
 except ImportError:
-    NeptuneFile = None
+    try:
+        from neptune.new.types import File as NeptuneFile
+    except ImportError:
+        NeptuneFile = None
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from lightning.pytorch.callbacks import Callback
@@ -201,8 +204,6 @@ class LoggerCallback(Callback):
             An instance of the PyTorch Lightning trainer.
         pl_module : BaseModel
             An instance of the optical flow model.
-        outputs : Any
-            Outputs of the training epoch.
         """
         img_grid = self._make_image_grid(self.train_images)
         self.log_image("train", img_grid, pl_module)
@@ -340,7 +341,7 @@ class LoggerCallback(Callback):
         inputs : Dict[str, torch.Tensor]
             The inputs of the model.
         preds : Dict[str, torch.Tensor]
-            The outrputs of the model.
+            The outputs of the model.
         """
         for k in self.log_keys:
             log_names = []
