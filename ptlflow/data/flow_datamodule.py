@@ -247,7 +247,7 @@ class FlowDataModule(pl.LightningDataModule):
     def _parse_dataset_selection(
         self,
         dataset_selection: str,
-    ) -> List[Tuple[int, str, ...]]:
+    ) -> "List[Tuple[int, str, ...]]":
         """Parse the input string into the selected dataset and their multipliers and parameters.
 
         For example, 'chairs-train+3*sintel-clean-trainval+kitti-2012-train*5' will be parsed into
@@ -292,7 +292,7 @@ class FlowDataModule(pl.LightningDataModule):
                     "The specified dataset string {:} is invalid. Check the FlowDataModule._parse_dataset_selection() documentation "
                     "to see how to write a valid selection string."
                 )
-        return cast(List[Tuple[int, str, ...]], datasets)
+        return cast("List[Tuple[int, str, ...]]", datasets)
 
     def _get_model_output_stride(self):
         if hasattr(self, "trainer") and self.trainer is not None:
