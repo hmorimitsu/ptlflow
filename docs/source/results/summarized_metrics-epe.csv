@@ -137,9 +137,9 @@ memflow_t,kitti,2.237,3.272,1.094,0.684
 ms_raft+,mixed,0.648,1.107,1.015,0.679
 neuflow,sintel,0.988,1.294,2.297,2.06
 neuflow,things,1.66,3.126,5.056,11.111
-neuflow2,mixed,0.999,1.661,1.293,1.666
-neuflow2,sintel,0.801,1.321,1.474,1.897
-neuflow2,things,1.265,2.767,1.725,4.065
+neuflow2,mixed,0.907,1.422,1.258,1.516
+neuflow2,sintel,0.583,0.785,1.432,1.533
+neuflow2,things,1.209,2.666,1.702,4.021
 pwcnet,things,2.643,4.059,4.042,10.288
 pwcnet,sintel,1.849,2.338,1.93,3.122
 pwcnet_nodc,things,3.329,4.769,5.29,12.274
