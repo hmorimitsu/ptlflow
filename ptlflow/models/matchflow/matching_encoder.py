@@ -174,6 +174,10 @@ class LocalFeatureTransformer(nn.Module):
             feat1 (torch.Tensor): [N, S, C]
             mask0 (torch.Tensor): [N, L] (optional)
             mask1 (torch.Tensor): [N, S] (optional)
+            H (int): height of the input feature, used when the inputs are flattened.
+            W (int): width of the input feature, used when the inputs are flattened.
+            pos0: Currently not used.
+            pos1: Currently not used.
         """
         assert self.d_model == feat0.size(
             2
@@ -182,7 +186,6 @@ class LocalFeatureTransformer(nn.Module):
             B, C, H, W = feat0.shape
             feat0 = rearrange(feat0, "b c h w -> b (h w) c")
             feat1 = rearrange(feat1, "b c h w -> b (h w) c")
-        ii = -1
         for layer, name in zip(self.layers, self.layer_names):
             if name == "self":
                 feat0 = layer(feat0, feat0, H, W)
@@ -202,11 +205,8 @@ class PositionEncodingSineNorm(nn.Module):
     def __init__(self, d_model, max_shape=(256, 256)):
         """
         Args:
+            d_model (int): number of features channels in the encoding
             max_shape (tuple): for 1/8 featmap, the max length of 256 corresponds to 2048 pixels
-            temp_bug_fix (bool): As noted in this [issue](https://github.com/zju3dv/LoFTR/issues/41),
-                the original implementation of LoFTR includes a bug in the pos-enc impl, which has little impact
-                on the final performance. For now, we keep both impls for backward compatability.
-                We will remove the buggy impl after re-training all variants of our released models.
         """
         super().__init__()
         self.d_model = d_model
@@ -233,6 +233,8 @@ class PositionEncodingSineNorm(nn.Module):
         """
         Args:
             x: [N, C, H, W]
+            train_reso (optional): resolution used during training, to adjust the position encoding.
+            eval_reso (optional): resolution used during evaluation, to adjust the position encoding.
         """
         if self.pe.dtype != x.dtype:
             self.pe.to(dtype=x.dtype)

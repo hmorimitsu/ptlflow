@@ -17,6 +17,8 @@
 import torch
 import torch.nn as nn
 
+from typing import Callable
+
 from .conv import Conv2dBlock
 from .cgu import CGUStage
 from .norm import LayerNorm2d
@@ -167,7 +169,7 @@ class MotionEncoder(nn.Module):
         corr_range: int,
         dec_flow_kernel_size: int,
         dec_motion_chs: int,
-        activation_function: callable,
+        activation_function: Callable[..., nn.Module],
     ):
         super(MotionEncoder, self).__init__()
 
@@ -222,10 +224,10 @@ class UpdateBlock(nn.Module):
         corr_range: int,
         dec_flow_kernel_size: int,
         dec_motion_chs: int,
-        activation_function: callable,
+        activation_function: Callable[..., nn.Module],
         net_chs_fixed: int,
         inp_chs_fixed: int,
-        dec_gru_norm_layer: callable,
+        dec_gru_norm_layer: Callable[..., nn.Module],
         dec_gru_depth: int,
         dec_gru_iters: int,
         dec_gru_mlp_ratio: float,

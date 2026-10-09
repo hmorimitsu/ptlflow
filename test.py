@@ -60,7 +60,7 @@ def _init_parser() -> ArgumentParser:
         "--output_path",
         type=str,
         default=str(Path("outputs/test")),
-        help="Path to the directory where the validation results will be saved.",
+        help="Path to the directory where the test results will be saved.",
     )
     parser.add_argument(
         "--show",
@@ -173,11 +173,11 @@ def test_one_dataloader(
     Parameters
     ----------
     args : Namespace
-        Arguments to configure the model and the validation.
+        Arguments to configure the model and the test.
     model : BaseModel
-        The model to be used for validation.
+        The model to be used for the test.
     dataloader : DataLoader
-        The dataloader for the validation.
+        The dataloader for the test.
     dataloader_idx : int
         The index of this dataloader.
     dataloader_name : str
@@ -191,7 +191,7 @@ def test_one_dataloader(
             scale_factor = (
                 None
                 if args.max_forward_side is None
-                else float(args.max_forward_side) / min(inputs["images"].shape[-2:])
+                else float(args.max_forward_side) / max(inputs["images"].shape[-2:])
             )
 
         io_adapter = IOAdapter(
@@ -262,6 +262,11 @@ def _write_to_file(
         out_root_dir = out_root_dir / dataloader_tokens[0]
         out_viz_root_dir = out_viz_root_dir / dataloader_tokens[0]
         flow_ext = "flo5"
+    else:
+        raise ValueError(
+            f"Cannot write outputs for dataloader {dataloader_name}. "
+            "Only kitti, sintel and spring are supported."
+        )
 
     extra_dirs = ""
     if metadata is not None:
@@ -302,7 +307,7 @@ def _show_v04_warning():
             return
 
     logger.warning(
-        "Since v0.4, it is now necessary to inform the model using the --model argument. For example, use: python infer.py --model raft --ckpt_path things"
+        "Since v0.4, it is now necessary to inform the model using the --model argument. For example, use: python test.py --model raft"
     )
 
 
@@ -344,4 +349,4 @@ if __name__ == "__main__":
     model = cli.model
     model = ptlflow.restore_model(model, cfg.ckpt_path)
 
-    metrics_df = test(cfg, model, datamodule)
+    test(cfg, model, datamodule)

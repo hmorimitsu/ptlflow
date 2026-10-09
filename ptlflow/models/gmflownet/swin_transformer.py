@@ -1040,6 +1040,7 @@ class POLATransBlock(nn.Module):
         Args:
             x: Input feature, tensor size (B, H*W, C).
             H, W: Spatial resolution of the input feature.
+            attn_mask: Attention mask for the input feature.
         """
         B, L, C = x.shape
         assert L == H * W, "input feature has wrong size"
@@ -1197,6 +1198,7 @@ class MixAxialPOLABlock(nn.Module):
         Args:
             x: Input feature, tensor size (B, H*W, C).
             H, W: Spatial resolution of the input feature.
+            attn_mask: Attention mask for the input feature.
         """
         B, L, C = x.shape
         assert L == H * W, "input feature has wrong size"

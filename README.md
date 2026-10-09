@@ -5,17 +5,6 @@
 ![GitHub CI lightning status](https://github.com/hmorimitsu/ptlflow/actions/workflows/lightning.yml/badge.svg)
 ![GitHub CI build status](https://github.com/hmorimitsu/ptlflow/actions/workflows/build.yml/badge.svg)
 
-> [!IMPORTANT]
-> 🏆 **RoCo-Spring: The Robust Correspondence Challenge @ NeurIPS 2026**
->
-> We are organizing **RoCo-Spring**, a NeurIPS 2026 Challenge on robust dense correspondence under realistic distribution shifts!
-> 
-> * **Tracks:** Optical Flow | Scene Flow | Stereo Matching | Exploration Track
-> * **Benchmarks:** Evaluated on high-detail [Spring](https://spring-benchmark.org/) & RobustSpring (blur, color, noise, quality, and weather shifts)
-> * **Key Dates:** Workshop Paper Submission: Sept 15, 2026 | Final Quantitative Submission: Sept 30, 2026
->
-> 📌 **Learn more & register:** [Challenge Website](https://roco-spring.github.io/index.html) | [Starter Kit Devkit](https://github.com/hmorimitsu/roco-spring-devkit)
-
 ## Introduction
 
 This is a collection of state-of-the-art deep model for estimating optical flow. The main goal is to provide a unified framework where multiple models can be trained and tested more easily.

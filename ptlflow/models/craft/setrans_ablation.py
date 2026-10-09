@@ -106,8 +106,6 @@ class MMPrivateMid(nn.Module):
         self.mid_act_fn = config.act_fun
 
     def forward(self, x):
-        x_trans = self.group_linear(x)  # [B0, 1024*8, 50] -> [B0, 1024*8, 50]
-        x_act = self.mid_act_fn(x_trans)  # [B0, 1024*8, 50]
         return x
 
 
@@ -116,7 +114,6 @@ class MMSharedMid(nn.Module):
         super(MMSharedMid, self).__init__()
         self.num_modes = config.num_modes
         self.feat_dim = config.feat_dim
-        feat_dim_allmode = self.feat_dim * self.num_modes
         self.shared_linear = nn.Linear(self.feat_dim, self.feat_dim)
         self.mid_act_fn = config.act_fun
 
@@ -162,7 +159,6 @@ class MMPrivateOutput(nn.Module):
     def forward(self, x, shortcut):
         x = self.group_linear(x)
         # x_comb: [B0, 1024*8, 50]. Residual connection.
-        x_comb = x + shortcut
         shape_4d = (x.shape[0], self.num_modes, self.feat_dim, x.shape[2])
         # x_comb_4d, x_drop_4d: [B0, 8, 50, 1024].
         x_comb_4d = x.view(shape_4d).permute([0, 1, 3, 2])

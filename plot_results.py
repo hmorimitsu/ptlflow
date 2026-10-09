@@ -1,4 +1,4 @@
-"""Save the number of trainable parameter and inference speed of all available models."""
+"""Plot metrics and benchmark results of the models saved in CSV files."""
 
 # =============================================================================
 # Copyright 2021 Henrique Morimitsu
@@ -172,7 +172,7 @@ def load_dataframe(args):
             columns={c: c.lower() for c in benchmark_df.columns}, inplace=True
         )
     metrics_df = None
-    if args.benchmark_csv_path is not None:
+    if args.metrics_csv_path is not None:
         metrics_df = pd.read_csv(args.metrics_csv_path)
         metrics_df.rename(
             columns={c: c.lower() for c in metrics_df.columns}, inplace=True
@@ -196,14 +196,15 @@ def load_dataframe(args):
         ), "Using all or more than one argument for --checkpoint_names is only supported if both --plot_axes are from the metrics CSV"
         base_columns += ["checkpoint"]
 
+    if metrics_df is not None and args.checkpoint_names[0] != "all":
+        metrics_df = metrics_df[metrics_df["checkpoint"].isin(args.checkpoint_names)]
+
     if len(unique_sources) == 1:
         if unique_sources[0] == "benchmark":
             df = benchmark_df
         if unique_sources[0] == "metrics":
             df = metrics_df
-            df = df[df["checkpoint"] == args.checkpoint_names[0]]
     else:
-        metrics_df = metrics_df[metrics_df["checkpoint"] == args.checkpoint_names[0]]
         df = pd.merge(metrics_df, benchmark_df, "inner", "model")
 
     df = df[base_columns + args.plot_axes]

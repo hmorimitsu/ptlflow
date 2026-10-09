@@ -15,7 +15,7 @@ Using this script, you can estimate the optical flow between two images by typin
 
     python infer.py --model raft_small --ckpt_path things --input_path /path/to/img1.jpg /path/to/img2.jpg --show
 
-Note that you can also give a path to a local checkpoint file to ``--pretrained_ckpt`` as well, like:
+Note that you can also give a path to a local checkpoint file to ``--ckpt_path`` as well, like:
 
 .. code-block:: bash
 
@@ -49,7 +49,7 @@ The code below shows a way to do this:
     from ptlflow.utils import flow_utils
     from ptlflow.utils.io_adapter import IOAdapter
 
-    # Get an optical flow model. As as example, we will use RAFT Small
+    # Get an optical flow model. As an example, we will use RAFT Small
     # with the weights pretrained on the FlyingThings3D dataset
     model = ptlflow.get_model('raft_small', ckpt_path='things')
     model.eval()

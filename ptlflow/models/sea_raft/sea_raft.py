@@ -15,7 +15,7 @@ from ..base_model.base_model import BaseModel
 
 try:
     import alt_cuda_corr
-except:
+except ImportError:
     alt_cuda_corr = None
 
 
@@ -34,7 +34,7 @@ class SequenceLoss(nn.Module):
         n_predictions = len(flow_preds)
 
         flow_loss = 0.0
-        # exlude invalid pixels and extremely large diplacements
+        # exclude invalid pixels and extremely large displacements
         mag = torch.sum(flow_gt**2, dim=1, keepdim=True).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
         for i in range(n_predictions):
@@ -236,7 +236,7 @@ class SEARAFT(BaseModel):
             info_predictions.append(info_up)
 
         if self.training:
-            # exlude invalid pixels and extremely large diplacements
+            # exclude invalid pixels and extremely large displacements
             nf_predictions = []
             for i in range(len(info_predictions)):
                 if not self.use_var:

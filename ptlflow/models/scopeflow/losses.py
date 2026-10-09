@@ -148,13 +148,12 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample(nn.Module):
 
             f_loss = flow_loss.detach()
             o_loss = occ_loss.detach()
-            if (f_loss.data > o_loss.data).numpy:
+            if bool(f_loss > o_loss):
                 f_l_w = 1
                 o_l_w = f_loss / o_loss
             else:
                 f_l_w = o_loss / f_loss
                 o_l_w = 1
-
             loss_dict["flow_loss"] = flow_loss / self._batch_size
             loss_dict["occ_loss"] = occ_loss / self._batch_size
             loss_dict["loss"] = (
@@ -163,11 +162,11 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample(nn.Module):
 
         else:
             loss_dict["epe"] = _elementwise_epe(
-                output_dict["flow"], target_dict["flows"][:, 0]
+                output_dict["flows"], target_dict["flows"][:, 0]
             ).mean()
             loss_dict["F1"] = f1_score(
                 target_dict["occs"][:, 0],
-                torch.round(self.occ_activ(output_dict["occ"])),
+                torch.round(self.occ_activ(output_dict["occs"])),
             )
 
         return loss_dict
@@ -193,7 +192,6 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel(nn.Module):
 
             # from tensorboard import summary
             # self.writer = summary(args.save)
-            from matplotlib.pyplot import hist
 
             self.perc = Percentile()
             print("Starting MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel loss percentile!")
@@ -288,7 +286,7 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel(nn.Module):
             # Calc total loss
             f_loss = flow_loss.detach()
             o_loss = occ_loss.detach()
-            if (f_loss.data > o_loss.data).numpy:
+            if bool(f_loss > o_loss):
                 f_l_w = 1
                 o_l_w = f_loss / o_loss
             else:
@@ -299,11 +297,11 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample_Sintel(nn.Module):
 
         else:
             loss_dict["epe"] = _elementwise_epe(
-                output_dict["flow"], target_dict["flows"][:, 0]
+                output_dict["flows"], target_dict["flows"][:, 0]
             ).mean()
             loss_dict["F1"] = f1_score(
                 target_dict["occs"][:, 0],
-                torch.round(self.occ_activ(output_dict["occ"])),
+                torch.round(self.occ_activ(output_dict["occs"])),
             )
 
         return loss_dict
@@ -372,7 +370,7 @@ class MultiScaleEPE_PWC_Bi_Occ_upsample_KITTI(nn.Module):
                 torch.norm(target_dict["flows"][:, 0], p=2, dim=1, keepdim=True) + 1e-8
             )
             flow_epe = (
-                _elementwise_epe(output_dict["flow"], target_dict["flows"][:, 0])
+                _elementwise_epe(output_dict["flows"], target_dict["flows"][:, 0])
                 * valid_mask
             )
 

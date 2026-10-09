@@ -33,8 +33,8 @@ class SequenceLoss(nn.Module):
         n_predictions = len(flow_preds)
         flow_loss = 0.0
 
-        # exlude invalid pixels and extremely large diplacements
-        mag = torch.sum(flow_gt**2, dim=2).sqrt()
+        # exclude invalid pixels and extremely large displacements
+        mag = torch.sum(flow_gt**2, dim=1).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
 
         for i in range(n_predictions):
@@ -43,18 +43,17 @@ class SequenceLoss(nn.Module):
             flow_pre = flow_preds[i]
             i_loss = (flow_pre - flow_gt).abs()
 
-            _valid = valid[:, :, None]
+            _valid = valid[:, None]
             if self.filter_epe:
-                loss_mag = torch.sum(i_loss**2, dim=2).sqrt()
+                loss_mag = torch.sum(i_loss**2, dim=1).sqrt()
                 mask = loss_mag > 1000
-                # print(mask.shape, _valid.shape)
                 if torch.any(mask):
                     print(
                         "[Found extrem epe. Filtered out. Max is {}. Ratio is {}]".format(
                             torch.max(loss_mag), torch.mean(mask.float())
                         )
                     )
-                    _valid = _valid & (~mask[:, :, None])
+                    _valid = _valid & (~mask[:, None])
 
             flow_loss += i_weight * (_valid * i_loss).mean()
 
@@ -142,15 +141,15 @@ class MemFlow(BaseModel):
         self.gamma = gamma
         self.max_flow = max_flow
 
-        self.optimizer_name = (optimizer_name,)
-        self.scheduler_name = (scheduler_name,)
-        self.canonical_lr = (canonical_lr,)
-        self.twins_lr_factor = (twins_lr_factor,)
-        self.adam_decay = (adam_decay,)
-        self.adamw_decay = (adamw_decay,)
-        self.epsilon = (epsilon,)
-        self.num_steps = (num_steps,)
-        self.anneal_strategy = (anneal_strategy,)
+        self.optimizer_name = optimizer_name
+        self.scheduler_name = scheduler_name
+        self.canonical_lr = canonical_lr
+        self.twins_lr_factor = twins_lr_factor
+        self.adam_decay = adam_decay
+        self.adamw_decay = adamw_decay
+        self.epsilon = epsilon
+        self.num_steps = num_steps
+        self.anneal_strategy = anneal_strategy
 
         self.network = MemFlowNet(
             cnet=cnet,
@@ -229,6 +228,7 @@ class MemFlow(BaseModel):
         # predict flow
         corr_fn = CorrBlock(fmaps[:, 0, ...], fmaps[:, 1, ...], num_levels=4, radius=4)
 
+        flow_predictions = []
         for itr in range(self.decoder_depth):
             coords1 = coords1.detach()
             corr = corr_fn(coords1)  # index correlation volume
@@ -250,6 +250,12 @@ class MemFlow(BaseModel):
             )
             # F(t+1) = F(t) + \Delta(t)
             coords1 = coords1 + delta_flow
+            if self.training:
+                flow_up_itr = self.network.upsample_flow(coords1 - coords0, up_mask)
+                flow_up_itr = self.postprocess_predictions(
+                    flow_up_itr, image_resizer, is_flow=True
+                )
+                flow_predictions.append(flow_up_itr)
         # upsample predictions
         flow_up = self.network.upsample_flow(coords1 - coords0, up_mask)
         flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
@@ -259,10 +265,10 @@ class MemFlow(BaseModel):
             self.memory.add_memory(key, current_value)
             self.last_mem_ti = self.curr_ti
 
-        # if self.training:
-        #     outputs = {"flows": flow_up[:, None], "flow_preds": flow_predictions}
-        # else:
-        outputs = {"flows": flow_up[:, None], "flow_small": coords1 - coords0}
+        if self.training:
+            outputs = {"flows": flow_up[:, None], "flow_preds": flow_predictions}
+        else:
+            outputs = {"flows": flow_up[:, None], "flow_small": coords1 - coords0}
 
         return outputs
 
@@ -312,7 +318,7 @@ class MemFlowT(MemFlow):
         min_mid_term_frames: int = 2,
         num_prototypes: int = 128,
         max_long_term_elements: int = 10000,
-        top_k: int | None = None,
+        top_k: Optional[int] = None,
         critical_params: Sequence[str] = (
             "cnet",
             "fnet",
@@ -323,7 +329,7 @@ class MemFlowT(MemFlow):
         ),
         filter_epe: bool = False,
         pretrain: bool = False,
-        train_avg_length: int | None = None,
+        train_avg_length: Optional[int] = None,
         gamma: float = 0.8,
         max_flow: float = 400,
         **kwargs,

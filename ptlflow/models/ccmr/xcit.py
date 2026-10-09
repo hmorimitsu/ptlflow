@@ -13,8 +13,7 @@ import math
 from functools import partial
 import torch
 import torch.nn as nn
-from timm.models.vision_transformer import Mlp
-from timm.models.layers import DropPath, trunc_normal_, to_2tuple
+from timm.models.layers import DropPath, trunc_normal_
 
 """ MLP module w/ dropout and configurable activation layer
 Hacked together by / Copyright 2020 Ross Wightman
@@ -326,7 +325,6 @@ class XCiT(nn.Module):
     ):
         """
         Args:
-            img_size (int, tuple): input image size
             embed_dim (int): embedding dimension
             depth (int): depth of transformer
             num_heads (int): number of attention heads
@@ -339,6 +337,7 @@ class XCiT(nn.Module):
             norm_layer: (nn.Module): normalization layer
             use_pos: (bool) whether to use positional encoding
             eta: (float) layerscale initialization value
+            separate: (bool) whether to use the separate cross-covariance attention
         """
         super().__init__()
         self.num_features = self.embed_dim = embed_dim

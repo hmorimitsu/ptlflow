@@ -16,10 +16,10 @@
 # limitations under the License.
 # =============================================================================
 
-__version__ = "0.4.2"
+__version__ = "0.4.3"
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 from jsonargparse import ArgumentParser, Namespace
 from loguru import logger
@@ -69,7 +69,7 @@ def get_model(
 ) -> BaseModel:
     """Return an instance of a chosen model.
 
-    The instance can have configured by he arguments, and load some existing pretrained weights.
+    The instance can be configured by the arguments, and load some existing pretrained weights.
 
     Note that this is different from get_model_reference(), which returns a reference to the model class. The instance,
     returned by this function, is a class already instantiated. Therefore, the return of this function is equivalent to
@@ -83,7 +83,7 @@ def get_model(
     ckpt_path : Optional[str], optional
         Name of the pretrained weight to load or a path to a local checkpoint file.
     args : Optional[Namespace], optional
-        Some arguments that ill be provided to the model.
+        Some arguments that will be provided to the model.
 
     Returns
     -------
@@ -125,7 +125,7 @@ def get_model(
     return model
 
 
-def get_model_reference(model_name: str) -> BaseModel:
+def get_model_reference(model_name: str) -> Type[BaseModel]:
     """Return a reference to the class of a chosen model.
 
     Note that this is different from get_model(), which returns an instance of a model. The reference, returned by this
@@ -198,7 +198,7 @@ def get_ptlflow_trained_model_names() -> List[str]:
     return _ptlflow_trained_models
 
 
-def load_checkpoint(ckpt_path: str, model_ref: BaseModel) -> Dict[str, Any]:
+def load_checkpoint(ckpt_path: str, model_ref: Type[BaseModel]) -> Dict[str, Any]:
     """Try to load the checkpoint specified in ckpt_path.
 
     Parameters
@@ -217,21 +217,20 @@ def load_checkpoint(ckpt_path: str, model_ref: BaseModel) -> Dict[str, Any]:
     --------
     get_model_reference : To get a reference to the class of a model.
     """
-    if Path(ckpt_path).exists():
-        ckpt_path = ckpt_path
-    elif hasattr(model_ref, "pretrained_checkpoints"):
-        tmp_ckpt_path = model_ref.pretrained_checkpoints.get(ckpt_path)
-        if tmp_ckpt_path is None:
-            raise ValueError(
-                f"Invalid checkpoint name {ckpt_path}. "
-                f'Choose one from {{{",".join(model_ref.pretrained_checkpoints.keys())}}}'
-            )
+    if not Path(ckpt_path).exists():
+        if hasattr(model_ref, "pretrained_checkpoints"):
+            tmp_ckpt_path = model_ref.pretrained_checkpoints.get(ckpt_path)
+            if tmp_ckpt_path is None:
+                raise ValueError(
+                    f"Invalid checkpoint name {ckpt_path}. "
+                    f'Choose one from {{{",".join(model_ref.pretrained_checkpoints.keys())}}}'
+                )
+            else:
+                ckpt_path = tmp_ckpt_path
         else:
-            ckpt_path = tmp_ckpt_path
-    else:
-        raise ValueError(
-            f"Cannot find checkpoint {ckpt_path} for model {model_ref.__name__}"
-        )
+            raise ValueError(
+                f"Cannot find checkpoint {ckpt_path} for model {model_ref.__name__}"
+            )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 

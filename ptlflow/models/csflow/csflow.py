@@ -23,7 +23,7 @@ class SequenceLoss(nn.Module):
         n_predictions = len(flow_preds)
         flow_loss = 0.0
 
-        # exlude invalid pixels and extremely large diplacements
+        # exclude invalid pixels and extremely large displacements
         mag = torch.sum(flow_gt**2, dim=1, keepdim=True).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
 
@@ -281,7 +281,7 @@ class StripCrossCorrMap_v2(nn.Module):
         for ly in self.children():
             if isinstance(ly, nn.Conv2d):
                 nn.init.kaiming_normal_(ly.weight, a=1)
-                if not ly.bias is None:
+                if ly.bias is not None:
                     nn.init.constant_(ly.bias, 0)
 
     def get_params(self):
@@ -289,7 +289,7 @@ class StripCrossCorrMap_v2(nn.Module):
         for name, module in self.named_modules():
             if isinstance(module, (nn.Linear, nn.Conv2d)):
                 wd_params.append(module.weight)
-                if not module.bias is None:
+                if module.bias is not None:
                     nowd_params.append(module.bias)
             elif isinstance(module, torch.nn.BatchNorm2d):
                 nowd_params += list(module.parameters())
@@ -322,7 +322,7 @@ class ConvBNReLU(nn.Module):
         for ly in self.children():
             if isinstance(ly, nn.Conv2d):
                 nn.init.kaiming_normal_(ly.weight, a=1)
-                if not ly.bias is None:
+                if ly.bias is not None:
                     nn.init.constant_(ly.bias, 0)
 
 
@@ -350,7 +350,7 @@ class BasicUpdateBlock(nn.Module):
         net = self.gru(net, inp)
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 0.25 * self.mask(net)
         return net, mask, delta_flow
 
@@ -366,7 +366,6 @@ def interp(x, dest):
 
 class BasicEncoder(nn.Module):
     def __init__(self, output_dim=128, norm_fn="batch", dropout=0.0):
-        from torch.nn.modules.utils import _pair
 
         super(BasicEncoder, self).__init__()
         self.norm_fn = norm_fn

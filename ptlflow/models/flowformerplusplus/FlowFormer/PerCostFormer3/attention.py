@@ -1,9 +1,7 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch import einsum
 
-from einops.layers.torch import Rearrange
 from einops import rearrange
 
 

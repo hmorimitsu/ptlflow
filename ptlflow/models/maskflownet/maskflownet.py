@@ -84,7 +84,7 @@ def upsample_kernel2d(w, dtype, device):
     return kernel.view(1, 1, w, w)
 
 
-def downsample_kernel2d(w, device):
+def downsample_kernel2d(w, dtype, device):
     kernel = (
         (w + 1) - torch.abs(w - torch.arange(w * 2 + 1, dtype=dtype, device=device))
     ) / (2 * w + 1)

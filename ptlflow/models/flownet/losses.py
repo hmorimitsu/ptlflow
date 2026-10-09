@@ -6,7 +6,6 @@ Portions of this code copyright 2017, Clement Pinard
 
 import torch
 import torch.nn as nn
-import math
 
 
 def EPE(input_flow, target_flow):

@@ -110,8 +110,6 @@ class StarFlow(BaseModel):
             list_pyramids.append(self.feature_pyramid_extractor(im) + [im])
 
         # outputs
-        output_dict = {}
-        output_dict_eval = {}
         flows_f = []  # indices : [level][time]
         flows_b = []  # indices : [level][time]
         occs_f = []

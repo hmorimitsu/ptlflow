@@ -14,7 +14,7 @@ then populate its lists according to the structure of your dataset. The code bel
         def __init__(
             self,
             my_params_here
-        ) -> None
+        ) -> None:
             super().__init__(
                 dataset_name='MyDatasetName',
                 transform=MyAugmentationTransform,
@@ -25,7 +25,7 @@ then populate its lists according to the structure of your dataset. The code bel
                 get_meta=True  # To return some metadata, such as paths, etc.
             )
 
-            # Read you dataset paths here (for example, using glob) and populate the following lists
+            # Read your dataset paths here (for example, using glob) and populate the following lists
             # self.img_paths
             # self.flow_paths
             #
@@ -44,7 +44,7 @@ then populate its lists according to the structure of your dataset. The code bel
             self.occ_paths.append(['/path/to/occlusion_mask.png'])
             # Notice we always append a list.
 
-            # That is all! BaseFlowDataset handles the actual loading of the data, as long it is correctly defined.
+            # That is all! BaseFlowDataset handles the actual loading of the data, as long as it is correctly defined.
 
-If you want to see more details, check the API definition of the all the dataset at :ref:`datasets`.
-This could serve as a guide to implement you own.
+If you want to see more details, check the API definition of all the datasets at :ref:`datasets`.
+This could serve as a guide to implement your own.

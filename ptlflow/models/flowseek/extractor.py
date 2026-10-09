@@ -27,12 +27,11 @@ class ResNetFPN(nn.Module):
         super().__init__()
         # Config
         block = BasicBlock
-        block_dims = block_dims
-        initial_dim = initial_dim
         self.init_weight = init_weight
         self.input_dim = input_dim
         # Class Variable
         self.in_planes = initial_dim
+        block_dims = list(block_dims)
         for i in range(len(block_dims)):
             block_dims[i] = int(block_dims[i] * ratio)
         # Networks

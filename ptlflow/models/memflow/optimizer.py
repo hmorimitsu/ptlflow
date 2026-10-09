@@ -79,7 +79,6 @@ def build_optimizer(
                     "lr": lr * factor,
                 },
             ]
-            full = [n for n, _ in model.named_parameters()]
             return torch.optim.AdamW(
                 param_dicts, lr=lr, weight_decay=adamw_decay, eps=epsilon
             )

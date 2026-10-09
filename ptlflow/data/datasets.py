@@ -18,7 +18,7 @@
 
 import math
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import cv2 as cv
 from einops import rearrange
@@ -49,7 +49,7 @@ class BaseFlowDataset(Dataset):
         More than two paths can also be added in case the model is able to use more images for estimating the flow.
     flow_paths : list[list[str]]
         Similar structure to img_paths. However, the inner list must have exactly one element less than img_paths.
-        For example, if an entry of img_paths is composed of two paths, then an entry of flow_list should be a list with a
+        For example, if an entry of img_paths is composed of two paths, then an entry of flow_paths should be a list with a
         single path, corresponding to the optical flow from the first image to the second.
     occ_paths : list[list[str]]
         Paths to the occlusion masks, follows the same structure as flow_paths. It can be left empty if not available.
@@ -57,7 +57,7 @@ class BaseFlowDataset(Dataset):
         Paths to the motion boundary masks, follows the same structure as flow_paths. It can be left empty if not available.
     flow_b_paths : list[list[str]]
         The same as flow_paths, but it corresponds to the backward flow. This list must be in the same order as flow_paths.
-        For example, flow_b_paths[i] must be backward flow of flow_paths[i]. It can be left empty if backard flows are not
+        For example, flow_b_paths[i] must be backward flow of flow_paths[i]. It can be left empty if backward flows are not
         available.
     occ_b_paths : list[list[str]]
         Backward occlusion mask paths, read occ_paths and flow_b_paths above.
@@ -71,7 +71,9 @@ class BaseFlowDataset(Dataset):
         self,
         dataset_name: str,
         split_name: str = "",
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
         get_occlusion_mask: bool = True,
@@ -99,7 +101,7 @@ class BaseFlowDataset(Dataset):
         get_motion_boundary_mask : bool, default True
             Whether to get motion boundary masks.
         get_backward : bool, default True
-            Whether to get the occluded version of the inputs.
+            Whether to also get the backward version of the inputs.
         get_meta : bool, default True
             Whether to get metadata.
         """
@@ -126,7 +128,7 @@ class BaseFlowDataset(Dataset):
 
         self.is_two_file_flow = False
 
-    def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:  # noqa: C901
+    def __getitem__(self, index: int) -> Dict[str, Any]:  # noqa: C901
         """Retrieve and return one input.
 
         Parameters
@@ -136,7 +138,7 @@ class BaseFlowDataset(Dataset):
 
         Returns
         -------
-        Dict[str, torch.Tensor]
+        Dict[str, Any]
             The retrieved input. This dict may contain the following keys, depending on the initialization choices:
             ['images', 'flows', 'mbs', 'occs', 'valids', 'flows_b', 'mbs_b', 'occs_b', 'valids_b', 'meta'].
             Except for 'meta', all the values are 4D tensors with shape NCHW. Notice that N does not correspond to the batch
@@ -159,12 +161,12 @@ class BaseFlowDataset(Dataset):
             if index < len(self.occ_paths):
                 inputs["occs"] = []
                 for path in self.occ_paths[index]:
-                    if str(path).endswith("npy"):
+                    if str(path).endswith(".npy"):
                         occ = np.load(path)
                     else:
                         occ = cv.imread(str(path), 0)
                     inputs["occs"].append(occ[:, :, None])
-            elif self.dataset_name.startswith("KITTI"):
+            elif self.dataset_name.startswith("KITTI") and index < len(self.flow_paths):
                 noc_paths = [
                     str(p).replace("flow_occ", "flow_noc")
                     for p in self.flow_paths[index]
@@ -221,7 +223,7 @@ class BaseFlowDataset(Dataset):
         self,
         flow_paths: Sequence[str],
         flow_format: Optional[str] = None,
-    ) -> Tuple[List[np.ndarray], List[Optional[np.ndarray]]]:
+    ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         flows = []
         valids = []
         for path in flow_paths:
@@ -249,7 +251,7 @@ class BaseFlowDataset(Dataset):
     def _log_status(self) -> None:
         if self.__len__() == 0:
             logger.warning(
-                "No samples were found for {} dataset. Be sure to update the dataset path in datasets.yml, "
+                "No samples were found for {} dataset. Be sure to update the dataset path in datasets.yaml, "
                 "or provide the path by the argument --[dataset_name]_root_dir.",
                 self.dataset_name,
             )
@@ -294,7 +296,9 @@ class AutoFlowDataset(BaseFlowDataset):
         self,
         root_dir: str,
         split: str = "train",
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
         get_meta: bool = True,
@@ -348,6 +352,10 @@ class AutoFlowDataset(BaseFlowDataset):
             remove_names = val_names
         elif split == "val":
             remove_names = [p.stem for p in sample_paths if p.stem not in val_names]
+        else:
+            raise ValueError(
+                f"Invalid split {split}. It must be one of ['train', 'val', 'trainval']."
+            )
 
         # Keep only data from the correct split
         self.img_paths = [
@@ -365,7 +373,7 @@ class AutoFlowDataset(BaseFlowDataset):
         self.metadata = [
             {
                 "image_paths": [str(p) for p in paths],
-                "is_val": paths[0].stem in val_names,
+                "is_val": paths[0].parent.stem in val_names,
                 "misc": "",
                 "is_seq_start": True,
             }
@@ -382,7 +390,9 @@ class FlyingChairsDataset(BaseFlowDataset):
         self,
         root_dir: str,
         split: str = "train",
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
         get_meta: bool = True,
@@ -445,6 +455,10 @@ class FlyingChairsDataset(BaseFlowDataset):
                 for p in img1_paths
                 if p.stem.split("_")[0] not in val_names
             ]
+        else:
+            raise ValueError(
+                f"Invalid split {split}. It must be one of ['train', 'val', 'trainval']."
+            )
 
         # Keep only data from the correct split
         self.img_paths = [
@@ -464,7 +478,7 @@ class FlyingChairsDataset(BaseFlowDataset):
         self.metadata = [
             {
                 "image_paths": [str(p) for p in paths],
-                "is_val": paths[0].stem in val_names,
+                "is_val": paths[0].stem.split("_")[0] in val_names,
                 "misc": "",
                 "is_seq_start": True,
             }
@@ -482,7 +496,9 @@ class FlyingChairs2Dataset(BaseFlowDataset):
         root_dir: str,
         split: str = "train",
         add_reverse: bool = False,
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 1000.0,
         get_valid_mask: bool = True,
         get_occlusion_mask: bool = False,
@@ -498,11 +514,11 @@ class FlyingChairs2Dataset(BaseFlowDataset):
             path to the root directory of the FlyingChairs2 dataset.
         split : str, default 'train'
             Which split of the dataset should be loaded. It can be one of {'train', 'val', 'trainval'}.
-        add_reverse : bool, default True
+        add_reverse : bool, default False
             If True, double the number of samples by appending the backward samples as additional samples.
         transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
             Transform to be applied on the inputs.
-        max_flow : float, default 10000.0
+        max_flow : float, default 1000.0
             Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
             as zero in the valid mask.
         get_valid_mask : bool, default True
@@ -512,7 +528,7 @@ class FlyingChairs2Dataset(BaseFlowDataset):
         get_motion_boundary_mask : bool, default True
             Whether to get motion boundary masks.
         get_backward : bool, default True
-            Whether to get the occluded version of the inputs.
+            Whether to also get the backward version of the inputs.
         get_meta : bool, default True
             Whether to get metadata.
         """
@@ -685,7 +701,9 @@ class FlyingThings3DDataset(BaseFlowDataset):
         pass_names: Union[str, List[str]] = "clean",
         side_names: Union[str, List[str]] = "left",
         add_reverse: bool = True,
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 1000.0,
         get_valid_mask: bool = True,
         get_occlusion_mask: bool = True,
@@ -711,7 +729,7 @@ class FlyingThings3DDataset(BaseFlowDataset):
             If True, double the number of samples by appending the backward samples as additional samples.
         transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
             Transform to be applied on the inputs.
-        max_flow : float, default 10000.0
+        max_flow : float, default 1000.0
             Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
             as zero in the valid mask.
         get_valid_mask : bool, default True
@@ -729,7 +747,7 @@ class FlyingThings3DDataset(BaseFlowDataset):
             temporal information.
         sequence_position : str, default "first"
             Only used when sequence_length > 2.
-            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            Determines the position where the main image frame will be in the sequence. It can be one of four values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
             - "last": the main frame will be the penultimate in the sequence,
@@ -987,7 +1005,9 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
         pass_names: Union[str, List[str]] = "clean",
         side_names: Union[str, List[str]] = "left",
         add_reverse: bool = True,
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 1000.0,
         get_valid_mask: bool = True,
         get_occlusion_mask: bool = True,
@@ -1013,7 +1033,7 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
             If True, double the number of samples by appending the backward samples as additional samples.
         transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
             Transform to be applied on the inputs.
-        max_flow : float, default 10000.0
+        max_flow : float, default 1000.0
             Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
             as zero in the valid mask.
         get_valid_mask : bool, default True
@@ -1023,7 +1043,7 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
         get_motion_boundary_mask : bool, default True
             Whether to get motion boundary masks.
         get_backward : bool, default True
-            Whether to get the occluded version of the inputs.
+            Whether to also get the backward version of the inputs.
         get_meta : bool, default True
             Whether to get metadata.
         sequence_length : int, default 2
@@ -1031,7 +1051,7 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
             temporal information.
         sequence_position : str, default "first"
             Only used when sequence_length > 2.
-            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            Determines the position where the main image frame will be in the sequence. It can be one of four values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
             - "last": the main frame will be the penultimate in the sequence,
@@ -1179,8 +1199,15 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
                                 flow_group = self._extend_paths_list(
                                     flow_group, sequence_length, sequence_position
                                 )
+                                step_size = (
+                                    (self.sequence_length - 1)
+                                    if sequence_position == "all"
+                                    else 1
+                                )
                                 for i in range(
-                                    len(flow_group) - self.sequence_length + 2
+                                    0,
+                                    len(flow_group) - self.sequence_length + 2,
+                                    step_size,
                                 ):
                                     flow_paths = flow_group[
                                         i : i + self.sequence_length - 1
@@ -1244,7 +1271,9 @@ class Hd1kDataset(BaseFlowDataset):
         self,
         root_dir: str,
         split: str = "train",
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 512.0,
         get_valid_mask: bool = True,
         get_meta: bool = True,
@@ -1273,7 +1302,7 @@ class Hd1kDataset(BaseFlowDataset):
             temporal information.
         sequence_position : str, default "first"
             Only used when sequence_length > 2.
-            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            Determines the position where the main image frame will be in the sequence. It can be one of four values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
             - "last": the main frame will be the penultimate in the sequence,
@@ -1373,7 +1402,9 @@ class KittiDataset(BaseFlowDataset):
         root_dir_2015: Optional[str] = None,
         split: str = "train",
         versions: Union[str, List[str]] = "2015",
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 512.0,
         get_valid_mask: bool = True,
         get_occlusion_mask: bool = False,
@@ -1466,6 +1497,10 @@ class KittiDataset(BaseFlowDataset):
                 remove_names = val_names
             elif split == "val":
                 remove_names = [p.stem for p in img1_paths if p.stem not in val_names]
+            else:
+                raise ValueError(
+                    f"Invalid split {split}. It must be one of ['train', 'val', 'trainval', 'test']."
+                )
 
             self.img_paths.extend(
                 [
@@ -1514,7 +1549,9 @@ class SintelDataset(BaseFlowDataset):
         root_dir: str,
         split: str = "train",
         pass_names: Union[str, List[str]] = "clean",
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
         get_occlusion_mask: bool = True,
@@ -1548,7 +1585,7 @@ class SintelDataset(BaseFlowDataset):
             temporal information.
         sequence_position : str, default "first"
             Only used when sequence_length > 2.
-            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            Determines the position where the main image frame will be in the sequence. It can be one of four values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
             - "last": the main frame will be the penultimate in the sequence,
@@ -1681,7 +1718,9 @@ class SpringDataset(BaseFlowDataset):
         split: str = "train",
         side_names: Union[str, List[str]] = "left",
         add_reverse: bool = True,
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
         get_backward: bool = False,
@@ -1692,12 +1731,12 @@ class SpringDataset(BaseFlowDataset):
         subsample: bool = False,
         is_image_4k: bool = False,
     ) -> None:
-        """Initialize SintelDataset.
+        """Initialize SpringDataset.
 
         Parameters
         ----------
         root_dir : str
-            path to the root directory of the MPI Sintel dataset.
+            path to the root directory of the Spring dataset.
         split : str, default 'train'
             Which split of the dataset should be loaded. It can be one of {'train', 'val', 'trainval', 'test'}.
         side_names : Union[str, List[str]], default 'left'
@@ -1720,7 +1759,7 @@ class SpringDataset(BaseFlowDataset):
             temporal information.
         sequence_position : str, default "first"
             Only used when sequence_length > 2.
-            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            Determines the position where the main image frame will be in the sequence. It can be one of four values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
             - "last": the main frame will be the penultimate in the sequence,
@@ -1728,7 +1767,7 @@ class SpringDataset(BaseFlowDataset):
         reverse_only : bool, default False
             If True, only uses the backward samples, discarding the forward ones.
         subsample : bool, default False
-            If True, the groundtruth is subsampled from 4K to 2K by neareast subsampling.
+            If True, the groundtruth is subsampled from 4K to 2K by nearest subsampling.
             If False, and is_image_4k is also False, then the groundtruth is reshaped as: einops.rearrange("b c (h nh) (w nw) -> b (nh nw) c h w", nh=2, nw=2),
             which corresponds to stacking the predictions of every 2x2 blocks.
             If False, and is_image_4k is True, then the groundtruth is returned in its original 4D-shaped 4K resolution, but the flow values are doubled.
@@ -1822,8 +1861,8 @@ class SpringDataset(BaseFlowDataset):
                                 flow_b_paths, sequence_length, sequence_position
                             )
                             assert len(image_paths) - 1 == len(
-                                flow_paths
-                            ), f"{seq_name}, {side}: {len(image_paths)-1} vs {len(flow_paths)}"
+                                flow_b_paths
+                            ), f"{seq_name}, {side}: {len(image_paths)-1} vs {len(flow_b_paths)}"
 
                     step_size = (
                         (self.sequence_length - 1) if sequence_position == "all" else 1
@@ -1860,7 +1899,7 @@ class SpringDataset(BaseFlowDataset):
 
         self._log_status()
 
-    def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:  # noqa: C901
+    def __getitem__(self, index: int) -> Dict[str, Any]:  # noqa: C901
         """Retrieve and return one input.
 
         Parameters
@@ -1870,7 +1909,7 @@ class SpringDataset(BaseFlowDataset):
 
         Returns
         -------
-        Dict[str, torch.Tensor]
+        Dict[str, Any]
             The retrieved input. This dict may contain the following keys, depending on the initialization choices:
             ['images', 'flows', 'mbs', 'occs', 'valids', 'flows_b', 'mbs_b', 'occs_b', 'valids_b', 'meta'].
             Except for 'meta', all the values are 4D tensors with shape NCHW. Notice that N does not correspond to the batch
@@ -1895,11 +1934,14 @@ class SpringDataset(BaseFlowDataset):
                     inputs["valids_b"] = valids_b
 
         if self.subsample:
-            inputs["flows"] = [f[::2, ::2] for f in inputs["flows"]]
-            inputs["valids"] = [v[::2, ::2] for v in inputs["valids"]]
-            if self.get_backward:
-                inputs["flows_b"] = [f[::2, ::2] for f in inputs["flows_b"]]
-                inputs["valids_b"] = [v[::2, ::2] for v in inputs["valids_b"]]
+            if "flows" in inputs:
+                inputs["flows"] = [f[::2, ::2] for f in inputs["flows"]]
+                if self.get_valid_mask:
+                    inputs["valids"] = [v[::2, ::2] for v in inputs["valids"]]
+                if self.get_backward:
+                    inputs["flows_b"] = [f[::2, ::2] for f in inputs["flows_b"]]
+                    if self.get_valid_mask:
+                        inputs["valids_b"] = [v[::2, ::2] for v in inputs["valids_b"]]
             if self.transform is not None:
                 inputs = self.transform(inputs)
         elif self.is_image_4k:
@@ -1934,7 +1976,8 @@ class SpringDataset(BaseFlowDataset):
                     max_diff = F.interpolate(
                         max_diff[:, None], scale_factor=2, mode="nearest"
                     )
-                    inputs[valid_key] = (max_diff < 1.0).float()
+                    if self.get_valid_mask:
+                        inputs[valid_key] = (max_diff < 1.0).float()
         else:
             if self.transform is not None:
                 inputs = self.transform(inputs)
@@ -1943,7 +1986,8 @@ class SpringDataset(BaseFlowDataset):
                 inputs["flows"] = rearrange(
                     inputs["flows"], "b c (h nh) (w nw) -> b (nh nw) c h w", nh=2, nw=2
                 )
-                inputs["valids"] = inputs["valids"][:, :, ::2, ::2]
+                if self.get_valid_mask:
+                    inputs["valids"] = inputs["valids"][:, :, ::2, ::2]
                 if self.get_backward:
                     inputs["flows_b"] = rearrange(
                         inputs["flows_b"],
@@ -1951,7 +1995,8 @@ class SpringDataset(BaseFlowDataset):
                         nh=2,
                         nw=2,
                     )
-                    inputs["valids_b"] = inputs["valids_b"][:, :, ::2, ::2]
+                    if self.get_valid_mask:
+                        inputs["valids_b"] = inputs["valids_b"][:, :, ::2, ::2]
 
         if self.get_meta:
             inputs["meta"] = {
@@ -1971,7 +2016,9 @@ class TartanAirDataset(BaseFlowDataset):
         self,
         root_dir: str,
         difficulties: Union[str, List[str]] = "easy",
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
         get_occlusion_mask: bool = True,
@@ -1984,9 +2031,7 @@ class TartanAirDataset(BaseFlowDataset):
         Parameters
         ----------
         root_dir : str
-            path to the root directory of the MPI Sintel dataset.
-        split : str, default 'train'
-            Which split of the dataset should be loaded. It can be one of {'train', 'val', 'trainval', 'test'}.
+            path to the root directory of the TartanAir dataset.
         difficulties : Union[str, List[str]], default 'easy'
             Which difficulties should be loaded. It can be one of {'easy', 'hard', ['easy', 'hard']}.
         transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
@@ -2005,7 +2050,7 @@ class TartanAirDataset(BaseFlowDataset):
             temporal information.
         sequence_position : str, default "first"
             Only used when sequence_length > 2.
-            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            Determines the position where the main image frame will be in the sequence. It can be one of four values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
             - "last": the main frame will be the penultimate in the sequence,
@@ -2106,7 +2151,9 @@ class MiddleburyDataset(BaseFlowDataset):
         self,
         root_dir: str,
         split: str = "train",
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
         get_meta: bool = True,
@@ -2119,8 +2166,6 @@ class MiddleburyDataset(BaseFlowDataset):
             path to the root directory of the Middlebury dataset.
         split : str, default 'train'
             Which split of the dataset should be loaded. It can be one of {'train', 'val', 'trainval', 'test'}.
-        pass_names : Union[str, List[str]], default 'clean'
-            Which passes should be loaded. It can be one of {'clean', 'final', ['clean', 'final']}.
         transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
             Transform to be applied on the inputs.
         max_flow : float, default 10000.0
@@ -2128,8 +2173,6 @@ class MiddleburyDataset(BaseFlowDataset):
             as zero in the valid mask.
         get_valid_mask : bool, default True
             Whether to get or generate valid masks.
-        get_occlusion_mask : bool, default True
-            Whether to get occlusion masks.
         get_meta : bool, default True
             Whether to get metadata.
         """
@@ -2203,7 +2246,9 @@ class MiddleburySTDataset(BaseFlowDataset):
     def __init__(  # noqa: C901
         self,
         root_dir: str,
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
         get_meta: bool = True,
@@ -2276,7 +2321,9 @@ class MonkaaDataset(BaseFlowDataset):
         pass_names: Union[str, List[str]] = "clean",
         side_names: Union[str, List[str]] = "left",
         add_reverse: bool = True,
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 1000.0,
         get_valid_mask: bool = True,
         get_backward: bool = True,
@@ -2298,13 +2345,13 @@ class MonkaaDataset(BaseFlowDataset):
             If True, double the number of samples by appending the backward samples as additional samples.
         transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
             Transform to be applied on the inputs.
-        max_flow : float, default 10000.0
+        max_flow : float, default 1000.0
             Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
             as zero in the valid mask.
         get_valid_mask : bool, default True
             Whether to get or generate valid masks.
         get_backward : bool, default True
-            Whether to get the occluded version of the inputs.
+            Whether to also get the backward version of the inputs.
         get_meta : bool, default True
             Whether to get metadata.
         sequence_length : int, default 2
@@ -2312,7 +2359,7 @@ class MonkaaDataset(BaseFlowDataset):
             temporal information.
         sequence_position : str, default "first"
             Only used when sequence_length > 2.
-            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            Determines the position where the main image frame will be in the sequence. It can be one of four values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
             - "last": the main frame will be the penultimate in the sequence,
@@ -2327,7 +2374,6 @@ class MonkaaDataset(BaseFlowDataset):
             get_occlusion_mask=False,
             get_motion_boundary_mask=False,
             get_backward=get_backward,
-            get_semantic_segmentation_labels=False,
             get_meta=get_meta,
         )
         self.root_dir = root_dir
@@ -2450,7 +2496,9 @@ class KubricDataset(BaseFlowDataset):
     def __init__(  # noqa: C901
         self,
         root_dir: str,
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
         get_backward: bool = True,
@@ -2473,7 +2521,7 @@ class KubricDataset(BaseFlowDataset):
         get_valid_mask : bool, default True
             Whether to get or generate valid masks.
         get_backward : bool, default True
-            Whether to get the occluded version of the inputs.
+            Whether to also get the backward version of the inputs.
         get_meta : bool, default True
             Whether to get metadata.
         sequence_length : int, default 2
@@ -2481,14 +2529,14 @@ class KubricDataset(BaseFlowDataset):
             temporal information.
         sequence_position : str, default "first"
             Only used when sequence_length > 2.
-            Determines the position where the main image frame will be in the sequence. It can one of three values:
+            Determines the position where the main image frame will be in the sequence. It can be one of four values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
             - "last": the main frame will be the penultimate in the sequence,
             - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         super().__init__(
-            dataset_name=f"Kubric",
+            dataset_name="Kubric",
             split_name="trainval",
             transform=transform,
             max_flow=max_flow,
@@ -2563,7 +2611,9 @@ class ViperDataset(BaseFlowDataset):
         self,
         root_dir: str,
         split: str = "train",
-        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        transform: Optional[
+            Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]
+        ] = None,
         max_flow: float = 10000.0,
         get_valid_mask: bool = True,
         get_meta: bool = True,
@@ -2573,7 +2623,7 @@ class ViperDataset(BaseFlowDataset):
         Parameters
         ----------
         root_dir : str
-            path to the root directory of the Middlebury dataset.
+            path to the root directory of the VIPER dataset.
         split : str, default 'train'
             Which split of the dataset should be loaded. It can be one of {'train', 'val', 'trainval'}.
         transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
@@ -2581,8 +2631,6 @@ class ViperDataset(BaseFlowDataset):
         max_flow : float, default 10000.0
             Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
             as zero in the valid mask.
-        img_extension : str
-            Extension of the image file. It can be one of {'jpg', 'png'}.
         get_valid_mask : bool, default True
             Whether to get or generate valid masks.
         get_meta : bool, default True

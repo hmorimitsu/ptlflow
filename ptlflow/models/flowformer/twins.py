@@ -128,7 +128,6 @@ class GroupAttnRPEContext(nn.Module):
         x_qk = F.pad(x_qk, (0, 0, pad_l, pad_r, pad_t, pad_b))
         _, Hp, Wp, _ = x.shape
         _h, _w = Hp // self.ws, Wp // self.ws
-        padded_N = Hp * Wp
 
         coords = coords_grid(B, Hp, Wp, dtype=x.dtype, device=x.device)
         coords = coords.view(B, 2, -1).permute(0, 2, 1)
@@ -247,7 +246,6 @@ class GroupAttnRPE(nn.Module):
         x = F.pad(x, (0, 0, pad_l, pad_r, pad_t, pad_b))
         _, Hp, Wp, _ = x.shape
         _h, _w = Hp // self.ws, Wp // self.ws
-        padded_N = Hp * Wp
 
         coords = coords_grid(B, Hp, Wp, dtype=x.dtype, device=x.device)
         coords = coords.view(B, 2, -1).permute(0, 2, 1)

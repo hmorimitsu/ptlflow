@@ -41,12 +41,12 @@ You can also benchmark all available models with:
 
     python model_benchmark.py --all
 
-IMPORTANT: when benchmarking multiple models with ``--select`` or ``--all``, it is not possible to provide model-specific argument directly from the command line!
+IMPORTANT: when benchmarking multiple models with ``--select`` or ``--all``, it is not possible to provide model-specific arguments directly from the command line!
 
 Reported metrics
 ================
 
-This script report the following metrics:
+This script reports the following metrics:
 
 - Number of model parameters
 - FLOPs

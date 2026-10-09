@@ -205,7 +205,6 @@ def photo_loss_fn(image1, warped_image, mask_level0):
 
 
 def cal_unsup_loss(image1, image2, flow_forward, flow_backward, gamma):
-    max_flow = MAX_FLOW
     n_predictions = len(flow_forward)
     flow_loss = 0.0
 
@@ -238,7 +237,7 @@ def sequence_loss(flow_preds, flow_gt, valid, cfg):
     flow_loss = 0.0
     flow_gt_thresholds = [5, 10, 20]
 
-    # exlude invalid pixels and extremely large diplacements
+    # exclude invalid pixels and extremely large displacements
     mag = torch.sum(flow_gt**2, dim=1).sqrt()
     valid = (valid >= 0.5) & (mag < max_flow)
 

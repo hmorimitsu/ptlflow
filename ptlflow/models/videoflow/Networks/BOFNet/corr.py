@@ -7,7 +7,7 @@ from ...utils import bilinear_sampler
 
 try:
     import alt_cuda_corr
-except:
+except ImportError:
     # alt_cuda_corr is not compiled
     pass
 
@@ -191,7 +191,6 @@ class AlternateCorrBlock:
 
         corr_list = []
         for i in range(self.num_levels):
-            r = self.radius
             fmap1_i = self.pyramid[0][0].permute(0, 2, 3, 1).contiguous()
             fmap2_i = self.pyramid[i][1].permute(0, 2, 3, 1).contiguous()
 

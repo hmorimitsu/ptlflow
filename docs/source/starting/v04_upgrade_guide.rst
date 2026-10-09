@@ -92,7 +92,7 @@ Please see the example in :ref:`new-model` or check the code of some existing mo
 Change of ckpt cache dir
 ========================
 
-To comply with the standard checkpoint functions from Lightning, the directory where downloaded ckpp files are stored have changed from
+To comply with the standard checkpoint functions from Lightning, the directory where downloaded ckpt files are stored has changed from
 ``${TORCH_HUB_CACHE_DIR}/ptlflow/checkpoints/`` to ``${TORCH_HUB_CACHE_DIR}/checkpoints/``.
 Therefore, if you have downloaded multiple ckpt files using PTLFlow v0.3 or earlier, you should move them to the new folder to avoid duplicates.
 In Linux, the default ``${TORCH_HUB_CACHE_DIR}`` is ``/home/${USER}/.cache/torch/hub/``.

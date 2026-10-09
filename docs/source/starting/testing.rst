@@ -12,7 +12,7 @@ predictions for the test split of some benchmarks. Read :ref:`initial-scripts` t
     At the moment, ``test.py`` only supports MPI-Sintel, KITTI 2012, and KITTI 2015 datasets by default.
     More datasets will be added in the future.
 
-Note, however, that ``test.py`` just generate optical flow files following the folder and naming structures
+Note, however, that ``test.py`` just generates optical flow files following the folder and naming structures
 according to each benchmark. Usually, an additional step is necessary before submitting the results to the
 respective websites. For example, MPI-Sintel provides a `bundler <http://sintel.is.tue.mpg.de/downloads>`__
 to be used to package your results, while KITTI requires a ZIP file.
@@ -31,7 +31,7 @@ Once you have downloaded the script, you can generate the test predictions as fo
 This is just an example using the ``raft_small`` model loaded with the weights pretrained on the FlyingThings3D dataset,
 but you should use your own model when making a submission. In this example, we are generating predictions
 for the KITTI 2015 dataset. If you want to use
-different datasets, then adapt the ``--test_dataset`` arguments accordingly.
+different datasets, then adapt the ``--data.test_dataset`` arguments accordingly.
 
 Visualizing the outputs during prediction
 =========================================

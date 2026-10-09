@@ -93,7 +93,7 @@ class PatchEmbed(nn.Module):
         return x, out_size
 
 
-from .twins import Block, CrossBlock
+from .twins import Block
 
 
 class GroupVerticalSelfAttentionLayer(nn.Module):

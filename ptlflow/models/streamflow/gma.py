@@ -1,7 +1,6 @@
 import torch
 from torch import nn, einsum
 from einops import rearrange
-import math
 
 
 class RelPosEmb(nn.Module):
@@ -47,7 +46,7 @@ class Attention(nn.Module):
         # self.pos_emb = RelPosEmb(max_pos_size, dim_head)
 
     def forward(self, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, _b, _c, _h, _w = self.heads, *fmap.shape
 
         q, k = self.to_qk(fmap).chunk(2, dim=1)
 
@@ -83,7 +82,7 @@ class Aggregate(nn.Module):
             self.project = None
 
     def forward(self, attn, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, _b, _c, h, w = self.heads, *fmap.shape
 
         v = self.to_v(fmap)
         v = rearrange(v, "b (h d) x y -> b h (x y) d", h=heads)
@@ -119,7 +118,7 @@ class TemporalAggregate(nn.Module):
         self.temporal_project = nn.Conv2d(inner_dim, dim, 1, bias=False)
 
     def forward(self, temporal_attn, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, _b, _c, h, w = self.heads, *fmap.shape
 
         v = self.to_v(fmap)
         v = rearrange(v, "b (h d) x y -> b h (x y) d", h=heads)
@@ -161,7 +160,7 @@ class SpatioTemporalAggregate(nn.Module):
             self.temporal_project = nn.Conv2d(inner_dim, dim, 1, bias=False)
 
     def forward(self, attn, temporal_attn, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, _b, _c, h, w = self.heads, *fmap.shape
 
         v = self.to_v(fmap)
         v = rearrange(v, "b (h d) x y -> b h (x y) d", h=heads)
@@ -233,9 +232,8 @@ class SpatioTemporalAggregate2(nn.Module):
             self.project = None
 
     def forward(self, attn, temporal_attn, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, b, _c, h, w = self.heads, *fmap.shape
         T = self.args.T - 1
-        B = b // T
 
         v = self.to_v(fmap)
         v = rearrange(v, "(B T) C H W -> B C H (T W)", T=T, W=w)
@@ -272,7 +270,7 @@ class TMMAggregate(nn.Module):
         self.temporal_gamma = nn.Parameter(torch.zeros(1))
 
     def forward(self, attn, temporal_attn, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, b, _c, h, w = self.heads, *fmap.shape
 
         v = self.to_v(fmap)
         v = rearrange(v, "b (h d) x y -> b h (x y) d", h=heads)

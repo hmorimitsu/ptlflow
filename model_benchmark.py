@@ -21,7 +21,7 @@ import os
 from pathlib import Path
 import sys
 import time
-from typing import Optional, Tuple, Union
+from typing import Any, Optional, Tuple, Union
 
 from loguru import logger
 import numpy as np
@@ -189,7 +189,7 @@ def _init_parser() -> ArgumentParser:
     return parser
 
 
-def benchmark(args: Namespace, device_handle) -> pd.DataFrame:
+def benchmark(args: Namespace, device_handle: Optional[Any]) -> pd.DataFrame:
     """Run the benchmark on all models.
 
     Parameters
@@ -229,7 +229,7 @@ def benchmark(args: Namespace, device_handle) -> pd.DataFrame:
     model_args = args
     available_model_names = ptlflow.get_model_names()
     if args.all:
-        model_names = ptlflow._models_dict.keys()
+        model_names = available_model_names
         model_args = None
     elif args.select is not None and len(args.select) > 0:
         for name in args.select:
@@ -323,10 +323,10 @@ def benchmark(args: Namespace, device_handle) -> pd.DataFrame:
                     all_times.sort()
                     final_times = {
                         "avg": np.array(all_times).mean(),
-                        "median": all_times[len(all_times) // 2],
-                        "perc1": all_times[len(all_times) // 100],
-                        "perc5": all_times[len(all_times) // 20],
-                        "perc10": all_times[len(all_times) // 10],
+                        "median": np.percentile(all_times, 50),
+                        "perc1": np.percentile(all_times, 1),
+                        "perc5": np.percentile(all_times, 5),
+                        "perc10": np.percentile(all_times, 10),
                     }
 
                     if len(all_memories) == 0:
@@ -334,10 +334,10 @@ def benchmark(args: Namespace, device_handle) -> pd.DataFrame:
                     all_memories.sort()
                     final_memories = {
                         "avg": np.array(all_memories).mean(),
-                        "median": all_memories[len(all_memories) // 2],
-                        "perc1": all_memories[len(all_memories) // 100],
-                        "perc5": all_memories[len(all_memories) // 20],
-                        "perc10": all_memories[len(all_memories) // 10],
+                        "median": np.percentile(all_memories, 50),
+                        "perc1": np.percentile(all_memories, 1),
+                        "perc5": np.percentile(all_memories, 5),
+                        "perc10": np.percentile(all_memories, 10),
                         "first": first_memory_used,
                     }
 
@@ -424,8 +424,8 @@ def estimate_inference_time(
     model: BaseModel,
     input_size: Tuple[int, int],
     dtype_str: str,
-) -> float:
-    """Compute the average forward time for one model.
+) -> list:
+    """Compute the time of each inference run for one model.
 
     Parameters
     ----------
@@ -436,8 +436,8 @@ def estimate_inference_time(
 
     Returns
     -------
-    float
-        The average time of the runs.
+    list
+        The time of each measured run.
     """
     timer = Timer("inference")
     time_vals = []
@@ -547,7 +547,7 @@ def _show_v04_warning():
             return
 
     logger.warning(
-        "Since v0.4, it is now necessary to inform the model using the --model argument. For example, use: python infer.py --model raft --ckpt_path things"
+        "Since v0.4, it is now necessary to inform the model using the --model argument. For example, use: python model_benchmark.py --model raft"
     )
 
 
@@ -561,7 +561,7 @@ if __name__ == "__main__":
         config_file_idx = sys.argv.index("--config") + 1
         with open(sys.argv[config_file_idx], "r") as f:
             config = yaml.safe_load(f)
-        if config["all"] or config["select"] is not None:
+        if config.get("all") or config.get("select") is not None:
             is_benchmark_list = True
 
     if "--all" in sys.argv or "--select" in sys.argv:

@@ -5,11 +5,11 @@ import math
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model
+from ptlflow.utils.registry import register_model, trainable
 from .depth_anything_v2.dpt import DepthAnythingV2
 from .update import BasicUpdateBlock
 from .corr import CorrBlock
-from .utils import coords_grid, InputPadder
+from .utils import coords_grid
 from .extractor import ResNetFPN
 from .layer import conv3x3
 from ..base_model.base_model import BaseModel
@@ -30,7 +30,7 @@ class SequenceLoss(nn.Module):
         n_predictions = len(flow_preds)
 
         flow_loss = 0.0
-        # exlude invalid pixels and extremely large diplacements
+        # exclude invalid pixels and extremely large displacements
         mag = torch.sum(flow_gt**2, dim=1, keepdim=True).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
         for i in range(n_predictions):
@@ -229,13 +229,6 @@ class FlowSeek(BaseModel):
         M = torch.cat([Tx, Ty, Tz, R1x, R2x, R1y, R2y, Rz], dim=1)  # Bx(8x2)xHxW
         return M
 
-    def initialize_flow(self, img):
-        """Flow is represented as difference between two coordinate grids flow = coords2 - coords1"""
-        N, C, H, W = img.shape
-        coords1 = coords_grid(N, H // 8, W // 8, device=img.device, dtype=img.dtype)
-        coords2 = coords_grid(N, H // 8, W // 8, device=img.device, dtype=img.dtype)
-        return coords1, coords2
-
     def upsample_data(self, flow, info, mask):
         """Upsample [H/8, W/8, C] -> [H, W, C] using convex combination"""
         N, C, H, W = info.shape
@@ -378,7 +371,7 @@ class FlowSeek(BaseModel):
             info_predictions.append(info_up)
 
         if self.training:
-            # exlude invalid pixels and extremely large diplacements
+            # exclude invalid pixels and extremely large displacements
             nf_predictions = []
             for i in range(len(info_predictions)):
                 if not self.use_var:
@@ -452,10 +445,12 @@ class FlowSeekM(FlowSeek):
 
 
 @register_model
+@trainable
 class flowseek_t(FlowSeekT):
     pass
 
 
 @register_model
+@trainable
 class flowseek_m(FlowSeekM):
     pass

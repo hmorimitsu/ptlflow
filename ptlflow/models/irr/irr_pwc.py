@@ -117,8 +117,6 @@ class IRRPWC(BaseModel):
         x2_pyramid = self.feature_pyramid_extractor(x2_raw) + [x2_raw]
 
         # outputs
-        output_dict = {}
-        output_dict_eval = {}
         flows = []
         occs = []
 

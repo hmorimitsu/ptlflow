@@ -115,7 +115,7 @@ class FeatureHooks:
             x = x[0]  # unwrap input tuple
         self._feature_outputs[x.device][hook_id] = x
 
-    def get_output(self, device) -> Dict[str, torch.tensor]:
+    def get_output(self, device) -> Dict[str, torch.Tensor]:
         output = self._feature_outputs[device]
         self._feature_outputs[device] = OrderedDict()  # clear after reading
         return output

@@ -14,7 +14,7 @@ from .memory_util import *
 
 try:
     from flash_attn import flash_attn_func
-except:
+except ImportError:
     pass
 
 

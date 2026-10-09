@@ -2,7 +2,7 @@
 
 This script only evaluates results of models that provide the "things" pretrained models.
 
-Tha parsing of this script is tightly connected to how the results are output by validate.py.
+The parsing of this script is tightly connected to how the results are output by validate.py.
 """
 
 # =============================================================================

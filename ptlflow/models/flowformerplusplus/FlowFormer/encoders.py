@@ -47,7 +47,6 @@ class twins_svt_large(nn.Module):
         return x, x_16
 
     def extract_ml_features(self, x, data=None, layer=2):
-        res = []
         B = x.shape[0]
         for i, (embed, drop, blocks, pos_blk) in enumerate(
             zip(

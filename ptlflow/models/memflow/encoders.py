@@ -36,15 +36,12 @@ class twins_svt_large(nn.Module):
             if i < len(self.svt.depths) - 1:
                 x = x.reshape(B, *size, -1).permute(0, 3, 1, 2).contiguous()
 
-            if i == 0:
-                x_16 = x.clone()
             if i == layer - 1:
                 break
 
         return x
 
     def extract_ml_features(self, x, data=None, layer=2):
-        res = []
         B = x.shape[0]
         for i, (embed, drop, blocks, pos_blk) in enumerate(
             zip(

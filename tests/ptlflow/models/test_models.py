@@ -122,7 +122,7 @@ def test_forward_fp16() -> None:
 
             if mname in MODEL_ARGS:
                 for name, val in MODEL_ARGS[mname].items():
-                    setattr(args, name, val)
+                    setattr(args.model, name, val)
 
             model = ptlflow.get_model(mname, args=args)
             model = model.eval()

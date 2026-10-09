@@ -102,7 +102,7 @@ class CNNEncoder(torch.nn.Module):
         )
 
     def forward(self, img):
-        b = img.shape[0]
+        img.shape[0]
 
         # x = self.relu(self.norm0(self.conv0(x)))
 

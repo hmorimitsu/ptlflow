@@ -1,4 +1,4 @@
-"""Validate optical flow estimation performance on standard datasets."""
+"""Convert a RapidFlow model to the ONNX format."""
 
 # =============================================================================
 # Copyright 2024 Henrique Morimitsu

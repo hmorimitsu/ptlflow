@@ -400,7 +400,6 @@ class CostPerceiverEncoder(nn.Module):
     def random_masking(self, x, mask_ratio, mask=None):
         B, _, H, W = x.shape
 
-        pad_l = pad_t = 0
         pad_r = (self.patch_size - W % self.patch_size) % self.patch_size
         pad_b = (self.patch_size - H % self.patch_size) % self.patch_size
         H = H + pad_b
@@ -710,7 +709,6 @@ class MemoryEncoder(nn.Module):
         feat_t_16 = None
 
         B, C, H, W = feat_s.shape
-        size = (H, W)
 
         if self.use_convertor:
             feat_s = self.channel_convertor(feat_s)

@@ -98,9 +98,6 @@ class SKMotionEncoder6_Deep_nopool_res(nn.Module):
             # print("later iterations")
             motion_hidden_state = motion_hidden_state.reshape(bs, N, -1, H, W)
 
-        forward_loc = forward_flow + coords0
-        backward_loc = backward_flow + coords0
-
         forward_motion_hidden_state = torch.cat(
             [
                 motion_hidden_state[:, 1:, ...],
@@ -194,6 +191,6 @@ class SKUpdateBlock6_Deep_nopoolres_AllDecoder2(nn.Module):
 
         delta_flow = self.flow_head(net)
 
-        # scale mask to balence gradients
+        # scale mask to balance gradients
         mask = 100.0 * self.mask(net)
         return net, motion_hidden_state, mask, delta_flow

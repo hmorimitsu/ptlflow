@@ -48,10 +48,10 @@ class IOAdapter(object):
             An integer representing the ratio (input_size / smallest_feature_size).
         input_size : Tuple[int, int]
             The shape of the original inputs, must be a tuple with at least two elements. It is assumed that the last two
-            elements are (height, with).
+            elements are (height, width).
         target_size : Optional[Tuple[int, int]], optional
-            If provided, the inputs will be resized to target_size. target_size is defined as a tuple (height, with).
-        target_scale_factor : Optional[float], default 1.0
+            If provided, the inputs will be resized to target_size. target_size is defined as a tuple (height, width).
+        target_scale_factor : Optional[float], optional
             This value is only used if size is None. The multiplier that will be applied to the original shape to scale
             the input.
         interpolation_mode : str, default 'bilinear'
@@ -59,8 +59,10 @@ class IOAdapter(object):
             torch.nn.functional.interpolate function.
         interpolation_align_corners : bool, default False
             Whether the interpolation keep the corners aligned. As defined in torch.nn.functional.interpolate.
-        cuda : bool
+        cuda : bool, default False
             If True, the input tensors are transferred to GPU (if a GPU is available).
+        fp16 : bool, default False
+            If True, the input tensors are converted to half precision.
         """
         self.output_stride = output_stride
         self.target_size = target_size
@@ -104,7 +106,7 @@ class IOAdapter(object):
             One or more groundtruth optical flow, which can be used for validation. Typically it will be an array HWC.
         inputs : Optional[Dict[str, Any]]
             Dict containing input tensors or other metadata. Only the tensors will be transformed.
-        image_only : Optional[bool]
+        image_only : bool, default False
             If True, only applies scaling and padding to the images.
         kwargs : Union[np.ndarray, List[np.ndarray]]
             Any other array inputs can be provided as keyworded arguments. This function will create an entry in the input dict

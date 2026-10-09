@@ -19,7 +19,7 @@ class Attention(nn.Module):
         self.to_qk = nn.Conv2d(dim, inner_dim * 2, 1, bias=False)
 
     def forward(self, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, _b, _c, _h, _w = self.heads, *fmap.shape
 
         q, k = self.to_qk(fmap).chunk(2, dim=1)
 
@@ -56,7 +56,7 @@ class Aggregate(nn.Module):
             self.project = None
 
     def forward(self, attn, fmap):
-        heads, b, c, h, w = self.heads, *fmap.shape
+        heads, _b, _c, h, w = self.heads, *fmap.shape
 
         v = self.to_v(fmap)
         v = rearrange(v, "b (h d) x y -> b h (x y) d", h=heads)

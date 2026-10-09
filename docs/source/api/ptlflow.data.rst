@@ -1,6 +1,6 @@
-===========
-ptflow.data
-===========
+============
+ptlflow.data
+============
 
 .. toctree::
     :maxdepth: 1

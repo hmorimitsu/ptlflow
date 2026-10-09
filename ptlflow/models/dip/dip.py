@@ -27,7 +27,7 @@ class SequenceLoss(nn.Module):
         n_predictions = len(flow_preds)
         flow_loss = 0.0
 
-        # exlude invalid pixels and extremely large diplacements
+        # exclude invalid pixels and extremely large displacements
         mag = torch.sum(flow_gt**2, dim=1, keepdim=True).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
 
@@ -124,7 +124,6 @@ class DIP(BaseModel):
         for i in range(max_layers - 1):
             if (curr_fmap1.shape[2] < min_width) and (curr_fmap1.shape[3] < min_width):
                 break
-            down_scale = 2 ** (i + 1)
             curr_fmap1 = F.avg_pool2d(curr_fmap1, 2, stride=2)
             curr_fmap2 = F.avg_pool2d(curr_fmap2, 2, stride=2)
             curr_cnet = F.avg_pool2d(curr_cnet, 2, stride=2)
@@ -174,7 +173,7 @@ class DIP(BaseModel):
             s_flow = scale * F.interpolate(
                 init_flow, size=new_size, mode="bilinear", align_corners=True
             )
-            initail_flow_max = 2 ** (auto_layer + 1) * 1.0
+            2 ** (auto_layer + 1) * 1.0
             noise = self.random_init_flow(
                 s_fmap1, max_offset=16, test_mode=(not self.training)
             )

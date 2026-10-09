@@ -193,8 +193,8 @@ class FlowFormerPlusPlus(BaseModel):
     def forward(self, inputs, mask=None, output=None):
         """Estimate optical flow between pair of frames"""
         if self.pretrain_mode:
-            image1 = (image1 + 1) * 127.5
-            image2 = (image2 + 1) * 127.5
+            image1 = (inputs["images"][:, 0] + 1) * 127.5
+            image2 = (inputs["images"][:, 1] + 1) * 127.5
             loss = self.pretrain_forward(image1, image2, mask=mask, output=output)
             return loss
 

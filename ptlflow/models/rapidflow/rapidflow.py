@@ -36,7 +36,7 @@ from .next1d import NeXt1DStage
 
 try:
     import alt_cuda_corr
-except:
+except ImportError:
     alt_cuda_corr = None
 
 
@@ -56,7 +56,7 @@ class SequenceLoss(nn.Module):
         n_predictions = len(flow_preds)
         flow_loss = 0.0
 
-        # exlude invalid pixels and extremely large diplacements
+        # exclude invalid pixels and extremely large displacements
         mag = torch.sum(flow_gt**2, dim=1, keepdim=True).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
 
@@ -134,7 +134,6 @@ class RAPIDFlow(BaseModel):
             assert (log_res) - int(
                 log_res
             ) < 1e-3, f"--pyramid_ranges values must be powers of 2, but found {v}"
-        num_recurrent_layers = int(math.log2(max(self.pyramid_ranges))) - 1
 
         self.pyramid_levels = [
             num_recurrent_layers + 1 - int(math.log2(v)) for v in self.pyramid_ranges
@@ -359,7 +358,7 @@ class RAPIDFlow(BaseModel):
                             mask = mask.view(N, 1, 9, pred_stride, pred_stride, H, W)
                             mask = torch.softmax(mask, dim=2)
 
-                            up_flow = F.unfold(flow, [3, 3], padding=1)
+                            up_flow = F.unfold(out_flow, [3, 3], padding=1)
                             up_flow = up_flow.view(N, 2, 9, 1, 1, H, W)
 
                             up_flow = torch.sum(mask * up_flow, dim=2)
@@ -388,7 +387,7 @@ class RAPIDFlow(BaseModel):
                             mask = mask.view(N, 1, 9, pred_stride, pred_stride, H, W)
                             mask = torch.softmax(mask, dim=2)
 
-                            up_flow = F.unfold(flow, [3, 3], padding=1)
+                            up_flow = F.unfold(out_flow, [3, 3], padding=1)
                             up_flow = up_flow.view(N, 2, 9, 1, 1, H, W)
 
                             up_flow = torch.sum(mask * up_flow, dim=2)

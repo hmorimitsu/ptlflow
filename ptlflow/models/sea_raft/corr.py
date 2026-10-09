@@ -4,7 +4,7 @@ from .utils import bilinear_sampler
 
 try:
     import alt_cuda_corr
-except:
+except ImportError:
     alt_cuda_corr = None
 from ptlflow.utils.correlation import IterativeCorrBlock
 
@@ -43,7 +43,6 @@ def coords_corr(corr, idx, b, x, y):
     x = torch.clamp(x, 0, W - 1).long()
     y = torch.clamp(y, 0, H - 1).long()
     res = corr[b, idx[:, 2], idx[:, 1], y, x] * mask.to(dtype=corr.dtype)
-    print(mask.requires_grad, x.requires_grad, y.requires_grad, res.requires_grad)
     return res
 
 
@@ -53,12 +52,11 @@ def bilinear_sampling_corr(corr, idx1, idx2):
     # reshape idx: [M * n_points, (bhw)]
     idx1 = idx1.unsqueeze(1).repeat(1, n_points, 1).view(-1, 3)
     idx2 = idx2.view(-1, 3)
-    device = corr.device
     offset = idx2 - idx2.floor()
     dx, dy = offset[:, 1], offset[:, 2]
     b = idx2[:, 0].long()
     x0, y0 = idx2[:, 1].floor(), idx2[:, 2].floor()
-    x1, y1 = x0 + 1, y0 + 1
+    _x1, _y1 = x0 + 1, y0 + 1
     f00 = (1 - dy) * (1 - dx) * coords_corr(corr, idx1, b, x0, y0)
     # f01 = (1 - dy) * dx * coords_corr(corr, idx1, b, x0, y1)
     # f10 = dy * (1 - dx) * coords_corr(corr, idx1, b, x1, y0)

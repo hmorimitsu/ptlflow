@@ -17,6 +17,7 @@
 from pathlib import Path
 import shutil
 
+import pytest
 import torch
 
 from ptlflow.data.datasets import (
@@ -28,7 +29,6 @@ from ptlflow.data.datasets import (
     Hd1kDataset,
     KittiDataset,
     KubricDataset,
-    MiddleburyDataset,
     MiddleburySTDataset,
     MonkaaDataset,
     SintelDataset,
@@ -62,6 +62,66 @@ def test_autoflow(tmp_path: Path) -> None:
             assert isinstance(inputs[k], torch.Tensor)
             assert len(inputs[k].shape) == 4
             assert min(inputs[k].shape) > 0
+
+    shutil.rmtree(tmp_path)
+
+
+def test_autoflow_invalid_split(tmp_path: Path) -> None:
+    dummy_datasets.write_autoflow(tmp_path)
+
+    with pytest.raises(ValueError):
+        AutoFlowDataset(root_dir=tmp_path / "autoflow", split="invalid")
+
+    shutil.rmtree(tmp_path)
+
+
+def test_autoflow_is_val_metadata(tmp_path: Path) -> None:
+    dummy_datasets.write_autoflow(tmp_path)
+
+    # Rename one sample to a name that is part of the validation split
+    part_dir = tmp_path / "autoflow" / "static_40k_png_1_of_4"
+    (part_dir / "table_0_batch_0").rename(part_dir / "table_0_batch_1")
+
+    dataset = AutoFlowDataset(
+        root_dir=tmp_path / "autoflow",
+        split="trainval",
+        transform=ToTensor(),
+        get_meta=True,
+    )
+
+    assert dataset[0]["meta"]["is_val"] is True
+    assert dataset[1]["meta"]["is_val"] is False
+
+    shutil.rmtree(tmp_path)
+
+
+def test_chairs_is_val_metadata(tmp_path: Path) -> None:
+    dummy_datasets.write_flying_chairs(tmp_path)
+
+    data_dir = tmp_path / "FlyingChairs_release" / "data"
+    suffixes = ["img1.ppm", "img2.ppm", "flow.flo"]
+
+    # 00006 is a validation sample in FlyingChairs_val.txt
+    for suffix in suffixes:
+        (data_dir / f"00001_{suffix}").rename(data_dir / f"00006_{suffix}")
+    dataset = FlyingChairsDataset(
+        root_dir=tmp_path / "FlyingChairs_release",
+        split="trainval",
+        transform=ToTensor(),
+        get_meta=True,
+    )
+    assert dataset[0]["meta"]["is_val"] is True
+
+    # 00002 is not a validation sample in FlyingChairs_val.txt
+    for suffix in suffixes:
+        (data_dir / f"00006_{suffix}").rename(data_dir / f"00002_{suffix}")
+    dataset = FlyingChairsDataset(
+        root_dir=tmp_path / "FlyingChairs_release",
+        split="trainval",
+        transform=ToTensor(),
+        get_meta=True,
+    )
+    assert dataset[0]["meta"]["is_val"] is False
 
     shutil.rmtree(tmp_path)
 
@@ -243,6 +303,32 @@ def test_middlebury_st(tmp_path: Path) -> None:
         "flows",
         "valids",
     ]
+    for k in keys:
+        assert inputs.get(k) is not None
+        assert isinstance(inputs[k], torch.Tensor)
+        assert len(inputs[k].shape) == 4
+        assert min(inputs[k].shape) > 0
+
+    shutil.rmtree(tmp_path)
+
+
+def test_monkaa(tmp_path: Path) -> None:
+    dummy_datasets.write_monkaa(tmp_path)
+
+    dataset = MonkaaDataset(
+        root_dir=tmp_path / "monkaa",
+        transform=ToTensor(),
+        add_reverse=True,
+        get_backward=True,
+        get_valid_mask=True,
+        get_meta=True,
+    )
+
+    inputs = dataset[0]
+
+    assert inputs.get("meta") is not None
+
+    keys = ["images", "flows", "valids", "flows_b", "valids_b"]
     for k in keys:
         assert inputs.get(k) is not None
         assert isinstance(inputs[k], torch.Tensor)

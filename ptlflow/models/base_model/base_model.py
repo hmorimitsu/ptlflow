@@ -262,7 +262,7 @@ class BaseModel(pl.LightningModule):
             An instance of InputPadder or InputScaler that will be used to reverse the resizing done to the inputs.
             Typically, this will be the instance returned by self.preprocess_images().
         is_flow : bool
-            Indicates if prediction is an optical flow prediction of not.
+            Indicates if prediction is an optical flow prediction or not.
             Only used if image_resizer is an instance of InputScaler, in which case the flow values need to be scaled.
 
         Returns
@@ -308,7 +308,7 @@ class BaseModel(pl.LightningModule):
             - 'occs': optional, and only included if the network also predicts occlusion masks. It is a 5D tensor following the
               same structure as 'flows'.
 
-            - 'mbs': same as 'occs' but for occlusion masks.
+            - 'mbs': same as 'occs' but for motion boundary masks.
 
             - 'confs': same as 'occs' but for flow confidence predictions.
 
@@ -338,8 +338,8 @@ class BaseModel(pl.LightningModule):
 
             - 'loss': torch.Tensor, containing the loss value. Required by Pytorch Lightning for the optimization step.
 
-            - 'dataset_name': str, a string representing the name of the dataset from where this batch came from. Used only for
-              logging purposes.
+            - 'dataset_name': list[str], a list with the names of the datasets from where this batch came from. Used only
+              for logging purposes.
         """
         preds = self(batch)
         self.last_inputs = batch
@@ -432,14 +432,22 @@ class BaseModel(pl.LightningModule):
     def on_validation_epoch_end(self) -> None:
         for i in range(len(self.val_metrics)):
             metrics = self.val_metrics[i].compute()
+            if self.val_dataset_names[i] is None:
+                # No batch was seen for this dataloader, so the dataset
+                # name is unknown. Just reset the metrics and move on.
+                self.val_metrics[i].reset()
+                continue
             dset_name = self.val_dataset_names[i].lower()
+            # The dataset name may contain a split suffix (e.g. kitti_2015-val),
+            # which must be removed to look for the main metric of the dataset.
+            dset_key = dset_name.split("-")[0]
+            main_metric = (
+                DATASET_MAIN_METRIC[dset_key]
+                if dset_key in DATASET_MAIN_METRIC
+                else "epe"
+            )
+            main_metric = f"val/{main_metric}"
             for name, val in metrics.items():
-                main_metric = (
-                    DATASET_MAIN_METRIC[dset_name]
-                    if dset_name in DATASET_MAIN_METRIC
-                    else "epe"
-                )
-                main_metric = f"val/{main_metric}"
                 if name == main_metric:
                     self.log(dset_name, val, sync_dist=True, prog_bar=True)
 

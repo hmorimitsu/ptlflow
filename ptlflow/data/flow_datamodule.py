@@ -14,7 +14,7 @@
 # limitations under the License.
 # =============================================================================
 
-from typing import Optional
+from typing import List, Optional, Tuple, cast
 
 import lightning.pytorch as pl
 from loguru import logger
@@ -49,7 +49,7 @@ class FlowDataModule(pl.LightningDataModule):
         val_dataset: Optional[str] = None,
         train_batch_size: Optional[int] = None,
         train_num_workers: int = 4,
-        train_crop_size: tuple[int, int] = None,
+        train_crop_size: Optional[Tuple[int, int]] = None,
         train_transform_cuda: bool = False,
         train_transform_fp16: bool = False,
         autoflow_root_dir: Optional[str] = None,
@@ -119,12 +119,6 @@ class FlowDataModule(pl.LightningDataModule):
                 self.val_dataset is not None
             ), "You need to provide a value for --data.val_dataset"
 
-            if self.train_dataset is None:
-                self.train_dataset = "chairs-train"
-                logger.warning(
-                    "--data.train_dataset is not set. It will be set as {}",
-                    self.train_dataset,
-                )
             if self.train_batch_size is None:
                 self.train_batch_size = 8
                 logger.warning(
@@ -140,7 +134,7 @@ class FlowDataModule(pl.LightningDataModule):
             assert (
                 self.predict_dataset is not None
             ), "You need to provide a value for --data.predict_dataset"
-            self.parsed_predict_dataset_parsed = self._parse_dataset_selection(
+            self.predict_dataset_parsed = self._parse_dataset_selection(
                 self.predict_dataset
             )
         elif stage == "test":
@@ -154,9 +148,6 @@ class FlowDataModule(pl.LightningDataModule):
             ), "You need to provide a value for --data.val_dataset"
             self.val_dataset_parsed = self._parse_dataset_selection(self.val_dataset)
 
-    def predict_dataloader(self):
-        return super().predict_dataloader()
-
     def test_dataloader(self):
         dataset_ids = [self.test_dataset]
         if "sintel" in dataset_ids:
@@ -166,6 +157,7 @@ class FlowDataModule(pl.LightningDataModule):
             dataset_ids.append("spring-revonly")
 
         dataloaders = []
+        self.test_dataloader_names = []
         for dataset_id in dataset_ids:
             dataset_id += "-test"
             dataset_tokens = dataset_id.split("-")
@@ -213,7 +205,8 @@ class FlowDataModule(pl.LightningDataModule):
                 num_workers=self.train_num_workers,
                 pin_memory=train_pin_memory,
                 drop_last=False,
-                persistent_workers=self.train_transform_cuda,
+                persistent_workers=self.train_transform_cuda
+                and self.train_num_workers > 0,
             )
             self.train_dataloader_length = len(train_dataloader)
             return train_dataloader
@@ -254,7 +247,7 @@ class FlowDataModule(pl.LightningDataModule):
     def _parse_dataset_selection(
         self,
         dataset_selection: str,
-    ) -> list[tuple[str, int]]:
+    ) -> "List[Tuple[int, str, ...]]":
         """Parse the input string into the selected dataset and their multipliers and parameters.
 
         For example, 'chairs-train+3*sintel-clean-trainval+kitti-2012-train*5' will be parsed into
@@ -269,8 +262,8 @@ class FlowDataModule(pl.LightningDataModule):
 
         Returns
         -------
-        List[Tuple[str, int]]
-            The parsed choice of datasets and their number of repetitions.
+        List[Tuple[int, str, ...]]
+            The parsed choice of datasets. Each tuple contains the number of repetitions, the dataset name, and any extra dataset parameters.
 
         Raises
         ------
@@ -296,10 +289,10 @@ class FlowDataModule(pl.LightningDataModule):
                 datasets[i] = (mult,) + tuple(params.split("-"))
             else:
                 raise ValueError(
-                    "The specified dataset string {:} is invalid. Check the BaseModel.parse_dataset_selection() documentation "
+                    "The specified dataset string {:} is invalid. Check the FlowDataModule._parse_dataset_selection() documentation "
                     "to see how to write a valid selection string."
                 )
-        return datasets
+        return cast("List[Tuple[int, str, ...]]", datasets)
 
     def _get_model_output_stride(self):
         if hasattr(self, "trainer") and self.trainer is not None:
@@ -319,8 +312,11 @@ class FlowDataModule(pl.LightningDataModule):
         md = make_divisible
 
         fbocc_transform = False
+        split = "trainval"
         for v in args:
-            if v == "fbocc":
+            if v in ["train", "val", "trainval"]:
+                split = v
+            elif v == "fbocc":
                 fbocc_transform = True
             else:
                 raise ValueError(f"Invalid arg: {v}")
@@ -333,7 +329,7 @@ class FlowDataModule(pl.LightningDataModule):
                 )
                 self.train_crop_size = (cy, cx)
                 logger.warning(
-                    "--train_crop_size is not set. It will be set as ({}, {}}).", cy, cx
+                    "--train_crop_size is not set. It will be set as ({}, {}).", cy, cx
                 )
             else:
                 cy, cx = (
@@ -366,9 +362,6 @@ class FlowDataModule(pl.LightningDataModule):
         else:
             transform = ft.ToTensor()
 
-        split = "trainval"
-        if len(args) > 0 and args[0] in ["train", "val", "trainval"]:
-            split = args[0]
         dataset = AutoFlowDataset(
             self.autoflow_root_dir, split=split, transform=transform
         )
@@ -382,7 +375,7 @@ class FlowDataModule(pl.LightningDataModule):
         split = "trainval"
         for v in args:
             if v in ["train", "val", "trainval"]:
-                split = args[0]
+                split = v
             elif v == "fbocc":
                 fbocc_transform = True
             else:
@@ -522,7 +515,7 @@ class FlowDataModule(pl.LightningDataModule):
         fbocc_transform = False
         for v in args:
             if v in ["train", "val", "trainval", "test"]:
-                split = args[0]
+                split = v
             elif v.startswith("seqlen"):
                 sequence_length = int(v.split("_")[1])
             elif v.startswith("seqpos"):
@@ -606,7 +599,6 @@ class FlowDataModule(pl.LightningDataModule):
                     md(288, self._get_model_output_stride()),
                     md(960, self._get_model_output_stride()),
                 )
-                # cy, cx = (md(416, self._get_model_output_stride()), md(960, self._get_model_output_stride()))
                 self.train_crop_size = (cy, cx)
                 logger.warning(
                     "--train_crop_size is not set. It will be set as ({}, {}).", cy, cx
@@ -651,9 +643,9 @@ class FlowDataModule(pl.LightningDataModule):
 
     def _get_kubric_dataset(self, is_train: bool, *args: str) -> Dataset:
         if is_train:
-            raise NotImplementedError()
-        else:
-            transform = ft.ToTensor()
+            raise NotImplementedError("Kubric can only be used for validation")
+
+        transform = ft.ToTensor()
 
         get_backward = False
         sequence_length = 2
@@ -668,6 +660,8 @@ class FlowDataModule(pl.LightningDataModule):
                 sequence_position = v.split("_")[1]
             elif v.startswith("maxseq"):
                 max_seq = int(v.split("_")[1])
+            else:
+                raise ValueError(f"Invalid arg: {v}")
 
         dataset = KubricDataset(
             self.kubric_root_dir,
@@ -773,7 +767,6 @@ class FlowDataModule(pl.LightningDataModule):
                     md(368, self._get_model_output_stride()),
                     md(768, self._get_model_output_stride()),
                 )
-                # cy, cx = (md(416, self._get_model_output_stride()), md(960, self._get_model_output_stride()))
                 self.train_crop_size = (cy, cx)
                 logger.warning(
                     "--train_crop_size is not set. It will be set as ({}, {}).", cy, cx
@@ -1143,7 +1136,6 @@ class FlowDataModule(pl.LightningDataModule):
                     md(400, self._get_model_output_stride()),
                     md(720, self._get_model_output_stride()),
                 )
-                # cy, cx = (md(416, self._get_model_output_stride()), md(960, self._get_model_output_stride()))
                 self.train_crop_size = (cy, cx)
                 logger.warning(
                     "--train_crop_size is not set. It will be set as ({}, {}).", cy, cx
@@ -1256,7 +1248,7 @@ class FlowDataModule(pl.LightningDataModule):
             dataset = SintelDataset(
                 self.mpi_sintel_root_dir,
                 split="trainval",
-                pass_names="clean",
+                pass_names=["clean"],
                 transform=transform,
                 get_occlusion_mask=False,
             )

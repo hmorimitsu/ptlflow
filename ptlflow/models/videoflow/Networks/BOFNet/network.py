@@ -5,13 +5,11 @@ import torch.nn.functional as F
 from .update import GMAUpdateBlock
 from ..encoders import twins_svt_large
 from .cnn import BasicEncoder
-from .corr import CorrBlock, OLCorrBlock, AlternateCorrBlock
-from ...utils.utils import bilinear_sampler, coords_grid, upflow8
-from .gma import Attention, Aggregate
+from .corr import CorrBlock, AlternateCorrBlock
+from ...utils.utils import coords_grid
+from .gma import Attention
 from .sk import SKUpdateBlock6_Deep_nopoolres_AllDecoder
 from .sk2 import SKUpdateBlock6_Deep_nopoolres_AllDecoder2
-
-from torchvision.utils import save_image
 
 autocast = torch.cuda.amp.autocast
 
@@ -21,8 +19,8 @@ class BOFNet(nn.Module):
         super().__init__()
         self.cfg = cfg
 
-        self.hidden_dim = hdim = 128
-        self.context_dim = cdim = 128
+        self.hidden_dim = 128
+        self.context_dim = 128
 
         cfg.corr_radius = 4
         cfg.corr_levels = 4

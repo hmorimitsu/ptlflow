@@ -1,6 +1,6 @@
 import torch
 from .knn import knn_faiss_raw
-from .utils import coords_grid, coords_grid_y_first
+from .utils import coords_grid_y_first
 
 
 def normalize_coords(coords, H, W):

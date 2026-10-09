@@ -126,85 +126,6 @@ def compute_out_of_boundary_mask(flow, downsample_factor=None):
     return valid_mask  # [B, H, W]
 
 
-def normalize_coords(grid):
-    """Normalize coordinates of image scale to [-1, 1]
-    Args:
-        grid: [B, 2, H, W]
-    """
-    assert grid.size(1) == 2
-    h, w = grid.size()[2:]
-    grid[:, 0, :, :] = 2 * (grid[:, 0, :, :].clone() / (w - 1)) - 1  # x: [-1, 1]
-    grid[:, 1, :, :] = 2 * (grid[:, 1, :, :].clone() / (h - 1)) - 1  # y: [-1, 1]
-    # grid = grid.permute((0, 2, 3, 1))  # [B, H, W, 2]
-    return grid
-
-
-def flow_warp(feature, flow, mask=False, padding_mode="zeros"):
-    b, c, h, w = feature.size()
-    assert flow.size(1) == 2
-
-    grid = coords_grid(b, h, w).to(flow.device) + flow  # [B, 2, H, W]
-
-    return bilinear_sampler(feature, grid, mask=mask, padding_mode=padding_mode)
-
-
-def upflow8(flow, mode="bilinear"):
-    new_size = (8 * flow.shape[2], 8 * flow.shape[3])
-    return 8 * F.interpolate(flow, size=new_size, mode=mode, align_corners=True)
-
-
-def bilinear_upflow(flow, scale_factor=8):
-    assert flow.size(1) == 2
-    flow = (
-        F.interpolate(
-            flow, scale_factor=scale_factor, mode="bilinear", align_corners=True
-        )
-        * scale_factor
-    )
-
-    return flow
-
-
-def upsample_flow(flow, img):
-    if flow.size(-1) != img.size(-1):
-        scale_factor = img.size(-1) / flow.size(-1)
-        flow = (
-            F.interpolate(
-                flow, size=img.size()[-2:], mode="bilinear", align_corners=True
-            )
-            * scale_factor
-        )
-    return flow
-
-
-def count_parameters(model):
-    num = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    return num
-
-
-def set_bn_eval(m):
-    classname = m.__class__.__name__
-    if classname.find("BatchNorm") != -1:
-        m.eval()
-
-
-def generate_window_grid(
-    h_min, h_max, w_min, w_max, len_h, len_w, dtype=None, device=None
-):
-    assert device is not None
-
-    x, y = torch.meshgrid(
-        [
-            torch.linspace(w_min, w_max, len_w, dtype=dtype, device=device),
-            torch.linspace(h_min, h_max, len_h, dtype=dtype, device=device),
-        ],
-        indexing="ij",
-    )
-    grid = torch.stack((x, y), -1).transpose(0, 1)  # [H, W, 2]
-
-    return grid
-
-
 def normalize_coords(coords, h, w):
     # coords: [B, H, W, 2]
     c = torch.Tensor([(w - 1) / 2.0, (h - 1) / 2.0]).to(
@@ -419,7 +340,7 @@ def window_partition_1d(x, window_size_w):
     """
     Args:
         x: (B, W, C)
-        window_size (int): window size
+        window_size_w (int): window size
     Returns:
         windows: (num_windows*B, window_size, C)
     """

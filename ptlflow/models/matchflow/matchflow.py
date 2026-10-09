@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 
 from loguru import logger
 import torch
@@ -17,7 +17,7 @@ from ..base_model.base_model import BaseModel
 
 try:
     import alt_cuda_corr
-except:
+except ImportError:
     alt_cuda_corr = None
 
 
@@ -37,7 +37,7 @@ class SequenceLoss(nn.Module):
         n_predictions = len(flow_preds)
         flow_loss = 0.0
 
-        # exlude invalid pixels and extremely large diplacements
+        # exclude invalid pixels and extremely large displacements
         mag = torch.sum(flow_gt**2, dim=1, keepdim=True).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
 
@@ -363,7 +363,7 @@ class MatchFlowRAFT(MatchFlow):
         position_only: bool = False,
         position_and_content: bool = False,
         alternate_corr: bool = False,
-        train_size: tuple[int, int] | None = None,
+        train_size: Optional[Tuple[int, int]] = None,
         **kwargs,
     ) -> None:
         super().__init__(

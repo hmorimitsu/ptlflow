@@ -27,7 +27,7 @@ Some operations are adapted from the following sources:
 
 from collections.abc import KeysView
 import random
-from typing import Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 from einops import rearrange
 import numpy as np
@@ -51,7 +51,7 @@ class Compose(object):
 
     def __call__(
         self, inputs: Dict[str, Union[np.ndarray, Sequence[np.ndarray]]]
-    ) -> Dict[str, torch.Tensor]:
+    ) -> Dict[str, Union[np.ndarray, Sequence[np.ndarray]]]:
         """Perform the transformation on the inputs.
 
         Parameters
@@ -61,7 +61,7 @@ class Compose(object):
 
         Returns
         -------
-        Dict[str, torch.Tensor]
+        Dict[str, Union[np.ndarray, Sequence[np.ndarray]]]
             The inputs transformed by this operation.
         """
         for t in self.transforms_list:
@@ -87,14 +87,14 @@ class ToTensor(object):
         Parameters
         ----------
         fp16 : bool, default False
-            If True, the tensors use have-precision floating point.
+            If True, the tensors use half-precision floating point.
         device : Union[str, torch.device], default 'cpu'
             Name of the torch device where the tensors will be put in.
         use_keys : Optional[Union[KeysView, Sequence[str]]], optional
             If it is not None, then only elements with these keys will be transformed. Otherwise, all elements are transformed,
             except the keys that are listed in ignore_keys.
         ignore_keys : Optional[Union[KeysView, Sequence[str]]], optional
-            If use_keys is None, the these keys are NOT transformed by this operation.
+            If use_keys is None, then these keys are NOT transformed by this operation.
         """
         self.dtype = torch.float16 if fp16 else torch.float32
         self.device = device
@@ -103,7 +103,7 @@ class ToTensor(object):
 
     def __call__(
         self, inputs: Dict[str, Union[np.ndarray, Sequence[np.ndarray]]]
-    ) -> Dict[str, torch.Tensor]:
+    ) -> Dict[str, Any]:
         """Perform the transformation on the inputs.
 
         Parameters
@@ -113,7 +113,7 @@ class ToTensor(object):
 
         Returns
         -------
-        Dict[str, torch.Tensor]
+        Dict[str, Any]
             The inputs transformed by this operation.
         """
         valid_keys = _get_valid_keys(inputs.keys(), self.use_keys, self.ignore_keys)
@@ -137,7 +137,7 @@ class ToTensor(object):
 
 
 class GenerateFBCheckFlowOcclusion(object):
-    """Generate occlusion masks based on forward/backward flow consistency.
+    r"""Generate occlusion masks based on forward/backward flow consistency.
 
     In other words, a pixel p is considered occluded when \|Ff(p) + Fb(p + F(f))\|_2 > threshold,
     where Ff and Fb get the forward and backward flow vectors of a pixel.
@@ -152,7 +152,7 @@ class GenerateFBCheckFlowOcclusion(object):
         backward_occlusion_key: str = "occs_b",
         compute_backward_occlusion: bool = True,
     ) -> None:
-        """Initialize ColorJitter.
+        r"""Initialize GenerateFBCheckFlowOcclusion.
 
         Parameters
         ----------
@@ -164,7 +164,7 @@ class GenerateFBCheckFlowOcclusion(object):
             The name of the input dict entry that stores the backward flow.
         forward_occlusion_key : str, default "occs"
             The name that will be added to the input dict to store the calculated occlusion masks for the forward flow.
-        backward_occlusion_key : str, default "occs"
+        backward_occlusion_key : str, default "occs_b"
             The name that will be added to the input dict to store the calculated occlusion masks for the backward flow.
         compute_backward_occlusion : bool, default True
             If False, the occlusion mask is calculated only for the forward flow.
@@ -242,10 +242,11 @@ class CenterCrop(object):
         self,
         crop_size: Optional[Tuple[int, int]] = None,
         occlusion_keys: Union[KeysView, Sequence[str]] = ("occs", "occs_b"),
+        flow_keys: Union[KeysView, Sequence[str]] = ("flows", "flows_b"),
         valid_key: str = "valids",
         ignore_keys: Optional[Sequence[str]] = None,
     ) -> None:
-        """Initialize RandomScaleAndCrop.
+        """Initialize CenterCrop.
 
         Parameters
         ----------
@@ -253,12 +254,15 @@ class CenterCrop(object):
             If provided, crop the inputs to this size (h, w).
         occlusion_keys : Union[KeysView, Sequence[str]], default ['occs', 'occs_b']
             Indicate which of the input keys correspond to occlusion mask tensors.
-        valid_keys : str, default 'valids'
+        flow_keys : Union[KeysView, Sequence[str]], default ['flows', 'flows_b']
+            Indicate which of the input keys correspond to optical flow tensors.
+            The size of the first flow tensor is used as the input size.
+        valid_key : str, default 'valids'
             The name of the key in inputs that contains the binary mask indicating which pixels are valid.
-            Only used when sparse=True.
         """
         self.crop_size = crop_size
         self.occlusion_keys = list(occlusion_keys)
+        self.flow_keys = list(flow_keys)
         self.valid_key = valid_key
         self.ignore_keys = ignore_keys
 
@@ -276,18 +280,13 @@ class CenterCrop(object):
         -------
         Dict[str, torch.Tensor]
             The inputs transformed by this operation.
-
-        Raises
-        ------
-        NotImplementedError
-            If trying to use time scale.
         """
-        h, w = inputs[self.valid_key].shape[2:4]
+        h, w = inputs[self.flow_keys[0]].shape[2:4]
         y_crop = (h - self.crop_size[0]) // 2
         x_crop = (w - self.crop_size[1]) // 2
 
         for k, v in inputs.items():
-            if k not in self.ignore_keys:
+            if self.ignore_keys is None or k not in self.ignore_keys:
                 v = v[
                     :,
                     :,
@@ -345,7 +344,7 @@ class ColorJitter(tt.ColorJitter):
             If it is not None, then only elements with these keys will be transformed. Otherwise, all elements are transformed,
             except the keys that are listed in ignore_keys.
         ignore_keys : Optional[Union[KeysView, Sequence[str]]], optional
-            If use_keys is None, the these keys are NOT transformed by this operation.
+            If use_keys is None, then these keys are NOT transformed by this operation.
         """
         super().__init__(
             brightness=brightness, contrast=contrast, saturation=saturation, hue=hue
@@ -397,7 +396,7 @@ class GaussianNoise(object):
             If it is not None, then only elements with these keys will be transformed. Otherwise, all elements are transformed,
             except the keys that are listed in ignore_keys.
         ignore_keys : Optional[Union[KeysView, Sequence[str]]], optional
-            If use_keys is None, the these keys are NOT transformed by this operation.
+            If use_keys is None, then these keys are NOT transformed by this operation.
         """
         self.stdev = stdev
         self.use_keys = use_keys
@@ -458,7 +457,7 @@ class RandomPatchEraser(object):
             If it is not None, then only elements with these keys will be transformed. Otherwise, all elements are transformed,
             except the keys that are listed in ignore_keys.
         ignore_keys : Optional[Union[KeysView, Sequence[str]]], optional
-            If use_keys is None, the these keys are NOT transformed by this operation.
+            If use_keys is None, then these keys are NOT transformed by this operation.
         """
         self.erase_prob = erase_prob
         self.noise_type = noise_type
@@ -552,7 +551,7 @@ class RandomFlip(object):
             If it is not None, then only elements with these keys will be transformed. Otherwise, all elements are transformed,
             except the keys that are listed in ignore_keys.
         ignore_keys : Optional[Union[KeysView, Sequence[str]]], optional
-            If use_keys is None, the these keys are NOT transformed by this operation.
+            If use_keys is None, then these keys are NOT transformed by this operation.
         image_keys : Union[KeysView, Sequence[str]], ['images']
             Indicate which of the input keys correspond to image tensors.
         flow_keys : Union[KeysView, Sequence[str]], ['flows', 'flows_b']
@@ -601,7 +600,7 @@ class RandomFlip(object):
                 if is_flips[-1]:
                     for ik in self.image_keys:
                         inputs = self._flip_inputs(
-                            inputs, iorient == 0, inputs_keys=[ik], ibatch=-1
+                            inputs, iorient == 0, valid_keys=[ik], ibatch=-1
                         )
 
         return inputs
@@ -671,7 +670,9 @@ class RandomFlip(object):
             The mirrored flow.
         """
         grid = torch.meshgrid(
-            torch.arange(flow.shape[1]), torch.arange(flow.shape[2]), indexing="ij"
+            torch.arange(flow.shape[1], device=flow.device, dtype=flow.dtype),
+            torch.arange(flow.shape[2], device=flow.device, dtype=flow.dtype),
+            indexing="ij",
         )
         grid = torch.stack(grid[::-1]).float()
         if is_hflip:
@@ -768,7 +769,7 @@ class RandomScaleAndCrop(object):
         sparse : bool, default False
             If True, only values at valid positions (indicated by the mask in inputs[valid_key]) will be kept when
             resizing binary and flow inputs. Requires valid_key to exist as a key in inputs.
-        valid_keys : str, default 'valids'
+        valid_key : str, default 'valids'
             The name of the key in inputs that contains the binary mask indicating which pixels are valid.
             Only used when sparse=True.
         """
@@ -902,8 +903,10 @@ class RandomTranslate(object):
             Indicate which of the input keys correspond to occlusion mask tensors.
         """
         self.translation = translation
-        if not isinstance(translation, tuple) or isinstance(translation, list):
+        if not isinstance(translation, (tuple, list)):
             self.translation = (translation, translation)
+        else:
+            self.translation = tuple(translation)
         self.flow_keys = flow_keys
         self.occlusion_keys = occlusion_keys
 
@@ -1098,13 +1101,19 @@ class RandomRotate(object):
 
                 if k in self.binary_keys:
                     v[t::2] = F.grid_sample(
-                        v[t::2], rot_grid[: v[t::2].shape[0]], mode="nearest"
+                        v[t::2],
+                        rot_grid[: v[t::2].shape[0]],
+                        mode="nearest",
+                        align_corners=True,
                     )
                 else:
                     if k in self.flow_keys:
                         if self.sparse:
                             v[t::2] = F.grid_sample(
-                                v[t::2], rot_grid[: v[t::2].shape[0]], mode="nearest"
+                                v[t::2],
+                                rot_grid[: v[t::2].shape[0]],
+                                mode="nearest",
+                                align_corners=True,
                             )
                         else:
                             v[t::2] = F.grid_sample(
@@ -1121,9 +1130,6 @@ class RandomRotate(object):
                             mode="bilinear",
                             align_corners=True,
                         )
-
-                if k in self.flow_keys:
-                    v[t::2] = rotate_flow(v[t::2], angle)
 
                 inputs[k] = v
 
@@ -1172,13 +1178,13 @@ class Resize(object):
             The scale factor to resize the images. Only used if size is zeros.
         binary_keys : Union[KeysView, Sequence[str]], default ['mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b']
             Indicate which of the input keys correspond to binary tensors.
-            [description], by default ['mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b']
+            by default ['mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b']
         flow_keys : Union[KeysView, Sequence[str]], default ['flows', 'flows_b']
             Indicate which of the input keys correspond to optical flow tensors.
         sparse : bool, default False
             If True, only values at valid positions (indicated by the mask in inputs[valid_key]) will be kept when
             resizing binary and flow inputs. Requires valid_key to exist as a key in inputs.
-        valid_keys : str, default 'valids'
+        valid_key : str, default 'valids'
             The name of the key in inputs that contains the binary mask indicating which pixels are valid.
             Only used when sparse=True.
         ignore_keys : Optional[Union[KeysView, Sequence[str]]]
@@ -1206,12 +1212,13 @@ class Resize(object):
             The inputs transformed by this operation.
         """
         h, w = inputs[list(inputs.keys())[0]].shape[2:4]
-        if self.size is None or self.size[0] < 1 or self.size[1] < 1:
-            self.size = (int(self.scale * h), int(self.scale * w))
-        if self.size[0] != h or self.size[1] != w:
+        size = self.size
+        if size is None or size[0] < 1 or size[1] < 1:
+            size = (int(self.scale * h), int(self.scale * w))
+        if size[0] != h or size[1] != w:
             inputs = _resize(
                 inputs,
-                self.size,
+                size,
                 self.binary_keys,
                 self.flow_keys,
                 self.sparse,
@@ -1271,7 +1278,7 @@ def _resize(
         Target (height, width) sizes.
     binary_keys : Union[KeysView, Sequence[str]]
         Indicate which of the input keys correspond to binary tensors.
-        [description], by default ['mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b']
+        by default ['mbs', 'occs', 'valids', 'mbs_b', 'occs_b', 'valids_b']
     flow_keys : Union[KeysView, Sequence[str]]
         Indicate which of the input keys correspond to optical flow tensors.
     sparse : bool
@@ -1283,8 +1290,8 @@ def _resize(
 
     Returns
     -------
-    torch.Tensor
-        The updated occlusion masks. Flows which went out-of-bounds are marked as occluded.
+    Dict[str, torch.Tensor]
+        The inputs dict with the tensors resized to target_size.
     """
     if sparse:
         assert (
@@ -1316,7 +1323,7 @@ def _resize(
             x_scaled = torch.round(coords_scaled[:, 0]).long()
             y_scaled = torch.round(coords_scaled[:, 1]).long()
             inbounds = (
-                (x_scaled > 0) & (x_scaled < ws) & (y_scaled > 0) & (y_scaled < hs)
+                (x_scaled >= 0) & (x_scaled < ws) & (y_scaled >= 0) & (y_scaled < hs)
             )
             inbounds_list.append(inbounds)
             x_scaled = x_scaled[inbounds]

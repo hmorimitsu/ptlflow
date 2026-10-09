@@ -3,13 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import einsum
 
-from einops.layers.torch import Rearrange
 from einops import rearrange
 
-from utils.utils import coords_grid, bilinear_sampler, indexing
-from loguru import logger
-
-import math
+from utils.utils import bilinear_sampler, indexing
 
 
 def nerf_encoding(x, L=6, NORMALIZE_FACOR=1 / 300):
@@ -27,43 +23,6 @@ def nerf_encoding(x, L=6, NORMALIZE_FACOR=1 / 300):
         ],
         dim=-1,
     )
-
-
-def sampler_gaussian(latent, mean, std, image_size, point_num=25):
-    # latent [B, H*W, D]
-    # mean [B, 2, H, W]
-    # std [B, 1, H, W]
-    H, W = image_size
-    B, HW, D = latent.shape
-    STD_MAX = 20
-    latent = rearrange(
-        latent, "b (h w) c -> b c h w", h=H, w=W
-    )  # latent = latent.view(B, H, W, D).permute(0, 3, 1, 2)
-    mean = mean.permute(0, 2, 3, 1)  # [B, H, W, 2]
-
-    dx = torch.linspace(-1, 1, int(point_num**0.5))
-    dy = torch.linspace(-1, 1, int(point_num**0.5))
-    delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), axis=-1).to(
-        mean.device
-    )  # [B*H*W, point_num**0.5, point_num**0.5, 2]
-    delta_3sigma = (
-        F.sigmoid(std.permute(0, 2, 3, 1).reshape(B * HW, 1, 1, 1))
-        * STD_MAX
-        * delta
-        * 3
-    )  # [B*H*W, point_num**0.5, point_num**0.5, 2]
-
-    centroid = mean.reshape(B * H * W, 1, 1, 2)
-    coords = centroid + delta_3sigma
-
-    coords = rearrange(coords, "(b h w) r1 r2 c -> b (h w) (r1 r2) c", b=B, h=H, w=W)
-    sampled_latents = bilinear_sampler(
-        latent, coords
-    )  # [B*H*W, dim, point_num**0.5, point_num**0.5]
-    sampled_latents = sampled_latents.permute(0, 2, 3, 1)
-    sampled_weights = -(torch.sum(delta.pow(2), dim=-1))
-
-    return sampled_latents, sampled_weights
 
 
 def sampler_gaussian_zy(
@@ -149,7 +108,6 @@ def sampler_gaussian_fix(latent, mean, image_size, point_num=49):
     # mean [B, 2, H, W]
     H, W = image_size
     B, HW, D = latent.shape
-    STD_MAX = 20
     latent = rearrange(
         latent, "b (h w) c -> b c h w", h=H, w=W
     )  # latent = latent.view(B, H, W, D).permute(0, 3, 1, 2)
@@ -185,7 +143,6 @@ def sampler_gaussian_fix_pyramid(
 
     H, W = image_size
     B, HW, D = latent.shape
-    STD_MAX = 20
     latent = rearrange(
         latent, "b (h w) c -> b c h w", h=H, w=W
     )  # latent = latent.view(B, H, W, D).permute(0, 3, 1, 2)
@@ -238,13 +195,10 @@ def sampler_gaussian_pyramid(
 
     H, W = image_size
     B, HW, D = latent.shape
-    STD_MAX = 20
     latent = rearrange(
         latent, "b (h w) c -> b c h w", h=H, w=W
     )  # latent = latent.view(B, H, W, D).permute(0, 3, 1, 2)
     mean = mean.permute(0, 2, 3, 1)  # [B, H, W, 2]
-
-    radius = int((int(point_num**0.5) - 1) / 2)
 
     dx = torch.linspace(-1, 1, int(point_num**0.5))
     dy = torch.linspace(-1, 1, int(point_num**0.5))
@@ -293,7 +247,6 @@ def sampler_gaussian_fix_MH(latent, mean, image_size, point_num=25):
     H, W = image_size
     B, HW, D = latent.shape
     _, _, _, _, HEADS = mean.shape
-    STD_MAX = 20
     latent = rearrange(latent, "b (h w) c -> b c h w", h=H, w=W)
     mean = mean.permute(0, 2, 3, 4, 1)  # [B, H, W, heads, 2]
 

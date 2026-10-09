@@ -14,7 +14,6 @@ from .utils import (
     compute_interpolation_weights,
 )
 from .knn import knn_faiss_raw
-from ..base_model.base_model import BaseModel
 
 
 class SequenceLoss(nn.Module):
@@ -33,7 +32,7 @@ class SequenceLoss(nn.Module):
         n_predictions = len(flow_preds)
         flow_loss = 0.0
 
-        # exlude invalid pixels and extremely large diplacements
+        # exclude invalid pixels and extremely large displacements
         mag = torch.sum(flow_gt**2, dim=1, keepdim=True).sqrt()
         valid = (valid >= 0.5) & (mag < self.max_flow)
 

@@ -311,7 +311,6 @@ class VCNSmall(BaseModel):
         fdima1 = 128  # 6/5/4
         fdima2 = 64  # 3/2
         fdimb1 = 16  # 6/5/4/3
-        fdimb2 = 12  # 2
 
         full = False
         self.f6 = butterfly4D(fdima1, fdimb1, withbn=withbn, full=full)
@@ -896,7 +895,6 @@ class VCN(VCNSmall):
         self.pspnet = pspnet(is_proj=False)
 
         ## Volumetric-UNet
-        fdima1 = 128  # 6/5/4
         fdima2 = 64  # 3/2
         fdimb1 = 16  # 6/5/4/3
         fdimb2 = 12  # 2

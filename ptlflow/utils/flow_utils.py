@@ -88,7 +88,7 @@ def flow_read(
     input_data: Sequence[Any], str, Path or IO
         Path of the file to read or a sequence containing the path and extra information.
     format: str, optional
-        Specify in what format the flow is read, accepted formats: "flo", "flo5", "kubric_png", "npz", "pfm", "png".
+        Specify in what format the flow is read, accepted formats: "flo", "flo5", "kubric_png", "viper_npz", "npy", "pfm", "png", "png128".
         If None, it is guessed from the file extension.
 
     Returns
@@ -105,18 +105,18 @@ def flow_read(
     ptlflow.utils.external.flow_IO.readFlo5Flow
     write_pfm
     """
-    if (format is not None and format == "pfm") or str(input_data).endswith("pfm"):
+    if (format is not None and format == "pfm") or str(input_data).endswith(".pfm"):
         return raft.read_pfm(input_data)
-    elif (format is not None and format == "flo5") or str(input_data).endswith("flo5"):
+    elif (format is not None and format == "flo5") or str(input_data).endswith(".flo5"):
         return flow_IO.readFlo5Flow(input_data)
-    elif (format is not None and format == "npy") or str(input_data).endswith("npy"):
+    elif (format is not None and format == "npy") or str(input_data).endswith(".npy"):
         return np.load(input_data)
     elif format is not None and format == "kubric_png":
         return read_kubric_flow(input_data[0], input_data[1])
     elif format is not None and format == "viper_npz":
         return read_viper_flow(input_data)
     elif (format is not None and format == "png128") or str(input_data).endswith(
-        "png128"
+        ".png128"
     ):
         return flowpy.flow_read(input_data, format, png_flow_mult=128.0)
     else:
@@ -124,7 +124,7 @@ def flow_read(
 
 
 def flow_write(
-    output_file: Union[str, Path, IO], flow: np.ndarray, format: str = None
+    output_file: Union[str, Path, IO], flow: np.ndarray, format: Optional[str] = None
 ) -> None:
     """Write optical flow to file.
 
@@ -139,23 +139,25 @@ def flow_write(
         flow[..., 0] should be the x-displacement
         flow[..., 1] should be the y-displacement
     format: str, optional
-        Specify in what format the flow is written, accepted formats: "png" or "flo"
+        Specify in what format the flow is written, accepted formats: "flo", "flo5", "viper_npz", "npy", "pfm", "png", "png128".
         If None, it is guessed on the file extension
 
     See Also
     --------
     ptlflow.utils.external.flowpy.flow_write
     """
-    if (format is not None and format == "pfm") or str(output_file).endswith("pfm"):
+    if (format is not None and format == "pfm") or str(output_file).endswith(".pfm"):
         selflow.write_pfm(output_file, flow)
-    elif (format is not None and format == "flo5") or str(output_file).endswith("flo5"):
+    elif (format is not None and format == "flo5") or str(output_file).endswith(
+        ".flo5"
+    ):
         flow_IO.writeFlo5File(flow, output_file)
-    elif (format is not None and format == "npy") or str(output_file).endswith("npy"):
+    elif (format is not None and format == "npy") or str(output_file).endswith(".npy"):
         np.save(output_file, flow)
     elif format is not None and format == "viper_npz":
-        return write_viper_flow(output_file, flow)
+        write_viper_flow(output_file, flow)
     elif (format is not None and format == "png128") or str(output_file).endswith(
-        "png128"
+        ".png128"
     ):
         flowpy.flow_write(output_file, flow, format, png_flow_mult=128.0)
     else:
@@ -218,6 +220,23 @@ def fb_check(
     backward_flow: Union[np.ndarray, torch.Tensor],
     threshold: float = 1.0,
 ):
+    """Compute a forward-backward consistency check mask.
+
+    Parameters
+    ----------
+    forward_flow : numpy.ndarray or torch.Tensor
+        3D flow in the HWF (Height, Width, Flow) layout (numpy) or 4D flow in the NCHW layout (torch).
+    backward_flow : numpy.ndarray or torch.Tensor
+        Same as forward_flow, but for the backward flow.
+    threshold : float, default 1.0
+        Maximum allowed difference between the forward flow and the warped backward flow.
+
+    Returns
+    -------
+    numpy.ndarray or torch.Tensor
+        Mask (or batch of masks) where a pixel is True (1) if it passes the check, i.e. it is likely not occluded.
+        The output type matches the input type.
+    """
     is_np_input = False
     if isinstance(forward_flow, np.ndarray):
         assert len(forward_flow.shape) == 3
@@ -227,8 +246,12 @@ def fb_check(
     assert len(forward_flow.shape) == 4
 
     coords = torch.meshgrid(
-        torch.arange(forward_flow.shape[-2], dtype=torch.float32),
-        torch.arange(forward_flow.shape[-1], dtype=torch.float32),
+        torch.arange(
+            forward_flow.shape[-2], dtype=forward_flow.dtype, device=forward_flow.device
+        ),
+        torch.arange(
+            forward_flow.shape[-1], dtype=forward_flow.dtype, device=forward_flow.device
+        ),
         indexing="ij",
     )
     coords = torch.stack(coords[::-1], dim=0)[None]

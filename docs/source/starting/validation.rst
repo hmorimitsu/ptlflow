@@ -43,7 +43,7 @@ Using a local checkpoint
 ========================
 
 If you have a local checkpoint which is not one of the pretrained ones, you can also load it for validation by passing a path to
-``--pretrained_ckpt`` argument, as:
+``--ckpt_path`` argument, as:
 
 .. code-block:: bash
 

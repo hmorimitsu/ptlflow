@@ -18,7 +18,6 @@ from pathlib import Path
 import shutil
 
 from ptlflow.data.flow_datamodule import FlowDataModule
-from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils import dummy_datasets
 
 MODEL_NAME = "raft_small"
@@ -88,7 +87,7 @@ def test_things_subset(tmp_path: Path) -> None:
     shutil.rmtree(tmp_path)
 
 
-def _get_datamodule(**kwargs: Path) -> BaseModel:
+def _get_datamodule(**kwargs: Path) -> FlowDataModule:
     datamodule = FlowDataModule()
     for k, v in kwargs.items():
         setattr(datamodule, k, v)

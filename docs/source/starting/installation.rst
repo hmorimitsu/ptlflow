@@ -11,7 +11,7 @@ For example, you can create one using `anaconda <https://www.anaconda.com/downlo
     conda activate ptlflow
 
 
-Next, install PyTorch following the official instructions at `https://pytorch.org/ <https://pytorch.org/>`__ (PTLFlow has been tested with Python versions >= 3.10 and <= 3.12 and PyTorch >= 2.3 and <= 2.6.0).
+Next, install PyTorch following the official instructions at `https://pytorch.org/ <https://pytorch.org/>`__ (PTLFlow has been tested with Python versions >= 3.10 and <= 3.13 and PyTorch >= 2.3 and <= 2.9).
 
 Afterward, you can use PTLFlow in one of two ways:
 
@@ -52,7 +52,7 @@ open a terminal and type:
 
 By default, this will download and save the scripts to a folder called ``ptlflow_scripts``.
 If you are going to be doing training or validation, then be sure to edit the file
-``datasets.yml`` and add the paths to the datasets you want to use in your machine.
+``datasets.yaml`` and add the paths to the datasets you want to use in your machine.
 
 To know more details about how to use each script, please read the next pages in this documentation.
 
@@ -152,7 +152,7 @@ You may also have to install the dependencies to run PTLFlow (in case you do not
 
 Another option is to install PTLFlow to your environment. The benefit is that ptlflow will be
 accessible from anywhere while using the environment. The drawback is that you will have to reinstall
-it everytime you modify the code. Therefore, this option is not recommended if you are
+it every time you modify the code. Therefore, this option is not recommended if you are
 making changes to the code.
 
 To install PTLFlow, you will have to build the wheel package and then install with ``pip``.
@@ -171,4 +171,4 @@ Then, enter the directory you cloned, build the package and install it:
     python -m build
     pip install dist/ptlflow-*.whl
 
-Then you should be able to use ``ptlflow`` in the same as if you had installed it from ``pip``.
+Then you should be able to use ``ptlflow`` in the same way as if you had installed it from ``pip``.

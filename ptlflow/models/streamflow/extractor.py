@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
-from torch import nn, einsum
+from torch import einsum
 from einops import rearrange
-import torch.nn.functional as F
 
-from timm.layers import Mlp, DropPath, to_2tuple
+from timm.layers import DropPath
 from timm.models.vision_transformer import Attention as MyAttention
 
 

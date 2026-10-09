@@ -415,7 +415,7 @@ class Lga3Function(Function):
             GANet.lga_cuda_forward(temp_out1, filters, temp_out2, radius)
             GANet.lga_cuda_forward(temp_out2, filters, output, radius)
             output = output.contiguous()
-        ctx.save_for_backward(input, fitlers, temp_out1, temp_out2)
+        ctx.save_for_backward(input, filters, temp_out1, temp_out2)
         return output
 
     @staticmethod
@@ -522,7 +522,7 @@ class Lgf2Function(Function):
 
 class LgaFunction(Function):
     @staticmethod
-    def forward(ctx, input, filters):
+    def forward(ctx, input, filters, radius=1):
         ctx.radius = radius
         assert input.is_contiguous() == True and filters.is_contiguous() == True
         with torch.cuda.device_of(input):
