@@ -272,11 +272,11 @@ class RAPIDFlow(BaseModel):
 
         if (
             not self.simple_io
-            and "prev_flows" in inputs
-            and inputs["prev_flows"] is not None
+            and inputs.get("prev_preds") is not None
+            and inputs["prev_preds"].get("flows") is not None
         ):
             flow = F.interpolate(
-                inputs["prev_flows"][:, 0],
+                inputs["prev_preds"]["flows"][:, 0],
                 [pass_pyramid1[0].shape[-2], pass_pyramid1[0].shape[-1]],
                 mode="bilinear",
                 align_corners=True,
