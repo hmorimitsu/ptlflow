@@ -27,8 +27,8 @@ from ptlflow.utils.utils import InputPadder, InputScaler
 class _DummyModel(BaseModel):
     """Minimal concrete model that always predicts a constant flow."""
 
-    def __init__(self) -> None:
-        super().__init__(output_stride=8)
+    def __init__(self, **kwargs) -> None:
+        super().__init__(output_stride=8, **kwargs)
         self._pred_flow = None
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
@@ -211,3 +211,43 @@ def test_add_extra_param() -> None:
     model.add_extra_param("foo", 42)
     model.add_extra_param("bar", "value")
     assert model.extra_params == {"foo": 42, "bar": "value"}
+
+
+def test_simple_io_helpers() -> None:
+    model = _DummyModel(simple_io=True)
+    assert model.simple_io is True
+
+    images = torch.rand(1, 2, 3, 32, 40)
+
+    # A raw tensor input is wrapped into an inputs dict
+    norm = model._normalize_inputs(images)
+    assert isinstance(norm, dict) and torch.equal(norm["images"], images)
+
+    # A dict input passes through unchanged
+    inputs = {"images": images}
+    assert model._normalize_inputs(inputs) is inputs
+
+    # 5D flows are reduced to their first temporal frame
+    flows5d = torch.rand(1, 1, 2, 32, 40)
+    assert torch.equal(model._maybe_return_simple({"flows": flows5d}), flows5d[:, 0])
+
+    # 4D flows are returned as they are
+    flows4d = torch.rand(1, 2, 32, 40)
+    assert torch.equal(model._maybe_return_simple({"flows": flows4d}), flows4d)
+
+    # Dicts without flow keys and non-dict outputs are returned unchanged
+    assert model._maybe_return_simple({"other": 1}) == {"other": 1}
+    assert model._maybe_return_simple(flows4d) is flows4d
+
+
+def test_simple_io_disabled_by_default() -> None:
+    model = _DummyModel()
+    assert model.simple_io is False
+    assert "simple_io" in model.hparams
+
+    images = torch.rand(1, 2, 3, 32, 40)
+    # Inputs and outputs pass through untouched
+    assert model._normalize_inputs(images) is images
+
+    outputs = {"flows": torch.rand(1, 1, 2, 32, 40)}
+    assert model._maybe_return_simple(outputs) is outputs

@@ -71,6 +71,19 @@ MODEL_ARGS = {
     "rpknet": {"corr_mode": "allpairs"},
 }
 
+# Only models with additional (not installed) requirements are skipped here.
+# streamflow is not skipped: unlike test_forward, the input below has enough
+# frames for it (see SIMPLE_IO_NUM_IMAGES).
+EXCLUDE_MODELS_SIMPLE_IO = [m for m in EXCLUDE_MODELS if m != "streamflow"]
+
+# Models that require more than two input frames.
+SIMPLE_IO_NUM_IMAGES = {
+    "memfof": 3,
+    "streamflow": 4,  # its update block is built for T=4 frames by default
+    "videoflow_bof": 3,
+    "videoflow_mof": 3,
+}
+
 
 def test_forward() -> None:
     model_names = ptlflow._models_dict.keys()
@@ -142,6 +155,69 @@ def test_forward_fp16() -> None:
                 inputs["images"] = inputs["images"].cuda().half()
 
             model(inputs)
+
+
+def test_simple_io() -> None:
+    model_names = ptlflow._models_dict.keys()
+    for mname in model_names:
+        if mname in EXCLUDE_MODELS_SIMPLE_IO:
+            continue
+
+        print(mname)
+        model_ref = ptlflow.get_model_reference(mname)
+        parser = ArgumentParser()
+        parser.add_class_arguments(model_ref, "model")
+        args = parser.parse_args([])
+
+        if mname in MODEL_ARGS:
+            for name, val in MODEL_ARGS[mname].items():
+                setattr(args.model, name, val)
+        setattr(args.model, "simple_io", True)
+
+        model = ptlflow.get_model(mname, args=args)
+        model = model.eval()
+
+        out_stride = model.output_stride
+        if out_stride is None:
+            out_stride = 64
+        s = make_divisible(256, out_stride)
+        num_images = SIMPLE_IO_NUM_IMAGES.get(mname, 2)
+        inputs = torch.rand(1, num_images, 3, s, s)
+
+        if torch.cuda.is_available():
+            model = model.cuda()
+            inputs = inputs.cuda()
+
+        with torch.no_grad():
+            # A raw image tensor must be accepted, producing a 4D flow tensor.
+            out_tensor = model(inputs)
+            # A dict input must also be accepted while simple_io is enabled.
+            out_dict = model({"images": inputs})
+            # With simple_io disabled, the output must be the standard dict.
+            model.simple_io = False
+            out_default = model({"images": inputs})
+
+        assert isinstance(out_tensor, torch.Tensor) and out_tensor.ndim == 4, (
+            f"{mname}: simple_io with a tensor input must return a 4D flow tensor, "
+            f"got {type(out_tensor)} with shape {getattr(out_tensor, 'shape', None)}"
+        )
+        assert isinstance(out_dict, torch.Tensor), (
+            f"{mname}: simple_io with a dict input must return a tensor, "
+            f"got {type(out_dict)}"
+        )
+        assert torch.allclose(
+            out_tensor, out_dict, rtol=0, atol=0, equal_nan=True
+        ), f"{mname}: tensor and dict inputs must produce the same output"
+
+        assert isinstance(out_default, dict) and "flows" in out_default, (
+            f"{mname}: the default output must be a dict with a flows key, "
+            f"got {type(out_default)}"
+        )
+        flows = out_default["flows"]
+        expected = flows[:, 0] if flows.ndim == 5 else flows
+        assert torch.allclose(
+            out_tensor, expected, rtol=0, atol=0, equal_nan=True
+        ), f"{mname}: the simple_io output must match the default flows output"
 
 
 @pytest.mark.skip(
