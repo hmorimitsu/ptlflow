@@ -33,6 +33,7 @@ class IRRPWCNetIRR(BaseModel):
         output_level: int = 4,
         num_chs: Sequence[int] = (3, 16, 32, 64, 96, 128, 196),
         train_batch_size: Optional[int] = None,
+        simple_io: bool = False,
         **kwargs,
     ):
         super(IRRPWCNetIRR, self).__init__(
@@ -40,6 +41,7 @@ class IRRPWCNetIRR(BaseModel):
             loss_fn=MultiScaleEPE_PWC(
                 train_batch_size=train_batch_size, div_flow=div_flow
             ),
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -78,6 +80,7 @@ class IRRPWCNetIRR(BaseModel):
         initialize_msra(self.modules())
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=0.0,
@@ -158,7 +161,7 @@ class IRRPWCNetIRR(BaseModel):
             outputs["flows"] = flow_up[:, None]
         else:
             outputs["flows"] = flow_up[:, None]
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 @register_model

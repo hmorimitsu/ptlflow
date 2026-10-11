@@ -110,6 +110,7 @@ class FastFlowNet(BaseModel):
         loss_num_scales: int = 5,
         loss_base_weight: float = 0.32,
         loss_norm: str = "L2",
+        simple_io: bool = False,
         **kwargs,
     ):
         super(FastFlowNet, self).__init__(
@@ -120,6 +121,7 @@ class FastFlowNet(BaseModel):
                 norm=loss_norm,
             ),
             output_stride=64,
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -241,6 +243,7 @@ class FastFlowNet(BaseModel):
         return output
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         mean_bgr = rearrange(inputs["images"], "b n c h w -> b c (n h w)").mean(2)[
             :, None, :, None, None
         ]
@@ -324,7 +327,7 @@ class FastFlowNet(BaseModel):
             outputs["flows"] = flow_up[:, None]
         else:
             outputs["flows"] = flow_up[:, None]
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 @register_model

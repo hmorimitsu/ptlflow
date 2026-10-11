@@ -55,10 +55,11 @@ class DIP(BaseModel):
         max_flow: float = 400,
         iters: int = 20,
         max_offset: int = 256,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=16, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+            output_stride=16, loss_fn=SequenceLoss(gamma, max_flow), simple_io=simple_io, **kwargs
         )
 
         self.corr_levels = corr_levels
@@ -227,6 +228,7 @@ class DIP(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=-0.5,
@@ -253,7 +255,7 @@ class DIP(BaseModel):
                 image1, image2, iters=self.iters, init_flow=init_flow
             )
             flow_up = self.postprocess_predictions(flow_up, image_resizer, is_flow=True)
-            return {"flows": flow_up[:, None]}
+            return self._maybe_return_simple({"flows": flow_up[:, None]})
 
         # run the feature network
         fmap1, fmap2 = self.fnet([image1, image2])
@@ -343,7 +345,7 @@ class DIP(BaseModel):
         else:
             outputs = {"flows": flow_up[:, None], "flow_small": flow}
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 @register_model

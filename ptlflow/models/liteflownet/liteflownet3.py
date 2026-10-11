@@ -457,11 +457,13 @@ class LiteFlowNet3(BaseModel):
         div_flow: float = 20.0,
         use_pseudo_regularization: bool = False,
         use_s_version: bool = False,
+        simple_io: bool = False,
         **kwargs,
     ):
         super(LiteFlowNet3, self).__init__(
             loss_fn=None,
             output_stride=32,
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -518,6 +520,7 @@ class LiteFlowNet3(BaseModel):
     def forward(
         self, inputs: Dict[str, torch.Tensor]
     ) -> Dict[str, Union[torch.Tensor, List[torch.Tensor]]]:
+        inputs = self._normalize_inputs(inputs)
         # The original implementation uses different BGR means for im1 and im2
         # Here, we use the same for both to make it simpler
         images, image_resizer = self.preprocess_images(
@@ -581,7 +584,7 @@ class LiteFlowNet3(BaseModel):
         else:
             outputs["flows"] = flow[:, None]
             outputs["confs"] = conf[:, None]
-        return outputs
+        return self._maybe_return_simple(outputs)
 
     def _create_images_pyr(
         self, images: torch.Tensor, feats_pyr: List[torch.Tensor]

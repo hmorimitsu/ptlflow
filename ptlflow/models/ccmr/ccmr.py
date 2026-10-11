@@ -55,9 +55,10 @@ class CCMR(BaseModel):
         cnet_norm: str = "group",
         fnet_norm: str = "group",
         num_scales: int = 3,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
-        super().__init__(output_stride=32, loss_fn=None, **kwargs)
+        super().__init__(output_stride=32, loss_fn=None, simple_io=simple_io, **kwargs)
 
         self.corr_levels = corr_levels
         self.corr_radius = corr_radius
@@ -139,6 +140,7 @@ class CCMR(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=-0.5,
@@ -226,7 +228,7 @@ class CCMR(BaseModel):
                 "flow_small": downflow(flow_up, factor=0.0625),
             }
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 class CCMRPlus(CCMR):

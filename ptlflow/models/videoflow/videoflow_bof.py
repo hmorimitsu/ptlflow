@@ -31,9 +31,10 @@ class VideoFlowBOF(BaseModel):
         corr_fn: str = "default",
         decoder_depth: int = 32,
         cost_heads_num: int = 1,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
-        super().__init__(loss_fn=None, output_stride=8, **kwargs)
+        super().__init__(loss_fn=None, output_stride=8, simple_io=simple_io, **kwargs)
 
         self.corr_levels = corr_levels
         self.corr_radius = corr_radius
@@ -113,6 +114,7 @@ class VideoFlowBOF(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
         images = self._check_input_shape(inputs["images"])
 
         images, image_resizer = self.preprocess_images(
@@ -210,7 +212,7 @@ class VideoFlowBOF(BaseModel):
                 "flow_bw_small": coords1_21 - coords0_21,
             }
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
     def _check_input_shape(self, images):
         assert (

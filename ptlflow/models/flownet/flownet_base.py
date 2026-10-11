@@ -12,6 +12,7 @@ class FlowNetBase(BaseModel):
         loss_num_scales: int = 5,
         loss_base_weight: float = 0.32,
         loss_norm: str = "L2",
+        simple_io: bool = False,
         **kwargs,
     ):
         super(FlowNetBase, self).__init__(
@@ -22,6 +23,7 @@ class FlowNetBase(BaseModel):
                 norm=loss_norm,
             ),
             output_stride=64,
+            simple_io=simple_io,
             **kwargs,
         )
         self.div_flow = div_flow

@@ -86,6 +86,7 @@ class FlowNetC(FlowNetBase):
         )
 
     def forward(self, inputs, skip_preprocess=False):
+        inputs = self._normalize_inputs(inputs)
         images = inputs["images"]
         if skip_preprocess:
             image_resizer = None
@@ -169,7 +170,7 @@ class FlowNetC(FlowNetBase):
         else:
             outputs["flows"] = out_flow[:, None]
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 @register_model

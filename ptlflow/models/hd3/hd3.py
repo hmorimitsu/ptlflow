@@ -102,10 +102,14 @@ class HD3(BaseModel):
         downsample: int = 6,
         corr_range: Sequence[int] = (4, 4, 4, 4, 4, 4),
         context: bool = False,
+        simple_io: bool = False,
         **kwargs,
     ):
         super(HD3, self).__init__(
-            loss_fn=LossCalculator(task), output_stride=int(2**downsample), **kwargs
+            loss_fn=LossCalculator(task),
+            output_stride=int(2**downsample),
+            simple_io=simple_io,
+            **kwargs,
         )
 
         self.task = task
@@ -183,6 +187,7 @@ class HD3(BaseModel):
         return flow_warp(x, vect)
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         x, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=[-0.485, -0.456, -0.406],
@@ -261,7 +266,7 @@ class HD3(BaseModel):
             outputs["flows"] = flow_up[:, None]
         else:
             outputs["flows"] = flow_up[:, None]
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 class HD3Context(HD3):

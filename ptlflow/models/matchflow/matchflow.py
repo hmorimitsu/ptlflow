@@ -75,10 +75,14 @@ class MatchFlow(BaseModel):
         position_and_content: bool = False,
         alternate_corr: bool = False,
         train_size: Optional[tuple[int, int]] = None,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=32, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+            output_stride=32,
+            loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
+            **kwargs,
         )
 
         self.corr_levels = corr_levels
@@ -175,6 +179,7 @@ class MatchFlow(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
         if self.train_size is not None:
             train_size = self.train_size
         else:
@@ -187,9 +192,9 @@ class MatchFlow(BaseModel):
             self.showed_warning = True
 
         if self.use_tile_input and train_size is not None:
-            return self.forward_tile(inputs, train_size)
+            return self._maybe_return_simple(self.forward_tile(inputs, train_size))
         else:
-            return self.forward_resize(inputs)
+            return self._maybe_return_simple(self.forward_resize(inputs))
 
     def forward_resize(self, inputs):
         images, image_resizer = self.preprocess_images(

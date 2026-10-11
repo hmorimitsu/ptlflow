@@ -81,10 +81,14 @@ class FlowFormer(BaseModel):
         tile_height: int = 432,
         tile_sigma: float = 0.05,
         train_size: Optional[tuple[int, int]] = None,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+            output_stride=8,
+            loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
+            **kwargs,
         )
 
         self.add_flow_token = add_flow_token
@@ -160,6 +164,7 @@ class FlowFormer(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
         if self.train_size is not None:
             train_size = self.train_size
         else:
@@ -172,9 +177,9 @@ class FlowFormer(BaseModel):
             self.showed_warning = True
 
         if self.use_tile_input and train_size is not None:
-            return self.forward_tile(inputs, train_size)
+            return self._maybe_return_simple(self.forward_tile(inputs, train_size))
         else:
-            return self.forward_pad(inputs)
+            return self._maybe_return_simple(self.forward_pad(inputs))
 
     def forward_pad(self, inputs):
         images, image_resizer = self.preprocess_images(

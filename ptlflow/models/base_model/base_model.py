@@ -70,6 +70,7 @@ class BaseModel(pl.LightningModule):
         wdecay: Optional[float] = None,
         warm_start: bool = False,
         metric_interpolate_pred_to_target_size: bool = False,
+        simple_io: bool = False,
     ) -> None:
         """Initialize BaseModel.
 
@@ -88,6 +89,8 @@ class BaseModel(pl.LightningModule):
             If True, use warm start to initialize the flow prediction. The warm_start strategy was presented by the RAFT method and forward interpolates the prediction from the last frame.
         metric_interpolate_pred_to_target_size : bool, default False
             If True, the prediction is bilinearly interpolated to match the target size during metric calculation, if their sizes are different.
+        simple_io : bool, default False
+            If True, input/output are just image/prediction tensors, rather than dictionaries with multiple keys.
         """
         super(BaseModel, self).__init__()
 
@@ -99,6 +102,7 @@ class BaseModel(pl.LightningModule):
         self.metric_interpolate_pred_to_target_size = (
             metric_interpolate_pred_to_target_size
         )
+        self.simple_io = simple_io
 
         self.train_size = None
         self.train_avg_length = None
@@ -204,14 +208,16 @@ class BaseModel(pl.LightningModule):
             An instance of InputPadder or InputScaler that was used to resize the images.
             Can be used to reverse the resizing operations.
         """
-        bgr_add = bgr_val_as_tensor(
-            bgr_add, reference_tensor=images, bgr_tensor_shape_position=-3
-        )
-        images = images + bgr_add
-        bgr_mult = bgr_val_as_tensor(
-            bgr_mult, reference_tensor=images, bgr_tensor_shape_position=-3
-        )
-        images *= bgr_mult
+        if bgr_add is not None:
+            bgr_add = bgr_val_as_tensor(
+                bgr_add, reference_tensor=images, bgr_tensor_shape_position=-3
+            )
+            images = images + bgr_add
+        if bgr_mult is not None:
+            bgr_mult = bgr_val_as_tensor(
+                bgr_mult, reference_tensor=images, bgr_tensor_shape_position=-3
+            )
+            images *= bgr_mult
         if bgr_to_rgb:
             images = torch.flip(images, [-3])
 
@@ -245,6 +251,28 @@ class BaseModel(pl.LightningModule):
         images = image_resizer.fill(images)
         images = images.contiguous()
         return images, image_resizer
+
+    def _normalize_inputs(self, inputs: Any) -> Any:
+        if getattr(self, "simple_io", False) and torch.is_tensor(inputs):
+            return {"images": inputs}
+        return inputs
+
+    def _maybe_return_simple(self, outputs: Any) -> Any:
+        if not getattr(self, "simple_io", False):
+            return outputs
+
+        if isinstance(outputs, dict):
+            if "flows" in outputs:
+                flow = outputs["flows"]
+                if torch.is_tensor(flow) and flow.ndim == 5:
+                    flow = flow[:, 0]
+                return flow
+            if "flow" in outputs:
+                flow = outputs["flow"]
+                if torch.is_tensor(flow) and flow.ndim == 5:
+                    flow = flow[:, 0]
+                return flow
+        return outputs
 
     def postprocess_predictions(
         self,
@@ -348,7 +376,10 @@ class BaseModel(pl.LightningModule):
         metrics = self.train_metrics(preds, batch)
         if isinstance(loss, dict):
             for k, v in loss.items():
-                metrics[f"train/{k}"] = v.item()
+                if not isinstance(v, torch.Tensor):
+                    metrics[f"train/{k}"] = -1
+                else:
+                    metrics[f"train/{k}"] = v.item()
             loss = loss["loss"]
         else:
             metrics["train/loss"] = loss.item()
@@ -393,6 +424,11 @@ class BaseModel(pl.LightningModule):
             self.val_dataset_names.append(None)
 
         if self.warm_start:
+            if "is_seq_start" in batch["meta"] and batch["meta"]["is_seq_start"][0]:
+                # First sample of a new sequence: drop the predictions of the previous sequence, so this sample
+                # runs cold. The reset must happen BEFORE the forward: resetting afterwards would also discard
+                # this sample's own predictions, leaving the second sample of the sequence cold as well.
+                self.prev_preds = None
             batch["prev_preds"] = self.prev_preds
 
         preds = self(batch)
@@ -419,13 +455,12 @@ class BaseModel(pl.LightningModule):
         )
 
         if self.warm_start:
-            if "is_seq_start" in batch["meta"] and batch["meta"]["is_seq_start"][0]:
-                self.prev_preds = None
-            else:
-                self.prev_preds = preds
-                for k, v in self.prev_preds.items():
-                    if isinstance(v, torch.Tensor):
-                        self.prev_preds[k] = v.detach()
+            # A copy of the predictions is stored, because the caller may modify the returned dict, which would
+            # silently disable the warm start of the next sample if they shared the same dict.
+            self.prev_preds = {
+                k: v.detach() if isinstance(v, torch.Tensor) else v
+                for k, v in preds.items()
+            }
 
         return {"preds": preds, "metrics": metrics}
 
@@ -479,6 +514,11 @@ class BaseModel(pl.LightningModule):
             When using multiple loaders, indicate from which loader this input is coming from.
         """
         if self.warm_start:
+            if "is_seq_start" in batch["meta"] and batch["meta"]["is_seq_start"][0]:
+                # First sample of a new sequence: drop the predictions of the previous sequence, so this sample
+                # runs cold. The reset must happen BEFORE the forward: resetting afterwards would also discard
+                # this sample's own predictions, leaving the second sample of the sequence cold as well.
+                self.prev_preds = None
             batch["prev_preds"] = self.prev_preds
 
         preds = self(batch)
@@ -486,13 +526,12 @@ class BaseModel(pl.LightningModule):
         self.last_predictions = preds
 
         if self.warm_start:
-            if "is_seq_start" in batch["meta"] and batch["meta"]["is_seq_start"][0]:
-                self.prev_preds = None
-            else:
-                self.prev_preds = preds
-                for k, v in self.prev_preds.items():
-                    if isinstance(v, torch.Tensor):
-                        self.prev_preds[k] = v.detach()
+            # A copy of the predictions is stored, because the caller may modify the returned dict, which would
+            # silently disable the warm start of the next sample if they shared the same dict.
+            self.prev_preds = {
+                k: v.detach() if isinstance(v, torch.Tensor) else v
+                for k, v in preds.items()
+            }
 
         return preds
 

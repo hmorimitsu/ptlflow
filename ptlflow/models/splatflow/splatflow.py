@@ -29,9 +29,10 @@ class SplatFlow(BaseModel):
         iters: int = 32,
         alternate_corr: bool = False,
         fast_inference: bool = True,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
-        super().__init__(output_stride=8, loss_fn=None, **kwargs)
+        super().__init__(output_stride=8, loss_fn=None, simple_io=simple_io, **kwargs)
 
         self.corr_levels = corr_levels
         self.corr_radius = corr_radius
@@ -85,6 +86,7 @@ class SplatFlow(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=-0.5,
@@ -115,7 +117,7 @@ class SplatFlow(BaseModel):
 
         out_flow = self.postprocess_predictions(out_flow, image_resizer, is_flow=True)
         outputs = {"flows": out_flow[:, None], "flow_small": flow_small}
-        return outputs
+        return self._maybe_return_simple(outputs)
 
     def forward_one_pair(self, image1, image2, mf_t=None):
         fmap1, fmap2 = self.fnet([image1, image2])

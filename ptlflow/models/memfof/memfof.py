@@ -81,10 +81,14 @@ class MEMFOF(BaseModel):
         use_var: bool = True,
         var_min: float = 0.0,
         var_max: float = 10.0,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=32, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+            output_stride=32,
+            loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
+            **kwargs,
         )
         self.dim = dim
         self.corr_levels = corr_levels
@@ -126,6 +130,8 @@ class MEMFOF(BaseModel):
         fmap_cache : list[torch.Tensor | None], optional
             Cache for feature maps to be used in current forward pass, by default [None, None, None]
         """
+
+        inputs = self._normalize_inputs(inputs)
 
         B, _, _, H, W = inputs["images"].shape
 
@@ -258,10 +264,11 @@ class MEMFOF(BaseModel):
             new_fmap_cache[2] = fmap3_16x.clone().cpu()
 
         if not self.training:
-            return {
+            outputs = {
                 "flows": flow_predictions[-1][:, 1:],
                 "fmap_cache": new_fmap_cache,
             }
+            return self._maybe_return_simple(outputs)
         else:
             # exclude invalid pixels and extremely large displacements
             nf_predictions = []
@@ -294,12 +301,13 @@ class MEMFOF(BaseModel):
 
                 nf_predictions.append(torch.stack(nf_losses, dim=1))
 
-            return {
+            outputs = {
                 "flow_preds": flow_predictions,
                 "info_preds": info_predictions,
                 "nf_preds": nf_predictions,
                 "fmap_cache": new_fmap_cache,
             }
+            return self._maybe_return_simple(outputs)
 
     def _upsample_data(self, flow, info, mask):
         """Upsample [H/16, W/16, C] -> [H, W, C] using convex combination"""

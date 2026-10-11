@@ -57,6 +57,7 @@ class PWCNet(BaseModel):
         loss_num_scales: int = 5,
         loss_base_weight: float = 0.32,
         loss_norm: str = "L2",
+        simple_io: bool = False,
         **kwargs,
     ):
         super(PWCNet, self).__init__(
@@ -67,6 +68,7 @@ class PWCNet(BaseModel):
                 norm=loss_norm,
             ),
             output_stride=64,
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -191,6 +193,7 @@ class PWCNet(BaseModel):
         return output * mask
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=0.0,
@@ -299,7 +302,7 @@ class PWCNet(BaseModel):
             outputs["flows"] = flow_up[:, None]
         else:
             outputs["flows"] = flow_up[:, None]
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 class PWCDCNet(PWCNet):
@@ -349,6 +352,7 @@ class PWCDCNet(PWCNet):
                     m.bias.data.zero_()
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=0.0,
@@ -460,7 +464,7 @@ class PWCDCNet(PWCNet):
             outputs["flows"] = flow_up[:, None]
         else:
             outputs["flows"] = flow_up[:, None]
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 @register_model

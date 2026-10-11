@@ -222,10 +222,11 @@ class SeparableFlow(BaseModel):
         iters: int = 32,
         hidden_dim: int = 128,
         context_dim: int = 128,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), simple_io=simple_io, **kwargs
         )
 
         self.corr_levels = corr_levels
@@ -292,6 +293,7 @@ class SeparableFlow(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=-0.5,
@@ -375,7 +377,7 @@ class SeparableFlow(BaseModel):
         else:
             outputs = {"flows": flow_up[:, None], "flow_small": coords1 - coords0}
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 @register_model

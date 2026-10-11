@@ -40,6 +40,7 @@ class IRRPWC(BaseModel):
         num_levels: int = 7,
         num_chs: Sequence[int] = (3, 16, 32, 64, 96, 128, 196),
         train_batch_size: Optional[int] = None,
+        simple_io: bool = False,
         **kwargs,
     ):
         super(IRRPWC, self).__init__(
@@ -47,6 +48,7 @@ class IRRPWC(BaseModel):
             loss_fn=MultiScaleEPE_PWC_Bi_Occ_upsample(
                 train_batch_size=train_batch_size, div_flow=div_flow
             ),
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -98,6 +100,7 @@ class IRRPWC(BaseModel):
         initialize_msra(self.modules())
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=0.0,
@@ -326,7 +329,7 @@ class IRRPWC(BaseModel):
             outputs["occs"] = occ_f_up[:, None]
             outputs["flows_b"] = flow_b_up[:, None]
             outputs["occs_b"] = occ_b_up[:, None]
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 @register_model
