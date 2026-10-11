@@ -104,6 +104,7 @@ class RAPIDFlow(BaseModel):
         super().__init__(
             output_stride=int(2 ** (num_recurrent_layers + 1)),
             loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -124,7 +125,6 @@ class RAPIDFlow(BaseModel):
         self.dec_mlp_ratio = dec_mlp_ratio
         self.use_upsample_mask = use_upsample_mask
         self.fuse_next1d_weights = fuse_next1d_weights
-        self.simple_io = simple_io
 
         for v in self.pyramid_ranges:
             assert (
@@ -223,12 +223,9 @@ class RAPIDFlow(BaseModel):
         return up_flow.reshape(N, 2, factor * H, factor * W)
 
     def forward(self, inputs):
-        if self.simple_io:
-            images = inputs
-        else:
-            images = inputs["images"]
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
-            images,
+            inputs["images"],
             bgr_add=-0.5,
             bgr_mult=2.0,
             bgr_to_rgb=False,
@@ -410,14 +407,11 @@ class RAPIDFlow(BaseModel):
                 )
                 flows.append(out_flow)
 
-        if self.simple_io:
-            return flows[-1]
-        else:
-            outputs = {}
-            outputs["flows"] = flows[-1][:, None]
-            if self.training:
-                outputs["flow_preds"] = flows
-            return outputs
+        outputs = {}
+        outputs["flows"] = flows[-1][:, None]
+        if self.training:
+            outputs["flow_preds"] = flows
+        return self._maybe_return_simple(outputs)
 
 
 class RAPIDFlow_it1(RAPIDFlow):

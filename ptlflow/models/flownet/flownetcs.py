@@ -26,6 +26,7 @@ class FlowNetCS(FlowNetBase):
         loss_num_scales: int = 5,
         loss_base_weight: float = 0.32,
         loss_norm: str = "L2",
+        simple_io: bool = False,
         **kwargs,
     ):
         super(FlowNetCS, self).__init__(
@@ -36,6 +37,7 @@ class FlowNetCS(FlowNetBase):
             loss_num_scales=loss_num_scales,
             loss_base_weight=loss_base_weight,
             loss_norm=loss_norm,
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -110,6 +112,7 @@ class FlowNetCS(FlowNetBase):
         return output * mask
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         orig_images = inputs["images"]
         bgr_mean = rearrange(orig_images, "b n c h w -> b n c (h w)").mean(-1)
         bgr_mean = bgr_mean[..., None, None]
@@ -154,7 +157,7 @@ class FlowNetCS(FlowNetBase):
 
         inputs["images"] = orig_images
 
-        return flownets1_preds
+        return self._maybe_return_simple(flownets1_preds)
 
 
 @register_model

@@ -33,9 +33,10 @@ class VideoFlowMOF(BaseModel):
         down_ratio: int = 8,
         context_3D: bool = False,
         cost_heads_num: int = 1,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
-        super().__init__(loss_fn=None, output_stride=8, **kwargs)
+        super().__init__(loss_fn=None, output_stride=8, simple_io=simple_io, **kwargs)
 
         self.corr_levels = corr_levels
         self.corr_radius = corr_radius
@@ -167,6 +168,7 @@ class VideoFlowMOF(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
         down_ratio = self.down_ratio
 
         images = self._check_input_shape(inputs["images"].clone())
@@ -349,7 +351,7 @@ class VideoFlowMOF(BaseModel):
                 "flow_bw_small": backward_coords1 - backward_coords0,
             }
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
     def _check_input_shape(self, images):
         if images.shape[1] == 2:

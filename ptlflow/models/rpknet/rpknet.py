@@ -144,6 +144,7 @@ class RPKNet(BaseModel):
         cache_pkconv_weights: bool = True,
         gamma: float = 0.8,
         max_flow: float = 400,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
         for v in pyramid_ranges:
@@ -159,6 +160,7 @@ class RPKNet(BaseModel):
         super().__init__(
             output_stride=output_stride,
             loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -306,6 +308,7 @@ class RPKNet(BaseModel):
         return up_flow.reshape(N, ch, factor * H, factor * W)
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=-0.5,
@@ -337,7 +340,7 @@ class RPKNet(BaseModel):
         if self.training:
             outputs["flow_preds"] = flow_predictions
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
     def predict(self, x1_raw, x2_raw, flow_init):
         b, _, height_im, width_im = x1_raw.size()

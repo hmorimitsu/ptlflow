@@ -145,6 +145,7 @@ class MaskFlownet_S(BaseModel):
         loss_match: str = "upsampling",
         loss_eps: float = 1e-8,
         loss_q: Optional[float] = None,
+        simple_io: bool = False,
         **kwargs,
     ):
         super(MaskFlownet_S, self).__init__(
@@ -156,6 +157,7 @@ class MaskFlownet_S(BaseModel):
                 q=loss_q,
             ),
             output_stride=64,
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -342,6 +344,7 @@ class MaskFlownet_S(BaseModel):
         return output * mask
 
     def forward(self, inputs, skip_preprocess=False):
+        inputs = self._normalize_inputs(inputs)
         if not skip_preprocess:
             bgr_mean = rearrange(inputs["images"], "b n c h w -> b c (n h w)").mean(2)[
                 :, None, :, None, None
@@ -514,7 +517,7 @@ class MaskFlownet_S(BaseModel):
             output["flow_preds"] = predictions
             output["occ_preds"] = occlusion_masks
 
-        return output
+        return self._maybe_return_simple(output)
 
 
 class MaskFlownet(BaseModel):
@@ -536,6 +539,7 @@ class MaskFlownet(BaseModel):
         loss_match: str = "upsampling",
         loss_eps: float = 1e-8,
         loss_q: Optional[float] = None,
+        simple_io: bool = False,
         **kwargs,
     ):
         super(MaskFlownet, self).__init__(
@@ -547,6 +551,7 @@ class MaskFlownet(BaseModel):
                 q=loss_q,
             ),
             output_stride=64,
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -732,6 +737,7 @@ class MaskFlownet(BaseModel):
         return output * mask
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         bgr_mean = rearrange(inputs["images"], "b n c h w -> b c (n h w)").mean(2)[
             :, None, :, None, None
         ]
@@ -887,7 +893,7 @@ class MaskFlownet(BaseModel):
 
         inputs["images"] = orig_images
 
-        return output
+        return self._maybe_return_simple(output)
 
 
 class EpeLoss(nn.Module):

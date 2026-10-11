@@ -63,10 +63,14 @@ class NeuFlow2(BaseModel):
         feature_dim_s1: int = 128,
         iters_s16: int = 1,
         iters_s8: int = 8,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=16, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+            output_stride=16,
+            loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
+            **kwargs,
         )
 
         self.gamma = gamma
@@ -221,6 +225,7 @@ class NeuFlow2(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
 
         images, image_resizer = self.preprocess_images(
             inputs["images"],
@@ -334,7 +339,7 @@ class NeuFlow2(BaseModel):
         else:
             outputs = {"flows": up_flow0[:, None]}
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 @register_model

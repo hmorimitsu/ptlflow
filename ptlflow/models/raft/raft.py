@@ -62,10 +62,11 @@ class RAFT(BaseModel):
         max_flow: float = 400,
         iters: int = 32,
         alternate_corr: bool = False,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), simple_io=simple_io, **kwargs
         )
 
         self.corr_levels = corr_levels
@@ -124,6 +125,7 @@ class RAFT(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=-0.5,
@@ -191,7 +193,7 @@ class RAFT(BaseModel):
         else:
             outputs = {"flows": flow_up[:, None], "flow_small": coords1 - coords0}
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 class RAFTSmall(RAFT):

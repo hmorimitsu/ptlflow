@@ -147,6 +147,7 @@ class DPFlow(BaseModel):
         use_var: bool = True,
         var_min: float = 0.0,
         var_max: float = 10.0,
+        simple_io: bool = False,
         **kwargs,
     ):
         if pyramid_levels is not None:
@@ -164,6 +165,7 @@ class DPFlow(BaseModel):
         super(DPFlow, self).__init__(
             loss_fn=SequenceLoss(loss=loss, max_flow=max_flow, gamma=gamma),
             output_stride=output_stride,
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -327,8 +329,9 @@ class DPFlow(BaseModel):
             )
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         try:
-            return self.forward_flow(inputs)
+            return self._maybe_return_simple(self.forward_flow(inputs))
         except torch.OutOfMemoryError:
             if self.corr_mode == "allpairs":
                 logger.warning(
@@ -337,7 +340,7 @@ class DPFlow(BaseModel):
                 )
                 self.corr_mode = "local"
                 try:
-                    return self.forward_flow(inputs)
+                    return self._maybe_return_simple(self.forward_flow(inputs))
                 except torch.OutOfMemoryError:
                     logger.error(
                         "DPFlow: CUDA out of memory error even after setting --model.corr_mode to 'local'. DPFlow cannot process this input size: {} on this device.",

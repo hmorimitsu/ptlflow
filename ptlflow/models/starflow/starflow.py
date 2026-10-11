@@ -32,11 +32,13 @@ class StarFlow(BaseModel):
         num_levels: int = 7,
         num_chs: Sequence[int] = (3, 16, 32, 64, 96, 128, 196),
         train_batch_size: Optional[int] = None,
+        simple_io: bool = False,
         **kwargs,
     ):
         super(StarFlow, self).__init__(
             output_stride=64,
             loss_fn=None,
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -91,6 +93,7 @@ class StarFlow(BaseModel):
         initialize_msra(self.modules())
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=0.0,
@@ -450,7 +453,7 @@ class StarFlow(BaseModel):
             outputs["flows_b"] = flow_b_up
             outputs["occs_b"] = occs_b_up
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 @register_model

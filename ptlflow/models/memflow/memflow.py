@@ -110,10 +110,14 @@ class MemFlow(BaseModel):
         epsilon=1e-8,
         num_steps=600000,
         anneal_strategy="linear",
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow, filter_epe), **kwargs
+            output_stride=8,
+            loss_fn=SequenceLoss(gamma, max_flow, filter_epe),
+            simple_io=simple_io,
+            **kwargs,
         )
 
         self.corr_levels = corr_levels
@@ -186,6 +190,7 @@ class MemFlow(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
         if (
             "meta" in inputs
             and "is_seq_start" in inputs["meta"]
@@ -270,7 +275,7 @@ class MemFlow(BaseModel):
         else:
             outputs = {"flows": flow_up[:, None], "flow_small": coords1 - coords0}
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
     def configure_optimizers(self):
         optimizer, lr_scheduler = fetch_optimizer(

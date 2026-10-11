@@ -47,6 +47,7 @@ class ScopeFlow(BaseModel):
         seploss: bool = False,
         loss_perc: bool = False,
         train_batch_size: Optional[int] = None,
+        simple_io: bool = False,
         **kwargs,
     ):
         super(ScopeFlow, self).__init__(
@@ -54,6 +55,7 @@ class ScopeFlow(BaseModel):
             loss_fn=MultiScaleEPE_PWC_Bi_Occ_upsample(
                 train_batch_size=train_batch_size, div_flow=div_flow
             ),
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -137,6 +139,7 @@ class ScopeFlow(BaseModel):
         self.mean_per_module = None
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=0.0,
@@ -287,7 +290,7 @@ class ScopeFlow(BaseModel):
             outputs["occs"] = occ_f_up[:, None]
             outputs["flows_b"] = flow_b_up[:, None]
             outputs["occs_b"] = occ_b_up[:, None]
-        return outputs
+        return self._maybe_return_simple(outputs)
 
     def submodules_summary(self):
         print(

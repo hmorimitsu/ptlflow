@@ -128,10 +128,14 @@ class WAFTa1(BaseModel):
         iters: int = 5,
         var_min: float = 0,
         var_max: float = 10,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=112, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+            output_stride=112,
+            loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
+            **kwargs,
         )
 
         self.iters = iters
@@ -207,6 +211,7 @@ class WAFTa1(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=[-0.406, -0.456, -0.485],
@@ -291,7 +296,7 @@ class WAFTa1(BaseModel):
         else:
             outputs = {"flows": flow_up[:, None]}
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 @register_model

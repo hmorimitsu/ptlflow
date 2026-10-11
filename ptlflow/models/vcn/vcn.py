@@ -291,11 +291,13 @@ class VCNSmall(BaseModel):
         maxdisp: int = 256,
         md: Sequence[int] = [4, 4, 4, 4, 4],
         train_batch_size: Optional[int] = None,
+        simple_io: bool = False,
         **kwargs,
     ):
         super(VCNSmall, self).__init__(
             loss_fn=VCNLoss(maxdisp, fac, train_batch_size),
             output_stride=64,
+            simple_io=simple_io,
             **kwargs,
         )
         self.md = md
@@ -543,6 +545,7 @@ class VCNSmall(BaseModel):
         return [param for name, param in self.named_parameters() if "bias" in name]
 
     def forward(self, inputs, disc_aux=None):
+        inputs = self._normalize_inputs(inputs)
         if self.extra_params is not None and "mean_bgr_L" in self.extra_params:
             mean_bgr = self.extra_params["mean_bgr_L"]
         else:
@@ -856,7 +859,7 @@ class VCNSmall(BaseModel):
         else:
             outputs["flows"] = flow2[:, None] * 4
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 class VCN(VCNSmall):
@@ -879,6 +882,7 @@ class VCN(VCNSmall):
         maxdisp: int = 256,
         md: Sequence[int] = [4, 4, 4, 4, 4],
         train_batch_size: Optional[int] = None,
+        simple_io: bool = False,
         **kwargs,
     ):
         super(VCN, self).__init__(
@@ -886,6 +890,7 @@ class VCN(VCNSmall):
             maxdisp=maxdisp,
             md=md,
             train_batch_size=train_batch_size,
+            simple_io=simple_io,
             **kwargs,
         )
         use_entropy = True
@@ -966,6 +971,7 @@ class VCN(VCNSmall):
                     m.bias.data.zero_()
 
     def forward(self, inputs, disc_aux=None):
+        inputs = self._normalize_inputs(inputs)
         # The original implementation uses different BGR means for im1 and im2
         # Here, we use the same for both to make it simpler
         if self.extra_params is not None and "mean_bgr_L" in self.extra_params:
@@ -1358,7 +1364,7 @@ class VCN(VCNSmall):
         else:
             outputs["flows"] = flow2[:, None] * 4
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 @register_model

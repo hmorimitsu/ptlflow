@@ -70,6 +70,7 @@ class BaseModel(pl.LightningModule):
         wdecay: Optional[float] = None,
         warm_start: bool = False,
         metric_interpolate_pred_to_target_size: bool = False,
+        simple_io: bool = False,
     ) -> None:
         """Initialize BaseModel.
 
@@ -88,6 +89,8 @@ class BaseModel(pl.LightningModule):
             If True, use warm start to initialize the flow prediction. The warm_start strategy was presented by the RAFT method and forward interpolates the prediction from the last frame.
         metric_interpolate_pred_to_target_size : bool, default False
             If True, the prediction is bilinearly interpolated to match the target size during metric calculation, if their sizes are different.
+        simple_io : bool, default False
+            If True, input/output are just image/prediction tensors, rather than dictionaries with multiple keys.
         """
         super(BaseModel, self).__init__()
 
@@ -99,6 +102,7 @@ class BaseModel(pl.LightningModule):
         self.metric_interpolate_pred_to_target_size = (
             metric_interpolate_pred_to_target_size
         )
+        self.simple_io = simple_io
 
         self.train_size = None
         self.train_avg_length = None
@@ -247,6 +251,28 @@ class BaseModel(pl.LightningModule):
         images = image_resizer.fill(images)
         images = images.contiguous()
         return images, image_resizer
+
+    def _normalize_inputs(self, inputs: Any) -> Any:
+        if getattr(self, "simple_io", False) and torch.is_tensor(inputs):
+            return {"images": inputs}
+        return inputs
+
+    def _maybe_return_simple(self, outputs: Any) -> Any:
+        if not getattr(self, "simple_io", False):
+            return outputs
+
+        if isinstance(outputs, dict):
+            if "flows" in outputs:
+                flow = outputs["flows"]
+                if torch.is_tensor(flow) and flow.ndim == 5:
+                    flow = flow[:, 0]
+                return flow
+            if "flow" in outputs:
+                flow = outputs["flow"]
+                if torch.is_tensor(flow) and flow.ndim == 5:
+                    flow = flow[:, 0]
+                return flow
+        return outputs
 
     def postprocess_predictions(
         self,

@@ -63,10 +63,14 @@ class FlowSeek(BaseModel):
         use_var: bool = True,
         var_min: float = 0,
         var_max: float = 10,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+            output_stride=8,
+            loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
+            **kwargs,
         )
 
         self.dim = dim
@@ -249,6 +253,7 @@ class FlowSeek(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
 
         images_res, _ = self.preprocess_images(
             inputs["images"],
@@ -398,14 +403,18 @@ class FlowSeek(BaseModel):
                 ) - torch.logsumexp(term1.unsqueeze(1) - term2, dim=2)
                 nf_predictions.append(nf_loss)
 
-            return {
-                "flows": flow_up[:, None],
-                "flow_preds": flow_predictions,
-                "info_preds": info_predictions,
-                "nf_preds": nf_predictions,
-            }
+            return self._maybe_return_simple(
+                {
+                    "flows": flow_up[:, None],
+                    "flow_preds": flow_predictions,
+                    "info_preds": info_predictions,
+                    "nf_preds": nf_predictions,
+                }
+            )
         else:
-            return {"flows": flow_up[:, None], "flow_small": flow_8x}
+            return self._maybe_return_simple(
+                {"flows": flow_up[:, None], "flow_small": flow_8x}
+            )
 
 
 class FlowSeekT(FlowSeek):

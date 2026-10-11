@@ -66,10 +66,14 @@ class GMFlow(BaseModel):
         pred_bidir_flow: bool = False,
         prop_radius_list: Sequence[int] = (-1,),
         upsample_factor: int = 8,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=32, loss_fn=SequenceLoss(gamma, max_flow), **kwargs
+            output_stride=32,
+            loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
+            **kwargs,
         )
 
         self.attention_type = attention_type
@@ -177,6 +181,7 @@ class GMFlow(BaseModel):
 
     def forward(self, inputs):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=[-0.406, -0.456, -0.485],
@@ -304,7 +309,7 @@ class GMFlow(BaseModel):
         else:
             outputs = {"flows": flow_up[:, None]}
 
-        return outputs
+        return self._maybe_return_simple(outputs)
 
 
 class GMFlowWithRefinement(GMFlow):

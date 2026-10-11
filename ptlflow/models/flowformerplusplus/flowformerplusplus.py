@@ -66,9 +66,10 @@ class FlowFormerPlusPlus(BaseModel):
         expand_factor: float = 4.0,
         query_num: int = 0,
         no_border: bool = False,
+        simple_io: bool = False,
         **kwargs,
     ) -> None:
-        super().__init__(output_stride=32, loss_fn=None, **kwargs)
+        super().__init__(output_stride=32, loss_fn=None, simple_io=simple_io, **kwargs)
 
         self.cnet = cnet
         self.fnet = fnet
@@ -192,6 +193,7 @@ class FlowFormerPlusPlus(BaseModel):
 
     def forward(self, inputs, mask=None, output=None):
         """Estimate optical flow between pair of frames"""
+        inputs = self._normalize_inputs(inputs)
         if self.pretrain_mode:
             image1 = (inputs["images"][:, 0] + 1) * 127.5
             image2 = (inputs["images"][:, 1] + 1) * 127.5
@@ -210,9 +212,9 @@ class FlowFormerPlusPlus(BaseModel):
             self.showed_warning = True
 
         if self.use_tile_input and train_size is not None:
-            return self.forward_tile(inputs, train_size)
+            return self._maybe_return_simple(self.forward_tile(inputs, train_size))
         else:
-            return self.forward_pad(inputs)
+            return self._maybe_return_simple(self.forward_pad(inputs))
 
     def forward_pad(self, inputs):
         images, image_resizer = self.preprocess_images(

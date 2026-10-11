@@ -162,6 +162,7 @@ class DICL(BaseModel):
             (192, 192),
         ),
         pad_by_cons: bool = False,
+        simple_io: bool = False,
         **kwargs,
     ):
         super(DICL, self).__init__(
@@ -173,6 +174,7 @@ class DICL(BaseModel):
                 use_valid_range=loss_use_valid_range,
             ),
             output_stride=128,
+            simple_io=simple_io,
             **kwargs,
         )
 
@@ -364,6 +366,7 @@ class DICL(BaseModel):
         return output * mask, mask
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         # left and right images normalized
         if self.pad_by_cons:
             pad_mode = "constant"
@@ -548,7 +551,7 @@ class DICL(BaseModel):
                 ]
             else:
                 output["flow_preds"] = [flow2, flow3, flow4, flow5, flow6]
-        return output
+        return self._maybe_return_simple(output)
 
     def compute_cost(self, x, y, matchnet, maxU, maxV):
         sizeU = 2 * maxU + 1
