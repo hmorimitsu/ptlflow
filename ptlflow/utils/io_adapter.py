@@ -38,6 +38,7 @@ class IOAdapter(object):
         interpolation_mode: str = "bilinear",
         interpolation_align_corners: bool = False,
         cuda: bool = False,
+        xpu: bool = False,
         fp16: bool = False,
     ) -> None:
         """Initialize IOAdapter.
@@ -61,6 +62,9 @@ class IOAdapter(object):
             Whether the interpolation keep the corners aligned. As defined in torch.nn.functional.interpolate.
         cuda : bool, default False
             If True, the input tensors are transferred to GPU (if a GPU is available).
+        xpu : bool, default False
+            If True, the input tensors are transferred to the Intel XPU device (if a torch.xpu device is
+            available). It takes precedence over cuda.
         fp16 : bool, default False
             If True, the input tensors are converted to half precision.
         """
@@ -70,6 +74,7 @@ class IOAdapter(object):
         self.interpolation_mode = interpolation_mode
         self.interpolation_align_corners = interpolation_align_corners
         self.cuda = cuda
+        self.xpu = xpu
         self.fp16 = fp16
 
         self.transform = ToTensor()
@@ -128,7 +133,7 @@ class IOAdapter(object):
                 del inputs[k]
             inputs = self.transform(inputs)
 
-        inputs = self._to_cuda(inputs)
+        inputs = self._to_device(inputs)
 
         for k, v in inputs.items():
             if image_only and k != "images":
@@ -181,25 +186,39 @@ class IOAdapter(object):
 
         return outputs
 
-    def _to_cuda(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        if self.cuda:
+    def _to_device(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        def convert_fp16(inputs: Dict[str, Any]) -> Dict[str, Any]:
+            return {
+                k: (
+                    v.half()
+                    if (isinstance(v, torch.Tensor) and ("flow" in k or "image" in k))
+                    else v
+                )
+                for k, v in inputs.items()
+            }
+
+        if self.xpu:
+            xpu_module = getattr(torch, "xpu", None)
+            if xpu_module is not None and xpu_module.is_available():
+                device = torch.device("xpu")
+                inputs = {
+                    k: v.to(device) if isinstance(v, torch.Tensor) else v
+                    for k, v in inputs.items()
+                }
+                if self.fp16:
+                    inputs = convert_fp16(inputs)
+            else:
+                logging.warning(
+                    "IOAdapter was asked to use xpu, but torch.xpu is not available. Tensors will remain on CPU."
+                )
+        elif self.cuda:
             if torch.cuda.is_available():
                 inputs = {
                     k: v.cuda() if isinstance(v, torch.Tensor) else v
                     for k, v in inputs.items()
                 }
                 if self.fp16:
-                    inputs = {
-                        k: (
-                            v.half()
-                            if (
-                                isinstance(v, torch.Tensor)
-                                and ("flow" in k or "image" in k)
-                            )
-                            else v
-                        )
-                        for k, v in inputs.items()
-                    }
+                    inputs = convert_fp16(inputs)
             else:
                 logging.warning(
                     "IOAdapter was asked to use cuda, but torch.cuda.is_available() == False. Tensors will remain on CPU."
