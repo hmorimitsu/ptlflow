@@ -40,6 +40,11 @@ EXCLUDE_MODELS = [
     "raft_localcorr_onnx",  # requires localcorr
     "raft_localcorr_sycl",  # requires localcorr + torch.xpu (OpenVINO deployment mode)
     "raft_localcorr_triton",  # requires localcorr
+    "pwcnet_localcorr_cuda",  # requires localcorr + its built CUDA kernel
+    "pwcnet_localcorr_onnx",  # requires localcorr
+    "pwcnet_localcorr_sycl",  # requires localcorr + torch.xpu (OpenVINO deployment mode)
+    "pwcnet_localcorr_triton",  # requires localcorr
+    "pwcnet_spatial_corr",  # requires the compiled spatial_correlation_sampler extension
     "scv4",
     "scv8",
     "separableflow",
@@ -58,6 +63,11 @@ EXCLUDE_MODELS_FP16 = [
     "raft_localcorr_onnx",  # requires localcorr
     "raft_localcorr_sycl",  # requires localcorr + torch.xpu (OpenVINO deployment mode)
     "raft_localcorr_triton",  # requires localcorr
+    "pwcnet_localcorr_cuda",  # requires localcorr + its built CUDA kernel
+    "pwcnet_localcorr_onnx",  # requires localcorr
+    "pwcnet_localcorr_sycl",  # requires localcorr + torch.xpu (OpenVINO deployment mode)
+    "pwcnet_localcorr_triton",  # requires localcorr
+    "pwcnet_spatial_corr",  # requires the compiled spatial_correlation_sampler extension
     "scv4",
     "scv8",
     "separableflow",

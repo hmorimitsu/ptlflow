@@ -2,17 +2,25 @@
 Portions of this code copyright 2017, Clement Pinard
 """
 
+from typing import Literal
+
 import numpy as np
+
+from loguru import logger
+
+try:
+    from spatial_correlation_sampler import SpatialCorrelationSampler
+except ModuleNotFoundError:
+    SpatialCorrelationSampler = None
+try:
+    import localcorr
+except ImportError:
+    localcorr = None
 import torch
 import torch.nn as nn
 
-from ptlflow.utils.corr_modes import (
-    get_spatial_corr_sampler,
-    log_corr_mode_warnings,
-    SpatialCorrMode,
-    SPATIAL_CORR_VARIANTS,
-)
-from ptlflow.utils.registry import register_model, register_model_variants, trainable
+from ptlflow.utils.correlation import IterSpatialCorrelationSampler
+from ptlflow.utils.registry import register_model, trainable
 from ..base_model.base_model import BaseModel
 from ..flownet.losses import MultiScale
 
@@ -52,7 +60,14 @@ class PWCNet(BaseModel):
         self,
         div_flow: float = 20.0,
         md: int = 4,
-        corr_mode: SpatialCorrMode = "iter",
+        corr_mode: Literal[
+            "iter",
+            "spatial",
+            "localcorr_cuda",
+            "localcorr_onnx",
+            "localcorr_sycl",
+            "localcorr_triton",
+        ] = "iter",
         loss_start_scale: int = 4,
         loss_num_scales: int = 5,
         loss_base_weight: float = 0.32,
@@ -97,10 +112,7 @@ class PWCNet(BaseModel):
 
         self.leakyRELU = nn.LeakyReLU(0.1)
 
-        log_corr_mode_warnings(self.corr_mode)
-        self.corr, self._corr_error = get_spatial_corr_sampler(
-            self.corr_mode, patch_size=2 * self.md + 1
-        )
+        self.corr, self._corr_error = self._select_corr_sampler()
 
         nd = (2 * self.md + 1) ** 2
         dd = np.cumsum([128, 128, 96, 64, 32])
@@ -161,6 +173,75 @@ class PWCNet(BaseModel):
         self.upsample1 = nn.Upsample(
             scale_factor=4, mode="bilinear", align_corners=True
         )
+
+    def _select_corr_sampler(self):
+        patch_size = 2 * self.md + 1
+        if self.corr_mode == "iter":
+            return (
+                IterSpatialCorrelationSampler(
+                    kernel_size=1, patch_size=patch_size, padding=0
+                ),
+                None,
+            )
+        if self.corr_mode == "spatial":
+            if SpatialCorrelationSampler is None:
+                error = ImportError(
+                    'corr_mode="spatial" requires the spatial_correlation_sampler '
+                    "extension, but it could not be imported. Compile it (see "
+                    "ptlflow/utils/external/Pytorch-Correlation-extension) or "
+                    "use another corr_mode."
+                )
+                logger.warning(
+                    "!!! spatial_correlation_sampler is not compiled! Using corr_mode=spatial will raise "
+                    "an error! Compile it from ptlflow/utils/external/Pytorch-Correlation-extension "
+                    "or choose another corr_mode !!!"
+                )
+                return None, error
+            return (
+                SpatialCorrelationSampler(
+                    kernel_size=1, patch_size=patch_size, padding=0
+                ),
+                None,
+            )
+        if self.corr_mode.startswith("localcorr"):
+            if localcorr is None:
+                error = ImportError(
+                    f"corr_mode={self.corr_mode!r} requires the localcorr package, "
+                    "but it could not be imported. Install localcorr or use "
+                    "another corr_mode."
+                )
+                logger.warning(
+                    f"!!! localcorr is not installed, so corr_mode={self.corr_mode} will not work! "
+                    "Install localcorr (its triton kernels are Linux-only) or choose another "
+                    "corr_mode !!!"
+                )
+                return None, error
+            if (
+                self.corr_mode == "localcorr_cuda"
+                and localcorr.get_cuda_pyramid_library() is None
+            ):
+                logger.warning(
+                    "!!! the localcorr CUDA kernel library is not built! Using "
+                    "corr_mode=localcorr_cuda will raise an error! Build it with "
+                    "'python -m localcorr.build_native cuda' or choose another corr_mode !!!"
+                )
+            if (
+                self.corr_mode == "localcorr_sycl"
+                and localcorr.get_sycl_xpu_extension() is None
+            ):
+                logger.warning(
+                    "!!! the localcorr SYCL XPU extension is not built! Eager execution with "
+                    "corr_mode=localcorr_sycl will raise an error (ONNX export for OpenVINO "
+                    "still works)! Build it with 'python -m localcorr.build_native xpu' or "
+                    "choose another corr_mode !!!"
+                )
+            return (
+                localcorr.get_localcorr_sampler(
+                    patch_size=patch_size, corr_mode=self.corr_mode
+                ),
+                None,
+            )
+        raise ValueError(f"Invalid corr_mode {self.corr_mode}.")
 
     def warp(self, x, flo):
         """
@@ -487,6 +568,31 @@ class pwcnet_nodc(PWCNet):
     pass
 
 
-register_model_variants(
-    {"pwcnet": PWCDCNet, "pwcnet_nodc": PWCNet}, SPATIAL_CORR_VARIANTS
-)
+@register_model
+class pwcnet_spatial_corr(PWCDCNet):
+    def __init__(self, corr_mode="spatial", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class pwcnet_localcorr_cuda(PWCDCNet):
+    def __init__(self, corr_mode="localcorr_cuda", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class pwcnet_localcorr_onnx(PWCDCNet):
+    def __init__(self, corr_mode="localcorr_onnx", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class pwcnet_localcorr_sycl(PWCDCNet):
+    def __init__(self, corr_mode="localcorr_sycl", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class pwcnet_localcorr_triton(PWCDCNet):
+    def __init__(self, corr_mode="localcorr_triton", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
