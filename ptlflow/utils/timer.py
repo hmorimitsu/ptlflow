@@ -18,7 +18,7 @@
 
 import logging
 import time
-from typing import Union, Tuple
+from typing import Optional, Tuple, Union
 
 try:
     import torch
@@ -56,7 +56,12 @@ class Timer(object):
       inner_op: 1000.0 (1000.0) ms
     """
 
-    def __init__(self, name: str, indent_level: int = 0) -> None:
+    def __init__(
+        self,
+        name: str,
+        indent_level: int = 0,
+        device: Optional[Union[str, "torch.device"]] = None,
+    ) -> None:
         """Initialize the Timer.
 
         Parameters
@@ -66,9 +71,16 @@ class Timer(object):
         indent_level : int, optional
             The level of indentation when printing this timer. Useful for creating better prints. E.g., inner parts may have a
             larger indentation.
+        device : Optional[Union[str, torch.device]], optional
+            The device whose work must be synchronized before reading the clock, so that asynchronous launches (cuda or
+            xpu) are accounted for. If None, cuda is synchronized if available, otherwise xpu (if available). Use "cpu" to
+            disable synchronization.
         """
         self.name = name
         self.indent_level = indent_level
+        self.device = (
+            torch.device(device) if (torch is not None and device is not None) else None
+        )
         self.reset()
         self.num_global_tocs = 0
 
@@ -81,19 +93,36 @@ class Timer(object):
     def tic(self) -> None:
         """Start to count the elapsed time."""
         self.has_tic = True
-        if torch is not None and torch.cuda.is_available():
-            torch.cuda.synchronize()
+        self._synchronize()
         self.start = time.perf_counter()
 
     def toc(self) -> None:
         """Count the elapsed time since the last tic() and add it to the total time."""
-        if torch is not None and torch.cuda.is_available():
-            torch.cuda.synchronize()
+        self._synchronize()
         self.end = time.perf_counter()
         assert self.has_tic, "toc called without tic"
         self.total_time += self.end - self.start
         self.has_tic = False
         self.num_tocs += 1
+
+    def _synchronize(self) -> None:
+        if torch is None:
+            return
+        if self.device is None:
+            # Auto: synchronize cuda (if available), otherwise xpu (if available).
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            else:
+                xpu_module = getattr(torch, "xpu", None)
+                if xpu_module is not None and xpu_module.is_available():
+                    xpu_module.synchronize()
+        elif self.device.type == "cuda":
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+        elif self.device.type == "xpu":
+            xpu_module = getattr(torch, "xpu", None)
+            if xpu_module is not None and xpu_module.is_available():
+                xpu_module.synchronize()
 
     def mean(self) -> float:
         """Return the average time (total time divided by the number of tocs).

@@ -39,7 +39,7 @@ from ptlflow.utils import flow_utils
 from ptlflow.utils.io_adapter import IOAdapter
 from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
 from ptlflow.utils.registry import RegisteredModel
-from ptlflow.utils.utils import tensor_dict_to_numpy
+from ptlflow.utils.utils import get_device, tensor_dict_to_numpy
 
 
 def _init_parser() -> ArgumentParser:
@@ -136,6 +136,11 @@ def _init_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--fp16", action="store_true", help="If set, use half floating point precision."
+    )
+    parser.add_argument(
+        "--xpu",
+        action="store_true",
+        help="If set, run on the Intel XPU device (torch.xpu) instead of the GPU.",
     )
     parser.add_argument(
         "--seq_val_mode",
@@ -241,8 +246,9 @@ def validate(
     ptlflow.models.base_model.base_model.BaseModel : The parent class of the available models.
     """
     model.eval()
-    if torch.cuda.is_available():
-        model = model.cuda()
+    device = get_device(args.xpu)
+    if device is not None:
+        model = model.to(device)
         if args.fp16:
             model = model.half()
 
@@ -414,6 +420,7 @@ def validate_one_dataloader(
                 input_size=inputs["images"].shape[-2:],
                 target_scale_factor=scale_factor,
                 cuda=torch.cuda.is_available(),
+                xpu=args.xpu,
                 fp16=args.fp16,
             )
             inputs = io_adapter.prepare_inputs(inputs=inputs, image_only=True)

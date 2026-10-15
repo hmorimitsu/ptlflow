@@ -44,6 +44,7 @@ from ptlflow.utils.io_adapter import IOAdapter
 from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
 from ptlflow.utils.registry import RegisteredModel
 from ptlflow.utils.utils import (
+    get_device,
     tensor_dict_to_numpy,
 )
 
@@ -92,6 +93,11 @@ def _init_parser() -> ArgumentParser:
         ),
     )
     parser.add_argument("--save_viz", action="store_true")
+    parser.add_argument(
+        "--xpu",
+        action="store_true",
+        help="If set, run on the Intel XPU device (torch.xpu) instead of the GPU.",
+    )
     return parser
 
 
@@ -147,8 +153,9 @@ def test(args: Namespace, model: BaseModel, data_module: FlowDataModule) -> None
     ptlflow.models.base_model.base_model.BaseModel : The parent class of the available models.
     """
     model.eval()
-    if torch.cuda.is_available():
-        model = model.cuda()
+    device = get_device(args.xpu)
+    if device is not None:
+        model = model.to(device)
 
     dataloaders = data_module.test_dataloader()
     dataloaders = {
@@ -199,6 +206,7 @@ def test_one_dataloader(
             inputs["images"].shape[-2:],
             target_scale_factor=scale_factor,
             cuda=torch.cuda.is_available(),
+            xpu=args.xpu,
         )
         inputs = io_adapter.prepare_inputs(inputs=inputs)
         inputs["prev_preds"] = prev_preds
