@@ -1,3 +1,5 @@
+from typing import Literal
+
 import torch
 import torch.nn.functional as F
 from .utils import bilinear_sampler
@@ -7,7 +9,12 @@ try:
 except ImportError:
     alt_cuda_corr = None
 
-from ptlflow.utils.corr_modes import get_raft_corr_block
+from ptlflow.utils.correlation import IterativeCorrBlock
+
+try:
+    import localcorr
+except ImportError:
+    localcorr = None
 
 
 class CorrBlock:
@@ -107,18 +114,66 @@ def get_corr_block(
     fmap2: torch.Tensor,
     num_levels: int = 4,
     radius: int = 4,
-    corr_mode: str = "allpairs",
+    corr_mode: Literal[
+        "allpairs",
+        "alt_cuda_corr",
+        "torch",
+        "localcorr_triton",
+        "localcorr_cuda",
+        "localcorr_onnx",
+        "localcorr_sycl",
+    ] = "allpairs",
 ):
     """Create the correlation block for the given mode.
 
-    See ptlflow.utils.corr_modes for the description of the modes.
+    Modes:
+    - allpairs: full correlation volume computed once with a matmul (the RAFT default; pure PyTorch).
+    - alt_cuda_corr: local correlation with the compiled alt_cuda_corr CUDA extension. It raises an error
+      if the extension is not compiled or if the feature maps are not on a CUDA device.
+    - torch: local correlation in pure PyTorch (IterativeCorrBlock). Slower, but it has no extra requirements.
+    - localcorr_triton, localcorr_onnx: local correlation from the localcorr package computed with its fused
+      Triton kernel (all pyramid levels in one launch), with forward and backward passes (triton only has
+      Linux wheels, so these modes require Linux and a supported accelerator device). The localcorr_onnx
+      mode only differs from localcorr_triton during ONNX export, which emits standard ops instead of the
+      TensorRT plugin node.
+    - localcorr_cuda: eager inference with the AOT CUDA kernel of the localcorr package, called through
+      ctypes (build it with python -m localcorr.build_native cuda). Inference-only and CUDA-only: it raises
+      an error for training or on other devices. ONNX export emits the TensorRT plugin node.
+    - localcorr_sycl: the Intel counterpart of localcorr_cuda. Eager inference on torch.xpu devices with
+      the fused SYCL kernel of the localcorr package (build it with python -m localcorr.build_native xpu);
+      inference-only. ONNX export emits the node resolved by the OpenVINO SYCL custom-op extension.
     """
-    return get_raft_corr_block(
-        corr_mode,
-        fmap1=fmap1,
-        fmap2=fmap2,
-        radius=radius,
-        num_levels=num_levels,
-        allpairs_cls=CorrBlock,
-        alt_cls=AlternateCorrBlock,
-    )
+    if corr_mode.startswith("localcorr"):
+        if localcorr is None:
+            raise ImportError(
+                f"corr_mode={corr_mode!r} requires the localcorr package, but it could not be imported. "
+                "Install localcorr or use another corr_mode."
+            )
+        return localcorr.get_localcorr_block(
+            fmap1=fmap1,
+            fmap2=fmap2,
+            radius=radius,
+            num_levels=num_levels,
+            corr_mode=corr_mode,
+        )
+
+    if corr_mode == "allpairs":
+        corr_fn = CorrBlock
+    elif corr_mode == "alt_cuda_corr":
+        if alt_cuda_corr is None:
+            raise ImportError(
+                'corr_mode="alt_cuda_corr" requires the alt_cuda_corr CUDA extension, but it could not be '
+                "imported. Compile it (see ptlflow/utils/external/alt_cuda_corr) or use another corr_mode."
+            )
+        if fmap1.device.type != "cuda":
+            raise RuntimeError(
+                'corr_mode="alt_cuda_corr" requires CUDA tensors, but the feature maps are on device '
+                f"{fmap1.device}."
+            )
+        corr_fn = AlternateCorrBlock
+    elif corr_mode == "torch":
+        corr_fn = IterativeCorrBlock
+    else:
+        raise ValueError(f"Invalid corr_mode {corr_mode}.")
+
+    return corr_fn(fmap1=fmap1, fmap2=fmap2, radius=radius, num_levels=num_levels)

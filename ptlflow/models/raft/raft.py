@@ -1,3 +1,6 @@
+from typing import Literal
+
+from loguru import logger
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -19,6 +22,16 @@ from .extractor import BasicEncoder, SmallEncoder
 from .corr import get_corr_block
 from .utils import coords_grid, upflow8
 from ..base_model.base_model import BaseModel
+
+try:
+    import alt_cuda_corr
+except ImportError:
+    alt_cuda_corr = None
+
+try:
+    import localcorr
+except ImportError:
+    localcorr = None
 
 
 class SequenceLoss(nn.Module):
@@ -61,7 +74,15 @@ class RAFT(BaseModel):
         self,
         corr_levels: int = 4,
         corr_radius: int = 4,
-        corr_mode: RaftCorrMode = "allpairs",
+        corr_mode: Literal[
+            "allpairs",
+            "alt_cuda_corr",
+            "torch",
+            "localcorr_cuda",
+            "localcorr_onnx",
+            "localcorr_sycl",
+            "localcorr_triton",
+        ] = "allpairs",
         dropout: float = 0.0,
         gamma: float = 0.8,
         max_flow: float = 400,
@@ -98,7 +119,39 @@ class RAFT(BaseModel):
 
         self.has_trained_on_ptlflow = True
 
-        log_corr_mode_warnings(self.corr_mode)
+        if self.corr_mode == "alt_cuda_corr" and alt_cuda_corr is None:
+            logger.warning(
+                "!!! alt_cuda_corr is not compiled! Using corr_mode=alt_cuda_corr will raise an error! "
+                "Compile it from ptlflow/utils/external/alt_cuda_corr or choose another corr_mode !!!"
+            )
+
+        if self.corr_mode.startswith("localcorr") and localcorr is None:
+            logger.warning(
+                f"!!! localcorr is not installed, so corr_mode={self.corr_mode} will not work! "
+                "Install localcorr (its triton kernels are Linux-only) or choose another corr_mode !!!"
+            )
+
+        if (
+            self.corr_mode == "localcorr_cuda"
+            and localcorr is not None
+            and localcorr.get_cuda_pyramid_library() is None
+        ):
+            logger.warning(
+                "!!! the localcorr CUDA kernel library is not built! Using corr_mode=localcorr_cuda "
+                "will raise an error! Build it with 'python -m localcorr.build_native cuda' or choose "
+                "another corr_mode !!!"
+            )
+
+        if (
+            self.corr_mode == "localcorr_sycl"
+            and localcorr is not None
+            and localcorr.get_sycl_xpu_extension() is None
+        ):
+            logger.warning(
+                "!!! the localcorr SYCL XPU extension is not built! Eager execution with "
+                "corr_mode=localcorr_sycl will raise an error (ONNX export for OpenVINO still works)! "
+                "Build it with 'python -m localcorr.build_native xpu' or choose another corr_mode !!!"
+            )
 
     def freeze_bn(self):
         for m in self.modules():
@@ -243,4 +296,37 @@ class raft_small(RAFTSmall):
     pass
 
 
-register_model_variants({"raft": RAFT, "raft_small": RAFTSmall}, RAFT_CORR_VARIANTS)
+@register_model
+class raft_alt_cuda_corr(RAFT):
+    def __init__(self, corr_mode="alt_cuda_corr", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class raft_torch_corr(RAFT):
+    def __init__(self, corr_mode="torch", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class raft_localcorr_cuda(RAFT):
+    def __init__(self, corr_mode="localcorr_cuda", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class raft_localcorr_onnx(RAFT):
+    def __init__(self, corr_mode="localcorr_onnx", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class raft_localcorr_sycl(RAFT):
+    def __init__(self, corr_mode="localcorr_sycl", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class raft_localcorr_triton(RAFT):
+    def __init__(self, corr_mode="localcorr_triton", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)

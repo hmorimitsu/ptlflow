@@ -35,6 +35,11 @@ DATASET = "overfit"
 EXCLUDE_MODELS = [
     "matchflow",
     "matchflow_raft",
+    "raft_alt_cuda_corr",  # requires the compiled alt_cuda_corr extension
+    "raft_localcorr_cuda",  # requires localcorr + its built CUDA kernel
+    "raft_localcorr_onnx",  # requires localcorr
+    "raft_localcorr_sycl",  # requires localcorr + torch.xpu (OpenVINO deployment mode)
+    "raft_localcorr_triton",  # requires localcorr
     "scv4",
     "scv8",
     "separableflow",
@@ -48,6 +53,11 @@ EXCLUDE_MODELS_FP16 = [
     "lcv_raft_small",
     "matchflow",
     "matchflow_raft",
+    "raft_alt_cuda_corr",  # requires the compiled alt_cuda_corr extension
+    "raft_localcorr_cuda",  # requires localcorr + its built CUDA kernel
+    "raft_localcorr_onnx",  # requires localcorr
+    "raft_localcorr_sycl",  # requires localcorr + torch.xpu (OpenVINO deployment mode)
+    "raft_localcorr_triton",  # requires localcorr
     "scv4",
     "scv8",
     "separableflow",
