@@ -1,3 +1,5 @@
+from typing import Literal
+
 from loguru import logger
 import torch
 import torch.nn as nn
@@ -15,6 +17,11 @@ try:
     import alt_cuda_corr
 except ImportError:
     alt_cuda_corr = None
+
+try:
+    import localcorr
+except ImportError:
+    localcorr = None
 
 
 class SequenceLoss(nn.Module):
@@ -57,25 +64,36 @@ class RAFT(BaseModel):
         self,
         corr_levels: int = 4,
         corr_radius: int = 4,
+        corr_mode: Literal[
+            "allpairs",
+            "alt_cuda_corr",
+            "torch",
+            "localcorr_cuda",
+            "localcorr_onnx",
+            "localcorr_sycl",
+            "localcorr_triton",
+        ] = "allpairs",
         dropout: float = 0.0,
         gamma: float = 0.8,
         max_flow: float = 400,
         iters: int = 32,
-        alternate_corr: bool = False,
         simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), simple_io=simple_io, **kwargs
+            output_stride=8,
+            loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
+            **kwargs,
         )
 
         self.corr_levels = corr_levels
         self.corr_radius = corr_radius
+        self.corr_mode = corr_mode
         self.dropout = dropout
         self.gamma = gamma
         self.max_flow = max_flow
         self.iters = iters
-        self.alternate_corr = alternate_corr
 
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
@@ -91,9 +109,38 @@ class RAFT(BaseModel):
 
         self.has_trained_on_ptlflow = True
 
-        if self.alternate_corr and alt_cuda_corr is None:
+        if self.corr_mode == "alt_cuda_corr" and alt_cuda_corr is None:
             logger.warning(
-                "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
+                "!!! alt_cuda_corr is not compiled! Using corr_mode=alt_cuda_corr will raise an error! "
+                "Compile it from ptlflow/utils/external/alt_cuda_corr or choose another corr_mode !!!"
+            )
+
+        if self.corr_mode.startswith("localcorr") and localcorr is None:
+            logger.warning(
+                f"!!! localcorr is not installed, so corr_mode={self.corr_mode} will not work! "
+                "Install localcorr (its triton kernels are Linux-only) or choose another corr_mode !!!"
+            )
+
+        if (
+            self.corr_mode == "localcorr_cuda"
+            and localcorr is not None
+            and localcorr.get_cuda_pyramid_library() is None
+        ):
+            logger.warning(
+                "!!! the localcorr CUDA kernel library is not built! Using corr_mode=localcorr_cuda "
+                "will raise an error! Build it with 'python -m localcorr.build_native cuda' or choose "
+                "another corr_mode !!!"
+            )
+
+        if (
+            self.corr_mode == "localcorr_sycl"
+            and localcorr is not None
+            and localcorr.get_sycl_xpu_extension() is None
+        ):
+            logger.warning(
+                "!!! the localcorr SYCL XPU extension is not built! Eager execution with "
+                "corr_mode=localcorr_sycl will raise an error (ONNX export for OpenVINO still works)! "
+                "Build it with 'python -m localcorr.build_native xpu' or choose another corr_mode !!!"
             )
 
     def freeze_bn(self):
@@ -150,7 +197,7 @@ class RAFT(BaseModel):
             fmap2=fmap2,
             radius=self.corr_radius,
             num_levels=self.corr_levels,
-            alternate_corr=self.alternate_corr,
+            corr_mode=self.corr_mode,
         )
 
         # run the context network
@@ -205,21 +252,11 @@ class RAFTSmall(RAFT):
         self,
         corr_levels: int = 4,
         corr_radius: int = 3,
-        dropout: float = 0.0,
-        gamma: float = 0.8,
-        max_flow: float = 400,
-        iters: int = 32,
-        alternate_corr: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
             corr_levels=corr_levels,
             corr_radius=corr_radius,
-            dropout=dropout,
-            gamma=gamma,
-            max_flow=max_flow,
-            iters=iters,
-            alternate_corr=alternate_corr,
             **kwargs,
         )
         self.hidden_dim = hdim = 96
@@ -247,3 +284,39 @@ class raft(RAFT):
 @ptlflow_trained
 class raft_small(RAFTSmall):
     pass
+
+
+@register_model
+class raft_alt_cuda_corr(RAFT):
+    def __init__(self, corr_mode="alt_cuda_corr", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class raft_torch_corr(RAFT):
+    def __init__(self, corr_mode="torch", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class raft_localcorr_cuda(RAFT):
+    def __init__(self, corr_mode="localcorr_cuda", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class raft_localcorr_onnx(RAFT):
+    def __init__(self, corr_mode="localcorr_onnx", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class raft_localcorr_sycl(RAFT):
+    def __init__(self, corr_mode="localcorr_sycl", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
+
+
+@register_model
+class raft_localcorr_triton(RAFT):
+    def __init__(self, corr_mode="localcorr_triton", **kwargs):
+        super().__init__(corr_mode=corr_mode, **kwargs)
