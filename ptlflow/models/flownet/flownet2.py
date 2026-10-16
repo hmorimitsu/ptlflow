@@ -3,7 +3,8 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import SPATIAL_CORR_VARIANTS
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from .flownetc import FlowNetC
 from .flownets import FlowNetS
 from .flownetsd import FlowNetSD
@@ -252,3 +253,6 @@ class FlowNet2(FlowNetBase):
 @trainable
 class flownet2(FlowNet2):
     pass
+
+
+register_model_variants({"flownet2": FlowNet2}, SPATIAL_CORR_VARIANTS)

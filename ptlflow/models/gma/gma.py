@@ -2,9 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from loguru import logger
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    log_corr_mode_warnings,
+    RaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import GMAUpdateBlock
 from .extractor import BasicEncoder
@@ -13,11 +17,6 @@ from .utils import coords_grid, upflow8
 from .gma_utils import Attention
 
 from ..base_model.base_model import BaseModel
-
-try:
-    import alt_cuda_corr
-except ImportError:
-    alt_cuda_corr = None
 
 
 class SequenceLoss(nn.Module):
@@ -67,12 +66,15 @@ class GMA(BaseModel):
         num_heads: int = 1,
         position_only: bool = False,
         position_and_content: bool = False,
-        alternate_corr: bool = False,
+        corr_mode: RaftCorrMode = "allpairs",
         simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), simple_io=simple_io, **kwargs
+            output_stride=8,
+            loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
+            **kwargs,
         )
 
         self.corr_levels = corr_levels
@@ -84,7 +86,7 @@ class GMA(BaseModel):
         self.num_heads = num_heads
         self.position_only = position_only
         self.position_and_content = position_and_content
-        self.alternate_corr = alternate_corr
+        self.corr_mode = corr_mode
 
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
@@ -109,10 +111,7 @@ class GMA(BaseModel):
             dim_head=cdim,
         )
 
-        if alternate_corr and alt_cuda_corr is None:
-            logger.warning(
-                "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
-            )
+        log_corr_mode_warnings(self.corr_mode)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -168,7 +167,7 @@ class GMA(BaseModel):
             fmap2=fmap2,
             radius=self.corr_radius,
             num_levels=self.corr_levels,
-            alternate_corr=self.alternate_corr,
+            corr_mode=self.corr_mode,
         )
 
         # run the context network
@@ -222,3 +221,6 @@ class GMA(BaseModel):
 @trainable
 class gma(GMA):
     pass
+
+
+register_model_variants({"gma": GMA}, RAFT_CORR_VARIANTS)

@@ -1,15 +1,15 @@
 from typing import Optional, Sequence
 
-try:
-    from spatial_correlation_sampler import SpatialCorrelationSampler
-except ModuleNotFoundError:
-    from ptlflow.utils.correlation import (
-        IterSpatialCorrelationSampler as SpatialCorrelationSampler,
-    )
 import torch
 import torch.nn as nn
 
-from ptlflow.utils.registry import register_model
+from ptlflow.utils.corr_modes import (
+    get_spatial_corr_sampler,
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants
 from .pwc_modules import conv, upsample2d_as, rescale_flow, initialize_msra
 from .pwc_modules import WarpingLayer, FeatureExtractor
 from .pwc_modules import FlowAndOccContextNetwork, FlowAndOccEstimatorDense
@@ -31,6 +31,7 @@ class StarFlow(BaseModel):
         output_level: int = 4,
         num_levels: int = 7,
         num_chs: Sequence[int] = (3, 16, 32, 64, 96, 128, 196),
+        corr_mode: SpatialCorrMode = "iter",
         train_batch_size: Optional[int] = None,
         simple_io: bool = False,
         **kwargs,
@@ -48,6 +49,7 @@ class StarFlow(BaseModel):
         self.num_levels = num_levels
         self.num_chs = num_chs
         self.train_batch_size = train_batch_size
+        self.corr_mode = corr_mode
 
         self.leakyRELU = nn.LeakyReLU(0.1, inplace=True)
 
@@ -86,14 +88,17 @@ class StarFlow(BaseModel):
         self.refine_flow = RefineFlow(2 + 1 + 32)
         self.refine_occ = RefineOcc(1 + 32 + 32)
 
-        self.corr = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.search_range + 1, padding=0
+        log_corr_mode_warnings(self.corr_mode)
+        self.corr, self._corr_error = get_spatial_corr_sampler(
+            self.corr_mode, patch_size=2 * self.search_range + 1
         )
 
         initialize_msra(self.modules())
 
     def forward(self, inputs):
         inputs = self._normalize_inputs(inputs)
+        if self.corr is None:
+            raise self._corr_error
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=0.0,
@@ -459,3 +464,6 @@ class StarFlow(BaseModel):
 @register_model
 class starflow(StarFlow):
     pass
+
+
+register_model_variants({"starflow": StarFlow}, SPATIAL_CORR_VARIANTS)

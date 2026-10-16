@@ -3,10 +3,16 @@ from typing import Optional, Sequence
 import torch
 import torch.nn as nn
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    get_raft_corr_block,
+    log_corr_mode_warnings,
+    RaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from ptlflow.utils.utils import forward_interpolate_batch
 from .optimizer import fetch_optimizer
-from .MemFlowNet.corr import CorrBlock
+from .MemFlowNet.corr import AlternateCorrBlock, CorrBlock
 from .memory_manager_skflow import MemoryManager
 from .MemFlowNet.MemFlow import MemFlowNet
 from .MemFlowNet.memory_util import *
@@ -76,7 +82,9 @@ class MemFlow(BaseModel):
         fnet: str = "basicencoder",
         feat_dim: int = 256,
         gma: str = "GMA-SK2",
-        corr_fn: str = "default",
+        # The all-pairs CorrBlock is the original (and default) correlation
+        # engine of this model, so "allpairs" remains the default corr_mode.
+        corr_mode: RaftCorrMode = "allpairs",
         down_ratio: int = 8,
         decoder_depth: int = 15,
         cost_heads_num: int = 1,
@@ -126,7 +134,7 @@ class MemFlow(BaseModel):
         self.fnet = fnet
         self.feat_dim = feat_dim
         self.gma = gma
-        self.corr_fn = corr_fn
+        self.corr_mode = corr_mode
         self.down_ratio = down_ratio
         self.decoder_depth = decoder_depth
         self.cost_heads_num = cost_heads_num
@@ -163,7 +171,7 @@ class MemFlow(BaseModel):
             decoder_depth=decoder_depth,
             pretrain=pretrain,
             gma=gma,
-            corr_fn=corr_fn,
+            corr_mode=corr_mode,
             train_avg_length=train_avg_length,
         )
 
@@ -175,6 +183,8 @@ class MemFlow(BaseModel):
             self.train_avg_length = train_avg_length
 
         self.clear_memory()
+
+        log_corr_mode_warnings(self.corr_mode)
 
     def clear_memory(self):
         self.curr_ti = -1
@@ -231,7 +241,15 @@ class MemFlow(BaseModel):
         )
 
         # predict flow
-        corr_fn = CorrBlock(fmaps[:, 0, ...], fmaps[:, 1, ...], num_levels=4, radius=4)
+        corr_fn = get_raft_corr_block(
+            self.corr_mode,
+            fmap1=fmaps[:, 0, ...],
+            fmap2=fmaps[:, 1, ...],
+            num_levels=4,
+            radius=4,
+            allpairs_cls=CorrBlock,
+            alt_cls=AlternateCorrBlock,
+        )
 
         flow_predictions = []
         for itr in range(self.decoder_depth):
@@ -312,7 +330,7 @@ class MemFlowT(MemFlow):
         fnet: str = "twins",
         feat_dim: int = 256,
         gma: str = "GMA-SK2",
-        corr_fn: str = "default",
+        corr_mode: RaftCorrMode = "allpairs",
         down_ratio: int = 8,
         decoder_depth: int = 15,
         cost_heads_num: int = 1,
@@ -346,7 +364,7 @@ class MemFlowT(MemFlow):
             fnet,
             feat_dim,
             gma,
-            corr_fn,
+            corr_mode,
             down_ratio,
             decoder_depth,
             cost_heads_num,
@@ -378,3 +396,6 @@ class memflow(MemFlow):
 @trainable
 class memflow_t(MemFlowT):
     pass
+
+
+register_model_variants({"memflow": MemFlow, "memflow_t": MemFlowT}, RAFT_CORR_VARIANTS)

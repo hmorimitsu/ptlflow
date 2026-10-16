@@ -2,7 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model
+from ptlflow.utils.corr_modes import (
+    get_raft_corr_block,
+    log_corr_mode_warnings,
+    RaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants
 from .Networks.encoders import twins_svt_large, convnext_Xlarge_4x, convnext_base_2x
 from .Networks.MOFNetStack.corr import CorrBlock, AlternateCorrBlock
 from .utils import coords_grid
@@ -26,7 +32,7 @@ class VideoFlowMOF(BaseModel):
         fnet: str = "twins",
         gma: str = "GMA-SK2",
         pretrain: bool = False,
-        corr_fn: str = "default",
+        corr_mode: RaftCorrMode = "allpairs",
         decoder_depth: int = 32,
         feat_dim: int = 256,
         Tfusion: str = "stack",
@@ -44,7 +50,7 @@ class VideoFlowMOF(BaseModel):
         self.fnet = fnet
         self.gma = gma
         self.pretrain = pretrain
-        self.corr_fn = corr_fn
+        self.corr_mode = corr_mode
         self.decoder_depth = decoder_depth
         self.feat_dim = feat_dim
         self.Tfusion = Tfusion
@@ -94,7 +100,7 @@ class VideoFlowMOF(BaseModel):
                 hidden_dim=128 // hidden_dim_ratio,
             )
 
-        print("[Using corr_fn {}]".format(self.corr_fn))
+        print("[Using corr_mode {}]".format(self.corr_mode))
 
         self.att = Attention(
             dim=128 // hidden_dim_ratio,
@@ -115,6 +121,8 @@ class VideoFlowMOF(BaseModel):
             )
 
         self.has_showed_warning = False
+
+        log_corr_mode_warnings(self.corr_mode)
 
     def initialize_flow(self, img, bs, down_ratio):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
@@ -213,30 +221,31 @@ class VideoFlowMOF(BaseModel):
             B, N, -1, H // down_ratio, W // down_ratio
         )
 
-        if self.corr_fn == "default":
-            corr_fn = CorrBlock
-        elif self.corr_fn == "efficient":
-            corr_fn = AlternateCorrBlock
-
-        forward_corr_fn = corr_fn(
-            fmaps[:, 1 : N - 1, ...].reshape(
+        forward_corr_fn = get_raft_corr_block(
+            self.corr_mode,
+            fmap1=fmaps[:, 1 : N - 1, ...].reshape(
                 B * (N - 2), -1, H // down_ratio, W // down_ratio
             ),
-            fmaps[:, 2:N, ...].reshape(
+            fmap2=fmaps[:, 2:N, ...].reshape(
                 B * (N - 2), -1, H // down_ratio, W // down_ratio
             ),
             num_levels=self.corr_levels,
             radius=self.corr_radius,
+            allpairs_cls=CorrBlock,
+            alt_cls=AlternateCorrBlock,
         )
-        backward_corr_fn = corr_fn(
-            fmaps[:, 1 : N - 1, ...].reshape(
+        backward_corr_fn = get_raft_corr_block(
+            self.corr_mode,
+            fmap1=fmaps[:, 1 : N - 1, ...].reshape(
                 B * (N - 2), -1, H // down_ratio, W // down_ratio
             ),
-            fmaps[:, 0 : N - 2, ...].reshape(
+            fmap2=fmaps[:, 0 : N - 2, ...].reshape(
                 B * (N - 2), -1, H // down_ratio, W // down_ratio
             ),
             num_levels=self.corr_levels,
             radius=self.corr_radius,
+            allpairs_cls=CorrBlock,
+            alt_cls=AlternateCorrBlock,
         )
 
         cnet = self.cnet(images[:, 1 : N - 1, ...].reshape(B * (N - 2), 3, H, W))
@@ -369,3 +378,6 @@ class VideoFlowMOF(BaseModel):
 @register_model
 class videoflow_mof(VideoFlowMOF):
     pass
+
+
+register_model_variants({"videoflow_mof": VideoFlowMOF}, RAFT_CORR_VARIANTS)
