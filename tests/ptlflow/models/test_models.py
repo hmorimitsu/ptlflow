@@ -35,39 +35,19 @@ DATASET = "overfit"
 EXCLUDE_MODELS = [
     "matchflow",
     "matchflow_raft",
-    "raft_alt_cuda_corr",  # requires the compiled alt_cuda_corr extension
-    "raft_localcorr_cuda",  # requires localcorr + its built CUDA kernel
-    "raft_localcorr_onnx",  # requires localcorr
-    "raft_localcorr_sycl",  # requires localcorr + torch.xpu (OpenVINO deployment mode)
-    "raft_localcorr_triton",  # requires localcorr
-    "pwcnet_localcorr_cuda",  # requires localcorr + its built CUDA kernel
-    "pwcnet_localcorr_onnx",  # requires localcorr
-    "pwcnet_localcorr_sycl",  # requires localcorr + torch.xpu (OpenVINO deployment mode)
-    "pwcnet_localcorr_triton",  # requires localcorr
-    "pwcnet_spatial_corr",  # requires the compiled spatial_correlation_sampler extension
     "scv4",
     "scv8",
     "separableflow",
     "splatflow",
     "streamflow",
     "waft_dinov3_a2",
-]  # Has additional requirements
+]  # Has additional requirements. Mode variants (see register_model_variants) are also excluded.
 
 EXCLUDE_MODELS_FP16 = [
     "lcv_raft",
     "lcv_raft_small",
     "matchflow",
     "matchflow_raft",
-    "raft_alt_cuda_corr",  # requires the compiled alt_cuda_corr extension
-    "raft_localcorr_cuda",  # requires localcorr + its built CUDA kernel
-    "raft_localcorr_onnx",  # requires localcorr
-    "raft_localcorr_sycl",  # requires localcorr + torch.xpu (OpenVINO deployment mode)
-    "raft_localcorr_triton",  # requires localcorr
-    "pwcnet_localcorr_cuda",  # requires localcorr + its built CUDA kernel
-    "pwcnet_localcorr_onnx",  # requires localcorr
-    "pwcnet_localcorr_sycl",  # requires localcorr + torch.xpu (OpenVINO deployment mode)
-    "pwcnet_localcorr_triton",  # requires localcorr
-    "pwcnet_spatial_corr",  # requires the compiled spatial_correlation_sampler extension
     "scv4",
     "scv8",
     "separableflow",
@@ -106,7 +86,9 @@ SIMPLE_IO_NUM_IMAGES = {
 
 
 def test_forward() -> None:
-    model_names = ptlflow._models_dict.keys()
+    model_names = [
+        n for n in ptlflow._models_dict.keys() if not ptlflow.is_model_variant(n)
+    ]
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
@@ -142,7 +124,9 @@ def test_forward() -> None:
 
 def test_forward_fp16() -> None:
     if torch.cuda.is_available():
-        model_names = ptlflow._models_dict.keys()
+        model_names = [
+            n for n in ptlflow._models_dict.keys() if not ptlflow.is_model_variant(n)
+        ]
         for mname in model_names:
             if mname in EXCLUDE_MODELS_FP16:
                 continue
@@ -178,7 +162,9 @@ def test_forward_fp16() -> None:
 
 
 def test_simple_io() -> None:
-    model_names = ptlflow._models_dict.keys()
+    model_names = [
+        n for n in ptlflow._models_dict.keys() if not ptlflow.is_model_variant(n)
+    ]
     for mname in model_names:
         if mname in EXCLUDE_MODELS_SIMPLE_IO:
             continue
@@ -246,7 +232,9 @@ def test_simple_io() -> None:
 def test_train(tmp_path: Path):
     write_flying_chairs2(tmp_path)
 
-    model_names = ptlflow._models_dict.keys()
+    model_names = [
+        n for n in ptlflow._models_dict.keys() if not ptlflow.is_model_variant(n)
+    ]
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
@@ -287,7 +275,9 @@ def _train_one_pass(tmp_path: Path, model_name: str) -> None:
 def test_overfit(tmp_path: Path) -> None:
     print("Saving outputs to " + str(tmp_path))
 
-    model_names = ptlflow._models_dict.keys()
+    model_names = [
+        n for n in ptlflow._models_dict.keys() if not ptlflow.is_model_variant(n)
+    ]
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue

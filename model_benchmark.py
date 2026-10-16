@@ -258,9 +258,11 @@ def benchmark(args: Namespace, device_handle: Optional[Any]) -> pd.DataFrame:
         output_suffix = None
 
     model_args = args
-    available_model_names = ptlflow.get_model_names()
+    available_model_names = ptlflow.get_model_names(include_variants=True)
     if args.all:
-        model_names = available_model_names
+        # --all only iterates over the primary models; use
+        # --select <variant names> to benchmark generated variants.
+        model_names = ptlflow.get_model_names()
         model_args = None
     elif args.select is not None and len(args.select) > 0:
         for name in args.select:

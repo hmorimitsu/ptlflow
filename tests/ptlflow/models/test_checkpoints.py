@@ -417,7 +417,9 @@ EXCLUDE_MODELS = ["scv4", "scv8"]  # Has additional requirements
 
 @pytest.mark.skip(reason="Requires to download all checkpoints. Just run occasionally.")
 def test_ckpt_exists() -> None:
-    model_names = ptlflow._models_dict.keys()
+    model_names = [
+        n for n in ptlflow._models_dict.keys() if not ptlflow.is_model_variant(n)
+    ]
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
@@ -436,7 +438,9 @@ def test_ckpt_exists() -> None:
 @pytest.mark.skip(reason="Requires to download all checkpoints. Just run occasionally.")
 def test_accuracy() -> None:
     data = _load_data()
-    model_names = ptlflow._models_dict.keys()
+    model_names = [
+        n for n in ptlflow._models_dict.keys() if not ptlflow.is_model_variant(n)
+    ]
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
