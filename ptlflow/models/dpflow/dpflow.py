@@ -33,12 +33,18 @@ from .utils import (
     get_norm,
 )
 from ptlflow.utils.utils import forward_interpolate_batch
-from ptlflow.utils.registry import register_model, trainable, ptlflow_trained
-
-try:
-    import alt_cuda_corr
-except ImportError:
-    alt_cuda_corr = None
+from ptlflow.utils.corr_modes import (
+    get_raft_corr_block,
+    log_corr_mode_warnings,
+    RaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import (
+    register_model,
+    register_model_variants,
+    trainable,
+    ptlflow_trained,
+)
 
 
 class SequenceLoss(nn.Module):
@@ -106,7 +112,7 @@ class DPFlow(BaseModel):
         detach_flow: bool = True,
         use_norm_affine: bool = False,
         group_norm_num_groups: int = 8,
-        corr_mode: str = "allpairs",  # "allpairs" or "local"
+        corr_mode: RaftCorrMode = "allpairs",
         corr_levels: int = 1,
         corr_range: int = 4,
         activation_function: str = "orig",  # "orig", "relu", "gelu", "silu", or "mish"
@@ -280,7 +286,8 @@ class DPFlow(BaseModel):
         self.current_output_stride = output_stride
 
         self.has_shown_input_message = False
-        self.has_shown_altcuda_message = False
+
+        log_corr_mode_warnings(self.corr_mode)
 
     def coords_grid(self, batch, ht, wd):
         coords = torch.meshgrid(
@@ -322,12 +329,6 @@ class DPFlow(BaseModel):
                 recommended_pyr_levels,
             )
 
-    def _show_altcuda_message(self):
-        if self.corr_mode == "local" and alt_cuda_corr is None:
-            logger.warning(
-                f"DPFlow: You are running with --corr_mode local, but alt_cuda_corr is not installed. Please install alt_cuda_corr to increase the speed."
-            )
-
     def forward(self, inputs):
         inputs = self._normalize_inputs(inputs)
         try:
@@ -335,28 +336,25 @@ class DPFlow(BaseModel):
         except torch.OutOfMemoryError:
             if self.corr_mode == "allpairs":
                 logger.warning(
-                    "DPFlow: CUDA out of memory error with input size {}. DPFlow will set --model.corr_mode to 'local' and re-attempt inference. This decreases memory consumption, but it is also slower.",
+                    "DPFlow: CUDA out of memory error with input size {}. DPFlow will set --model.corr_mode to 'torch' and re-attempt inference. This decreases memory consumption, but it is also slower.",
                     list(inputs["images"].shape[-2:]),
                 )
-                self.corr_mode = "local"
+                self.corr_mode = "torch"
                 try:
                     return self._maybe_return_simple(self.forward_flow(inputs))
                 except torch.OutOfMemoryError:
                     logger.error(
-                        "DPFlow: CUDA out of memory error even after setting --model.corr_mode to 'local'. DPFlow cannot process this input size: {} on this device.",
+                        "DPFlow: CUDA out of memory error even after setting --model.corr_mode to 'torch'. DPFlow cannot process this input size: {} on this device.",
                         list(inputs["images"].shape[-2:]),
                     )
             else:
                 logger.error(
-                    "DPFlow: CUDA out of memory error even with --model.corr_mode set to 'local'. DPFlow cannot process this input size: {} on this device.",
+                    "DPFlow: CUDA out of memory error even with --model.corr_mode set to '{}'. DPFlow cannot process this input size: {} on this device.",
+                    self.corr_mode,
                     list(inputs["images"].shape[-2:]),
                 )
 
     def forward_flow(self, inputs):
-        if self.corr_mode == "local" and not self.has_shown_altcuda_message:
-            self._show_altcuda_message()
-            self.has_shown_altcuda_message = True
-
         if self.pyramid_levels is not None and not self.has_shown_input_message:
             self._show_input_message(inputs["images"])
             self.has_shown_input_message = True
@@ -492,10 +490,15 @@ class DPFlow(BaseModel):
 
             coords0 = self.coords_grid(x1.shape[0], x1.shape[2], x1.shape[3])
 
-            if self.corr_mode == "allpairs":
-                corr_fn = CorrBlock(x1, x2, self.corr_levels, self.corr_range)
-            else:
-                corr_fn = AlternateCorrBlock(x1, x2, self.corr_levels, self.corr_range)
+            corr_fn = get_raft_corr_block(
+                self.corr_mode,
+                fmap1=x1,
+                fmap2=x2,
+                num_levels=self.corr_levels,
+                radius=self.corr_range,
+                allpairs_cls=CorrBlock,
+                alt_cls=AlternateCorrBlock,
+            )
 
             if l > 0:
                 flow = rescale_flow(flow, x1.shape[-1], x1.shape[-2], to_local=False)
@@ -549,3 +552,6 @@ class DPFlow(BaseModel):
 @ptlflow_trained
 class dpflow(DPFlow):
     pass
+
+
+register_model_variants({"dpflow": DPFlow}, RAFT_CORR_VARIANTS)

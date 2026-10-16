@@ -4,7 +4,13 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    get_spatial_corr_sampler,
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from .submodules import *
 from .flownet_base import FlowNetBase
 
@@ -19,6 +25,7 @@ class FlowNetC(FlowNetBase):
         div_flow: float = 20.0,
         input_channels: int = 6,
         batch_norm: bool = False,
+        corr_mode: SpatialCorrMode = "iter",
         loss_start_scale: int = 4,
         loss_num_scales: int = 5,
         loss_base_weight: float = 0.32,
@@ -37,13 +44,29 @@ class FlowNetC(FlowNetBase):
         )
 
         self.rgb_max = 1
+        self.corr_mode = corr_mode
 
         self.conv1 = conv(self.batch_norm, 3, 64, kernel_size=7, stride=2)
         self.conv2 = conv(self.batch_norm, 64, 128, kernel_size=5, stride=2)
         self.conv3 = conv(self.batch_norm, 128, 256, kernel_size=5, stride=2)
         self.conv_redir = conv(self.batch_norm, 256, 32, kernel_size=1, stride=1)
 
-        self.corr = correlate  # Correlation(pad_size=20, kernel_size=1, max_displacement=20, stride1=1, stride2=2, corr_multiply=1)
+        log_corr_mode_warnings(corr_mode)
+        # Equivalent to the original correlate() from .submodules: patch of 21
+        # with dilation 2 (displacements up to +-20), output [B, 21*21, H, W] / C.
+        corr_sampler, self._corr_error = get_spatial_corr_sampler(
+            corr_mode, patch_size=21, dilation_patch=2
+        )
+        if corr_sampler is not None:
+
+            def _correlate(input1, input2, _sampler=corr_sampler):
+                out_corr = _sampler(input1, input2)
+                b, ph, pw, h, w = out_corr.size()
+                return out_corr.view(b, ph * pw, h, w) / input1.size(1)
+
+            self.corr = _correlate
+        else:
+            self.corr = None
 
         self.corr_activation = nn.LeakyReLU(0.1, inplace=True)
         self.conv3_1 = conv(self.batch_norm, 473, 256)
@@ -86,6 +109,8 @@ class FlowNetC(FlowNetBase):
         )
 
     def forward(self, inputs, skip_preprocess=False):
+        if self.corr is None:
+            raise self._corr_error
         inputs = self._normalize_inputs(inputs)
         images = inputs["images"]
         if skip_preprocess:
@@ -177,3 +202,6 @@ class FlowNetC(FlowNetBase):
 @trainable
 class flownetc(FlowNetC):
     pass
+
+
+register_model_variants({"flownetc": FlowNetC}, SPATIAL_CORR_VARIANTS)

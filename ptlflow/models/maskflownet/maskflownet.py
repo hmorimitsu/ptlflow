@@ -8,14 +8,13 @@ from torch.autograd import Variable
 import numpy as np
 from torchvision import ops
 
-try:
-    from spatial_correlation_sampler import SpatialCorrelationSampler
-except ModuleNotFoundError:
-    from ptlflow.utils.correlation import (
-        IterSpatialCorrelationSampler as SpatialCorrelationSampler,
-    )
-
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    get_spatial_corr_sampler,
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from ..base_model.base_model import BaseModel
 
 
@@ -141,6 +140,7 @@ class MaskFlownet_S(BaseModel):
         deform_bias: bool = True,
         strides: Sequence[int] = (64, 32, 16, 8, 4),
         upfeat_ch: Sequence[int] = (16, 16, 16, 16),
+        corr_mode: SpatialCorrMode = "iter",
         loss_weights: Sequence[float] = (0.005, 0.01, 0.02, 0.08, 0.32),
         loss_match: str = "upsampling",
         loss_eps: float = 1e-8,
@@ -167,6 +167,7 @@ class MaskFlownet_S(BaseModel):
         self.deform_bias = deform_bias
         self.strides = strides
         self.upfeat_ch = upfeat_ch
+        self.corr_mode = corr_mode
 
         self.scale = self.div_flow * self.flow_multiplier
         self.deform_bias = self.deform_bias
@@ -190,8 +191,9 @@ class MaskFlownet_S(BaseModel):
         self.conv6b = conv(196, 196, kernel_size=3, stride=1)
         self.conv6c = conv(196, 196, kernel_size=3, stride=1)
 
-        self.corr_fn = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.md + 1, padding=0
+        log_corr_mode_warnings(self.corr_mode)
+        self.corr_fn, self._corr_error = get_spatial_corr_sampler(
+            self.corr_mode, patch_size=2 * self.md + 1
         )
         # self.corr    = Correlation(pad_size=md, kernel_size=1, max_displacement=md, stride1=1, stride2=1, corr_multiply=1)
         self.leakyRELU = nn.LeakyReLU(0.1)
@@ -345,6 +347,8 @@ class MaskFlownet_S(BaseModel):
 
     def forward(self, inputs, skip_preprocess=False):
         inputs = self._normalize_inputs(inputs)
+        if self.corr_fn is None:
+            raise self._corr_error
         if not skip_preprocess:
             bgr_mean = rearrange(inputs["images"], "b n c h w -> b c (n h w)").mean(2)[
                 :, None, :, None, None
@@ -535,6 +539,7 @@ class MaskFlownet(BaseModel):
         deform_bias: bool = True,
         strides: Sequence[int] = (64, 32, 16, 8, 4),
         upfeat_ch: Sequence[int] = (16, 16, 16, 16),
+        corr_mode: SpatialCorrMode = "iter",
         loss_weights: Sequence[float] = (0.005, 0.01, 0.02, 0.08, 0.32),
         loss_match: str = "upsampling",
         loss_eps: float = 1e-8,
@@ -562,9 +567,12 @@ class MaskFlownet(BaseModel):
         self.deform_bias = deform_bias
         self.strides = strides
         self.upfeat_ch = upfeat_ch
+        self.corr_mode = corr_mode
 
         self.scale = self.div_flow * self.flow_multiplier
         self.deform_bias = self.deform_bias
+
+        log_corr_mode_warnings(self.corr_mode)
 
         self.MaskFlownet_S = MaskFlownet_S(
             div_flow=div_flow,
@@ -573,6 +581,7 @@ class MaskFlownet(BaseModel):
             deform_bias=deform_bias,
             strides=strides,
             upfeat_ch=upfeat_ch,
+            corr_mode=corr_mode,
             loss_weights=loss_weights,
             loss_match=loss_match,
             loss_eps=loss_eps,
@@ -601,8 +610,8 @@ class MaskFlownet(BaseModel):
         self.conv6z = conv(196, 196, stride=1)
 
         self.leakyRELU = nn.LeakyReLU(0.1)
-        self.corr_fn = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.md2 + 1, padding=0
+        self.corr_fn, self._corr_error = get_spatial_corr_sampler(
+            self.corr_mode, patch_size=2 * self.md2 + 1
         )
         # self.corr    = Correlation(pad_size=self.md, kernel_size=1, max_displacement=self.md, stride1=1, stride2=1, corr_multiply=1)
 
@@ -738,6 +747,8 @@ class MaskFlownet(BaseModel):
 
     def forward(self, inputs):
         inputs = self._normalize_inputs(inputs)
+        if self.corr_fn is None:
+            raise self._corr_error
         bgr_mean = rearrange(inputs["images"], "b n c h w -> b c (n h w)").mean(2)[
             :, None, :, None, None
         ]
@@ -966,3 +977,8 @@ class maskflownet_s(MaskFlownet_S):
 @trainable
 class maskflownet(MaskFlownet):
     pass
+
+
+register_model_variants(
+    {"maskflownet": MaskFlownet, "maskflownet_s": MaskFlownet_S}, SPATIAL_CORR_VARIANTS
+)

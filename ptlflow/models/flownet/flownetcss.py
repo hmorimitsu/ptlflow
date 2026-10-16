@@ -9,7 +9,8 @@ from .submodules import *
 from .flownet_base import FlowNetBase
 
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import SPATIAL_CORR_VARIANTS
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 
 
 class FlowNetCSS(FlowNetBase):
@@ -194,3 +195,6 @@ class FlowNetCSS(FlowNetBase):
 @trainable
 class flownetcss(FlowNetCSS):
     pass
+
+
+register_model_variants({"flownetcss": FlowNetCSS}, SPATIAL_CORR_VARIANTS)

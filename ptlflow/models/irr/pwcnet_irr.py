@@ -1,15 +1,15 @@
 from typing import Optional, Sequence
 
-try:
-    from spatial_correlation_sampler import SpatialCorrelationSampler
-except ModuleNotFoundError:
-    from ptlflow.utils.correlation import (
-        IterSpatialCorrelationSampler as SpatialCorrelationSampler,
-    )
 import torch
 import torch.nn as nn
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    get_spatial_corr_sampler,
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from .pwc_modules import conv, rescale_flow, upsample2d_as, initialize_msra
 from .pwc_modules import (
     WarpingLayer,
@@ -32,6 +32,7 @@ class IRRPWCNetIRR(BaseModel):
         search_range: int = 4,
         output_level: int = 4,
         num_chs: Sequence[int] = (3, 16, 32, 64, 96, 128, 196),
+        corr_mode: SpatialCorrMode = "iter",
         train_batch_size: Optional[int] = None,
         simple_io: bool = False,
         **kwargs,
@@ -50,6 +51,7 @@ class IRRPWCNetIRR(BaseModel):
         self.output_level = output_level
         self.num_chs = num_chs
         self.train_batch_size = train_batch_size
+        self.corr_mode = corr_mode
 
         self.leakyRELU = nn.LeakyReLU(0.1, inplace=True)
 
@@ -73,14 +75,17 @@ class IRRPWCNetIRR(BaseModel):
             ]
         )
 
-        self.corr = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.search_range + 1, padding=0
+        log_corr_mode_warnings(self.corr_mode)
+        self.corr, self._corr_error = get_spatial_corr_sampler(
+            self.corr_mode, patch_size=2 * self.search_range + 1
         )
 
         initialize_msra(self.modules())
 
     def forward(self, inputs):
         inputs = self._normalize_inputs(inputs)
+        if self.corr is None:
+            raise self._corr_error
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=0.0,
@@ -168,3 +173,6 @@ class IRRPWCNetIRR(BaseModel):
 @trainable
 class irr_pwcnet_irr(IRRPWCNetIRR):
     pass
+
+
+register_model_variants({"irr_pwcnet_irr": IRRPWCNetIRR}, SPATIAL_CORR_VARIANTS)

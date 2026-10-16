@@ -4,7 +4,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from . import backbone
 from . import transformer
 from . import matching
@@ -53,6 +58,7 @@ class NeuFlow(BaseModel):
         gamma: float = 0.8,
         max_flow: float = 400.0,
         feature_dim: int = 90,
+        corr_mode: SpatialCorrMode = "iter",
         simple_io: bool = False,
         **kwargs,
     ) -> None:
@@ -64,6 +70,8 @@ class NeuFlow(BaseModel):
         )
 
         self.feature_dim = feature_dim
+        self.corr_mode = corr_mode
+        log_corr_mode_warnings(corr_mode)
 
         if not version("torch").startswith("2"):
             raise ImportError(
@@ -104,7 +112,9 @@ class NeuFlow(BaseModel):
             ),
         )
 
-        self.refine_s8 = refine.Refine(feature_dim, patch_size=7, num_layers=6)
+        self.refine_s8 = refine.Refine(
+            feature_dim, patch_size=7, num_layers=6, corr_mode=corr_mode
+        )
 
         self.conv_s8 = backbone.ConvBlock(
             3, feature_dim, kernel_size=8, stride=8, padding=0
@@ -200,3 +210,6 @@ class NeuFlow(BaseModel):
 @trainable
 class neuflow(NeuFlow):
     pass
+
+
+register_model_variants({"neuflow": NeuFlow}, SPATIAL_CORR_VARIANTS)

@@ -57,11 +57,8 @@ EXCLUDE_MODELS_FP16 = [
 ]  # Some operations do not support fp16
 
 MODEL_ARGS = {
-    "ccmr": {"alternate_corr": False},
-    "ccmr_p": {"alternate_corr": False},
     "flowformer": {"use_tile_input": False},
     "flowformer_pp": {"use_tile_input": False},
-    "ms_raft_p": {"alternate_corr": False},
     "rapidflow": {"corr_mode": "allpairs"},
     "rapidflow_it1": {"corr_mode": "allpairs"},
     "rapidflow_it2": {"corr_mode": "allpairs"},

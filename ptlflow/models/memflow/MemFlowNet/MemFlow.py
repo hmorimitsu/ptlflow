@@ -5,7 +5,8 @@ import torch.nn.functional as F
 from .update import GMAUpdateBlock
 from ..encoders import twins_svt_large
 from .cnn import BasicEncoder
-from .corr import CorrBlock
+from .corr import AlternateCorrBlock, CorrBlock
+from ptlflow.utils.corr_modes import get_raft_corr_block
 from ..utils import coords_grid
 from .gma import Attention
 from .sk import SKUpdateBlock6_Deep_nopoolres_AllDecoder
@@ -28,8 +29,8 @@ class MemFlowNet(nn.Module):
         decoder_depth,
         pretrain,
         gma,
-        corr_fn,
-        train_avg_length,
+        corr_mode="allpairs",
+        train_avg_length=None,
     ):
         super().__init__()
 
@@ -38,6 +39,7 @@ class MemFlowNet(nn.Module):
         self.corr_levels = corr_levels
         self.corr_radius = corr_radius
         self.decoder_depth = decoder_depth
+        self.corr_mode = corr_mode
 
         self.hidden_dim = 128
         self.context_dim = 128
@@ -78,7 +80,7 @@ class MemFlowNet(nn.Module):
                 hidden_dim=128,
             )
 
-        print("[Using corr_fn {}]".format(corr_fn))
+        print("[Using corr_mode {}]".format(corr_mode))
 
         self.att = Attention(
             dim=self.context_dim,
@@ -164,11 +166,14 @@ class MemFlowNet(nn.Module):
         ref_values,
         test_mode=False,
     ):
-        corr_fn = CorrBlock(
-            fmaps[:, 0, ...],
-            fmaps[:, 1, ...],
+        corr_fn = get_raft_corr_block(
+            self.corr_mode,
+            fmap1=fmaps[:, 0, ...],
+            fmap2=fmaps[:, 1, ...],
             num_levels=self.corr_levels,
             radius=self.corr_radius,
+            allpairs_cls=CorrBlock,
+            alt_cls=AlternateCorrBlock,
         )
         flow_predictions = []
         query = query.flatten(start_dim=2).permute(0, 2, 1).unsqueeze(2)

@@ -1,16 +1,16 @@
 from typing import Sequence
 
-try:
-    from spatial_correlation_sampler import SpatialCorrelationSampler
-except ModuleNotFoundError:
-    from ptlflow.utils.correlation import (
-        IterSpatialCorrelationSampler as SpatialCorrelationSampler,
-    )
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    get_spatial_corr_sampler,
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from .hd3_ops import *
 from .dla_up import DLAEncoder as dlaup_encoder
 from .vgg import VGGEncoder as vgg_encoder
@@ -101,6 +101,7 @@ class HD3(BaseModel):
         decoder: str = "hda",
         downsample: int = 6,
         corr_range: Sequence[int] = (4, 4, 4, 4, 4, 4),
+        corr_mode: SpatialCorrMode = "iter",
         context: bool = False,
         simple_io: bool = False,
         **kwargs,
@@ -117,6 +118,7 @@ class HD3(BaseModel):
         self.decoder = decoder
         self.downsample = downsample
         self.corr_range = corr_range
+        self.corr_mode = corr_mode
         self.context = context
 
         if self.task == "flow":
@@ -169,7 +171,10 @@ class HD3(BaseModel):
                     Decoder(input_d, dec_block, self.classes[l], up_classes=up_classes),
                 )
 
-        self.corr = SpatialCorrelationSampler(kernel_size=1, patch_size=9, padding=0)
+        log_corr_mode_warnings(self.corr_mode)
+        self.corr, self._corr_error = get_spatial_corr_sampler(
+            self.corr_mode, patch_size=9
+        )
 
         for m in self.modules():
             classname = m.__class__.__name__
@@ -188,6 +193,8 @@ class HD3(BaseModel):
 
     def forward(self, inputs):
         inputs = self._normalize_inputs(inputs)
+        if self.corr is None:
+            raise self._corr_error
         x, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=[-0.485, -0.456, -0.406],
@@ -288,7 +295,13 @@ class HD3Context(HD3):
         **kwargs,
     ):
         super().__init__(
-            task, encoder, decoder, downsample, corr_range, context, **kwargs
+            task=task,
+            encoder=encoder,
+            decoder=decoder,
+            downsample=downsample,
+            corr_range=corr_range,
+            context=context,
+            **kwargs,
         )
 
 
@@ -302,3 +315,6 @@ class hd3(HD3):
 @trainable
 class hd3_ctxt(HD3Context):
     pass
+
+
+register_model_variants({"hd3": HD3, "hd3_ctxt": HD3Context}, SPATIAL_CORR_VARIANTS)

@@ -21,7 +21,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model, trainable, ptlflow_trained
+from ptlflow.utils.corr_modes import (
+    log_corr_mode_warnings,
+    RaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import (
+    register_model,
+    register_model_variants,
+    trainable,
+    ptlflow_trained,
+)
 from ptlflow.utils.utils import forward_interpolate_batch
 from .pwc_modules import rescale_flow, upsample2d_as
 from .update_partial import UpdatePartialBlock
@@ -121,7 +131,7 @@ class RPKNet(BaseModel):
         input_pad_one_side: bool = False,
         input_bgr_to_rgb: bool = False,
         detach_flow: bool = True,
-        corr_mode: str = "allpairs",
+        corr_mode: RaftCorrMode = "allpairs",
         upgate_norm_type: str = "group",
         use_norm_affine: bool = False,
         group_norm_num_groups: int = 8,
@@ -285,6 +295,8 @@ class RPKNet(BaseModel):
 
         self.has_trained_on_ptlflow = True
 
+        log_corr_mode_warnings(self.corr_mode)
+
     def coords_grid(self, batch, ht, wd):
         coords = torch.meshgrid(
             torch.arange(ht, dtype=self.dtype, device=self.device),
@@ -408,7 +420,7 @@ class RPKNet(BaseModel):
                 x2,
                 self.corr_levels,
                 self.corr_range,
-                alternate_corr=self.corr_mode == "local",
+                corr_mode=self.corr_mode,
             )
 
             if net is None:
@@ -465,3 +477,6 @@ class RPKNet(BaseModel):
 @ptlflow_trained
 class rpknet(RPKNet):
     pass
+
+
+register_model_variants({"rpknet": RPKNet}, RAFT_CORR_VARIANTS)
