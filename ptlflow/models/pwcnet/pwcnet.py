@@ -20,7 +20,7 @@ import torch
 import torch.nn as nn
 
 from ptlflow.utils.correlation import IterSpatialCorrelationSampler
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from ..base_model.base_model import BaseModel
 from ..flownet.losses import MultiScale
 
@@ -568,31 +568,13 @@ class pwcnet_nodc(PWCNet):
     pass
 
 
-@register_model
-class pwcnet_spatial_corr(PWCDCNet):
-    def __init__(self, corr_mode="spatial", **kwargs):
-        super().__init__(corr_mode=corr_mode, **kwargs)
-
-
-@register_model
-class pwcnet_localcorr_cuda(PWCDCNet):
-    def __init__(self, corr_mode="localcorr_cuda", **kwargs):
-        super().__init__(corr_mode=corr_mode, **kwargs)
-
-
-@register_model
-class pwcnet_localcorr_onnx(PWCDCNet):
-    def __init__(self, corr_mode="localcorr_onnx", **kwargs):
-        super().__init__(corr_mode=corr_mode, **kwargs)
-
-
-@register_model
-class pwcnet_localcorr_sycl(PWCDCNet):
-    def __init__(self, corr_mode="localcorr_sycl", **kwargs):
-        super().__init__(corr_mode=corr_mode, **kwargs)
-
-
-@register_model
-class pwcnet_localcorr_triton(PWCDCNet):
-    def __init__(self, corr_mode="localcorr_triton", **kwargs):
-        super().__init__(corr_mode=corr_mode, **kwargs)
+_CORR_MODE_VARIANTS = {
+    "spatial_corr": {"corr_mode": "spatial"},
+    "localcorr_cuda": {"corr_mode": "localcorr_cuda"},
+    "localcorr_onnx": {"corr_mode": "localcorr_onnx"},
+    "localcorr_sycl": {"corr_mode": "localcorr_sycl"},
+    "localcorr_triton": {"corr_mode": "localcorr_triton"},
+}
+register_model_variants(
+    {"pwcnet": PWCDCNet, "pwcnet_nodc": PWCNet}, _CORR_MODE_VARIANTS
+)

@@ -5,11 +5,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.corr_modes import (
-    log_corr_mode_warnings,
-    RaftCorrMode,
-    RAFT_CORR_VARIANTS,
-)
 from ptlflow.utils.registry import (
     register_model,
     register_model_variants,
@@ -296,37 +291,12 @@ class raft_small(RAFTSmall):
     pass
 
 
-@register_model
-class raft_alt_cuda_corr(RAFT):
-    def __init__(self, corr_mode="alt_cuda_corr", **kwargs):
-        super().__init__(corr_mode=corr_mode, **kwargs)
-
-
-@register_model
-class raft_torch_corr(RAFT):
-    def __init__(self, corr_mode="torch", **kwargs):
-        super().__init__(corr_mode=corr_mode, **kwargs)
-
-
-@register_model
-class raft_localcorr_cuda(RAFT):
-    def __init__(self, corr_mode="localcorr_cuda", **kwargs):
-        super().__init__(corr_mode=corr_mode, **kwargs)
-
-
-@register_model
-class raft_localcorr_onnx(RAFT):
-    def __init__(self, corr_mode="localcorr_onnx", **kwargs):
-        super().__init__(corr_mode=corr_mode, **kwargs)
-
-
-@register_model
-class raft_localcorr_sycl(RAFT):
-    def __init__(self, corr_mode="localcorr_sycl", **kwargs):
-        super().__init__(corr_mode=corr_mode, **kwargs)
-
-
-@register_model
-class raft_localcorr_triton(RAFT):
-    def __init__(self, corr_mode="localcorr_triton", **kwargs):
-        super().__init__(corr_mode=corr_mode, **kwargs)
+_CORR_MODE_VARIANTS = {
+    "alt_cuda_corr": {"corr_mode": "alt_cuda_corr"},
+    "torch_corr": {"corr_mode": "torch"},
+    "localcorr_cuda": {"corr_mode": "localcorr_cuda"},
+    "localcorr_onnx": {"corr_mode": "localcorr_onnx"},
+    "localcorr_sycl": {"corr_mode": "localcorr_sycl"},
+    "localcorr_triton": {"corr_mode": "localcorr_triton"},
+}
+register_model_variants({"raft": RAFT, "raft_small": RAFTSmall}, _CORR_MODE_VARIANTS)
