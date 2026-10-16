@@ -33,6 +33,7 @@ from ptlflow.utils.registry import (
     _models_dict,
     _ptlflow_trained_models,
     _trainable_models,
+    is_model_variant,
 )
 
 
@@ -159,17 +160,26 @@ def get_model_reference(model_name: str) -> Type[BaseModel]:
         )
 
 
-def get_model_names() -> List[str]:
+def get_model_names(include_variants: bool = False) -> List[str]:
     """Return a list of all model names that are registered in this platform.
 
     Models are added to this list by decorating their classes with @ptlflow.utils.registry.register_model.
+
+    Parameters
+    ----------
+    include_variants : bool, default False
+        If True, also include the generated preset variants (see
+        ptlflow.utils.registry.register_model_variants). By default only the primary models
+        are listed.
 
     Returns
     -------
     List[str]
         The list of the all registered model names.
     """
-    return sorted(list(_models_dict.keys()))
+    if include_variants:
+        return sorted(list(_models_dict.keys()))
+    return sorted([name for name in _models_dict.keys() if not is_model_variant(name)])
 
 
 def get_trainable_model_names() -> List[str]:

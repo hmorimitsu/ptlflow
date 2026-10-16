@@ -300,7 +300,7 @@ def validate_list_of_models(args: Namespace, data_module: FlowDataModule) -> Non
     if exclude is None:
         exclude = []
     else:
-        available_model_names = ptlflow.get_model_names()
+        available_model_names = ptlflow.get_model_names(include_variants=True)
         for name in exclude:
             assert name in available_model_names
 
