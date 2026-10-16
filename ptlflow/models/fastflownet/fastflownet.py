@@ -2,18 +2,18 @@
 Portions of this code copyright 2017, Clement Pinard
 """
 
-try:
-    from spatial_correlation_sampler import SpatialCorrelationSampler
-except ModuleNotFoundError:
-    from ptlflow.utils.correlation import (
-        IterSpatialCorrelationSampler as SpatialCorrelationSampler,
-    )
 from einops import rearrange
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    get_spatial_corr_sampler,
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from ..base_model.base_model import BaseModel
 from ..flownet.losses import MultiScale
 
@@ -106,6 +106,7 @@ class FastFlowNet(BaseModel):
         div_flow: float = 20.0,
         md: int = 4,
         groups: int = 3,
+        corr_mode: SpatialCorrMode = "iter",
         loss_start_scale: int = 4,
         loss_num_scales: int = 5,
         loss_base_weight: float = 0.32,
@@ -128,6 +129,7 @@ class FastFlowNet(BaseModel):
         self.div_flow = div_flow
         self.md = md
         self.groups = groups
+        self.corr_mode = corr_mode
 
         self.pconv1_1 = convrelu(3, 16, 3, 2)
         self.pconv1_2 = convrelu(16, 16, 3, 1)
@@ -138,8 +140,9 @@ class FastFlowNet(BaseModel):
         self.pconv3_2 = convrelu(64, 64, 3, 1)
         self.pconv3_3 = convrelu(64, 64, 3, 1)
 
-        self.corr_layer = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.md + 1, padding=0
+        log_corr_mode_warnings(self.corr_mode)
+        self.corr_layer, self._corr_error = get_spatial_corr_sampler(
+            self.corr_mode, patch_size=2 * self.md + 1
         )
         self.index = torch.tensor(
             [
@@ -244,6 +247,8 @@ class FastFlowNet(BaseModel):
 
     def forward(self, inputs):
         inputs = self._normalize_inputs(inputs)
+        if self.corr_layer is None:
+            raise self._corr_error
         mean_bgr = rearrange(inputs["images"], "b n c h w -> b c (n h w)").mean(2)[
             :, None, :, None, None
         ]
@@ -334,3 +339,6 @@ class FastFlowNet(BaseModel):
 @trainable
 class fastflownet(FastFlowNet):
     pass
+
+
+register_model_variants({"fastflownet": FastFlowNet}, SPATIAL_CORR_VARIANTS)

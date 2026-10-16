@@ -1,11 +1,6 @@
 import torch
 
-try:
-    from spatial_correlation_sampler import SpatialCorrelationSampler
-except ModuleNotFoundError:
-    from ptlflow.utils.correlation import (
-        IterSpatialCorrelationSampler as SpatialCorrelationSampler,
-    )
+from ptlflow.utils.corr_modes import get_spatial_corr_sampler
 
 
 class ConvBlock(torch.nn.Module):
@@ -28,13 +23,14 @@ class ConvBlock(torch.nn.Module):
 
 
 class Refine(torch.nn.Module):
-    def __init__(self, feature_dim, patch_size, num_layers):
+    def __init__(self, feature_dim, patch_size, num_layers, corr_mode="iter"):
         super(Refine, self).__init__()
 
         self.patch_size = patch_size
+        self.corr_mode = corr_mode
 
-        self.correlation_sampler = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=patch_size, stride=1, padding=0, dilation=1
+        self.correlation_sampler, self._corr_error = get_spatial_corr_sampler(
+            corr_mode, patch_size=patch_size
         )
 
         self.conv1 = ConvBlock(
@@ -57,6 +53,8 @@ class Refine(torch.nn.Module):
     def forward(self, feature_0, feature_1, flow_0):
         b, c, h, w = feature_0.shape
 
+        if self.correlation_sampler is None:
+            raise self._corr_error
         attn = self.correlation_sampler(feature_0, feature_1).view(b, -1, h, w)
         # attn = F.softmax(attn, dim=1)
 

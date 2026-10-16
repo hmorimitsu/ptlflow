@@ -5,18 +5,22 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    log_corr_mode_warnings,
+    RaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import (
+    register_model,
+    register_model_variants,
+    trainable,
+)
 from .update import BasicUpdateBlock
 from .corr import get_corr_block
 from .utils import coords_grid
 from .extractor import ResNetFPN
 from .layer import conv3x3
 from ..base_model.base_model import BaseModel
-
-try:
-    import alt_cuda_corr
-except ImportError:
-    alt_cuda_corr = None
 
 
 class SequenceLoss(nn.Module):
@@ -63,7 +67,7 @@ class SEARAFT(BaseModel):
         gamma: float = 0.8,
         max_flow: float = 400,
         iters: int = 4,
-        alternate_corr: bool = False,
+        corr_mode: RaftCorrMode = "allpairs",
         use_var: bool = True,
         var_min: float = 0,
         var_max: float = 10,
@@ -87,7 +91,7 @@ class SEARAFT(BaseModel):
         self.gamma = gamma
         self.max_flow = max_flow
         self.iters = iters
-        self.alternate_corr = alternate_corr
+        self.corr_mode = corr_mode
         self.use_var = use_var
         self.var_min = var_min
         self.var_max = var_max
@@ -136,10 +140,7 @@ class SEARAFT(BaseModel):
                 cdim=dim,
             )
 
-        if self.alternate_corr and alt_cuda_corr is None:
-            print(
-                "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
-            )
+        log_corr_mode_warnings(self.corr_mode)
 
     def initialize_flow(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords2 - coords1"""
@@ -216,7 +217,7 @@ class SEARAFT(BaseModel):
                 fmap2=fmap2_8x,
                 radius=self.corr_radius,
                 num_levels=self.corr_levels,
-                alternate_corr=self.alternate_corr,
+                corr_mode=self.corr_mode,
             )
 
         for itr in range(self.iters):
@@ -303,7 +304,7 @@ class SEARAFT_S(SEARAFT):
         gamma: float = 0.8,
         max_flow: float = 400,
         iters: int = 4,
-        alternate_corr: bool = False,
+        corr_mode: RaftCorrMode = "allpairs",
         use_var: bool = True,
         var_min: float = 0,
         var_max: float = 10,
@@ -320,7 +321,7 @@ class SEARAFT_S(SEARAFT):
             gamma,
             max_flow,
             iters,
-            alternate_corr,
+            corr_mode,
             use_var,
             var_min,
             var_max,
@@ -350,7 +351,7 @@ class SEARAFT_M(SEARAFT):
         gamma: float = 0.8,
         max_flow: float = 400,
         iters: int = 4,
-        alternate_corr: bool = False,
+        corr_mode: RaftCorrMode = "allpairs",
         use_var: bool = True,
         var_min: float = 0,
         var_max: float = 10,
@@ -367,7 +368,7 @@ class SEARAFT_M(SEARAFT):
             gamma,
             max_flow,
             iters,
-            alternate_corr,
+            corr_mode,
             use_var,
             var_min,
             var_max,
@@ -397,7 +398,7 @@ class SEARAFT_L(SEARAFT):
         gamma: float = 0.8,
         max_flow: float = 400,
         iters: int = 12,
-        alternate_corr: bool = False,
+        corr_mode: RaftCorrMode = "allpairs",
         use_var: bool = True,
         var_min: float = 0,
         var_max: float = 10,
@@ -414,7 +415,7 @@ class SEARAFT_L(SEARAFT):
             gamma,
             max_flow,
             iters,
-            alternate_corr,
+            corr_mode,
             use_var,
             var_min,
             var_max,
@@ -444,3 +445,14 @@ class sea_raft_m(SEARAFT_M):
 @trainable
 class sea_raft_l(SEARAFT_L):
     pass
+
+
+register_model_variants(
+    {
+        "sea_raft": SEARAFT,
+        "sea_raft_s": SEARAFT_S,
+        "sea_raft_m": SEARAFT_M,
+        "sea_raft_l": SEARAFT_L,
+    },
+    RAFT_CORR_VARIANTS,
+)
