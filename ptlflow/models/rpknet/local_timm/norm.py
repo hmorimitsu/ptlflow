@@ -10,6 +10,39 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+def _layer_norm_with_optional_affine(
+    x: torch.Tensor,
+    weight: torch.Tensor | None,
+    bias: torch.Tensor | None,
+    eps: float,
+) -> torch.Tensor:
+    """LayerNorm computed with basic ops instead of F.layer_norm.
+
+    F.layer_norm needs a static normalized_shape (and weight slice) during
+    ONNX export, which fails when the last dimension of x is traced
+    dynamically (SymbolicValueError on a shape Gather). This decomposition
+    works with a dynamic last dimension: the normalization uses reductions
+    over dim=-1 and the affine parameters are sliced and broadcast with
+    unsqueezes only.
+    """
+    mean = x.mean(dim=-1, keepdim=True)
+    var = (x - mean).pow(2).mean(dim=-1, keepdim=True)
+    x = (x - mean) * torch.rsqrt(var + eps)
+
+    if weight is not None:
+        weight = weight[: x.shape[-1]]
+        bias = bias[: x.shape[-1]] if bias is not None else None
+        for _ in range(x.ndim - 1):
+            weight = weight.unsqueeze(0)
+            if bias is not None:
+                bias = bias.unsqueeze(0)
+        x = x * weight
+        if bias is not None:
+            x = x + bias
+
+    return x
+
+
 class LayerNorm(nn.LayerNorm):
     """LayerNorm w/ fast norm option"""
 
@@ -17,17 +50,12 @@ class LayerNorm(nn.LayerNorm):
         super().__init__(num_channels, eps=eps, elementwise_affine=affine)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if self.weight is not None:
-            x = F.layer_norm(
-                x,
-                (x.shape[-1],),
-                self.weight[: x.shape[-1]],
-                self.bias[: x.shape[-1]],
-                self.eps,
-            )
-        else:
-            x = F.layer_norm(x, (x.shape[-1],), eps=self.eps)
-        return x
+        return _layer_norm_with_optional_affine(
+            x,
+            self.weight,
+            self.bias,
+            self.eps,
+        )
 
 
 class LayerNorm2d(nn.LayerNorm):
@@ -38,16 +66,12 @@ class LayerNorm2d(nn.LayerNorm):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x.permute(0, 2, 3, 1)
-        if self.weight is not None:
-            x = F.layer_norm(
-                x,
-                (x.shape[-1],),
-                self.weight[: x.shape[-1]],
-                self.bias[: x.shape[-1]],
-                self.eps,
-            )
-        else:
-            x = F.layer_norm(x, (x.shape[-1],), eps=self.eps)
+        x = _layer_norm_with_optional_affine(
+            x,
+            self.weight,
+            self.bias,
+            self.eps,
+        )
         x = x.permute(0, 3, 1, 2)
         return x
 
