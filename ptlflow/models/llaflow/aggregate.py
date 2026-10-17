@@ -60,12 +60,18 @@ def PatchExtra(x, size):
 
 def ImgShift(x, size):
     B, C, H, W = x.shape
-    x = F.pad(x, (size // 2, size // 2, size // 2, size // 2), "replicate")
-    return (
-        F.unfold(x, [H, W], stride=1, padding=0)
-        .reshape(B, C, H, W, size**2)
-        .permute(4, 0, 1, 2, 3)
-    )
+    pad = size // 2
+    x = F.pad(x, (pad, pad, pad, pad), "replicate")
+
+    # Shifted copies of x via slicing instead of F.unfold: unfold cannot be
+    # exported to ONNX (its window sizes are read from tensor shapes, which
+    # traces to an unexportable Gather on the fly).
+    shifted = []
+    for y_offset in range(size):
+        for x_offset in range(size):
+            shifted.append(x[:, :, y_offset : y_offset + H, x_offset : x_offset + W])
+
+    return torch.stack(shifted, dim=0)
 
 
 class GlobalSimilar(nn.Module):
@@ -184,7 +190,7 @@ class ShiftLSA(nn.Module):
         corr = einsum("b h n d l, b h m d l -> b h n m", f1s, f2s)
         corr = rearrange(corr, "b h n m -> b n h m").view(b, h, w, heads, h, w)
 
-        return corr / torch.sqrt(torch.tensor(self.dim // self.heads))
+        return corr * self.scale
 
 
 class LSA(nn.Module):
