@@ -79,6 +79,21 @@ def density2vector(prob, dim, normalize=True):
         return disp
 
 
+def _pool2x2_argmax(pr):
+    # pr: [B, N, d, d] reshaped probability map. Equivalent to
+    # nn.MaxPool2d(kernel_size=d-1, stride=1, return_indices=True) applied to
+    # the 2x2 average-pooled grid, but implemented with amax/argmax so the
+    # ONNX graph does not contain MaxPool nodes with a second (indices)
+    # output, which TensorRT cannot parse ("does not support more than 1
+    # outputs for MaxPool nodes").
+    avg_pool = nn.AvgPool2d(kernel_size=2, stride=1, padding=0)
+    pooled = avg_pool(pr)
+    flat_pooled = pooled.flatten(2)
+    out = flat_pooled.amax(dim=2)
+    indice = flat_pooled.argmax(dim=2)
+    return out, indice
+
+
 def prob_gather(prob, normalize=True, dim=2, return_indices=False):
     # gather probability for confidence map visualization
     # return shape: out, indice [B,1,H,W]
@@ -89,15 +104,13 @@ def prob_gather(prob, normalize=True, dim=2, return_indices=False):
     B, C, H, W = prob.size()
     d = int(math.sqrt(C))
     pr = prob.reshape(B, d, d, -1).permute(0, 3, 1, 2)
-    avg_pool = nn.AvgPool2d(kernel_size=2, stride=1, padding=0)
-    max_pool = nn.MaxPool2d(kernel_size=d - 1, stride=1, return_indices=True)
-    out, indice = max_pool(avg_pool(pr))
-    out = 4 * out.squeeze().reshape(B, 1, H, W)
+    out, indice = _pool2x2_argmax(pr)
+    out = 4 * out.reshape(B, 1, H, W)
     if not return_indices:
         return out
     else:
-        indice += indice / (d - 1)
-        indice = indice.squeeze().reshape(B, 1, H, W)
+        indice += torch.div(indice, d - 1, rounding_mode="floor")
+        indice = indice.reshape(B, 1, H, W)
         return out, indice
 
 
@@ -219,16 +232,9 @@ def _prob2cornerflow(prob, normalize=True):
     B, C, H, W = prob.size()
     d = int(math.sqrt(C))
     pr = prob.reshape(B, d, d, -1).permute(0, 3, 1, 2)
-    avg_pool = nn.AvgPool2d(kernel_size=2, stride=1, padding=0)
-    max_pool = nn.MaxPool2d(kernel_size=d - 1, stride=1, return_indices=True)
-    out, indice = max_pool(avg_pool(pr))
-    if version.parse(torch.__version__) >= version.parse("1.8.0"):
-        indice += torch.div(
-            indice, (d - 1), rounding_mode="floor"
-        )  # in original coordinate
-    else:
-        indice += indice // (d - 1)
-    indice = indice.squeeze().reshape(B, H, W).unsqueeze(1)
+    _, indice = _pool2x2_argmax(pr)
+    indice += torch.div(indice, d - 1, rounding_mode="floor")  # in original coordinate
+    indice = indice.reshape(B, H, W).unsqueeze(1)
     lt_prob = torch.gather(prob, 1, indice)
     lt_flow = indice2flow(indice, d).to(dtype=prob.dtype)
     rt_prob = torch.gather(prob, 1, indice + 1)
