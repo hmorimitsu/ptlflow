@@ -75,6 +75,31 @@ def subtract_mean(input):
     return input - input.mean(2).mean(2).unsqueeze(2).unsqueeze(2).expand_as(input)
 
 
+def weighted_local_sum(x_padded, kernel, size):
+    """Aggregate a padded map with spatially-varying per-position weights.
+
+    Computes the same as
+        torch.sum(nn.Unfold(size, size)(x_padded) * nn.Unfold(1, 1)(kernel), dim=1)
+    but with shifted slices instead of unfold: the Unfold -> Mul ->
+    ReduceSum chains crash the OpenCL compiler of the OpenVINO GPU plugin
+    when many of them are fused (irr/scopeflow refine blocks).
+
+    x_padded: [B, 1, H + pad, W + pad] (already padded with pad = size // 2)
+    kernel: [B, size * size, H, W] weights in row-major kernel order
+    Returns [B, 1, H, W].
+    """
+    b, _, h, w = kernel.shape
+    out = x_padded[:, :, 0:h, 0:w] * kernel[:, 0:1]
+    k = 1
+    for i in range(size):
+        for j in range(size):
+            if i == 0 and j == 0:
+                continue
+            out = out + x_padded[:, :, i : i + h, j : j + w] * kernel[:, k : k + 1]
+            k += 1
+    return out
+
+
 class RefineFlow(nn.Module):
     def __init__(self, ch_in):
         super(RefineFlow, self).__init__()
@@ -94,8 +119,6 @@ class RefineFlow(nn.Module):
         )
 
         self.softmax_feat = nn.Softmax(dim=1)
-        self.unfold_flow = nn.Unfold(kernel_size=(self.kernel_size, self.kernel_size))
-        self.unfold_kernel = nn.Unfold(kernel_size=(1, 1))
 
     def forward(self, flow, diff_img, feature):
         b, _, h, w = flow.size()
@@ -109,19 +132,11 @@ class RefineFlow(nn.Module):
         flow_x = flow[:, 0].unsqueeze(1)
         flow_y = flow[:, 1].unsqueeze(1)
 
-        flow_x_unfold = self.unfold_flow(self.pad_ftn(flow_x))
-        flow_y_unfold = self.unfold_flow(self.pad_ftn(flow_y))
-        feat_kernel_unfold = self.unfold_kernel(feat_kernel)
-
-        flow_out_x = (
-            torch.sum(flow_x_unfold * feat_kernel_unfold, dim=1)
-            .unsqueeze(1)
-            .view(b, 1, h, w)
+        flow_out_x = weighted_local_sum(
+            self.pad_ftn(flow_x), feat_kernel, self.kernel_size
         )
-        flow_out_y = (
-            torch.sum(flow_y_unfold * feat_kernel_unfold, dim=1)
-            .unsqueeze(1)
-            .view(b, 1, h, w)
+        flow_out_y = weighted_local_sum(
+            self.pad_ftn(flow_y), feat_kernel, self.kernel_size
         )
 
         return torch.cat([flow_out_x, flow_out_y], dim=1)
@@ -146,8 +161,6 @@ class RefineOcc(nn.Module):
         )
 
         self.softmax_feat = nn.Softmax(dim=1)
-        self.unfold_occ = nn.Unfold(kernel_size=(self.kernel_size, self.kernel_size))
-        self.unfold_kernel = nn.Unfold(kernel_size=(1, 1))
 
     def forward(self, occ, feat1, feat2):
         b, _, h, w = occ.size()
@@ -155,13 +168,6 @@ class RefineOcc(nn.Module):
         feat = self.convs(torch.cat([occ, feat1, feat2], dim=1))
         feat_kernel = self.softmax_feat(-(feat**2))
 
-        occ_unfold = self.unfold_occ(self.pad_ftn(occ))
-        feat_kernel_unfold = self.unfold_kernel(feat_kernel)
-
-        occ_out = (
-            torch.sum(occ_unfold * feat_kernel_unfold, dim=1)
-            .unsqueeze(1)
-            .view(b, 1, h, w)
-        )
+        occ_out = weighted_local_sum(self.pad_ftn(occ), feat_kernel, self.kernel_size)
 
         return occ_out

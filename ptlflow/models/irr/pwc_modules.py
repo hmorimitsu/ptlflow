@@ -152,11 +152,21 @@ class WarpingLayer(nn.Module):
         grid = torch.add(get_grid(x), flow_for_grid).transpose(1, 2).transpose(2, 3)
         x_warp = tf.grid_sample(x, grid, align_corners=True)
 
-        mask = torch.ones(x.size(), requires_grad=False).to(
-            dtype=x.dtype, device=x.device
-        )
-        mask = tf.grid_sample(mask, grid, align_corners=True)
-        mask = (mask >= 1.0).to(dtype=x.dtype)
+        # Validity mask as a closed form: bilinear weights sum to 1 exactly
+        # inside the image, so warping an all-ones image and thresholding at
+        # 1.0 equals checking the sampling position against [-1, 1]. The
+        # second grid_sample is avoided: two GridSample nodes fused together
+        # crash the OpenCL compiler of the OpenVINO GPU plugin. (The closed
+        # form is also deterministic: the old >= 1.0 threshold depended on
+        # float rounding of the weight sum and sporadically masked out valid
+        # interior pixels.)
+        mask = (
+            (grid[..., 0] >= -1.0)
+            & (grid[..., 0] <= 1.0)
+            & (grid[..., 1] >= -1.0)
+            & (grid[..., 1] <= 1.0)
+        ).to(dtype=x_warp.dtype)
+        mask = mask.unsqueeze(1)
 
         return x_warp * mask
 
