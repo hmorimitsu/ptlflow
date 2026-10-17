@@ -253,12 +253,14 @@ class StripCrossCorrMap_v2(nn.Module):
 
         # vertical striping map
         fmap2_w = self.conv2_1(fmap2)  # B, 64, H, W
-        fmap2_w = F.avg_pool2d(fmap2_w, [h, 1])
+        # Mean over the full height instead of F.avg_pool2d([h, 1]): kernel
+        # sizes read from tensor shapes cannot be exported to ONNX.
+        fmap2_w = fmap2_w.mean(dim=2, keepdim=True)
         fmap2_w = fmap2_w.view(batchsize, c_middle, -1).permute(0, 2, 1)
 
         # horizontal striping map
         fmap2_h = self.conv2_2(fmap2)  # B, 64, H, W
-        fmap2_h = F.avg_pool2d(fmap2_h, [1, w])
+        fmap2_h = fmap2_h.mean(dim=3, keepdim=True)
         fmap2_h = fmap2_h.view(batchsize, c_middle, -1).permute(0, 2, 1)
 
         # cross strip corr map
