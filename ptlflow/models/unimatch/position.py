@@ -27,9 +27,10 @@ class PositionEmbeddingSine(nn.Module):
         # x = tensor_list.tensors  # [B, C, H, W]
         # mask = tensor_list.mask  # [B, H, W], input with padding, valid as 0
         b, c, h, w = x.size()
-        mask = torch.ones((b, h, w), device=x.device)  # [B, H, W]
-        y_embed = mask.cumsum(1, dtype=x.dtype)
-        x_embed = mask.cumsum(2, dtype=x.dtype)
+        y_embed = torch.arange(1, h + 1, dtype=x.dtype, device=x.device).view(1, h, 1)
+        x_embed = torch.arange(1, w + 1, dtype=x.dtype, device=x.device).view(1, 1, w)
+        y_embed = y_embed.expand(b, h, w)
+        x_embed = x_embed.expand(b, h, w)
         if self.normalize:
             eps = 1e-6
             y_embed = y_embed / (y_embed[:, -1:, :] + eps) * self.scale
