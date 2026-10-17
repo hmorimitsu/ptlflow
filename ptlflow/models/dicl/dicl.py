@@ -349,19 +349,21 @@ class DICL(BaseModel):
             grid = grid.cuda()
         vgrid = Variable(grid) + flo
 
-        # scale grid to [-1,1]
-        vgrid[:, 0, :, :] = 2.0 * vgrid[:, 0, :, :] / max(W - 1, 1) - 1.0
-        vgrid[:, 1, :, :] = 2.0 * vgrid[:, 1, :, :] / max(H - 1, 1) - 1.0
-
-        vgrid = vgrid.permute(0, 2, 3, 1)
+        # scale grid to [-1,1] without in-place slice assignments, which are
+        # not ONNX-exportable
+        vgrid_x = 2.0 * vgrid[:, 0:1] / max(W - 1, 1) - 1.0
+        vgrid_y = 2.0 * vgrid[:, 1:2] / max(H - 1, 1) - 1.0
+        vgrid = torch.cat((vgrid_x, vgrid_y), dim=1).permute(0, 2, 3, 1)
         output = nn.functional.grid_sample(x, vgrid, align_corners=True)
-        mask = torch.autograd.Variable(
-            torch.ones(x.size(), dtype=x.dtype, device=x.device)
-        )
-        mask = nn.functional.grid_sample(mask, vgrid, align_corners=True)
 
-        mask[mask < 0.9999] = 0
-        mask[mask > 0] = 1
+        # Validity mask as a closed form: bilinear weights sum to 1 exactly
+        # inside the image, so warping an all-ones image and thresholding at
+        # 0.9999 equals checking the sampling position against [-1, 1]. The
+        # second grid_sample is avoided: two GridSample nodes fused together
+        # crash the OpenCL compiler of the OpenVINO GPU plugin.
+        mask = (
+            (vgrid_x >= -1.0) & (vgrid_x <= 1.0) & (vgrid_y >= -1.0) & (vgrid_y <= 1.0)
+        ).to(dtype=output.dtype)
 
         return output * mask, mask
 
