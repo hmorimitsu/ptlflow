@@ -92,6 +92,17 @@ def _init_parser() -> ArgumentParser:
         ),
     )
     parser.add_argument("--save_viz", action="store_true")
+    parser.add_argument(
+        "--num_threads",
+        type=int,
+        default=None,
+        help=(
+            "Number of torch CPU threads to use. If not set, torch's default is kept. "
+            "On some CPUs (e.g. hybrid P/E-core architectures) the default thread count "
+            "can be much slower than a smaller value. If the predictions on the CPU are "
+            "unusually slow, try setting this to the number of performance cores."
+        ),
+    )
     return parser
 
 
@@ -120,15 +131,19 @@ def generate_outputs(
     metadata : Dict[str, Any], optional
         Metadata about this input, if available.
     """
-    inputs = tensor_dict_to_numpy(inputs)
     preds = tensor_dict_to_numpy(preds)
-    preds["flows_viz"] = flow_utils.flow_to_rgb(preds["flows"])[:, :, ::-1]
-    if preds.get("flows_b") is not None:
-        preds["flows_b_viz"] = flow_utils.flow_to_rgb(preds["flows_b"])[:, :, ::-1]
+    # The flow visualization is only consumed by _show and by the
+    # --save_viz branch of _write_to_file, so it is only computed (once) when
+    # at least one of them will be used.
+    if args.show or args.save_viz:
+        preds["flows_viz"] = flow_utils.flow_to_rgb(preds["flows"])[:, :, ::-1]
+        if preds.get("flows_b") is not None:
+            preds["flows_b_viz"] = flow_utils.flow_to_rgb(preds["flows_b"])[:, :, ::-1]
 
     _write_to_file(args, preds, dataloader_name, batch_idx, metadata)
 
     if args.show:
+        inputs = tensor_dict_to_numpy(inputs)
         _show(inputs, preds, args.max_show_side)
 
 
@@ -146,6 +161,9 @@ def test(args: Namespace, model: BaseModel, data_module: FlowDataModule) -> None
     --------
     ptlflow.models.base_model.base_model.BaseModel : The parent class of the available models.
     """
+    if getattr(args, "num_threads", None) is not None:
+        torch.set_num_threads(args.num_threads)
+
     model.eval()
     if torch.cuda.is_available():
         model = model.cuda()
@@ -295,9 +313,13 @@ def _write_to_file(
     if args.save_viz:
         out_viz_dir = out_viz_root_dir / extra_dirs
         out_viz_dir.mkdir(parents=True, exist_ok=True)
-        flow_viz = flow_utils.flow_to_rgb(preds["flows"])
+        # Reuse the visualization from generate_outputs when available (it is
+        # computed there if any consumer needs it).
+        flow_viz = preds.get("flows_viz")
+        if flow_viz is None:
+            flow_viz = flow_utils.flow_to_rgb(preds["flows"])[:, :, ::-1]
         viz_path = out_viz_dir / f"{image_name}.png"
-        cv.imwrite(str(viz_path), flow_viz[:, :, ::-1])
+        cv.imwrite(str(viz_path), flow_viz)
 
 
 def _show_v04_warning():

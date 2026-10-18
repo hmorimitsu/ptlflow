@@ -127,6 +127,17 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--fp16", action="store_true", help="If set, use half floating point precision."
     )
+    parser.add_argument(
+        "--num_threads",
+        type=int,
+        default=None,
+        help=(
+            "Number of torch CPU threads to use. If not set, torch's default is kept. "
+            "On some CPUs (e.g. hybrid P/E-core architectures) the default thread count "
+            "can be much slower than a smaller value. If the inference on the CPU is "
+            "unusually slow, try setting this to the number of performance cores."
+        ),
+    )
     return parser
 
 
@@ -145,6 +156,9 @@ def infer(args: Namespace, model: BaseModel) -> None:
     --------
     ptlflow.models.base_model.base_model.BaseModel : The parent class of the available models.
     """
+    if getattr(args, "num_threads", None) is not None:
+        torch.set_num_threads(args.num_threads)
+
     model.eval()
     if torch.cuda.is_available():
         model = model.cuda()
@@ -205,9 +219,14 @@ def infer(args: Namespace, model: BaseModel) -> None:
                     f"EPE: {epe.mean():.03f}, Fl-All: {100*flall.mean():.03f}",
                 )
 
-            preds_npy["flows_viz"] = flow_to_rgb(preds_npy["flows"])[:, :, ::-1]
-            if preds_npy.get("flows_b") is not None:
-                preds_npy["flows_b_viz"] = flow_to_rgb(preds_npy["flows_b"])[:, :, ::-1]
+            # The flow visualization is only consumed when the outputs are
+            # written to disk or shown on the screen.
+            if args.write_outputs or args.show:
+                preds_npy["flows_viz"] = flow_to_rgb(preds_npy["flows"])[:, :, ::-1]
+                if preds_npy.get("flows_b") is not None:
+                    preds_npy["flows_b_viz"] = flow_to_rgb(preds_npy["flows_b"])[
+                        :, :, ::-1
+                    ]
             if args.write_outputs:
                 write_outputs(
                     preds_npy,

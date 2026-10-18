@@ -93,6 +93,17 @@ The code below shows a way to do this:
     cv.imshow('flow', flow_bgr_npy)
     cv.waitKey()
 
+Speeding up the inference on the CPU
+===================================
+
+If the model runs on the CPU and the inference is unusually slow, the number of CPU threads may be the culprit. Some
+CPUs (e.g. with hybrid performance/efficiency cores) run much faster with fewer threads than the default. You can
+control it with ``--num_threads``:
+
+.. code-block:: bash
+
+    python infer.py --model raft_small --ckpt_path things --input_path image1.png image2.png --num_threads 8
+
 Inference on batches of images
 ==============================
 
