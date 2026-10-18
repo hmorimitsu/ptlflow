@@ -495,17 +495,9 @@ class UFM(BaseModel):
             "https://huggingface.co/infinity1096/UFM-Base/resolve/main/model.safetensors",
             "ufm-base.safetensors",
         ),
-        "refine": (
-            "https://huggingface.co/infinity1096/UFM-Refine/resolve/main/model.safetensors",
-            "ufm-refine.safetensors",
-        ),
         "base-980": (
             "https://huggingface.co/infinity1096/UFM-Base-980/resolve/main/model.safetensors",
             "ufm-base-980.safetensors",
-        ),
-        "refine-980": (
-            "https://huggingface.co/infinity1096/UFM-Refine-980/resolve/main/model.safetensors",
-            "ufm-refine-980.safetensors",
         ),
         "base-dinov2l-init": (
             "https://huggingface.co/infinity1096/UFM-Base-DINOv2L-init/resolve/main/model.safetensors",
@@ -542,12 +534,61 @@ class UFM(BaseModel):
 
         The official checkpoints store the parameters without any prefix, whereas this model keeps
         the UFM network inside the self.model attribute.
+
+        Checkpoints from the refine variants contain extra modules (classification_head,
+        unet_feature, etc.) that only exist in those variants. Therefore, before loading, this
+        method checks that the architecture of the checkpoint matches the architecture of the
+        instantiated variant, raising an informative error when they diverge. In this way,
+        loading can remain strict, and genuine loading problems are not silently ignored.
         """
         state_dict = {
             (k if k.startswith("model.") else "model." + k): v
             for k, v in state_dict.items()
         }
-        return super().load_state_dict(state_dict, strict=strict, assign=assign)
+        if strict:
+            self._check_variant_matches_checkpoint(state_dict)
+        try:
+            return super().load_state_dict(state_dict, strict=strict, assign=assign)
+        except RuntimeError as err:
+            raise RuntimeError(
+                f"Failed to load the UFM checkpoint into the model variant {self.variant!r}. "
+                "Each UFM checkpoint can only be loaded into a model instantiated with the "
+                "matching variant, so verify that the value given to --model.variant corresponds "
+                "to the checkpoint given to --ckpt_path.\n"
+                f"Original error:\n{err}"
+            ) from err
+
+    def _check_variant_matches_checkpoint(self, state_dict) -> None:
+        """Raise an informative error if the checkpoint belongs to another variant family.
+
+        The refine variants (refine and refine-980) are the only ones with classification
+        refinement modules. The presence (or absence) of these modules in the checkpoint is used
+        to detect when the checkpoint belongs to a different family than the instantiated
+        variant.
+        """
+        ckpt_has_refine_modules = any(
+            k.startswith("model.classification_head.") for k in state_dict
+        )
+        if ckpt_has_refine_modules != (self.variant in _REFINE_VARIANTS):
+            if ckpt_has_refine_modules:
+                raise ValueError(
+                    f"The given checkpoint contains the classification refinement modules "
+                    f"(classification_head, unet_feature, etc.), but they do not exist in the "
+                    f"instantiated variant {self.variant!r}. This checkpoint most likely "
+                    f"corresponds to one of the refine variants "
+                    f"{list(_REFINE_VARIANTS)}. Instantiate the model with the matching variant, "
+                    f"e.g., with --model.variant refine."
+                )
+            else:
+                raise ValueError(
+                    f"The instantiated variant {self.variant!r} expects the classification "
+                    f"refinement modules (classification_head, unet_feature, etc.), but they are "
+                    f"not present in the given checkpoint. This checkpoint most likely "
+                    f"corresponds to one of the base variants "
+                    f"{[v for v in _VARIANT_CONFIGS if v not in _REFINE_VARIANTS]}. "
+                    f"Instantiate the model with the matching variant, "
+                    f"e.g., with --model.variant base."
+                )
 
     def forward(self, inputs):
         """Forward the inputs through the network and produce the predictions.
@@ -600,6 +641,35 @@ class UFM(BaseModel):
         return self._maybe_return_simple(outputs)
 
 
+class UFMRefine(UFM):
+    """UFM model with the classification refinement architecture.
+
+    This variant is only compatible with the "refine" and "refine-980" variants, which are the
+    only ones that include the classification refinement modules (classification_head,
+    unet_feature, etc.).
+    """
+    pretrained_checkpoints = {
+        "refine": (
+            "https://huggingface.co/infinity1096/UFM-Refine/resolve/main/model.safetensors",
+            "ufm-refine.safetensors",
+        ),
+        "refine-980": (
+            "https://huggingface.co/infinity1096/UFM-Refine-980/resolve/main/model.safetensors",
+            "ufm-refine-980.safetensors",
+        ),
+    }
+
+    def __init__(self, variant="refine", **kwargs):
+        super().__init__(variant=variant, **kwargs)
+
+
+
+
 @register_model
 class ufm(UFM):
+    pass
+
+
+@register_model
+class ufm_refine(UFMRefine):
     pass
