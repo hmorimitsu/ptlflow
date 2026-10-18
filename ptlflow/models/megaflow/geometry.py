@@ -2,8 +2,15 @@ import torch
 import torch.nn.functional as F
 
 
-def coords_grid(b, h, w, homogeneous=False, device=None):
-    y, x = torch.meshgrid(torch.arange(h), torch.arange(w))  # [H, W]
+def coords_grid(b, h, w, homogeneous=False, dtype=None, device=None):
+    if dtype is None:
+        dtype = torch.float32
+
+    y, x = torch.meshgrid(
+        torch.arange(h, dtype=dtype, device=device),
+        torch.arange(w, dtype=dtype, device=device),
+        indexing="ij",
+    )  # [H, W]
 
     stacks = [x, y]
 
@@ -11,12 +18,9 @@ def coords_grid(b, h, w, homogeneous=False, device=None):
         ones = torch.ones_like(x)  # [H, W]
         stacks.append(ones)
 
-    grid = torch.stack(stacks, dim=0).float()  # [2, H, W] or [3, H, W]
+    grid = torch.stack(stacks, dim=0)  # [2, H, W] or [3, H, W]
 
     grid = grid[None].repeat(b, 1, 1, 1)  # [B, 2, H, W] or [B, 3, H, W]
-
-    if device is not None:
-        grid = grid.to(device)
 
     return grid
 
@@ -29,6 +33,7 @@ def generate_window_grid(h_min, h_max, w_min, w_max, len_h, len_w, device=None):
             torch.linspace(w_min, w_max, len_w, device=device),
             torch.linspace(h_min, h_max, len_h, device=device),
         ],
+        indexing="ij",
     )
     grid = torch.stack((x, y), -1).transpose(0, 1).float()  # [H, W, 2]
 

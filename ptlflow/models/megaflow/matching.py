@@ -11,15 +11,21 @@ def global_correlation_softmax(
 ):
     # global correlation
     b, c, h, w = feature0.shape
-    feature0 = feature0.view(b, c, -1).permute(0, 2, 1)  # [B, H*W, C]
-    feature1 = feature1.view(b, c, -1)  # [B, C, H*W]
+    orig_dtype = feature0.dtype
+    # Compute in float32. With fp16 features, the dot products over C
+    # channels can overflow to inf, which becomes NaN after the softmax.
+    # It also keeps the dtypes consistent for the matmuls below.
+    feature0 = feature0.view(b, c, -1).permute(0, 2, 1).float()  # [B, H*W, C]
+    feature1 = feature1.view(b, c, -1).float()  # [B, C, H*W]
 
     correlation = torch.matmul(feature0, feature1).view(b, h, w, h, w) / (
         c**0.5
     )  # [B, H, W, H, W]
 
     # flow from softmax
-    init_grid = coords_grid(b, h, w).to(correlation.device)  # [B, 2, H, W]
+    init_grid = coords_grid(
+        b, h, w, dtype=correlation.dtype, device=correlation.device
+    )  # [B, 2, H, W]
     grid = init_grid.view(b, 2, -1).permute(0, 2, 1)  # [B, H*W, 2]
 
     correlation = correlation.view(b, h * w, h * w)  # [B, H*W, H*W]
@@ -39,7 +45,7 @@ def global_correlation_softmax(
     )  # [B, 2, H, W]
 
     # when predicting bidirectional flow, flow is the concatenation of forward flow and backward flow
-    flow = correspondence - init_grid
+    flow = (correspondence - init_grid).to(orig_dtype)
 
     return flow, prob
 
@@ -97,7 +103,10 @@ def local_correlation_softmax(
     )  # [B, H*W, (2R+1)^2]
 
     # mask invalid locations
-    corr[~valid] = -1e9
+    # -1e9 would overflow to -inf in fp16, producing NaN in the softmax
+    # when a whole row is masked out
+    val = -1e4 if corr.dtype == torch.float16 else -1e9
+    corr[~valid] = val
 
     prob = F.softmax(corr, -1)  # [B, H*W, (2R+1)^2]
 
@@ -162,12 +171,18 @@ def local_correlation_with_flow(
     )  # [B, H*W, C, (2R+1)^2]
     feature0_view = feature0.permute(0, 2, 3, 1).view(b, h * w, 1, c)  # [B, H*W, 1, C]
 
-    corr = torch.matmul(feature0_view, window_feature).view(b, h * w, -1) / (
-        c**0.5
+    # Compute in float32 to avoid overflow with fp16 features
+    corr = (
+        torch.matmul(feature0_view.float(), window_feature.float())
+        .view(b, h * w, -1)
+        / (c**0.5)
     )  # [B, H*W, (2R+1)^2]
 
     corr = (
-        corr.view(b, h, w, -1).permute(0, 3, 1, 2).contiguous()
+        corr.to(feature0.dtype)
+        .view(b, h, w, -1)
+        .permute(0, 3, 1, 2)
+        .contiguous()
     )  # [B, (2R+1)^2, H, W]
 
     return corr
