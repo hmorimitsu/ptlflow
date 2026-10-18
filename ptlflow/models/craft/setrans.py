@@ -802,7 +802,14 @@ class SlidingPosBiases2D(nn.Module):
             all_w1s = self.all_w1s[:H, :W]
             all_h2s = self.all_h2s[:H, :W]
             all_w2s = self.all_w2s[:H, :W]
-            padded_pos_biases[(all_h1s, all_w1s, all_h2s, all_w2s)] = self.biases
+            # Expand the [2R+1, 2R+1] biases to the broadcast shape of the
+            # index tensors explicitly: assigning the raw parameter lets
+            # the ONNX exporter trace the implicit broadcast as a Reshape
+            # of [15,15] into [H,W,15,15], which changes the element count
+            # and is rejected later. expand() is a view, so eager results
+            # and gradients are unchanged.
+            biases_b = self.biases.expand(H, W, 2 * self.R + 1, 2 * self.R + 1)
+            padded_pos_biases[(all_h1s, all_w1s, all_h2s, all_w2s)] = biases_b
 
         # Remove padding. [H+2R, W+2R, H+2R, W+2R] => [H, W, H, W].
         pos_biases = padded_pos_biases[:, :, R:-R, R:-R]
