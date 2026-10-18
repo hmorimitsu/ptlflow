@@ -484,13 +484,37 @@ class UFM(BaseModel):
             checkpoint given to --ckpt_path, since each variant has a different architecture.
     """
 
+    # All the original checkpoints are named model.safetensors inside their HuggingFace
+    # repositories. Since the local cache name is deduced from the url by default, all the
+    # variants would collide into a single model.safetensors file. Therefore, each entry is
+    # given as a (url, file_name) tuple, where file_name is the unique name used to store and
+    # search for the checkpoint in the local cache. These are the names registered in
+    # docs/source/models/checkpoint_list.csv.
     pretrained_checkpoints = {
-        "base": "https://huggingface.co/infinity1096/UFM-Base/resolve/main/model.safetensors",
-        "refine": "https://huggingface.co/infinity1096/UFM-Refine/resolve/main/model.safetensors",
-        "base-980": "https://huggingface.co/infinity1096/UFM-Base-980/resolve/main/model.safetensors",
-        "refine-980": "https://huggingface.co/infinity1096/UFM-Refine-980/resolve/main/model.safetensors",
-        "base-dinov2l-init": "https://huggingface.co/infinity1096/UFM-Base-DINOv2L-init/resolve/main/model.safetensors",
-        "base-dinov2g-init": "https://huggingface.co/infinity1096/UFM-Base-DINOv2G-init/resolve/main/model.safetensors",
+        "base": (
+            "https://huggingface.co/infinity1096/UFM-Base/resolve/main/model.safetensors",
+            "ufm-base.safetensors",
+        ),
+        "refine": (
+            "https://huggingface.co/infinity1096/UFM-Refine/resolve/main/model.safetensors",
+            "ufm-refine.safetensors",
+        ),
+        "base-980": (
+            "https://huggingface.co/infinity1096/UFM-Base-980/resolve/main/model.safetensors",
+            "ufm-base-980.safetensors",
+        ),
+        "refine-980": (
+            "https://huggingface.co/infinity1096/UFM-Refine-980/resolve/main/model.safetensors",
+            "ufm-refine-980.safetensors",
+        ),
+        "base-dinov2l-init": (
+            "https://huggingface.co/infinity1096/UFM-Base-DINOv2L-init/resolve/main/model.safetensors",
+            "ufm-base-dinov2l-init.safetensors",
+        ),
+        "base-dinov2g-init": (
+            "https://huggingface.co/infinity1096/UFM-Base-DINOv2G-init/resolve/main/model.safetensors",
+            "ufm-base-dinov2g-init.safetensors",
+        ),
     }
 
     def __init__(
