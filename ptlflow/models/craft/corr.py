@@ -211,7 +211,15 @@ class TransCorrBlock(CorrBlock, nn.Module):
         if self.do_corr_global_norm:
             B, C, H, W = corr.shape
             corr_3d = corr.view(B, C, H * W)
-            corr_normed = F.layer_norm(corr_3d, (corr_3d.shape[2],), eps=1e-12)
+            # F.layer_norm with a tensor-derived normalized_shape
+            # (corr_3d.shape[2] stays a dynamic value in the traced graph)
+            # fails ONNX export ("not constant"). Normalizing over the full
+            # last dimension with mean/var is exactly what layer_norm does
+            # for that shape (no affine), so compute it explicitly - the
+            # results are identical and the ops export to ONNX.
+            corr_mean = corr_3d.mean(dim=2, keepdim=True)
+            corr_var = corr_3d.var(dim=2, keepdim=True, unbiased=False)
+            corr_normed = (corr_3d - corr_mean) / torch.sqrt(corr_var + 1e-12)
             corr = corr_normed.view(B, C, H, W)
 
         corr = corr.view(batch, ht, wd, 1, ht, wd)
