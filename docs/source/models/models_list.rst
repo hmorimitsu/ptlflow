@@ -500,6 +500,17 @@ StreamFlow
 
 - Model names: ``streamflow``
 
+UFM
+---
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/ufm>`__
+
+- Paper: **UFM: A Simple Path towards Unified Dense Correspondence with Flow** - `https://arxiv.org/abs/2506.09278 <https://arxiv.org/abs/2506.09278>`_
+
+- Reference code: `https://github.com/UniFlowMatch/UFM <https://github.com/UniFlowMatch/UFM>`__
+
+- Model name: ``ufm``
+
 VCN
 ---
 
