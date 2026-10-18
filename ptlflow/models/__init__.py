@@ -21,6 +21,7 @@ from .liteflownet import *
 from .llaflow import *
 from .maskflownet import *
 from .matchflow import *
+from .megaflow import *
 from .memflow import *
 from .memfof import *
 from .ms_raft_plus import *

@@ -297,6 +297,17 @@ MatchFlow
 
 - Model names: ``matchflow``, ``matchflow_raft``
 
+MegaFlow
+--------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/megaflow>`__
+
+- Paper: **MegaFlow: Zero-Shot Large Displacement Optical Flow** - `https://arxiv.org/abs/2603.25739 <https://arxiv.org/abs/2603.25739>`_
+
+- Reference code: `https://github.com/cvg/megaflow <https://github.com/cvg/megaflow>`_
+
+- Model name: ``megaflow``
+
 MemFlow
 -------
 
