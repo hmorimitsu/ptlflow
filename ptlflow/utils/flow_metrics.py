@@ -27,6 +27,23 @@ import torch
 import torch.nn.functional as F
 from torchmetrics import Metric
 
+# Keys of the input dicts whose tensors are consumed by the metrics. Only
+# these keys are moved to the metrics device in FlowMetrics.update().
+_METRICS_TENSOR_KEYS = ("flows", "valids", "occs", "mbs", "confs")
+
+# Parameters of the WAUC metric, following the Spring benchmark evaluation
+# (https://github.com/cv-stuttgart/springwebsite/blob/main/springeval/management/commands/evaluation.py):
+# wauc = sum_{i=1..100} w_i * count(epe <= i/20) / (N * sum(w_i)), with w_i = 1 - (i-1)/100.
+_WAUC_BOUNDARIES = tuple(i / 20.0 for i in range(1, 101))
+_WAUC_WEIGHTS = tuple(1 - ((i - 1) / 100.0) for i in range(1, 101))
+_WAUC_SUM_WEIGHTS = sum(_WAUC_WEIGHTS)
+# _WAUC_SUFFIX_WEIGHTS[j] = sum of w_i for all i >= j+1. An epe value in bin j
+# (j/20 < epe <= (j+1)/20) is counted by exactly the thresholds i >= j+1, so
+# sum_i w_i * count(epe <= i/20) == histogram(epe) . _WAUC_SUFFIX_WEIGHTS.
+_WAUC_SUFFIX_WEIGHTS = tuple(
+    sum(_WAUC_WEIGHTS[j:]) for j in range(len(_WAUC_WEIGHTS) + 1)
+)
+
 
 class FlowMetrics(Metric):
     """Handler for optical flow and related metrics.
@@ -151,6 +168,7 @@ class FlowMetrics(Metric):
         """
         preds = self._convert_dict_to_metrics_dtype(preds)
         targets = self._convert_dict_to_metrics_dtype(targets)
+        preds, targets = self._to_metrics_device(preds, targets)
 
         if self.average_mode == "epoch_mean":
             prev_weight = 1.0
@@ -334,6 +352,45 @@ class FlowMetrics(Metric):
             tensor = tensor.mean()
         return tensor
 
+    def _to_metrics_device(
+        self, preds: Dict[str, torch.Tensor], targets: Dict[str, torch.Tensor]
+    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        """Make the metrics run on the device of the groundtruth tensors.
+
+        The metric states are moved to the device of the groundtruth flows, and
+        any prediction tensor left on another device (e.g. the one the model
+        ran on) is moved to it. This way the metrics can be computed and
+        accumulated on an accelerator while the model runs on another device
+        (e.g. the CPU), without the caller having to move the predictions.
+        Tensors that are not used by the metrics (e.g. the images) are not
+        moved. If everything is already on the same device, this is a no-op.
+
+        Parameters
+        ----------
+        preds : dict[str, torch.Tensor]
+            The predictions of the optical flow model. Modified in place.
+        targets : dict[str, torch.Tensor]
+            The groundtruth of the predictions. Modified in place.
+
+        Returns
+        -------
+        Tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]
+            The same preds and targets dicts, with the metric tensors moved.
+        """
+        flow_target = targets.get("flows")
+        if (
+            isinstance(flow_target, torch.Tensor)
+            and flow_target.device != self.epe.device
+        ):
+            self.to(flow_target.device)
+        device = self.epe.device
+        for tensors in (preds, targets):
+            for key in _METRICS_TENSOR_KEYS:
+                value = tensors.get(key)
+                if isinstance(value, torch.Tensor) and value.device != device:
+                    tensors[key] = value.to(device)
+        return preds, targets
+
     def _convert_dict_to_metrics_dtype(
         self, tensors: Dict[str, torch.Tensor]
     ) -> Dict[str, torch.Tensor]:
@@ -456,22 +513,38 @@ class FlowMetrics(Metric):
     def _compute_total_wauc(
         self, epe: torch.Tensor, valid_mask: torch.Tensor
     ) -> torch.Tensor:
-        # Code adapted from https://github.com/cv-stuttgart/springwebsite/blob/main/springeval/management/commands/evaluation.py
-        # MIT License
-        epe = epe.clone()
-        epe[valid_mask < 0.5] = 100
-        epe = epe.view(epe.shape[0], -1)
-        N = valid_mask.reshape(valid_mask.shape[0], -1).sum(dim=1)
+        # Vectorized equivalent of the reference implementation from
+        # https://github.com/cv-stuttgart/springwebsite/blob/main/springeval/management/commands/evaluation.py
+        # (MIT License), which loops over 100 thresholds. Since each epe value
+        # contributes to the count of every threshold larger than it, the
+        # weighted counts can be computed with one histogram of the epe values
+        # followed by a dot product with the suffix sums of the weights (see
+        # _WAUC_SUFFIX_WEIGHTS). This replaces 100 reduction ops with ~3 ops,
+        # which is much faster on any device.
+        boundaries = torch.tensor(_WAUC_BOUNDARIES, device=epe.device, dtype=epe.dtype)
+        # Bin j holds the pixels with j/20 < epe <= (j+1)/20. Invalid pixels
+        # (masked out below) are sent to the last bin, which has weight 0.
+        bins = torch.bucketize(epe, boundaries, right=False)
+        bins = bins.masked_fill(valid_mask < 0.5, len(_WAUC_BOUNDARIES))
+        bins = bins.view(bins.shape[0], -1)
 
-        wauc = torch.zeros(epe.shape[0], dtype=epe.dtype, device=epe.device)
-        sum_wi = 0
-        for i in range(1, 101):
-            wi = 1 - ((i - 1) / 100.0)
-            deltai = i / 20.0
-            err = (epe <= deltai).sum(dim=1)
-            wauc += wi * err
-            sum_wi += wi
-        wauc = 100 * wauc / (N * sum_wi + 1e-8)
+        num_bins = len(_WAUC_SUFFIX_WEIGHTS)
+        offsets = torch.arange(bins.shape[0], device=bins.device).unsqueeze(1)
+        offsets = offsets * num_bins
+        hist = torch.bincount(
+            (bins + offsets).view(-1), minlength=bins.shape[0] * num_bins
+        ).view(bins.shape[0], num_bins)
+
+        suffix_weights = torch.tensor(
+            _WAUC_SUFFIX_WEIGHTS, device=epe.device, dtype=epe.dtype
+        )
+        num_valid = valid_mask.reshape(valid_mask.shape[0], -1).sum(dim=1)
+
+        wauc = (
+            100
+            * (hist.to(epe.dtype) @ suffix_weights)
+            / (num_valid * _WAUC_SUM_WEIGHTS + 1e-8)
+        )
 
         if self.average_mode == "epoch_mean":
             wauc = wauc.sum()

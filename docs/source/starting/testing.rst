@@ -49,6 +49,17 @@ Outputs
 The outputs will be saved in the directory specified by the ``--output_path`` argument.
 By default, they are saved to the ``outputs/test`` directory.
 
+Speeding up the predictions on the CPU
+======================================
+
+If the model runs on the CPU and the predictions are unusually slow, the number of CPU threads may be the culprit. Some
+CPUs (e.g. with hybrid performance/efficiency cores) run much faster with fewer threads than the default. You can
+control it with ``--num_threads``:
+
+.. code-block:: bash
+
+    python test.py --model raft_small --ckpt_path things --num_threads 8
+
 Other options
 =============
 

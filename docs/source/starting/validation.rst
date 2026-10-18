@@ -74,6 +74,29 @@ Viewing the validation metrics
 A table with the average metrics computed during the validation will be saved in the directory specified by
 ``--output_path``. By default, it is saved to ``outputs/validate``.
 
+Speeding up the metric computation
+==================================
+
+The metric computations (EPE, Flall, WAUC, ...) consist of many small reductions. On the CPU these are dominated by
+thread-pool synchronization, which can slow them down by more than an order of magnitude on many-core CPUs. If a torch
+accelerator is available, the metrics are automatically computed on it (a CUDA GPU first, then an Intel XPU), which is
+usually much faster. You can also choose the device explicitly with ``--metrics_device``:
+
+.. code-block:: bash
+
+    python validate.py --model raft_small --ckpt_path things --metrics_device cuda
+
+The model itself is not affected by this argument, it keeps running on its own device (a CUDA GPU if available,
+otherwise the CPU).
+
+If the model runs on the CPU and validation is unusually slow, the number of CPU threads may also be the culprit. Some
+CPUs (e.g. with hybrid performance/efficiency cores) run much faster with fewer threads than the default. You can
+control it with ``--num_threads``:
+
+.. code-block:: bash
+
+    python validate.py --model raft_small --ckpt_path things --num_threads 8
+
 Other options
 =============
 
