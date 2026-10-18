@@ -399,12 +399,15 @@ def validate_list_of_models(args: Namespace, data_module: FlowDataModule) -> Non
                 logger.info("Saved metrics to {}", metrics_path)
 
             except Exception as e:  # noqa: B902
+                import traceback
+
                 logger.warning(
                     "Skipping model {} with ckpt {} due to exception {}",
                     mname,
                     cname,
                     e,
                 )
+                traceback.print_exc()
                 continue
 
 
