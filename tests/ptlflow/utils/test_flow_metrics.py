@@ -150,6 +150,49 @@ def test_epoch_mean_accumulates_two_steps() -> None:
     assert metric.step_count == 2
 
 
+def _wauc_reference_loop(epe: torch.Tensor, valid_mask: torch.Tensor) -> torch.Tensor:
+    """WAUC as defined by the Spring benchmark reference implementation.
+
+    See https://github.com/cv-stuttgart/springwebsite/blob/main/springeval/management/commands/evaluation.py
+    (the original, non-vectorized version of FlowMetrics._compute_total_wauc).
+    """
+    epe = epe.clone()
+    epe[valid_mask < 0.5] = 100
+    epe = epe.view(epe.shape[0], -1)
+    N = valid_mask.reshape(valid_mask.shape[0], -1).sum(dim=1)
+
+    wauc = torch.zeros(epe.shape[0], dtype=epe.dtype, device=epe.device)
+    sum_wi = 0
+    for i in range(1, 101):
+        wi = 1 - ((i - 1) / 100.0)
+        deltai = i / 20.0
+        err = (epe <= deltai).sum(dim=1)
+        wauc += wi * err
+        sum_wi += wi
+    wauc = 100 * wauc / (N * sum_wi + 1e-8)
+    return wauc.sum()
+
+
+def test_wauc_matches_reference_loop() -> None:
+    torch.manual_seed(42)
+    metric = FlowMetrics()
+
+    epe = torch.rand(2, 32, 48) * 10
+    valid = (torch.rand(2, 32, 48) > 0.25).float()
+    valid[0, :4] = 0  # rows fully invalid in one of the samples
+    assert metric._compute_total_wauc(epe, valid).item() == pytest.approx(
+        _wauc_reference_loop(epe, valid).item(), abs=1e-4
+    )
+
+    # epe values falling exactly on the threshold edges must be counted
+    # by their threshold (edge comparisons use <=).
+    epe_edges = torch.tensor([i / 20.0 for i in range(1, 9)]).repeat(2, 4, 1)
+    valid_ones = torch.ones_like(epe_edges)
+    assert metric._compute_total_wauc(epe_edges, valid_ones).item() == pytest.approx(
+        _wauc_reference_loop(epe_edges, valid_ones).item(), abs=1e-4
+    )
+
+
 def test_ema_average_mode() -> None:
     decay = 0.9
     metric = FlowMetrics(average_mode="ema", ema_decay=decay)

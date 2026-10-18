@@ -130,6 +130,33 @@ def _init_parser() -> ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--metrics_device",
+        type=str,
+        default="auto",
+        choices=["auto", "cpu", "cuda", "xpu"],
+        help=(
+            "Torch device used to compute the validation metrics (EPE, Flall, "
+            "WAUC, ...). On the CPU these small per-op reductions are dominated "
+            "by thread-pool synchronization (hundreds of ms per sample on "
+            "many-core CPUs), so 'auto' (the default) computes them on the "
+            "first available torch accelerator (cuda, then xpu) and falls back "
+            "to the cpu. The model itself is not affected: it keeps running on "
+            "its own device (cuda if available, otherwise cpu)."
+        ),
+    )
+    parser.add_argument(
+        "--num_threads",
+        type=int,
+        default=None,
+        help=(
+            "Number of torch CPU threads to use. If not set, torch's default is kept. "
+            "On some CPUs (e.g. hybrid P/E-core architectures) the default thread count "
+            "can be much slower than a smaller value, for both the model forward on the "
+            "CPU and the CPU metric reductions. If validation on the CPU is unusually "
+            "slow, try setting this to the number of performance cores."
+        ),
+    )
+    parser.add_argument(
         "--reversed",
         action="store_true",
         help="To be combined with model all or select. Iterates over the list of models in reversed order",
@@ -166,6 +193,29 @@ def _init_parser() -> ArgumentParser:
         help=("Names of metrics to not be included in the saved results."),
     )
     return parser
+
+
+# Groundtruth keys whose tensors are fed to the metrics. Only these are moved
+# to the metrics device (see --metrics_device).
+_METRICS_INPUT_KEYS = ("flows", "valids", "occs", "mbs")
+
+
+def _resolve_metrics_device(name: str) -> str:
+    """Translate the --metrics_device choice into a concrete torch device.
+
+    'auto' prefers a torch accelerator: the FlowMetrics updates are many
+    small reductions that suffer badly from CPU thread-pool synchronization
+    (measured to be more than an order of magnitude slower on many-core CPUs
+    than the same ops on an accelerator), while the model inference itself is
+    unaffected and keeps running on its own device.
+    """
+    if name != "auto":
+        return name
+    if torch.cuda.is_available():
+        return "cuda"
+    if hasattr(torch, "xpu") and torch.xpu.is_available():
+        return "xpu"
+    return "cpu"
 
 
 def generate_outputs(
@@ -240,6 +290,9 @@ def validate(
     --------
     ptlflow.models.base_model.base_model.BaseModel : The parent class of the available models.
     """
+    if getattr(args, "num_threads", None) is not None:
+        torch.set_num_threads(args.num_threads)
+
     model.eval()
     if torch.cuda.is_available():
         model = model.cuda()
@@ -387,6 +440,15 @@ def validate_one_dataloader(
     num_processed_batches = 0
     dataloader_suffix = ""
 
+    # Computing the metrics on the CPU is dominated by per-op thread-pool
+    # synchronization (see _resolve_metrics_device), so they run on a torch
+    # accelerator when one is available. Only the groundtruth tensors read by
+    # the metrics are moved; the model keeps running on its own device and
+    # the predictions are moved inside FlowMetrics.update().
+    metrics_device = _resolve_metrics_device(getattr(args, "metrics_device", "auto"))
+    if dataloader_idx == 0:
+        logger.info("Computing validation metrics on torch device: {}", metrics_device)
+
     metrics_individual = None
     if args.write_individual_metrics:
         metrics_individual = {
@@ -417,6 +479,14 @@ def validate_one_dataloader(
                 fp16=args.fp16,
             )
             inputs = io_adapter.prepare_inputs(inputs=inputs, image_only=True)
+
+            for key in _METRICS_INPUT_KEYS:
+                value = inputs.get(key)
+                if (
+                    isinstance(value, torch.Tensor)
+                    and value.device.type != metrics_device
+                ):
+                    inputs[key] = value.to(metrics_device)
 
             outputs = model.validation_step(inputs, i, dataloader_idx)
 
@@ -451,10 +521,25 @@ def validate_one_dataloader(
                         preds[key] = val[:, k : k + 1]
 
             metrics = outputs["metrics"]
+            # Pull all the metric scalars to the CPU with a single transfer.
+            # Calling .item() on each tensor would synchronize the metrics
+            # device once per metric and per use below.
+            metric_keys = []
+            metric_tensors = []
+            for k, v in metrics.items():
+                if isinstance(v, torch.Tensor):
+                    metric_keys.append(k)
+                    metric_tensors.append(v)
+            metrics = {
+                k: v for k, v in metrics.items() if not isinstance(v, torch.Tensor)
+            }
+            if len(metric_tensors) > 0:
+                metric_values = torch.stack(metric_tensors).detach().cpu().tolist()
+                metrics.update(zip(metric_keys, metric_values))
             for k in metrics.keys():
                 if metrics_sum.get(k) is None:
                     metrics_sum[k] = 0.0
-                metrics_sum[k] += metrics[k].item()
+                metrics_sum[k] += metrics[k]
             progress_bar_values = {
                 "epe": metrics_sum["val/epe"] / (i + 1),
                 "flall": metrics_sum["val/flall"] / (i + 1),
@@ -480,14 +565,19 @@ def validate_one_dataloader(
 
             if metrics_individual is not None:
                 metrics_individual["filename"].append(filename)
-                metrics_individual["epe"].append(metrics["val/epe"].item())
-                metrics_individual["flall"].append(metrics["val/flall"].item())
-                metrics_individual["wauc"].append(metrics["val/wauc"].item())
-                metrics_individual["px1"].append(metrics["val/px1"].item())
+                metrics_individual["epe"].append(metrics["val/epe"])
+                metrics_individual["flall"].append(metrics["val/flall"])
+                metrics_individual["wauc"].append(metrics["val/wauc"])
+                metrics_individual["px1"].append(metrics["val/px1"])
 
-            generate_outputs(
-                args, inputs, preds, dataloader_name, i, inputs.get("meta")
-            )
+            # The visualizations are only computed when they are actually
+            # consumed: generate_outputs always converts the flow to RGB and
+            # computes the EPE map (~100ms per sample on the CPU), even with
+            # --show and --write_outputs both unset.
+            if args.show or args.write_outputs:
+                generate_outputs(
+                    args, inputs, preds, dataloader_name, i, inputs.get("meta")
+                )
 
             if args.max_samples is not None and i >= (args.max_samples - 1):
                 break
