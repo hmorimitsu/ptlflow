@@ -94,6 +94,15 @@ checkpoint name to ``--ckpt_path`` as follows:
 
 This will show an error message with a list of the available checkpoint names.
 
+Some checkpoints (e.g., from ``megaflow``) are stored on HuggingFace. If huggingface.co is not
+directly accessible, the downloads can be redirected to a mirror by setting the ``HF_ENDPOINT``
+environment variable, as follows:
+
+.. code-block:: bash
+
+    export HF_ENDPOINT=https://hf-mirror.com
+    python validate.py --model megaflow --ckpt_path flow
+
 Optional dependencies
 =====================
 

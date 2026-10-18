@@ -117,6 +117,9 @@ matchflow_gma-kitti-bc72ce81.ckpt,matchflow-g-kitti.pth,
 matchflow_gma-sintel-683422f4.ckpt,matchflow-g-sintel.pth,
 matchflow_gma-things-49295bd8.ckpt,matchflow-g-things.pth,
 matchflow_raft-things-bf560032.ckpt,matchflow-r-things.pth,
+megaflow-flow.safetensors,megaflow-flow.safetensors,https://huggingface.co/Kristen-Z/MegaFlow
+megaflow-track.safetensors,megaflow-track.safetensors,
+megaflow-chairs-things.safetensors,megaflow-chairs-things.safetensors,
 memflow-things-90d0b74c.ckpt,MemFlowNet_things.pth,https://github.com/DQiaole/MemFlow
 memflow-sintel-38621d84.ckpt,MemFlowNet_sintel.pth,
 memflow-kitti-ee6cbf09.ckpt,MemFlowNet_kitti.pth,
