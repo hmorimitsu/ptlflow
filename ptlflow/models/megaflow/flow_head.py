@@ -271,10 +271,14 @@ class FlowFeature(nn.Module):
         patch_w = x.shape[-1]
         patch_h = x.shape[-2]
         pos_embed = create_uv_grid(
-            patch_w, patch_h, aspect_ratio=W / H, dtype=x.dtype, device=x.device
+            patch_w, patch_h, aspect_ratio=W / H, dtype=torch.float32, device=x.device
         )
         pos_embed = position_grid_to_embed(pos_embed, x.shape[1])
         pos_embed = pos_embed * ratio
+        # Cast back to the input dtype. Otherwise x + pos_embed would promote
+        # the output to float32, breaking fp16 inference (dtype mismatch in
+        # the following conv layers).
+        pos_embed = pos_embed.to(dtype=x.dtype)
         pos_embed = pos_embed.permute(2, 0, 1)[None].expand(x.shape[0], -1, -1, -1)
         return x + pos_embed
 
