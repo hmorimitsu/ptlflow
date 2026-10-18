@@ -20,7 +20,7 @@ __version__ = "0.4.3"
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 from urllib.parse import urlparse
 
 from jsonargparse import ArgumentParser, Namespace
@@ -249,6 +249,34 @@ def _load_ckpt_file(ckpt_path: str, device: str) -> Dict[str, Any]:
         )
 
 
+def _split_pretrained_checkpoint_value(
+    ckpt_value: Union[str, Tuple[str, str]]
+) -> Tuple[str, Optional[str]]:
+    """Split an entry of a pretrained_checkpoints dictionary into its url and cache file name.
+
+    The entries of the pretrained_checkpoints dictionaries are usually just the url of the checkpoint. However, the urls
+    of multiple checkpoints may end with the same file name (e.g., HuggingFace repositories that store their weights as
+    model.safetensors). In this case, all the checkpoints would collide into a single file in the local cache. To avoid
+    it, the entry can also be given as a (url, file_name) tuple, where file_name is the name used to store and search
+    for the checkpoint in the local cache.
+
+    Parameters
+    ----------
+    ckpt_value : Union[str, Tuple[str, str]]
+        An entry of a pretrained_checkpoints dictionary. Either a plain url or a (url, file_name) tuple.
+
+    Returns
+    -------
+    Tuple[str, Optional[str]]
+        The checkpoint url and the name that the checkpoint must have in the local cache. The name is None if the input
+        was just a url, in which case the name must be deduced from the url itself.
+    """
+    if isinstance(ckpt_value, str):
+        return ckpt_value, None
+    url, file_name = ckpt_value
+    return url, file_name
+
+
 def load_checkpoint(ckpt_path: str, model_ref: Type[BaseModel]) -> Dict[str, Any]:
     """Try to load the checkpoint specified in ckpt_path.
 
@@ -256,6 +284,10 @@ def load_checkpoint(ckpt_path: str, model_ref: Type[BaseModel]) -> Dict[str, Any
     model_ref.pretrained_checkpoints. The pretrained checkpoints can be given as any url (e.g., a github release or a
     huggingface url). HuggingFace urls are redirected to the endpoint set in the HF_ENDPOINT variable, if it is set.
     Checkpoints ending with .safetensors are loaded with the safetensors library.
+
+    The entries of model_ref.pretrained_checkpoints can be plain urls or (url, file_name) tuples. The file_name is used
+    to name the checkpoint in the local cache, which is required when the urls of multiple checkpoints end with the same
+    file name (see _split_pretrained_checkpoint_value() for more details).
 
     Parameters
     ----------
@@ -273,6 +305,7 @@ def load_checkpoint(ckpt_path: str, model_ref: Type[BaseModel]) -> Dict[str, Any
     --------
     get_model_reference : To get a reference to the class of a model.
     """
+    cache_file_name = None
     if not Path(ckpt_path).exists():
         if hasattr(model_ref, "pretrained_checkpoints"):
             tmp_ckpt_path = model_ref.pretrained_checkpoints.get(ckpt_path)
@@ -282,7 +315,10 @@ def load_checkpoint(ckpt_path: str, model_ref: Type[BaseModel]) -> Dict[str, Any
                     f'Choose one from {{{",".join(model_ref.pretrained_checkpoints.keys())}}}'
                 )
             else:
-                ckpt_path = tmp_ckpt_path
+                (
+                    ckpt_path,
+                    cache_file_name,
+                ) = _split_pretrained_checkpoint_value(tmp_ckpt_path)
         else:
             raise ValueError(
                 f"Cannot find checkpoint {ckpt_path} for model {model_ref.__name__}"
@@ -296,7 +332,11 @@ def load_checkpoint(ckpt_path: str, model_ref: Type[BaseModel]) -> Dict[str, Any
     elif ckpt_path.lower().endswith(".safetensors"):
         model_dir = Path(hub.get_dir()) / "checkpoints"
         model_dir.mkdir(parents=True, exist_ok=True)
-        local_path = model_dir / os.path.basename(urlparse(ckpt_path).path)
+        local_path = model_dir / (
+            cache_file_name
+            if cache_file_name is not None
+            else os.path.basename(urlparse(ckpt_path).path)
+        )
         if not local_path.exists():
             logger.info("Downloading {} to {}.", ckpt_path, str(local_path))
             hub.download_url_to_file(ckpt_path, str(local_path), progress=True)
