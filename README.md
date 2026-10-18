@@ -137,6 +137,7 @@ Major update to support Lightning 2 (finally!). However, it also introduces brea
 - LLA-Flow [https://arxiv.org/abs/2304.08101](https://arxiv.org/abs/2304.08101)
 - MaskFlownet [https://arxiv.org/abs/2003.10955](https://arxiv.org/abs/2003.10955)
 - MatchFlow [https://arxiv.org/abs/2303.08384](https://arxiv.org/abs/2303.08384)
+- MegaFlow [https://arxiv.org/abs/2603.25739](https://arxiv.org/abs/2603.25739)
 - MemFlow [https://arxiv.org/abs/2404.04808](https://arxiv.org/abs/2404.04808)
 - MEMFOF [https://arxiv.org/abs/2506.23151](https://arxiv.org/abs/2506.23151)
 - MS-RAFT+ [https://arxiv.org/abs/2210.16900](https://arxiv.org/abs/2210.16900)
