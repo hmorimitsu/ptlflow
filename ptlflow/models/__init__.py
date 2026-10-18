@@ -40,6 +40,7 @@ from .skflow import *
 from .splatflow import *
 from .starflow import *
 from .streamflow import *
+from .ufm import *
 from .unimatch import *
 from .vcn import *
 from .videoflow import *

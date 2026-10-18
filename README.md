@@ -156,6 +156,7 @@ Major update to support Lightning 2 (finally!). However, it also introduces brea
 - SplatFlow [https://arxiv.org/abs/2306.08887](https://arxiv.org/abs/2306.08887)
 - STaRFlow [https://arxiv.org/abs/2007.05481](https://arxiv.org/abs/2007.05481)
 - StreamFlow [https://arxiv.org/abs/2311.17099](https://arxiv.org/abs/2311.17099)
+- UFM [https://arxiv.org/abs/2506.09278](https://arxiv.org/abs/2506.09278)
 - VCN [https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf](https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf)
 - VideoFlow [https://arxiv.org/abs/2303.08340](https://arxiv.org/abs/2303.08340)
 - WAFT [https://arxiv.org/abs/2506.21526](https://arxiv.org/abs/2506.21526)
