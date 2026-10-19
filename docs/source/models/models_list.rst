@@ -509,7 +509,7 @@ UFM
 
 - Reference code: `https://github.com/UniFlowMatch/UFM <https://github.com/UniFlowMatch/UFM>`__
 
-- Model name: ``ufm``, ``ufm_refine``
+- Model name: ``ufm``, ``ufm_base``, ``ufm_base_980``, ``ufm_base_dinov2l``, ``ufm_base_dinov2g``, ``ufm_refine``, ``ufm_refine_980``
 
 VCN
 ---
