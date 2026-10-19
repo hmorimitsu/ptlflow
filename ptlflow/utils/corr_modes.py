@@ -16,6 +16,13 @@ has to provide its own correlation classes. The model variants for each
 corr_mode (e.g. raft_localcorr_triton) are generated with
 ptlflow.utils.registry.register_model_variants using the preset dicts defined
 here.
+
+If the engine chosen with corr_mode is not available in the current
+environment (e.g. an extension is not compiled or the inputs are on the wrong
+device), the factories below log a warning and fall back to the pure-PyTorch
+engines, which are always available: IterativeCorrBlock ("torch") for the
+RAFT-style models and IterSpatialCorrelationSampler ("iter") for the
+PWCNet-style models.
 """
 
 from typing import Any, Dict, Literal, Optional, Tuple
@@ -98,11 +105,119 @@ SPATIAL_CORR_VARIANTS = {
 }
 
 
+_TRITON_AVAILABLE: Optional[bool] = None
+_FALLBACKS_LOGGED = set()
+
+
+def _triton_available() -> bool:
+    """Check whether the triton package can be imported (cached).
+
+    triton publishes Linux-only wheels, so it is an optional dependency of
+    localcorr: without it the localcorr eager kernels cannot run.
+    """
+    global _TRITON_AVAILABLE
+    if _TRITON_AVAILABLE is None:
+        try:
+            import triton  # noqa: F401
+
+            _TRITON_AVAILABLE = True
+        except (ImportError, OSError):
+            _TRITON_AVAILABLE = False
+    return _TRITON_AVAILABLE
+
+
+def _log_corr_mode_fallback(corr_mode: str, fallback_mode: str, reason: str) -> None:
+    """Log (only once) that corr_mode falls back to the pure-PyTorch engine."""
+    key = (corr_mode, fallback_mode, reason)
+    if key in _FALLBACKS_LOGGED:
+        return
+    _FALLBACKS_LOGGED.add(key)
+    logger.warning(
+        f"!!! corr_mode={corr_mode!r} is not available ({reason}). "
+        f"Falling back to corr_mode={fallback_mode!r}, the pure-PyTorch engine !!!"
+    )
+
+
+def _localcorr_unavailable_reason(
+    corr_mode: str,
+    fmap1: Optional[torch.Tensor] = None,
+    is_sampler: bool = False,
+) -> Optional[str]:
+    """Return why a localcorr corr_mode cannot be used now, or None if it can.
+
+    The localcorr engines only check their requirements when they are first
+    called, so this centralizes the checks needed to decide the fallback:
+
+    - the localcorr package must be importable;
+    - for eager execution, the triton modes need the triton package,
+      localcorr_cuda needs the built CUDA kernel library and CUDA tensors,
+      and localcorr_sycl needs the built SYCL XPU extension and XPU tensors;
+    - during ONNX export the engines emit ONNX nodes without loading their
+      eager kernels, so the eager-only requirements do not apply (the
+      exception is the PWCNet-style localcorr_triton sampler, whose class
+      imports triton when it is created).
+
+    Parameters
+    ----------
+    corr_mode : str
+        One of the localcorr_* corr modes.
+    fmap1 : Optional[torch.Tensor]
+        The first input feature map, used for the device checks of the RAFT
+        blocks. None for the PWCNet-style samplers, which are created before
+        any tensor is available.
+    is_sampler : bool, default False
+        Whether the engine is a PWCNet-style spatial correlation sampler.
+    """
+    if localcorr is None:
+        return (
+            "the localcorr package is not installed. Install localcorr (its triton "
+            "kernels are Linux-only) to use it"
+        )
+    if torch.onnx.is_in_onnx_export():
+        if is_sampler and corr_mode == "localcorr_triton" and not _triton_available():
+            return (
+                "the triton package is not installed, which the localcorr triton "
+                "sampler requires"
+            )
+        return None
+    if corr_mode in ("localcorr_triton", "localcorr_onnx") and not _triton_available():
+        return (
+            "the triton package is not installed, which the localcorr eager kernels "
+            "require"
+        )
+    if corr_mode == "localcorr_cuda":
+        if localcorr.get_cuda_pyramid_library() is None:
+            return (
+                "the localcorr CUDA kernel library is not built. Build it with "
+                "'python -m localcorr.build_native cuda' to use it"
+            )
+        if fmap1 is not None and not fmap1.is_cuda:
+            return (
+                "it requires CUDA tensors, but the feature maps are on device "
+                f"{fmap1.device}"
+            )
+    if corr_mode == "localcorr_sycl":
+        if localcorr.get_sycl_xpu_extension() is None:
+            return (
+                "the localcorr SYCL XPU extension is not built. Build it with "
+                "'python -m localcorr.build_native xpu' to use it"
+            )
+        if fmap1 is not None and not getattr(fmap1, "is_xpu", False):
+            return (
+                "it requires torch.xpu tensors, but the feature maps are on device "
+                f"{fmap1.device}"
+            )
+    return None
+
+
 def log_corr_mode_warnings(corr_mode: str) -> None:
     """Log the standard warnings for corr modes whose engine is unavailable.
 
-    Call this from the model __init__. Each engine still raises a clear error
-    when it is actually used; these warnings only give an early notice.
+    Call this from the model __init__. When the engine is unavailable, the
+    factories in this module (get_raft_corr_block and
+    get_spatial_corr_sampler) log a warning and fall back to the pure-PyTorch
+    engine ("torch" or "iter") instead of raising an error; these warnings
+    only give an early notice of that.
 
     Parameters
     ----------
@@ -111,22 +226,23 @@ def log_corr_mode_warnings(corr_mode: str) -> None:
     """
     if corr_mode == "alt_cuda_corr" and alt_cuda_corr is None:
         logger.warning(
-            "!!! alt_cuda_corr is not compiled! Using corr_mode=alt_cuda_corr will raise an error! "
-            "Compile it from ptlflow/utils/external/alt_cuda_corr or choose another corr_mode !!!"
+            "!!! alt_cuda_corr is not compiled! corr_mode=alt_cuda_corr will fall back "
+            "to the pure-PyTorch engine (corr_mode=torch)! Compile it from "
+            "ptlflow/utils/external/alt_cuda_corr to use it !!!"
         )
 
     if corr_mode == "spatial" and SpatialCorrelationSampler is None:
         logger.warning(
-            "!!! spatial_correlation_sampler is not compiled! Using corr_mode=spatial will raise "
-            "an error! Compile it from ptlflow/utils/external/Pytorch-Correlation-extension "
-            "or choose another corr_mode !!!"
+            "!!! spatial_correlation_sampler is not compiled! Using corr_mode=spatial "
+            "will fall back to the pure-PyTorch engine (corr_mode=iter)! Compile it "
+            "from ptlflow/utils/external/Pytorch-Correlation-extension to use it !!!"
         )
 
     if corr_mode.startswith("localcorr") and localcorr is None:
         logger.warning(
-            f"!!! localcorr is not installed, so corr_mode={corr_mode} will not work! "
-            "Install localcorr (its triton kernels are Linux-only) or choose another "
-            "corr_mode !!!"
+            f"!!! localcorr is not installed, so corr_mode={corr_mode} will fall back "
+            "to the pure-PyTorch engine (corr_mode=torch or iter)! Install localcorr "
+            "(its triton kernels are Linux-only) to use it !!!"
         )
 
     if (
@@ -135,9 +251,10 @@ def log_corr_mode_warnings(corr_mode: str) -> None:
         and localcorr.get_cuda_pyramid_library() is None
     ):
         logger.warning(
-            "!!! the localcorr CUDA kernel library is not built! Using corr_mode=localcorr_cuda "
-            "will raise an error! Build it with 'python -m localcorr.build_native cuda' or choose "
-            "another corr_mode !!!"
+            "!!! the localcorr CUDA kernel library is not built! Eager execution with "
+            "corr_mode=localcorr_cuda will fall back to the pure-PyTorch engine (ONNX "
+            "export still emits the plugin node)! Build it with "
+            "'python -m localcorr.build_native cuda' to use it !!!"
         )
 
     if (
@@ -147,9 +264,42 @@ def log_corr_mode_warnings(corr_mode: str) -> None:
     ):
         logger.warning(
             "!!! the localcorr SYCL XPU extension is not built! Eager execution with "
-            "corr_mode=localcorr_sycl will raise an error (ONNX export for OpenVINO still works)! "
-            "Build it with 'python -m localcorr.build_native xpu' or choose another corr_mode !!!"
+            "corr_mode=localcorr_sycl will fall back to the pure-PyTorch engine (ONNX "
+            "export for OpenVINO still works)! Build it with "
+            "'python -m localcorr.build_native xpu' to use it !!!"
         )
+
+
+def _raft_corr_unavailable_reason(
+    corr_mode: str,
+    fmap1: torch.Tensor,
+    allpairs_cls: Optional[Any],
+    alt_cls: Optional[Any],
+) -> Optional[str]:
+    """Return why a RAFT-style corr_mode cannot be used now, or None if it can."""
+    if corr_mode == "torch":
+        return None
+    if corr_mode == "allpairs":
+        if allpairs_cls is None:
+            return "this model has no all-pairs correlation implementation"
+        return None
+    if corr_mode == "alt_cuda_corr":
+        if alt_cls is None:
+            return "this model does not support corr_mode='alt_cuda_corr'"
+        if alt_cuda_corr is None:
+            return (
+                "the alt_cuda_corr CUDA extension is not compiled. Compile it from "
+                "ptlflow/utils/external/alt_cuda_corr to use it"
+            )
+        if fmap1.device.type != "cuda":
+            return (
+                "it requires CUDA tensors, but the feature maps are on device "
+                f"{fmap1.device}"
+            )
+        return None
+    if corr_mode.startswith("localcorr"):
+        return _localcorr_unavailable_reason(corr_mode, fmap1=fmap1)
+    return None
 
 
 def get_raft_corr_block(
@@ -164,8 +314,10 @@ def get_raft_corr_block(
     """Create a RAFT-style correlation block for the given mode.
 
     The allpairs and alt_cuda_corr engines are model-specific classes; the torch and
-    localcorr_* engines are shared. alt_cuda_corr raises an error if the extension is
-    not compiled or if the feature maps are not on a CUDA device.
+    localcorr_* engines are shared. If the chosen engine is not available (missing
+    package or compiled extension, or feature maps on a device it does not
+    support), a warning is logged and the pure-PyTorch IterativeCorrBlock
+    (corr_mode="torch") is used instead.
 
     Parameters
     ----------
@@ -184,12 +336,13 @@ def get_raft_corr_block(
     -------
     The correlation block, callable with coords [B, 2, H, W].
     """
-    if corr_mode.startswith("localcorr"):
-        if localcorr is None:
-            raise ImportError(
-                f"corr_mode={corr_mode!r} requires the localcorr package, but it could not be "
-                "imported. Install localcorr or use another corr_mode."
-            )
+    fallback_reason = _raft_corr_unavailable_reason(
+        corr_mode, fmap1, allpairs_cls, alt_cls
+    )
+    if fallback_reason is not None:
+        _log_corr_mode_fallback(corr_mode, "torch", fallback_reason)
+        corr_fn = IterativeCorrBlock
+    elif corr_mode.startswith("localcorr"):
         return localcorr.get_localcorr_block(
             fmap1=fmap1,
             fmap2=fmap2,
@@ -197,31 +350,9 @@ def get_raft_corr_block(
             num_levels=num_levels,
             corr_mode=corr_mode,
         )
-
-    if corr_mode == "allpairs":
-        if allpairs_cls is None:
-            raise ValueError(
-                'corr_mode="allpairs" is not supported by this model (it has no '
-                "all-pairs correlation implementation). Use another corr_mode."
-            )
+    elif corr_mode == "allpairs":
         corr_fn = allpairs_cls
     elif corr_mode == "alt_cuda_corr":
-        if alt_cls is None:
-            raise ValueError(
-                'corr_mode="alt_cuda_corr" is not supported by this model. '
-                "Use another corr_mode."
-            )
-        if alt_cuda_corr is None:
-            raise ImportError(
-                'corr_mode="alt_cuda_corr" requires the alt_cuda_corr CUDA extension, but it '
-                "could not be imported. Compile it (see ptlflow/utils/external/alt_cuda_corr) "
-                "or use another corr_mode."
-            )
-        if fmap1.device.type != "cuda":
-            raise RuntimeError(
-                'corr_mode="alt_cuda_corr" requires CUDA tensors, but the feature maps are on '
-                f"device {fmap1.device}."
-            )
         corr_fn = alt_cls
     elif corr_mode == "torch":
         corr_fn = IterativeCorrBlock
@@ -238,6 +369,10 @@ def get_spatial_corr_sampler(
 ) -> Tuple[Any, Optional[Exception]]:
     """Create a PWCNet-style spatial correlation sampler for the given mode.
 
+    If the chosen engine is not available (missing package or compiled
+    extension), a warning is logged and the pure-PyTorch
+    IterSpatialCorrelationSampler (corr_mode="iter") is used instead.
+
     Parameters
     ----------
     corr_mode : str
@@ -253,9 +388,24 @@ def get_spatial_corr_sampler(
     Returns
     -------
     Tuple[Any, Optional[Exception]]
-        The sampler, and an error to be raised by the model forward if the sampler
-        could not be created (None on success).
+        The sampler and an error to be raised by the model forward if the
+        sampler could not be created (None on success; with the fallback it
+        is always None, kept for backward compatibility).
     """
+    fallback_reason = None
+    if corr_mode == "spatial":
+        if SpatialCorrelationSampler is None:
+            fallback_reason = (
+                "the spatial_correlation_sampler extension is not compiled. Compile it "
+                "from ptlflow/utils/external/Pytorch-Correlation-extension to use it"
+            )
+    elif corr_mode.startswith("localcorr"):
+        fallback_reason = _localcorr_unavailable_reason(corr_mode, is_sampler=True)
+
+    if fallback_reason is not None:
+        _log_corr_mode_fallback(corr_mode, "iter", fallback_reason)
+        corr_mode = "iter"
+
     if corr_mode == "iter":
         return (
             IterSpatialCorrelationSampler(
@@ -267,14 +417,6 @@ def get_spatial_corr_sampler(
             None,
         )
     if corr_mode == "spatial":
-        if SpatialCorrelationSampler is None:
-            error = ImportError(
-                'corr_mode="spatial" requires the spatial_correlation_sampler extension, '
-                "but it could not be imported. Compile it (see "
-                "ptlflow/utils/external/Pytorch-Correlation-extension) or use another "
-                "corr_mode."
-            )
-            return None, error
         return (
             SpatialCorrelationSampler(
                 kernel_size=1,
@@ -285,12 +427,6 @@ def get_spatial_corr_sampler(
             None,
         )
     if corr_mode.startswith("localcorr"):
-        if localcorr is None:
-            error = ImportError(
-                f"corr_mode={corr_mode!r} requires the localcorr package, but it could "
-                "not be imported. Install localcorr or use another corr_mode."
-            )
-            return None, error
         return (
             localcorr.get_localcorr_sampler(
                 patch_size=patch_size,
