@@ -490,25 +490,6 @@ class UFM(BaseModel):
     # given as a (url, file_name) tuple, where file_name is the unique name used to store and
     # search for the checkpoint in the local cache. These are the names registered in
     # docs/source/models/checkpoint_list.csv.
-    pretrained_checkpoints = {
-        "base": (
-            "https://huggingface.co/infinity1096/UFM-Base/resolve/main/model.safetensors",
-            "ufm-base.safetensors",
-        ),
-        "base-980": (
-            "https://huggingface.co/infinity1096/UFM-Base-980/resolve/main/model.safetensors",
-            "ufm-base-980.safetensors",
-        ),
-        "base-dinov2l-init": (
-            "https://huggingface.co/infinity1096/UFM-Base-DINOv2L-init/resolve/main/model.safetensors",
-            "ufm-base-dinov2l-init.safetensors",
-        ),
-        "base-dinov2g-init": (
-            "https://huggingface.co/infinity1096/UFM-Base-DINOv2G-init/resolve/main/model.safetensors",
-            "ufm-base-dinov2g-init.safetensors",
-        ),
-    }
-
     def __init__(
         self,
         variant: str = "base",
@@ -641,21 +622,59 @@ class UFM(BaseModel):
         return self._maybe_return_simple(outputs)
 
 
-class UFMRefine(UFM):
-    """UFM model with the classification refinement architecture.
-
-    This variant is only compatible with the "refine" and "refine-980" variants, which are the
-    only ones that include the classification refinement modules (classification_head,
-    unet_feature, etc.).
-    """
+class UFMBase(UFM):
     pretrained_checkpoints = {
-        "refine": (
-            "https://huggingface.co/infinity1096/UFM-Refine/resolve/main/model.safetensors",
-            "ufm-refine.safetensors",
+        "mixed": (
+            "https://huggingface.co/infinity1096/UFM-Base/resolve/main/model.safetensors",
+            "ufm_base-mixed.safetensors",
         ),
-        "refine-980": (
-            "https://huggingface.co/infinity1096/UFM-Refine-980/resolve/main/model.safetensors",
-            "ufm-refine-980.safetensors",
+    }
+
+    def __init__(self, variant="base", **kwargs):
+        super().__init__(variant=variant, **kwargs)
+
+
+class UFMBase980(UFM):
+    pretrained_checkpoints = {
+        "mixed": (
+            "https://huggingface.co/infinity1096/UFM-Base-980/resolve/main/model.safetensors",
+            "ufm_base_980-mixed.safetensors",
+        ),
+    }
+
+    def __init__(self, variant="base-980", **kwargs):
+        super().__init__(variant=variant, **kwargs)
+
+
+class UFMBaseDINOv2L(UFM):
+    pretrained_checkpoints = {
+        "mixed": (
+            "https://huggingface.co/infinity1096/UFM-Base-DINOv2L-init/resolve/main/model.safetensors",
+            "ufm_base_dinov2l-mixed.safetensors",
+        ),
+    }
+
+    def __init__(self, variant="base-dinov2l-init", **kwargs):
+        super().__init__(variant=variant, **kwargs)
+
+
+class UFMBaseDINOv2G(UFM):
+    pretrained_checkpoints = {
+        "mixed": (
+            "https://huggingface.co/infinity1096/UFM-Base-DINOv2G-init/resolve/main/model.safetensors",
+            "ufm_base_dinov2g-mixed.safetensors",
+        ),
+    }
+
+    def __init__(self, variant="base-dinov2g-init", **kwargs):
+        super().__init__(variant=variant, **kwargs)
+
+
+class UFMRefine(UFM):
+    pretrained_checkpoints = {
+        "mixed": (
+            "https://huggingface.co/infinity1096/UFM-Refine/resolve/main/model.safetensors",
+            "ufm_refine-mixed.safetensors",
         ),
     }
 
@@ -663,6 +682,16 @@ class UFMRefine(UFM):
         super().__init__(variant=variant, **kwargs)
 
 
+class UFMRefine980(UFM):
+    pretrained_checkpoints = {
+        "mixed": (
+            "https://huggingface.co/infinity1096/UFM-Refine-980/resolve/main/model.safetensors",
+            "ufm_refine_980-mixed.safetensors",
+        ),
+    }
+
+    def __init__(self, variant="refine-980", **kwargs):
+        super().__init__(variant=variant, **kwargs)
 
 
 @register_model
@@ -671,5 +700,30 @@ class ufm(UFM):
 
 
 @register_model
+class ufm_base(UFMBase):
+    pass
+
+
+@register_model
+class ufm_base_980(UFMBase980):
+    pass
+
+
+@register_model
+class ufm_base_dinov2l(UFMBaseDINOv2L):
+    pass
+
+
+@register_model
+class ufm_base_dinov2g(UFMBaseDINOv2G):
+    pass
+
+
+@register_model
 class ufm_refine(UFMRefine):
+    pass
+
+
+@register_model
+class ufm_refine_980(UFMRefine980):
     pass
