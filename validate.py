@@ -626,7 +626,7 @@ def _get_model_names(args: Namespace) -> List[str]:
         assert len(args.select) > 0
         model_names = args.select
         for name in model_names:
-            assert name in available_model_names
+            assert name in available_model_names, f"Model {name} is not available."
     return model_names
 
 
