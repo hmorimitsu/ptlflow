@@ -597,20 +597,26 @@ class CrossAttFeatTrans(SETransInitWeights):
         # if self.call_count == 0:
         #    print0(f"{self.name} query: {list(query_feat.shape)}, attn: {list(attention_scores.shape)}")
 
-        with torch.no_grad():
-            curr_max_attn = attention_scores.max().item()
-            curr_avg_attn = attention_scores.abs().mean().item()
+        # The .item() reads below are data-dependent: tracing (legacy ONNX
+        # exporter) silently bakes the taken branch, while torch.export
+        # (dynamo ONNX exporter) refuses them outright
+        # (GuardOnDataDependentSymNode). This block is an eager-mode
+        # diagnostic/safety net, so skip it entirely while exporting.
+        if not (torch.jit.is_tracing() or torch.compiler.is_exporting()):
+            with torch.no_grad():
+                curr_max_attn = attention_scores.max().item()
+                curr_avg_attn = attention_scores.abs().mean().item()
 
-        if curr_max_attn > self.max_attn:
-            self.max_attn = curr_max_attn
+            if curr_max_attn > self.max_attn:
+                self.max_attn = curr_max_attn
 
-        if curr_max_attn > self.attn_clip:
-            attention_scores = torch.clamp(
-                attention_scores, -self.attn_clip, self.attn_clip
-            )
-            self.clamp_count += 1
+            if curr_max_attn > self.attn_clip:
+                attention_scores = torch.clamp(
+                    attention_scores, -self.attn_clip, self.attn_clip
+                )
+                self.clamp_count += 1
 
-        self.call_count += 1
+            self.call_count += 1
         if self.training:
             if self.call_count % self.attn_diag_cycles == 0:
                 print0(
