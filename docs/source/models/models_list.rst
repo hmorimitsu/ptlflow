@@ -297,6 +297,17 @@ MatchFlow
 
 - Model names: ``matchflow``, ``matchflow_raft``
 
+MegaFlow
+--------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/megaflow>`__
+
+- Paper: **MegaFlow: Zero-Shot Large Displacement Optical Flow** - `https://arxiv.org/abs/2603.25739 <https://arxiv.org/abs/2603.25739>`_
+
+- Reference code: `https://github.com/cvg/megaflow <https://github.com/cvg/megaflow>`_
+
+- Model name: ``megaflow``
+
 MemFlow
 -------
 
@@ -488,6 +499,17 @@ StreamFlow
 - Paper: **StreamFlow: Streamlined Multi-Frame Optical Flow Estimation for Video Sequences** - `https://arxiv.org/abs/2311.17099 <https://arxiv.org/abs/2311.17099>`_
 
 - Model names: ``streamflow``
+
+UFM
+---
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/ufm>`__
+
+- Paper: **UFM: A Simple Path towards Unified Dense Correspondence with Flow** - `https://arxiv.org/abs/2506.09278 <https://arxiv.org/abs/2506.09278>`_
+
+- Reference code: `https://github.com/UniFlowMatch/UFM <https://github.com/UniFlowMatch/UFM>`__
+
+- Model name: ``ufm``, ``ufm_base``, ``ufm_base_980``, ``ufm_base_dinov2l``, ``ufm_base_dinov2g``, ``ufm_refine``, ``ufm_refine_980``
 
 VCN
 ---

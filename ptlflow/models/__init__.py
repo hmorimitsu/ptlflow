@@ -21,6 +21,7 @@ from .liteflownet import *
 from .llaflow import *
 from .maskflownet import *
 from .matchflow import *
+from .megaflow import *
 from .memflow import *
 from .memfof import *
 from .ms_raft_plus import *
@@ -39,6 +40,7 @@ from .skflow import *
 from .splatflow import *
 from .starflow import *
 from .streamflow import *
+from .ufm import *
 from .unimatch import *
 from .vcn import *
 from .videoflow import *

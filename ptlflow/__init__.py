@@ -18,12 +18,15 @@
 
 __version__ = "0.4.3"
 
+import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from urllib.parse import urlparse
 
 from jsonargparse import ArgumentParser, Namespace
 from loguru import logger
 import requests
+from safetensors.torch import load_file as load_safetensors_file
 import torch
 from torch import hub
 
@@ -198,8 +201,93 @@ def get_ptlflow_trained_model_names() -> List[str]:
     return _ptlflow_trained_models
 
 
+_HF_DEFAULT_ENDPOINT = "https://huggingface.co"
+
+
+def _redirect_hf_url(url: str) -> str:
+    """Replace the HuggingFace endpoint with the one set in the HF_ENDPOINT variable.
+
+    This is useful, for example, to use a mirror of huggingface.co by setting
+    HF_ENDPOINT=https://hf-mirror.com.
+
+    Parameters
+    ----------
+    url : str
+        The url to be redirected.
+
+    Returns
+    -------
+    str
+        The url with the endpoint replaced, if applicable.
+    """
+    endpoint = os.environ.get("HF_ENDPOINT")
+    if endpoint is not None and url.startswith(_HF_DEFAULT_ENDPOINT):
+        url = endpoint.rstrip("/") + url[len(_HF_DEFAULT_ENDPOINT) :]
+    return url
+
+
+def _load_ckpt_file(ckpt_path: str, device: str) -> Dict[str, Any]:
+    """Load a checkpoint file, guessing the format from the file extension.
+
+    Parameters
+    ----------
+    ckpt_path : str
+        Path to a local checkpoint file.
+    device : str
+        Device in which the checkpoint contents will be loaded.
+
+    Returns
+    -------
+    Dict[str, Any]
+        A dictionary of the loaded checkpoint.
+    """
+    if ckpt_path.lower().endswith(".safetensors"):
+        return load_safetensors_file(ckpt_path, device=device)
+    else:
+        return torch.load(
+            ckpt_path, map_location=torch.device(device), weights_only=True
+        )
+
+
+def _split_pretrained_checkpoint_value(
+    ckpt_value: Union[str, Tuple[str, str]]
+) -> Tuple[str, Optional[str]]:
+    """Split an entry of a pretrained_checkpoints dictionary into its url and cache file name.
+
+    The entries of the pretrained_checkpoints dictionaries are usually just the url of the checkpoint. However, the urls
+    of multiple checkpoints may end with the same file name (e.g., HuggingFace repositories that store their weights as
+    model.safetensors). In this case, all the checkpoints would collide into a single file in the local cache. To avoid
+    it, the entry can also be given as a (url, file_name) tuple, where file_name is the name used to store and search
+    for the checkpoint in the local cache.
+
+    Parameters
+    ----------
+    ckpt_value : Union[str, Tuple[str, str]]
+        An entry of a pretrained_checkpoints dictionary. Either a plain url or a (url, file_name) tuple.
+
+    Returns
+    -------
+    Tuple[str, Optional[str]]
+        The checkpoint url and the name that the checkpoint must have in the local cache. The name is None if the input
+        was just a url, in which case the name must be deduced from the url itself.
+    """
+    if isinstance(ckpt_value, str):
+        return ckpt_value, None
+    url, file_name = ckpt_value
+    return url, file_name
+
+
 def load_checkpoint(ckpt_path: str, model_ref: Type[BaseModel]) -> Dict[str, Any]:
     """Try to load the checkpoint specified in ckpt_path.
+
+    The checkpoint can be a local file or the name of one of the pretrained checkpoints registered in
+    model_ref.pretrained_checkpoints. The pretrained checkpoints can be given as any url (e.g., a github release or a
+    huggingface url). HuggingFace urls are redirected to the endpoint set in the HF_ENDPOINT variable, if it is set.
+    Checkpoints ending with .safetensors are loaded with the safetensors library.
+
+    The entries of model_ref.pretrained_checkpoints can be plain urls or (url, file_name) tuples. The file_name is used
+    to name the checkpoint in the local cache, which is required when the urls of multiple checkpoints end with the same
+    file name (see _split_pretrained_checkpoint_value() for more details).
 
     Parameters
     ----------
@@ -211,12 +299,13 @@ def load_checkpoint(ckpt_path: str, model_ref: Type[BaseModel]) -> Dict[str, Any
     Returns
     -------
     Dict[str, Any]
-        A dictionary of the loaded checkpoint. The output of torch.load().
+        A dictionary of the loaded checkpoint. The output of torch.load() or safetensors load_file().
 
     See Also
     --------
     get_model_reference : To get a reference to the class of a model.
     """
+    cache_file_name = None
     if not Path(ckpt_path).exists():
         if hasattr(model_ref, "pretrained_checkpoints"):
             tmp_ckpt_path = model_ref.pretrained_checkpoints.get(ckpt_path)
@@ -226,18 +315,32 @@ def load_checkpoint(ckpt_path: str, model_ref: Type[BaseModel]) -> Dict[str, Any
                     f'Choose one from {{{",".join(model_ref.pretrained_checkpoints.keys())}}}'
                 )
             else:
-                ckpt_path = tmp_ckpt_path
+                (
+                    ckpt_path,
+                    cache_file_name,
+                ) = _split_pretrained_checkpoint_value(tmp_ckpt_path)
         else:
             raise ValueError(
                 f"Cannot find checkpoint {ckpt_path} for model {model_ref.__name__}"
             )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    ckpt_path = _redirect_hf_url(ckpt_path)
 
     if Path(ckpt_path).exists():
-        ckpt = torch.load(
-            ckpt_path, map_location=torch.device(device), weights_only=True
+        ckpt = _load_ckpt_file(ckpt_path, device)
+    elif ckpt_path.lower().endswith(".safetensors"):
+        model_dir = Path(hub.get_dir()) / "checkpoints"
+        model_dir.mkdir(parents=True, exist_ok=True)
+        local_path = model_dir / (
+            cache_file_name
+            if cache_file_name is not None
+            else os.path.basename(urlparse(ckpt_path).path)
         )
+        if not local_path.exists():
+            logger.info("Downloading {} to {}.", ckpt_path, str(local_path))
+            hub.download_url_to_file(ckpt_path, str(local_path), progress=True)
+        ckpt = _load_ckpt_file(str(local_path), device)
     else:
         model_dir = Path(hub.get_dir()) / "checkpoints"
         ckpt = hub.load_state_dict_from_url(
@@ -247,6 +350,11 @@ def load_checkpoint(ckpt_path: str, model_ref: Type[BaseModel]) -> Dict[str, Any
             check_hash=True,
             weights_only=True,
         )
+
+    if isinstance(ckpt, dict) and "state_dict" not in ckpt:
+        # Some checkpoints (e.g., safetensors releases) only store the raw state dict.
+        # Wrap it, so it looks like a regular ptlflow checkpoint.
+        ckpt = {"state_dict": ckpt}
     return ckpt
 
 

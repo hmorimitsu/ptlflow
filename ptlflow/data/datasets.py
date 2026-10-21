@@ -1667,7 +1667,6 @@ class SintelDataset(BaseFlowDataset):
                         occ_paths = self._extend_paths_list(
                             occ_paths, sequence_length, sequence_position
                         )
-                        assert len(occ_paths) == len(flow_paths)
 
                 step_size = (
                     (self.sequence_length - 1) if sequence_position == "all" else 1

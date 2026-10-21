@@ -76,6 +76,12 @@ MODEL_ARGS = {
 # frames for it (see SIMPLE_IO_NUM_IMAGES).
 EXCLUDE_MODELS_SIMPLE_IO = [m for m in EXCLUDE_MODELS if m != "streamflow"]
 
+# Very demanding models, skipped on CPU-only machines (such as the GitHub
+# Actions runners) to keep the test runtime acceptable.
+EXCLUDE_MODELS_ON_CPU = [
+    "ufm_base_dinov2g",  # more than 1B parameters
+]
+
 # Models that require more than two input frames.
 SIMPLE_IO_NUM_IMAGES = {
     "memfof": 3,
@@ -84,11 +90,17 @@ SIMPLE_IO_NUM_IMAGES = {
     "videoflow_mof": 3,
 }
 
+# Repeated forward passes must produce identical outputs on CPU. On CUDA some
+# kernels are non-deterministic, so a small tolerance is required instead.
+SIMPLE_IO_ATOL = 0.1 if torch.cuda.is_available() else 0.0
+
 
 def test_forward() -> None:
     model_names = ptlflow._models_dict.keys()
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
+            continue
+        if mname in EXCLUDE_MODELS_ON_CPU and not torch.cuda.is_available():
             continue
 
         print(mname)
@@ -162,6 +174,8 @@ def test_simple_io() -> None:
     for mname in model_names:
         if mname in EXCLUDE_MODELS_SIMPLE_IO:
             continue
+        if mname in EXCLUDE_MODELS_ON_CPU and not torch.cuda.is_available():
+            continue
 
         print(mname)
         model_ref = ptlflow.get_model_reference(mname)
@@ -206,7 +220,7 @@ def test_simple_io() -> None:
             f"got {type(out_dict)}"
         )
         assert torch.allclose(
-            out_tensor, out_dict, rtol=0, atol=0, equal_nan=True
+            out_tensor, out_dict, rtol=0, atol=SIMPLE_IO_ATOL, equal_nan=True
         ), f"{mname}: tensor and dict inputs must produce the same output"
 
         assert isinstance(out_default, dict) and "flows" in out_default, (
@@ -216,7 +230,7 @@ def test_simple_io() -> None:
         flows = out_default["flows"]
         expected = flows[:, 0] if flows.ndim == 5 else flows
         assert torch.allclose(
-            out_tensor, expected, rtol=0, atol=0, equal_nan=True
+            out_tensor, expected, rtol=0, atol=SIMPLE_IO_ATOL, equal_nan=True
         ), f"{mname}: the simple_io output must match the default flows output"
 
 

@@ -117,6 +117,9 @@ matchflow_gma-kitti-bc72ce81.ckpt,matchflow-g-kitti.pth,
 matchflow_gma-sintel-683422f4.ckpt,matchflow-g-sintel.pth,
 matchflow_gma-things-49295bd8.ckpt,matchflow-g-things.pth,
 matchflow_raft-things-bf560032.ckpt,matchflow-r-things.pth,
+megaflow-flow.safetensors,megaflow-flow.safetensors,https://huggingface.co/Kristen-Z/MegaFlow
+megaflow-track.safetensors,megaflow-track.safetensors,
+megaflow-chairs-things.safetensors,megaflow-chairs-things.safetensors,
 memflow-things-90d0b74c.ckpt,MemFlowNet_things.pth,https://github.com/DQiaole/MemFlow
 memflow-sintel-38621d84.ckpt,MemFlowNet_sintel.pth,
 memflow-kitti-ee6cbf09.ckpt,MemFlowNet_kitti.pth,
@@ -194,6 +197,12 @@ streamflow-things-c640255a.ckpt,streamflow-things.pth,https://github.com/littles
 streamflow-kitti-eaafa6ed.ckpt,streamflow-kitti.pth,
 streamflow-sintel-af557e5e.ckpt,streamflow-sintel.pth,
 streamflow-spring-092f8a17.ckpt,streamflow-spring.pth,
+ufm_base-mixed.safetensors,model.safetensors,https://huggingface.co/infinity1096/UFM-Base
+ufm_refine-mixed.safetensors,model.safetensors,https://huggingface.co/infinity1096/UFM-Refine
+ufm_base_980-mixed.safetensors,model.safetensors,https://huggingface.co/infinity1096/UFM-Base-980
+ufm_refine_980-mixed.safetensors,model.safetensors,https://huggingface.co/infinity1096/UFM-Refine-980
+ufm_base_dinov2l-mixed.safetensors,model.safetensors,https://huggingface.co/infinity1096/UFM-Base-DINOv2L-init
+ufm_base_dinov2g-mixed.safetensors,model.safetensors,https://huggingface.co/infinity1096/UFM-Base-DINOv2G-init
 unimatch-mixdata-9d7c1e4d.ckpt,gmflow-scale1-mixdata-train320x576-4c3a6e9a.pth,https://github.com/autonomousvision/unimatch
 unimatch-things-2433864a.ckpt,gmflow-scale1-things-e9887eda.pth,
 unimatch_scale2-mixdata-b514dde2.ckpt,gmflow-scale2-mixdata-train320x576-9ff1c094.pth,

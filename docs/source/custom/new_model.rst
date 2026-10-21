@@ -167,7 +167,11 @@ you should just override the required methods from BaseModel with the setting yo
 
 PTLFlow looks for this class variable in order to know how to load pretrained weights for the model.
 It must be a ``dict``, in which the key is any identifier string and the value is either a path
-to a local file, or a link to an online resource. If you do not have pretrained weights for your
+to a local file, or a link to an online resource. The link can point, for example, to a github
+release or to a HuggingFace repository. Files in the safetensors format are also supported (they
+can even store only the raw state dict, without the ``state_dict`` wrapper key). If the link points
+to huggingface.co, the download can be redirected to a mirror by setting the ``HF_ENDPOINT``
+environment variable. If you do not have pretrained weights for your
 model, then simply do not define this variable.
 
 4. BaseModel constructor
