@@ -915,6 +915,7 @@ class MegaFlow(BaseModel):
         return results_dict
 
     def forward(self, inputs):
+        inputs = self._normalize_inputs(inputs)
         imgs = inputs["images"]
 
         results_dict = {}
@@ -1063,7 +1064,7 @@ class MegaFlow(BaseModel):
         results_dict.update({"flow_preds": flows_preds})
         results_dict.update({"flows": flows_preds[-1]})
 
-        return results_dict
+        return self._maybe_return_simple(results_dict)
 
     def _process_frame_attention(self, tokens, B, S, P, C, frame_idx, pos=None):
         """
