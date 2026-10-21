@@ -195,125 +195,6 @@ class ExportableDeformConv2d(nn.Module):
         return F.conv2d(sampled_features, weight, bias=self.bias)
 
 
-class ExportableDeformConv2d(nn.Module):
-    """ONNX-exportable stand-in for torchvision deform_conv2d.
-
-    The legacy ONNX exporter cannot export torchvision::deform_conv2d (it
-    has no registered symbolic), so during export (simple_io=True or
-    deploy=True, as done by the edgeflowbench converters) the deformable
-    convolutions are replaced by this module, which computes the same
-    operation with standard ops (per-tap grid_sample + 1x1 convolution).
-    Matches ops.DeformConv2d outputs up to float rounding (~1e-6), also for
-    the out-of-range samples produced by large flow offsets.
-
-    Supports the configuration used by the MaskFlownet models: one offset
-    group, optional bias and no modulation mask.
-    """
-
-    def __init__(
-        self,
-        in_planes,
-        out_planes,
-        kernel_size=3,
-        strides=1,
-        padding=1,
-        use_bias=True,
-    ):
-        super().__init__()
-        if isinstance(kernel_size, int):
-            kernel_size = (kernel_size, kernel_size)
-        if isinstance(strides, int):
-            strides = (strides, strides)
-        if isinstance(padding, int):
-            padding = (padding, padding)
-
-        self.in_planes = in_planes
-        self.out_planes = out_planes
-        self.kernel_size = kernel_size
-        self.strides = strides
-        self.padding = padding
-        self.weight = nn.Parameter(
-            torch.empty(out_planes, in_planes, kernel_size[0], kernel_size[1])
-        )
-        if use_bias:
-            self.bias = nn.Parameter(torch.empty(out_planes))
-        else:
-            self.register_parameter("bias", None)
-
-        nn.init.kaiming_uniform_(self.weight, a=np.sqrt(5))
-        if self.bias is not None:
-            fan_in = in_planes * kernel_size[0] * kernel_size[1]
-            bound = 1 / np.sqrt(fan_in)
-            nn.init.uniform_(self.bias, -bound, bound)
-
-    def forward(self, x, offset):
-        batch_size, _, height, width = x.shape
-        kernel_h, kernel_w = self.kernel_size
-        stride_h, stride_w = self.strides
-        pad_h, pad_w = self.padding
-
-        # Zero-pad with torch.cat instead of F.pad: an F.pad output feeding
-        # grid_sample loses its static shape during ONNX export, while the
-        # cat output keeps it. Numerically identical to F.pad mode="constant".
-        if pad_h > 0 or pad_w > 0:
-            if pad_w > 0:
-                pad_w_tensor = torch.zeros(
-                    batch_size,
-                    x.shape[1],
-                    height,
-                    pad_w,
-                    dtype=x.dtype,
-                    device=x.device,
-                )
-                x = torch.cat([pad_w_tensor, x, pad_w_tensor], dim=3)
-            if pad_h > 0:
-                pad_h_tensor = torch.zeros(
-                    batch_size,
-                    x.shape[1],
-                    pad_h,
-                    width + 2 * pad_w,
-                    dtype=x.dtype,
-                    device=x.device,
-                )
-                x = torch.cat([pad_h_tensor, x, pad_h_tensor], dim=2)
-        padded_h = height + 2 * pad_h
-        padded_w = width + 2 * pad_w
-        out_h = (padded_h - kernel_h) // stride_h + 1
-        out_w = (padded_w - kernel_w) // stride_w + 1
-
-        base_y = torch.arange(out_h, dtype=x.dtype, device=x.device) * stride_h
-        base_x = torch.arange(out_w, dtype=x.dtype, device=x.device) * stride_w
-        grid_y, grid_x = torch.meshgrid(base_y, base_x, indexing="ij")
-
-        sampled_features = []
-        offset_index = 0
-        for kernel_y in range(kernel_h):
-            for kernel_x in range(kernel_w):
-                offset_y = offset[:, offset_index]
-                offset_x = offset[:, offset_index + 1]
-                offset_index += 2
-
-                sample_x = grid_x + kernel_x + offset_x
-                sample_y = grid_y + kernel_y + offset_y
-                sample_x = 2.0 * sample_x / max(padded_w - 1, 1) - 1.0
-                sample_y = 2.0 * sample_y / max(padded_h - 1, 1) - 1.0
-                sample_grid = torch.stack((sample_x, sample_y), dim=-1)
-                sampled = F.grid_sample(
-                    x,
-                    sample_grid,
-                    mode="bilinear",
-                    padding_mode="zeros",
-                    align_corners=True,
-                )
-                sampled_features.append(sampled)
-
-        sampled_features = torch.stack(sampled_features, dim=2).reshape(
-            batch_size, self.in_planes * kernel_h * kernel_w, out_h, out_w
-        )
-        weight = self.weight.view(self.out_planes, -1, 1, 1)
-        return F.conv2d(sampled_features, weight, bias=self.bias)
-
-
 def upsample_kernel2d(w, dtype, device):
     c = w // 2
     kernel = 1 - torch.abs(c - torch.arange(w, dtype=dtype, device=device)) / (c + 1)
@@ -385,7 +266,6 @@ class MaskFlownet_S(BaseModel):
         loss_q: Optional[float] = None,
         simple_io: bool = False,
         deploy: bool = False,
-        deploy: bool = False,
         **kwargs,
     ):
         super(MaskFlownet_S, self).__init__(
@@ -400,11 +280,6 @@ class MaskFlownet_S(BaseModel):
             simple_io=simple_io,
             **kwargs,
         )
-        # deploy selects the ONNX-export-friendly ops (the grid_sample-based
-        # exportable deformable conv) without changing the input/output
-        # format like simple_io does. MaskFlownet sets it on its inner
-        # MaskFlownet_S when it is itself created with simple_io=True.
-        self.deploy = deploy
         # deploy selects the ONNX-export-friendly ops (the grid_sample-based
         # exportable deformable conv) without changing the input/output
         # format like simple_io does. MaskFlownet sets it on its inner
@@ -540,15 +415,6 @@ class MaskFlownet_S(BaseModel):
         self.deform4 = deform_conv_factory(96, 96)
         self.deform3 = deform_conv_factory(64, 64)
         self.deform2 = deform_conv_factory(32, 32)
-        deform_conv_factory = (
-            ExportableDeformConv2d
-            if (self.simple_io or self.deploy)
-            else deformable_conv
-        )
-        self.deform5 = deform_conv_factory(128, 128)
-        self.deform4 = deform_conv_factory(96, 96)
-        self.deform3 = deform_conv_factory(64, 64)
-        self.deform2 = deform_conv_factory(32, 32)
 
         self.conv5f = conv(
             16, 128, kernel_size=3, stride=1, padding=1, activation=False
@@ -588,11 +454,6 @@ class MaskFlownet_S(BaseModel):
         # vgrid = Variable(grid) + flo
         vgrid = Variable(grid) + torch.flip(flo, [1])
 
-        # scale grid to [-1,1] without in-place slice assignments, which are
-        # not ONNX-exportable
-        vgrid_x = 2.0 * vgrid[:, 0:1] / max(W - 1, 1) - 1.0
-        vgrid_y = 2.0 * vgrid[:, 1:2] / max(H - 1, 1) - 1.0
-        vgrid = torch.cat((vgrid_x, vgrid_y), dim=1).permute(0, 2, 3, 1)
         # scale grid to [-1,1] without in-place slice assignments, which are
         # not ONNX-exportable
         vgrid_x = 2.0 * vgrid[:, 0:1] / max(W - 1, 1) - 1.0
@@ -854,7 +715,6 @@ class MaskFlownet(BaseModel):
             loss_eps=loss_eps,
             loss_q=loss_q,
             deploy=simple_io,
-            deploy=simple_io,
             **kwargs,
         )
         self.activate = nn.LeakyReLU(0.1)
@@ -964,14 +824,6 @@ class MaskFlownet(BaseModel):
 
         # self.upfeat5 = deconv()
 
-        deform_conv_factory = (
-            ExportableDeformConv2d if self.simple_io else deformable_conv
-        )
-        self.deform6 = deform_conv_factory(196, 196)
-        self.deform5 = deform_conv_factory(128, 128)
-        self.deform4 = deform_conv_factory(96, 96)
-        self.deform3 = deform_conv_factory(64, 64)
-        self.deform2 = deform_conv_factory(32, 32)
         deform_conv_factory = (
             ExportableDeformConv2d if self.simple_io else deformable_conv
         )
