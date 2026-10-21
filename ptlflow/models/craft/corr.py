@@ -18,8 +18,12 @@ class CorrBlock:
 
         batch, h1, w1, dim, h2, w2 = corr.shape
         if self.do_corr_global_norm:
+            # Static (h1*w1*h2*w2) instead of corr_3d.shape[2] so ONNX export
+            # gets a constant layer_norm normalized_shape.
             corr_3d = corr.permute(0, 3, 1, 2, 4, 5).view(batch, dim, -1)
-            corr_normed = F.layer_norm(corr_3d, (corr_3d.shape[2],), eps=1e-12)
+            corr_normed = F.layer_norm(
+                corr_3d, (h1 * w1 * h2 * w2,), eps=1e-12
+            )
             corr = corr_normed.view(batch, dim, h1, w1, h2, w2).permute(
                 0, 2, 3, 1, 4, 5
             )
@@ -95,8 +99,12 @@ class CorrBlockSingleScale(nn.Module):
         corr = CorrBlock.corr(fmap1, fmap2)
         batch, h1, w1, dim, h2, w2 = corr.shape
         if self.do_corr_global_norm:
+            # Static (h1*w1*h2*w2) instead of corr_3d.shape[2] so ONNX export
+            # gets a constant layer_norm normalized_shape.
             corr_3d = corr.permute(0, 3, 1, 2, 4, 5).view(batch, dim, -1)
-            corr_normed = F.layer_norm(corr_3d, (corr_3d.shape[2],), eps=1e-12)
+            corr_normed = F.layer_norm(
+                corr_3d, (h1 * w1 * h2 * w2,), eps=1e-12
+            )
             corr = corr_normed.view(batch, dim, h1, w1, h2, w2).permute(
                 0, 2, 3, 1, 4, 5
             )
@@ -180,17 +188,20 @@ class TransCorrBlock(CorrBlock, nn.Module):
             corr_1o2t = self.corr(ht, wd, vispos1o, vispos2, pos_biases)
             # Try concatenation instead of averaging, as averaging may lose info.
             corr = torch.cat([corr_1t2o, corr_1o2t], dim=3)
+            corr_dim = 2
         else:
             # single-way correlation.
             corr = self.corr(ht, wd, vispos1, vispos2, pos_biases)
+            corr_dim = 1
 
-        batch, h1, w1, dim, h2, w2 = corr.shape
-        # Merge batch with h1 and w1 to improve efficiency. They will be separate later.
-        corr = corr.reshape(batch * h1 * w1, dim, h2, w2)
+        # corr: [batch, ht, wd, corr_dim, ht, wd]. Reshape with static sizes
+        # (fmap1.shape is static, unlike the traced shape of corr) so the
+        # ONNX exporter gets constant reshape arguments.
+        corr = corr.reshape(batch * ht * wd, corr_dim, ht, wd)
 
         if "SAVECORR" in os.environ:
             corr_savepath = os.environ["SAVECORR"]
-            corr2 = corr.detach().cpu().reshape(batch, h1, w1, h2, w2)
+            corr2 = corr.detach().cpu().reshape(batch, ht, wd, ht, wd)
             torch.save(corr2, corr_savepath)
             print(f"Corr tensor saved to {corr_savepath}")
 
@@ -209,20 +220,15 @@ class TransCorrBlock(CorrBlock, nn.Module):
         # corr: [1, 1, 7040, 7040]
         corr = self.setrans(vispos1, vispos2, pos_biases)
         if self.do_corr_global_norm:
-            B, C, H, W = corr.shape
-            corr_3d = corr.view(B, C, H * W)
-            # F.layer_norm with a tensor-derived normalized_shape
-            # (corr_3d.shape[2] stays a dynamic value in the traced graph)
-            # fails ONNX export ("not constant"). Normalizing over the full
-            # last dimension with mean/var is exactly what layer_norm does
-            # for that shape (no affine), so compute it explicitly - the
-            # results are identical and the ops export to ONNX.
-            corr_mean = corr_3d.mean(dim=2, keepdim=True)
-            corr_var = corr_3d.var(dim=2, keepdim=True, unbiased=False)
-            corr_normed = (corr_3d - corr_mean) / torch.sqrt(corr_var + 1e-12)
-            corr = corr_normed.view(B, C, H, W)
+            # Use static sizes derived from ht/wd (and -1, which the ONNX
+            # exporter accepts) instead of unpacking corr.shape: the traced
+            # shape of the setrans output is not always inferable, and view/
+            # layer_norm args must be constants for ONNX export.
+            corr_3d = corr.view(-1, 1, ht * wd * ht * wd)
+            corr_normed = F.layer_norm(corr_3d, (ht * wd * ht * wd,), eps=1e-12)
+            corr = corr_normed.view(-1, 1, ht * wd, ht * wd)
 
-        corr = corr.view(batch, ht, wd, 1, ht, wd)
+        corr = corr.view(-1, ht, wd, 1, ht, wd)
         return corr
 
     # __call__() inherits from CorrBlock.
