@@ -3,13 +3,18 @@ from typing import Optional, Sequence
 import torch
 import torch.nn as nn
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    get_spatial_corr_sampler,
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from .pwc_modules import (
     conv,
     upsample2d_as,
     rescale_flow,
     initialize_msra,
-    compute_cost_volume,
 )
 from .pwc_modules import (
     WarpingLayer,
@@ -39,6 +44,7 @@ class IRRPWC(BaseModel):
         output_level: int = 4,
         num_levels: int = 7,
         num_chs: Sequence[int] = (3, 16, 32, 64, 96, 128, 196),
+        corr_mode: SpatialCorrMode = "iter",
         train_batch_size: Optional[int] = None,
         simple_io: bool = False,
         **kwargs,
@@ -58,6 +64,7 @@ class IRRPWC(BaseModel):
         self.num_levels = num_levels
         self.num_chs = num_chs
         self.train_batch_size = train_batch_size
+        self.corr_mode = corr_mode
 
         self.leakyRELU = nn.LeakyReLU(0.1, inplace=True)
 
@@ -88,19 +95,17 @@ class IRRPWC(BaseModel):
         self.refine_flow = RefineFlow(2 + 1 + 32)
         self.refine_occ = RefineOcc(1 + 32 + 32)
 
-        self.corr_params = {
-            "pad_size": self.search_range,
-            "kernel_size": 1,
-            "max_disp": self.search_range,
-            "stride1": 1,
-            "stride2": 1,
-            "corr_multiply": 1,
-        }
+        log_corr_mode_warnings(self.corr_mode)
+        self.corr, self._corr_error = get_spatial_corr_sampler(
+            self.corr_mode, patch_size=2 * self.search_range + 1
+        )
 
         initialize_msra(self.modules())
 
     def forward(self, inputs):
         inputs = self._normalize_inputs(inputs)
+        if self.corr is None:
+            raise self._corr_error
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=0.0,
@@ -161,8 +166,16 @@ class IRRPWC(BaseModel):
                     )
 
                 # correlation
-                out_corr_f = compute_cost_volume(x1, x2_warp, self.corr_params)
-                out_corr_b = compute_cost_volume(x2, x1_warp, self.corr_params)
+                out_corr_f = self.corr(x1, x2_warp)
+                out_corr_f = out_corr_f.view(
+                    out_corr_f.shape[0], -1, out_corr_f.shape[3], out_corr_f.shape[4]
+                )
+                out_corr_f = out_corr_f / x1.shape[1]
+                out_corr_b = self.corr(x2, x1_warp)
+                out_corr_b = out_corr_b.view(
+                    out_corr_b.shape[0], -1, out_corr_b.shape[3], out_corr_b.shape[4]
+                )
+                out_corr_b = out_corr_b / x2.shape[1]
 
                 out_corr_relu_f = self.leakyRELU(out_corr_f)
                 out_corr_relu_b = self.leakyRELU(out_corr_b)
@@ -336,3 +349,6 @@ class IRRPWC(BaseModel):
 @trainable
 class irr_pwc(IRRPWC):
     pass
+
+
+register_model_variants({"irr_pwc": IRRPWC}, SPATIAL_CORR_VARIANTS)
