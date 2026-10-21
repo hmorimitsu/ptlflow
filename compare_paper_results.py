@@ -42,13 +42,13 @@ def _init_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--paper_results_path",
         type=str,
-        default=str(Path("docs/source/results/paper_results_things.csv")),
+        default=str(Path("docs/source/results/paper_results_zeroshot.csv")),
         help=("Path to the csv file containing the results from the papers."),
     )
     parser.add_argument(
         "--validate_results_path",
         type=str,
-        default=str(Path("docs/source/results/metrics_all_things.csv")),
+        default=str(Path("docs/source/results/metrics_all_zeroshot.csv")),
         help=(
             "Path to the csv file containing the results obtained by the validate script."
         ),
