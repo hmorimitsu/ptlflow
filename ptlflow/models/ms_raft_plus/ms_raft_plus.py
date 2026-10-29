@@ -74,7 +74,7 @@ class MSRAFTPlus(BaseModel):
         iters: Sequence[int] = (4, 6, 5, 10),
         lookup_pyramid_levels: int = 2,
         lookup_radius: int = 4,
-        corr_mode: RaftCorrMode = "alt_cuda_corr",
+        corr_mode: RaftCorrMode = "localcorr_triton",
         simple_io: bool = False,
         **kwargs,
     ) -> None:

@@ -47,7 +47,7 @@ class CCMR(BaseModel):
         corr_levels: int = 4,
         corr_radius: int = 4,
         iters: Sequence[int] = [8, 10, 15],
-        corr_mode: RaftCorrMode = "alt_cuda_corr",
+        corr_mode: RaftCorrMode = "localcorr_triton",
         lookup_pyramid_levels: int = 2,
         lookup_radius: int = 4,
         model_type: str = "CCMR",

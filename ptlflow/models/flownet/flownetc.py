@@ -25,7 +25,7 @@ class FlowNetC(FlowNetBase):
         div_flow: float = 20.0,
         input_channels: int = 6,
         batch_norm: bool = False,
-        corr_mode: SpatialCorrMode = "iter",
+        corr_mode: SpatialCorrMode = "localcorr_triton",
         loss_start_scale: int = 4,
         loss_num_scales: int = 5,
         loss_base_weight: float = 0.32,
