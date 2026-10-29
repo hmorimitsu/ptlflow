@@ -18,7 +18,6 @@ from pathlib import Path
 import shutil
 
 from jsonargparse import ArgumentParser
-import lightning.pytorch as pl
 import pandas as pd
 import pytest
 import torch
@@ -26,7 +25,11 @@ import torch
 import ptlflow
 import train
 import validate
-from ptlflow.utils.dummy_datasets import write_flying_chairs2
+from ptlflow.data.flow_datamodule import FlowDataModule
+from ptlflow.utils.dummy_datasets import write_flying_chairs2, write_sintel
+from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
+from ptlflow.utils.lightning.ptlflow_trainer import PTLFlowTrainer
+from ptlflow.utils.registry import RegisteredModel
 from ptlflow.utils.utils import make_divisible
 
 TRAIN_EPOCHS = 1
@@ -73,11 +76,27 @@ MODEL_ARGS = {
 # frames for it (see SIMPLE_IO_NUM_IMAGES).
 EXCLUDE_MODELS_SIMPLE_IO = [m for m in EXCLUDE_MODELS if m != "streamflow"]
 
-# Very demanding models, skipped on CPU-only machines (such as the GitHub
-# Actions runners) to keep the test runtime acceptable.
-EXCLUDE_MODELS_ON_CPU = [
-    "ufm_base_dinov2g",  # more than 1B parameters
+# Very demanding models, skipped on machines without enough resources (CPU-only
+# runners such as GitHub Actions, or GPUs with little VRAM) to keep the test
+# runtime and memory usage acceptable.
+EXCLUDE_MODELS_LOW_MEM = [
+    "ufm_base_dinov2g",  # more than 1B parameters (inference needs ~8 GiB)
 ]
+
+# Minimum GPU memory required to run the models in EXCLUDE_MODELS_LOW_MEM.
+# ufm_base_dinov2g needs around 8 GiB for inference alone, so add a margin to
+# avoid flaky out-of-memory errors caused by fragmentation.
+MIN_GPU_MEM_GIB = 12.0
+
+
+def _skip_low_mem_model(mname: str) -> bool:
+    if mname not in EXCLUDE_MODELS_LOW_MEM:
+        return False
+    if not torch.cuda.is_available():
+        return True
+    total_mem_gib = torch.cuda.get_device_properties(0).total_memory / 2**30
+    return total_mem_gib < MIN_GPU_MEM_GIB
+
 
 # Models that require more than two input frames.
 SIMPLE_IO_NUM_IMAGES = {
@@ -92,6 +111,17 @@ SIMPLE_IO_NUM_IMAGES = {
 SIMPLE_IO_ATOL = 0.1 if torch.cuda.is_available() else 0.0
 
 
+def _get_trainable_model_names() -> list[str]:
+    # Only models annotated with @trainable define a loss function, so they
+    # are the only ones that can be trained and overfitted.
+    trainable_names = set(ptlflow.get_trainable_model_names())
+    return [
+        n
+        for n in ptlflow._models_dict.keys()
+        if not ptlflow.is_model_variant(n) and n in trainable_names
+    ]
+
+
 def test_forward() -> None:
     model_names = [
         n for n in ptlflow._models_dict.keys() if not ptlflow.is_model_variant(n)
@@ -99,7 +129,7 @@ def test_forward() -> None:
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
-        if mname in EXCLUDE_MODELS_ON_CPU and not torch.cuda.is_available():
+        if _skip_low_mem_model(mname):
             continue
 
         print(mname)
@@ -128,7 +158,11 @@ def test_forward() -> None:
             model = model.cuda()
             inputs["images"] = inputs["images"].cuda()
 
-        model(inputs)
+        with torch.no_grad():
+            # Gradients are not needed here, and keeping them would store all
+            # the intermediate activations, requiring much more GPU memory
+            # (some models can then exceed the capacity of consumer GPUs).
+            model(inputs)
 
 
 def test_forward_fp16() -> None:
@@ -167,7 +201,8 @@ def test_forward_fp16() -> None:
                 model = model.cuda()
                 inputs["images"] = inputs["images"].cuda().half()
 
-            model(inputs)
+            with torch.no_grad():
+                model(inputs)
 
 
 def test_simple_io() -> None:
@@ -177,7 +212,7 @@ def test_simple_io() -> None:
     for mname in model_names:
         if mname in EXCLUDE_MODELS_SIMPLE_IO:
             continue
-        if mname in EXCLUDE_MODELS_ON_CPU and not torch.cuda.is_available():
+        if _skip_low_mem_model(mname):
             continue
 
         print(mname)
@@ -243,9 +278,7 @@ def test_simple_io() -> None:
 def test_train(tmp_path: Path):
     write_flying_chairs2(tmp_path)
 
-    model_names = [
-        n for n in ptlflow._models_dict.keys() if not ptlflow.is_model_variant(n)
-    ]
+    model_names = _get_trainable_model_names()
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
@@ -259,36 +292,56 @@ def test_train(tmp_path: Path):
 def _train_one_pass(tmp_path: Path, model_name: str) -> None:
     parser = train._init_parser()
 
-    model_ref = ptlflow.get_model_reference(model_name)
-    parser = model_ref.add_model_specific_args(parser)
-
-    parser = pl.Trainer.add_argparse_args(parser)
-
-    args = parser.parse_args([model_name])
-
-    args.log_dir = tmp_path / model_name
-    args.max_epochs = 1
-    args.train_batch_size = 1
-    args.train_dataset = "overfit-chairs2"
-    args.val_dataset = "none"
-    args.flying_chairs2_root_dir = tmp_path / "FlyingChairs2"
-    args.train_crop_size = (256, 256)
+    train_args = [
+        "--model",
+        model_name,
+        "--log_dir",
+        str(tmp_path / model_name),
+        "--trainer.max_epochs",
+        str(TRAIN_EPOCHS),
+        "--trainer.default_root_dir",
+        str(tmp_path / model_name),
+        "--trainer.logger",
+        "False",
+        "--trainer.limit_val_batches",
+        "0",
+        "--trainer.num_sanity_val_steps",
+        "0",
+        "--data.train_dataset",
+        "overfit-chairs2",
+        "--data.val_dataset",
+        "overfit-chairs2",
+        "--data.flying_chairs2_root_dir",
+        str(tmp_path / "FlyingChairs2"),
+        "--data.train_batch_size",
+        "1",
+        "--data.train_crop_size",
+        "[256, 256]",
+    ]
     if torch.cuda.is_available():
-        args.gpus = 1
+        train_args += ["--trainer.devices", "1"]
 
-    try:
-        train.train(args)
-    except AssertionError:
-        pass  # When the model has no loss function
+    cli = PTLFlowCLI(
+        model_class=RegisteredModel,
+        subclass_mode_model=True,
+        datamodule_class=FlowDataModule,
+        trainer_class=PTLFlowTrainer,
+        auto_configure_optimizers=False,
+        parser_kwargs={"parents": [parser]},
+        run=False,
+        ignore_sys_argv=True,
+        args=train_args,
+    )
+
+    cli.trainer.fit(cli.model, datamodule=cli.datamodule)
 
 
 @pytest.mark.skip(reason="It takes too long. To be used sporadically.")
 def test_overfit(tmp_path: Path) -> None:
     print("Saving outputs to " + str(tmp_path))
+    write_sintel(tmp_path)
 
-    model_names = [
-        n for n in ptlflow._models_dict.keys() if not ptlflow.is_model_variant(n)
-    ]
+    model_names = _get_trainable_model_names()
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
@@ -318,41 +371,71 @@ def _overfit_model(tmp_path: Path, model_name: str) -> float:
 def _train_overfit(tmp_path: Path, model_name: str) -> None:
     parser = train._init_parser()
 
-    model_ref = ptlflow.get_model_reference(model_name)
-    parser = model_ref.add_model_specific_args(parser)
-
-    parser = pl.Trainer.add_argparse_args(parser)
-
-    args = parser.parse_args([model_name])
-
-    args.log_dir = tmp_path / model_name
-    args.max_epochs = 100
-    args.train_batch_size = 1
-    args.train_dataset = "overfit-sintel"
-    args.val_dataset = "none"
-    args.mpi_sintel_root_dir = Path("tests/data/ptlflow/models/sintel")
+    train_args = [
+        "--model",
+        model_name,
+        "--log_dir",
+        str(tmp_path / model_name),
+        "--trainer.max_epochs",
+        "100",
+        "--trainer.default_root_dir",
+        str(tmp_path / model_name),
+        "--trainer.logger",
+        "False",
+        "--trainer.limit_val_batches",
+        "0",
+        "--trainer.num_sanity_val_steps",
+        "0",
+        "--data.train_dataset",
+        "overfit-sintel",
+        "--data.val_dataset",
+        "overfit-sintel",
+        "--data.mpi_sintel_root_dir",
+        str(tmp_path / "MPI-Sintel"),
+        "--data.train_batch_size",
+        "1",
+    ]
     if torch.cuda.is_available():
-        args.gpus = 1
+        train_args += ["--trainer.devices", "1"]
 
-    train.train(args)
+    cli = PTLFlowCLI(
+        model_class=RegisteredModel,
+        subclass_mode_model=True,
+        datamodule_class=FlowDataModule,
+        trainer_class=PTLFlowTrainer,
+        auto_configure_optimizers=False,
+        parser_kwargs={"parents": [parser]},
+        run=False,
+        ignore_sys_argv=True,
+        args=train_args,
+    )
+
+    cli.trainer.fit(cli.model, datamodule=cli.datamodule)
 
 
 def _validate(tmp_path: Path, model_name: str) -> pd.DataFrame:
-    parser = validate._init_parser()
+    ckpt_path = list((tmp_path / model_name).glob("**/*.ckpt"))[0]
 
-    model_ref = ptlflow.get_model_reference(model_name)
-    parser = model_ref.add_model_specific_args(parser)
+    model = ptlflow.get_model(model_name, str(ckpt_path))
 
-    args = parser.parse_args([model_name])
+    data_parser = ArgumentParser()
+    data_parser.add_class_arguments(FlowDataModule, "data")
+    data_args = data_parser.parse_args([])
+    data_args.data.val_dataset = DATASET
+    data_args.data.mpi_sintel_root_dir = str(tmp_path / "MPI-Sintel")
 
-    args.output_path = tmp_path / model_name
-    args.mpi_sintel_root_dir = Path("tests/data/ptlflow/models/sintel")
-    args.val_dataset = DATASET
-    args.pretrained_ckpt = str(
-        list((tmp_path / model_name).glob("**/*_last_*.ckpt"))[0]
-    )
-    args.write_viz = True
+    data_parser = ArgumentParser(exit_on_error=False)
+    data_parser.add_argument("--data", type=FlowDataModule)
+    data_cfg = data_parser.parse_object({"data": data_args.data})
+    datamodule = data_parser.instantiate_classes(data_cfg).data
 
-    model = ptlflow.get_model(model_name, args.pretrained_ckpt, args)
-    metrics_df = validate.validate(args, model)
+    parser = ArgumentParser(parents=[validate._init_parser()])
+    args = parser.parse_args([])
+    args.output_path = str(tmp_path / model_name / "validate")
+    args.write_outputs = True
+    args.max_samples = 1
+    args.model_name = model_name
+    args.ckpt_path = str(ckpt_path)
+
+    metrics_df = validate.validate(args, model, datamodule)
     return metrics_df
