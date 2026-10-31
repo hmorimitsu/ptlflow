@@ -129,6 +129,36 @@ It is included inside PTLFlow, but you have to manually compile it following the
     cd ptlflow/utils/external/alt_cuda_corr/
     python setup.py install
 
+Correlation with the localcorr package
+--------------------------------------
+
+Since v0.5, PTLFlow uses the `localcorr <https://github.com/hmorimitsu/localcorr>`__ package to compute the correlation of many models.
+This package is installed automatically together with PTLFlow, and its default Triton kernels are JIT-compiled on first use, so no extra setup is needed to use it on Linux.
+
+The localcorr engines are selected with the ``corr_mode`` argument of the models (for example, ``--model.corr_mode localcorr_triton``).
+Alternatively, each model also registers one variant per mode, which can be chosen directly with the ``--model`` argument (for example, ``--model raft_localcorr_triton``).
+The main modes are:
+
+- ``localcorr_triton``: the default mode. It runs on NVIDIA and Intel GPUs with JIT-compiled Triton kernels and does not require any build step.
+- ``localcorr_cuda``: an ahead-of-time compiled CUDA kernel, which is the fastest option on NVIDIA GPUs and also provides a TensorRT plugin. It requires the CUDA toolkit (``nvcc``), CMake and TensorRT, and it can be compiled with:
+
+.. code-block:: bash
+
+    python -m localcorr.build_native cuda
+
+- ``localcorr_sycl``: a SYCL kernel for Intel GPUs, used with ``torch.xpu`` tensors. It requires a PyTorch XPU build and the Intel oneAPI compiler (``icpx``), and it can be compiled with:
+
+.. code-block:: bash
+
+    python -m localcorr.build_native xpu
+
+- ``localcorr_onnx``: runs with the same Triton kernels as ``localcorr_triton`` in eager mode, but exports the correlation as standard ONNX ops (without custom plugins) when converting the models to ONNX.
+
+If a localcorr engine is not available (e.g., its kernels were not compiled or the inputs are on a device it does not support), PTLFlow shows a warning and falls back to its pure PyTorch correlation implementations.
+
+Before v0.5, the correlation engine was configured with the ``alternate_corr`` or ``corr_fn`` arguments of the models.
+These old notations are still accepted for compatibility with old configurations, but they are deprecated: they are converted to the equivalent ``corr_mode`` value with a warning, and they may be removed in the future.
+
 Troubleshooting
 ===============
 
