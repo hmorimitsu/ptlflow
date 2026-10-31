@@ -619,7 +619,7 @@ def validate_one_dataloader(
 
 
 def _get_model_names(args: Namespace) -> List[str]:
-    available_model_names = ptlflow.get_model_names()
+    available_model_names = ptlflow.get_model_names(include_variants=True)
     if args.all:
         model_names = available_model_names
     else:
