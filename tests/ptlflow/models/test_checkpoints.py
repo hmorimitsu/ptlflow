@@ -424,7 +424,7 @@ EXCLUDE_MODELS = [
 ]  # Has additional requirements. Mode variants (see register_model_variants) are also excluded.
 
 
-# @pytest.mark.skip(reason="Requires to download all checkpoints. Just run occasionally.")
+@pytest.mark.skip(reason="Requires to download all checkpoints. Just run occasionally.")
 def test_ckpt_exists() -> None:
     model_names = [
         n for n in ptlflow._models_dict.keys() if not ptlflow.is_model_variant(n)
