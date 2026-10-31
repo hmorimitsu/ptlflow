@@ -1,20 +1,26 @@
-from loguru import logger
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Optional
 
-from ptlflow.utils.registry import register_model, trainable, ptlflow_trained
+from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
+    log_corr_mode_warnings,
+    RaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import (
+    register_model,
+    register_model_variants,
+    trainable,
+    ptlflow_trained,
+)
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock, SmallUpdateBlock
 from .extractor import BasicEncoder, SmallEncoder
 from .corr import get_corr_block
 from .utils import coords_grid, upflow8
 from ..base_model.base_model import BaseModel
-
-try:
-    import alt_cuda_corr
-except ImportError:
-    alt_cuda_corr = None
 
 
 class SequenceLoss(nn.Module):
@@ -57,25 +63,29 @@ class RAFT(BaseModel):
         self,
         corr_levels: int = 4,
         corr_radius: int = 4,
+        corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         dropout: float = 0.0,
         gamma: float = 0.8,
         max_flow: float = 400,
         iters: int = 32,
-        alternate_corr: bool = False,
         simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), simple_io=simple_io, **kwargs
+            output_stride=8,
+            loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
+            **kwargs,
         )
 
         self.corr_levels = corr_levels
         self.corr_radius = corr_radius
+        self.corr_mode = interpret_corr_mode(corr_mode, alternate_corr=alternate_corr)
         self.dropout = dropout
         self.gamma = gamma
         self.max_flow = max_flow
         self.iters = iters
-        self.alternate_corr = alternate_corr
 
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
@@ -91,10 +101,7 @@ class RAFT(BaseModel):
 
         self.has_trained_on_ptlflow = True
 
-        if self.alternate_corr and alt_cuda_corr is None:
-            logger.warning(
-                "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
-            )
+        log_corr_mode_warnings(self.corr_mode)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -150,7 +157,7 @@ class RAFT(BaseModel):
             fmap2=fmap2,
             radius=self.corr_radius,
             num_levels=self.corr_levels,
-            alternate_corr=self.alternate_corr,
+            corr_mode=self.corr_mode,
         )
 
         # run the context network
@@ -205,21 +212,11 @@ class RAFTSmall(RAFT):
         self,
         corr_levels: int = 4,
         corr_radius: int = 3,
-        dropout: float = 0.0,
-        gamma: float = 0.8,
-        max_flow: float = 400,
-        iters: int = 32,
-        alternate_corr: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
             corr_levels=corr_levels,
             corr_radius=corr_radius,
-            dropout=dropout,
-            gamma=gamma,
-            max_flow=max_flow,
-            iters=iters,
-            alternate_corr=alternate_corr,
             **kwargs,
         )
         self.hidden_dim = hdim = 96
@@ -247,3 +244,6 @@ class raft(RAFT):
 @ptlflow_trained
 class raft_small(RAFTSmall):
     pass
+
+
+register_model_variants({"raft": RAFT, "raft_small": RAFTSmall}, RAFT_CORR_VARIANTS)

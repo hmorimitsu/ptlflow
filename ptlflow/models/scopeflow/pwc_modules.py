@@ -136,20 +136,18 @@ class WarpingLayer(nn.Module):
         if debug:
             print(x_warp.mean())
 
-        mask = torch.ones_like(x, requires_grad=False)
-        if not cuda:
-            mask = mask.cpu()
-            grid = grid.cpu()
-
-        if debug:
-            print(mask.mean())
-
-        mask = tf.grid_sample(mask, grid, align_corners=True)
-        if debug:
-            print(mask.mean())
-
-        mask[mask < 0.99999] = 0.0
-        mask[mask > 0] = 1.0
+        # Validity mask as a closed form: bilinear weights sum to 1 exactly
+        # inside the image, so warping an all-ones image and thresholding at
+        # 0.99999 equals checking the sampling position against [-1, 1]. The
+        # second grid_sample is avoided: two GridSample nodes fused together
+        # crash the OpenCL compiler of the OpenVINO GPU plugin.
+        mask = (
+            (grid[..., 0] >= -1.0)
+            & (grid[..., 0] <= 1.0)
+            & (grid[..., 1] >= -1.0)
+            & (grid[..., 1] <= 1.0)
+        ).to(dtype=x_warp.dtype)
+        mask = mask.unsqueeze(1)
 
         if debug:
             print(mask.mean())

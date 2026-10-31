@@ -1,16 +1,17 @@
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
-try:
-    from spatial_correlation_sampler import SpatialCorrelationSampler
-except ModuleNotFoundError:
-    from ptlflow.utils.correlation import (
-        IterSpatialCorrelationSampler as SpatialCorrelationSampler,
-    )
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model
+from ptlflow.utils.correlation import IterSpatialCorrelationSampler
+from ptlflow.utils.corr_modes import (
+    get_spatial_corr_sampler,
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants
 from .warp import WarpingLayer
 from ..base_model.base_model import BaseModel
 
@@ -61,8 +62,71 @@ class FeatureExtractor(nn.Module):
         return features[::-1]
 
 
+class _StridedCorrSampler(nn.Module):
+    """Wrap a stride-1 correlation sampler, subsampling its output.
+
+    This computes the same values as constructing the wrapped sampler with
+    stride=stride, a parameter that the shared localcorr engines do not
+    expose.
+    """
+
+    def __init__(self, sampler: nn.Module, stride: int) -> None:
+        super(_StridedCorrSampler, self).__init__()
+        self.sampler = sampler
+        self.stride = stride
+
+    def forward(self, input1: torch.Tensor, input2: torch.Tensor) -> torch.Tensor:
+        corr = self.sampler(input1, input2)
+        return corr[:, :, :, :: self.stride, :: self.stride]
+
+
+def _get_corr_sampler(
+    corr_mode: SpatialCorrMode,
+    patch_size: int,
+    stride: int = 1,
+    dilation_patch: int = 1,
+) -> Tuple[nn.Module, Optional[Exception]]:
+    """Create the correlation sampler of the Matching modules.
+
+    This extends ptlflow.utils.corr_modes.get_spatial_corr_sampler with the
+    sampler stride and patch dilation used by the strided correlation levels,
+    which the shared factory does not expose. The iter engine accepts them
+    directly; the other engines are created with stride 1 and wrapped, which
+    computes the same values.
+
+    Returns
+    -------
+    Tuple[nn.Module, Optional[Exception]]
+        The sampler, and an error to be raised by the module forward if the
+        sampler could not be created (None on success).
+    """
+    if corr_mode == "iter" and (stride != 1 or dilation_patch != 1):
+        return (
+            IterSpatialCorrelationSampler(
+                kernel_size=1,
+                patch_size=patch_size,
+                padding=0,
+                stride=stride,
+                dilation_patch=dilation_patch,
+            ),
+            None,
+        )
+    sampler, corr_error = get_spatial_corr_sampler(
+        corr_mode, patch_size=patch_size, dilation_patch=dilation_patch
+    )
+    if sampler is None or stride == 1:
+        return sampler, corr_error
+    return _StridedCorrSampler(sampler, stride), None
+
+
 class Matching(nn.Module):
-    def __init__(self, level: int, num_levels: int = 5, div_flow: float = 20.0) -> None:
+    def __init__(
+        self,
+        level: int,
+        num_levels: int = 5,
+        div_flow: float = 20.0,
+        corr_mode: SpatialCorrMode = "iter",
+    ) -> None:
         super(Matching, self).__init__()
 
         corr_stride = [1, 1, 1, 2, 2][level]
@@ -91,12 +155,8 @@ class Matching(nn.Module):
             nn.Conv2d(32, 2, flow_kernel_size, 1, flow_kernel_size // 2),
         )
 
-        self.corr = SpatialCorrelationSampler(
-            kernel_size=1,
-            patch_size=7,
-            padding=0,
-            stride=corr_stride,
-            dilation_patch=corr_stride,
+        self.corr, self._corr_error = _get_corr_sampler(
+            corr_mode, patch_size=7, stride=corr_stride, dilation_patch=corr_stride
         )
 
         self.warp = WarpingLayer()
@@ -258,6 +318,7 @@ class LiteFlowNet(BaseModel):
     def __init__(
         self,
         div_flow: float = 20.0,
+        corr_mode: SpatialCorrMode = "iter",
         simple_io: bool = False,
         **kwargs,
     ):
@@ -269,12 +330,15 @@ class LiteFlowNet(BaseModel):
         )
 
         self.div_flow = div_flow
+        self.corr_mode = corr_mode
         self.num_levels = 5
+
+        log_corr_mode_warnings(self.corr_mode)
 
         self.feature_net = FeatureExtractor()
         self.matching_nets = nn.ModuleList(
             [
-                Matching(i, self.num_levels, self.div_flow)
+                Matching(i, self.num_levels, self.div_flow, corr_mode=self.corr_mode)
                 for i in range(self.num_levels)
             ]
         )
@@ -298,6 +362,8 @@ class LiteFlowNet(BaseModel):
         self, inputs: Dict[str, torch.Tensor]
     ) -> Dict[str, Union[torch.Tensor, List[torch.Tensor]]]:
         inputs = self._normalize_inputs(inputs)
+        if self.matching_nets[0].corr is None:
+            raise self.matching_nets[0]._corr_error
         # The original implementation uses different BGR means for im1 and im2
         # Here, we use the same for both to make it simpler
         images, image_resizer = self.preprocess_images(
@@ -360,3 +426,6 @@ class LiteFlowNet(BaseModel):
 @register_model
 class liteflownet(LiteFlowNet):
     pass
+
+
+register_model_variants({"liteflownet": LiteFlowNet}, SPATIAL_CORR_VARIANTS)

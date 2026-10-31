@@ -18,12 +18,22 @@
 
 import math
 
-from loguru import logger
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model, trainable, ptlflow_trained
+from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
+    log_corr_mode_warnings,
+    LegacyRaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import (
+    register_model,
+    register_model_variants,
+    trainable,
+    ptlflow_trained,
+)
 from ptlflow.utils.utils import forward_interpolate_batch
 from .pwc_modules import rescale_flow
 from .update import UpdateBlock
@@ -33,11 +43,6 @@ from ..base_model.base_model import BaseModel
 
 from .next1d_encoder import NeXt1DEncoder
 from .next1d import NeXt1DStage
-
-try:
-    import alt_cuda_corr
-except ImportError:
-    alt_cuda_corr = None
 
 
 class SequenceLoss(nn.Module):
@@ -80,7 +85,7 @@ class RAPIDFlow(BaseModel):
         self,
         pyramid_ranges: tuple[int, int] = (32, 8),
         iters: int = 12,
-        corr_mode: str = "allpairs",
+        corr_mode: LegacyRaftCorrMode = "allpairs",
         corr_levels: int = 1,
         corr_range: int = 4,
         enc_hidden_chs: int = 64,
@@ -110,7 +115,7 @@ class RAPIDFlow(BaseModel):
 
         self.pyramid_ranges = pyramid_ranges
         self.iters = iters
-        self.corr_mode = corr_mode
+        self.corr_mode = interpret_corr_mode(corr_mode)
         self.corr_levels = corr_levels
         self.corr_range = corr_range
         self.enc_hidden_chs = enc_hidden_chs
@@ -195,10 +200,7 @@ class RAPIDFlow(BaseModel):
 
         self.has_trained_on_ptlflow = True
 
-        if self.corr_mode == "local" and alt_cuda_corr is None:
-            logger.warning(
-                "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
-            )
+        log_corr_mode_warnings(self.corr_mode)
 
     def coords_grid(self, batch, ht, wd, dtype, device):
         coords = torch.meshgrid(
@@ -298,7 +300,7 @@ class RAPIDFlow(BaseModel):
                 x2,
                 self.corr_levels,
                 self.corr_range,
-                alternate_corr=self.corr_mode == "local",
+                corr_mode=self.corr_mode,
             )
 
             net_tmp, inp = torch.split(
@@ -503,3 +505,15 @@ class rapidflow_it3(RAPIDFlow_it3):
 @ptlflow_trained
 class rapidflow_it6(RAPIDFlow_it6):
     pass
+
+
+register_model_variants(
+    {
+        "rapidflow": RAPIDFlow,
+        "rapidflow_it1": RAPIDFlow_it1,
+        "rapidflow_it2": RAPIDFlow_it2,
+        "rapidflow_it3": RAPIDFlow_it3,
+        "rapidflow_it6": RAPIDFlow_it6,
+    },
+    RAFT_CORR_VARIANTS,
+)

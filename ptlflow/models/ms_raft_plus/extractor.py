@@ -3,6 +3,17 @@ import torch.nn as nn
 import torchvision.transforms.functional as TF
 
 
+# TF.resize defaults to antialias=True, which traces to
+# aten::_upsample_bilinear2d_aa (no ONNX symbolic). Every resize in this
+# module upsamples a feature map up the pyramid (deeper -> shallower
+# level), where the antialias filter is a documented no-op (verified
+# bit-identical outputs for x2/x4 upsampling), so switching it off only
+# makes the op exportable to ONNX.
+def TF_resize_antialias_off(x, size):
+    return TF.resize(x, size, antialias=False)
+
+
+
 class ResidualBlock(nn.Module):
     def __init__(self, in_planes, planes, norm_fn="group", stride=1):
         super(ResidualBlock, self).__init__()
@@ -196,19 +207,19 @@ class BasicEncoder(nn.Module):
 
         # uplayer2:
         cur_h, cur_w = list(enc_out3.size())[-2:]
-        enc_out4_resized = TF.resize(enc_out4, (cur_h, cur_w))
+        enc_out4_resized = TF_resize_antialias_off(enc_out4, (cur_h, cur_w))
         up2layer_input = torch.cat((enc_out4_resized, enc_out3), dim=1)
         up2_out = self.up_layer2(up2layer_input)
 
         # uplayer1:
         cur_h, cur_w = list(enc_out2.size())[-2:]
-        up2_out_resized = TF.resize(up2_out, (cur_h, cur_w))
+        up2_out_resized = TF_resize_antialias_off(up2_out, (cur_h, cur_w))
         up1layer_input = torch.cat((up2_out_resized, enc_out2), dim=1)
         up1_out = self.up_layer1(up1layer_input)
 
         # uplayer0:
         cur_h, cur_w = list(enc_out1.size())[-2:]
-        up1_out_resized = TF.resize(up1_out, (cur_h, cur_w))
+        up1_out_resized = TF_resize_antialias_off(up1_out, (cur_h, cur_w))
         up0layer_input = torch.cat((up1_out_resized, enc_out1), dim=1)
         up0_out = self.up_layer0(up0layer_input)
 
@@ -304,19 +315,19 @@ class Basic_Context_Encoder(nn.Module):
 
         # uplayer2:
         cur_h, cur_w = list(enc_out3.size())[-2:]
-        enc_out4_resized = TF.resize(enc_out4, (cur_h, cur_w))
+        enc_out4_resized = TF_resize_antialias_off(enc_out4, (cur_h, cur_w))
         up2layer_input = torch.cat((enc_out4_resized, enc_out3), dim=1)
         up2_out = self.up_layer2(up2layer_input)
 
         # uplayer1:
         cur_h, cur_w = list(enc_out2.size())[-2:]
-        up2_out_resized = TF.resize(up2_out, (cur_h, cur_w))
+        up2_out_resized = TF_resize_antialias_off(up2_out, (cur_h, cur_w))
         up1layer_input = torch.cat((up2_out_resized, enc_out2), dim=1)
         up1_out = self.up_layer1(up1layer_input)
 
         # uplayer 0:
         cur_h, cur_w = list(enc_out1.size())[-2:]
-        up1_out_resized = TF.resize(up1_out, (cur_h, cur_w))
+        up1_out_resized = TF_resize_antialias_off(up1_out, (cur_h, cur_w))
         up0layer_input = torch.cat((up1_out_resized, enc_out1), dim=1)
         up0_out = self.up_layer0(up0layer_input)
 

@@ -283,6 +283,38 @@ def count_parameters(model: torch.nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
+def get_device(use_xpu: bool = False) -> Optional[torch.device]:
+    """Return the torch device that the frontend scripts should use.
+
+    Parameters
+    ----------
+    use_xpu : bool, default False
+        If True, return the Intel XPU device (torch.xpu). An error is raised if no torch.xpu device is
+        available.
+
+    Returns
+    -------
+    Optional[torch.device]
+        The xpu device if requested; otherwise the cuda device if one is available; otherwise None (cpu).
+
+    Raises
+    ------
+    RuntimeError
+        If use_xpu is True but torch.xpu is not available in this environment.
+    """
+    if use_xpu:
+        xpu_module = getattr(torch, "xpu", None)
+        if xpu_module is None or not xpu_module.is_available():
+            raise RuntimeError(
+                "--xpu was given, but torch.xpu is not available. Use a PyTorch build with XPU support "
+                "and an Intel GPU, or remove the --xpu flag."
+            )
+        return torch.device("xpu")
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    return None
+
+
 def make_divisible(v: int, div: int) -> int:
     """Decrease a number v until it is divisible by div.
 

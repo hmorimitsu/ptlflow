@@ -9,7 +9,8 @@ from .submodules import *
 from .flownet_base import FlowNetBase
 
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import SPATIAL_CORR_VARIANTS, SpatialCorrMode
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 
 
 class FlowNetCS(FlowNetBase):
@@ -22,6 +23,7 @@ class FlowNetCS(FlowNetBase):
         div_flow: float = 20.0,
         input_channels: int = 12,
         batch_norm: bool = False,
+        corr_mode: SpatialCorrMode = "localcorr_triton",
         loss_start_scale: int = 4,
         loss_num_scales: int = 5,
         loss_base_weight: float = 0.32,
@@ -48,6 +50,7 @@ class FlowNetCS(FlowNetBase):
             div_flow=div_flow,
             input_channels=input_channels,
             batch_norm=batch_norm,
+            corr_mode=corr_mode,
             loss_start_scale=loss_start_scale,
             loss_num_scales=loss_num_scales,
             loss_base_weight=loss_base_weight,
@@ -87,27 +90,29 @@ class FlowNetCS(FlowNetBase):
         """
         B, C, H, W = x.size()
         # mesh grid
-        xx = torch.arange(0, W).view(1, -1).repeat(H, 1)
-        yy = torch.arange(0, H).view(-1, 1).repeat(1, W)
+        xx = torch.arange(0, W, device=x.device, dtype=x.dtype).view(1, -1).repeat(H, 1)
+        yy = torch.arange(0, H, device=x.device, dtype=x.dtype).view(-1, 1).repeat(1, W)
         xx = xx.view(1, 1, H, W).repeat(B, 1, 1, 1)
         yy = yy.view(1, 1, H, W).repeat(B, 1, 1, 1)
         grid = torch.cat((xx, yy), 1)
 
-        if x.is_cuda:
-            grid = grid.to(dtype=x.dtype, device=x.device)
         vgrid = grid + flo
 
-        # scale grid to [-1,1]
-        vgrid[:, 0, :, :] = 2.0 * vgrid[:, 0, :, :].clone() / max(W - 1, 1) - 1.0
-        vgrid[:, 1, :, :] = 2.0 * vgrid[:, 1, :, :].clone() / max(H - 1, 1) - 1.0
-
-        vgrid = vgrid.permute(0, 2, 3, 1)
+        # scale grid to [-1,1] without in-place slice assignments, which are
+        # not ONNX-exportable
+        vgrid_x = 2.0 * vgrid[:, 0:1] / max(W - 1, 1) - 1.0
+        vgrid_y = 2.0 * vgrid[:, 1:2] / max(H - 1, 1) - 1.0
+        vgrid = torch.cat((vgrid_x, vgrid_y), dim=1).permute(0, 2, 3, 1)
         output = nn.functional.grid_sample(x, vgrid, align_corners=True)
-        mask = torch.ones(x.size()).to(dtype=x.dtype, device=x.device)
-        mask = nn.functional.grid_sample(mask, vgrid, align_corners=True)
 
-        mask[mask < 0.9999] = 0
-        mask[mask > 0] = 1
+        # Validity mask as a closed form: bilinear weights sum to 1 exactly
+        # inside the image, so warping an all-ones image and thresholding at
+        # 0.9999 equals checking the sampling position against [-1, 1]. The
+        # second grid_sample is avoided: two GridSample nodes fused together
+        # crash the OpenCL compiler of the OpenVINO GPU plugin.
+        mask = (
+            (vgrid_x >= -1.0) & (vgrid_x <= 1.0) & (vgrid_y >= -1.0) & (vgrid_y <= 1.0)
+        ).to(dtype=output.dtype)
 
         return output * mask
 
@@ -164,3 +169,6 @@ class FlowNetCS(FlowNetBase):
 @trainable
 class flownetcs(FlowNetCS):
     pass
+
+
+register_model_variants({"flownetcs": FlowNetCS}, SPATIAL_CORR_VARIANTS)

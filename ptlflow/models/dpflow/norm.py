@@ -18,16 +18,9 @@ class LayerNorm2d(nn.LayerNorm):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x.permute(0, 2, 3, 1)
-        if self.weight is not None:
-            x = F.layer_norm(
-                x,
-                (x.shape[-1],),
-                self.weight,
-                self.bias,
-                self.eps,
-            )
-        else:
-            x = F.layer_norm(x, (x.shape[-1],), eps=self.eps)
+        # Use the static normalized_shape instead of (x.shape[-1],): a shape
+        # read traced dynamically cannot be exported to ONNX.
+        x = F.layer_norm(x, self.normalized_shape, self.weight, self.bias, self.eps)
         x = x.permute(0, 3, 1, 2)
         return x
 

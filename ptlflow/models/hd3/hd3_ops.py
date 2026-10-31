@@ -33,21 +33,19 @@ def flow_warp(x, flo, mul=True):
     vgrid = grid + flo
 
     # scale grid to [-1,1]
-    vgrid = torch.stack(
-        [
-            2.0 * vgrid[:, 0, :, :] / max(W - 1, 1) - 1.0,
-            2.0 * vgrid[:, 1, :, :] / max(H - 1, 1) - 1.0,
-        ],
-        dim=1,
-    )
-
-    vgrid = vgrid.permute(0, 2, 3, 1)
+    vgrid_x = 2.0 * vgrid[:, 0:1] / max(W - 1, 1) - 1.0
+    vgrid_y = 2.0 * vgrid[:, 1:2] / max(H - 1, 1) - 1.0
+    vgrid = torch.cat((vgrid_x, vgrid_y), dim=1).permute(0, 2, 3, 1)
     output = F.grid_sample(x, vgrid, padding_mode="border", align_corners=True)
-    mask = torch.ones(x.size(), dtype=x.dtype, device=x.device)
-    mask = F.grid_sample(mask, vgrid, padding_mode="zeros", align_corners=True)
 
-    mask[mask < 0.9999] = 0
-    mask[mask > 0] = 1
+    # Validity mask as a closed form: bilinear weights (with zero padding)
+    # sum to 1 exactly inside the image, so warping an all-ones image and
+    # thresholding at 0.9999 equals checking the sampling position against
+    # [-1, 1]. The second grid_sample is avoided: two GridSample nodes fused
+    # together crash the OpenCL compiler of the OpenVINO GPU plugin.
+    mask = (
+        (vgrid_x >= -1.0) & (vgrid_x <= 1.0) & (vgrid_y >= -1.0) & (vgrid_y <= 1.0)
+    ).to(dtype=output.dtype)
 
     if mul:
         return output * mask
@@ -81,6 +79,21 @@ def density2vector(prob, dim, normalize=True):
         return disp
 
 
+def _pool2x2_argmax(pr):
+    # pr: [B, N, d, d] reshaped probability map. Equivalent to
+    # nn.MaxPool2d(kernel_size=d-1, stride=1, return_indices=True) applied to
+    # the 2x2 average-pooled grid, but implemented with amax/argmax so the
+    # ONNX graph does not contain MaxPool nodes with a second (indices)
+    # output, which TensorRT cannot parse ("does not support more than 1
+    # outputs for MaxPool nodes").
+    avg_pool = nn.AvgPool2d(kernel_size=2, stride=1, padding=0)
+    pooled = avg_pool(pr)
+    flat_pooled = pooled.flatten(2)
+    out = flat_pooled.amax(dim=2)
+    indice = flat_pooled.argmax(dim=2)
+    return out, indice
+
+
 def prob_gather(prob, normalize=True, dim=2, return_indices=False):
     # gather probability for confidence map visualization
     # return shape: out, indice [B,1,H,W]
@@ -91,15 +104,13 @@ def prob_gather(prob, normalize=True, dim=2, return_indices=False):
     B, C, H, W = prob.size()
     d = int(math.sqrt(C))
     pr = prob.reshape(B, d, d, -1).permute(0, 3, 1, 2)
-    avg_pool = nn.AvgPool2d(kernel_size=2, stride=1, padding=0)
-    max_pool = nn.MaxPool2d(kernel_size=d - 1, stride=1, return_indices=True)
-    out, indice = max_pool(avg_pool(pr))
-    out = 4 * out.squeeze().reshape(B, 1, H, W)
+    out, indice = _pool2x2_argmax(pr)
+    out = 4 * out.reshape(B, 1, H, W)
     if not return_indices:
         return out
     else:
-        indice += indice / (d - 1)
-        indice = indice.squeeze().reshape(B, 1, H, W)
+        indice += torch.div(indice, d - 1, rounding_mode="floor")
+        indice = indice.reshape(B, 1, H, W)
         return out, indice
 
 
@@ -221,16 +232,9 @@ def _prob2cornerflow(prob, normalize=True):
     B, C, H, W = prob.size()
     d = int(math.sqrt(C))
     pr = prob.reshape(B, d, d, -1).permute(0, 3, 1, 2)
-    avg_pool = nn.AvgPool2d(kernel_size=2, stride=1, padding=0)
-    max_pool = nn.MaxPool2d(kernel_size=d - 1, stride=1, return_indices=True)
-    out, indice = max_pool(avg_pool(pr))
-    if version.parse(torch.__version__) >= version.parse("1.8.0"):
-        indice += torch.div(
-            indice, (d - 1), rounding_mode="floor"
-        )  # in original coordinate
-    else:
-        indice += indice // (d - 1)
-    indice = indice.squeeze().reshape(B, H, W).unsqueeze(1)
+    _, indice = _pool2x2_argmax(pr)
+    indice += torch.div(indice, d - 1, rounding_mode="floor")  # in original coordinate
+    indice = indice.reshape(B, H, W).unsqueeze(1)
     lt_prob = torch.gather(prob, 1, indice)
     lt_flow = indice2flow(indice, d).to(dtype=prob.dtype)
     rt_prob = torch.gather(prob, 1, indice + 1)

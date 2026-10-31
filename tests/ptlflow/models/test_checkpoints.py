@@ -412,12 +412,23 @@ reference_accuracy = {
     "vcn_small_things_sintel": 0.575,
 }
 
-EXCLUDE_MODELS = ["scv4", "scv8"]  # Has additional requirements
+EXCLUDE_MODELS = [
+    "matchflow",
+    "matchflow_raft",
+    "scv4",
+    "scv8",
+    "separableflow",
+    "splatflow",
+    "streamflow",
+    "waft_dinov3_a2",
+]  # Has additional requirements. Mode variants (see register_model_variants) are also excluded.
 
 
 @pytest.mark.skip(reason="Requires to download all checkpoints. Just run occasionally.")
 def test_ckpt_exists() -> None:
-    model_names = ptlflow._models_dict.keys()
+    model_names = [
+        n for n in ptlflow._models_dict.keys() if not ptlflow.is_model_variant(n)
+    ]
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
@@ -427,16 +438,15 @@ def test_ckpt_exists() -> None:
         else:
             ckpt_names = [None]
         for cname in ckpt_names:
-            parser = model_ref.add_model_specific_args()
-            args = parser.parse_args([])
-
-            ptlflow.get_model(mname, cname, args)
+            ptlflow.get_model(mname, cname)
 
 
 @pytest.mark.skip(reason="Requires to download all checkpoints. Just run occasionally.")
 def test_accuracy() -> None:
     data = _load_data()
-    model_names = ptlflow._models_dict.keys()
+    model_names = [
+        n for n in ptlflow._models_dict.keys() if not ptlflow.is_model_variant(n)
+    ]
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
@@ -449,10 +459,7 @@ def test_accuracy() -> None:
             ckpt_names = [None]
 
         for cname in ckpt_names:
-            parser = model_ref.add_model_specific_args()
-            args = parser.parse_args([])
-
-            model = ptlflow.get_model(mname, cname, args)
+            model = ptlflow.get_model(mname, cname)
             model = model.eval()
             if torch.cuda.is_available():
                 model = model.cuda()

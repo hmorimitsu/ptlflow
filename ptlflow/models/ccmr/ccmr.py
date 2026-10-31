@@ -1,6 +1,5 @@
-from typing import Sequence
+from typing import Optional, Sequence
 
-from loguru import logger
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,14 +10,15 @@ from .corr import get_corr_block
 from .utils import coords_grid, upflow2
 from .xcit import XCiT
 
-from ptlflow.utils.registry import register_model
+from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
+    log_corr_mode_warnings,
+    RaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants
 from ptlflow.utils.utils import forward_interpolate_batch
 from ..base_model.base_model import BaseModel
-
-try:
-    import alt_cuda_corr
-except ImportError:
-    alt_cuda_corr = None
 
 
 def downflow(flow, mode="bilinear", factor=0.125):
@@ -48,7 +48,8 @@ class CCMR(BaseModel):
         corr_levels: int = 4,
         corr_radius: int = 4,
         iters: Sequence[int] = [8, 10, 15],
-        alternate_corr: bool = True,
+        corr_mode: RaftCorrMode = "localcorr_triton",
+        alternate_corr: Optional[bool] = None,
         lookup_pyramid_levels: int = 2,
         lookup_radius: int = 4,
         model_type: str = "CCMR",
@@ -63,7 +64,7 @@ class CCMR(BaseModel):
         self.corr_levels = corr_levels
         self.corr_radius = corr_radius
         self.iters = iters
-        self.alternate_corr = alternate_corr
+        self.corr_mode = interpret_corr_mode(corr_mode, alternate_corr=alternate_corr)
         self.lookup_pyramid_levels = lookup_pyramid_levels
         self.lookup_radius = lookup_radius
         self.model_type = model_type
@@ -98,10 +99,7 @@ class CCMR(BaseModel):
                 [XCiT(embed_dim=128, depth=1, num_heads=8, mlp_ratio=1, separate=False)]
             )
 
-        if self.alternate_corr and alt_cuda_corr is None:
-            logger.warning(
-                "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
-            )
+        log_corr_mode_warnings(self.corr_mode)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -183,7 +181,7 @@ class CCMR(BaseModel):
                 fmap2=fmap2,
                 radius=self.lookup_radius,
                 num_levels=self.lookup_pyramid_levels,
-                alternate_corr=self.alternate_corr,
+                corr_mode=self.corr_mode,
             )
 
             net, inp = torch.split(cnet_pyramid[index], [128, 128], dim=1)
@@ -242,7 +240,8 @@ class CCMRPlus(CCMR):
         corr_levels: int = 4,
         corr_radius: int = 4,
         iters: Sequence[int] = [8, 10, 10, 10],
-        alternate_corr: bool = True,
+        corr_mode: RaftCorrMode = "alt_cuda_corr",
+        alternate_corr: Optional[bool] = None,
         lookup_pyramid_levels: int = 2,
         lookup_radius: int = 4,
         model_type: str = "CCMR+",
@@ -255,6 +254,7 @@ class CCMRPlus(CCMR):
             corr_levels,
             corr_radius,
             iters,
+            corr_mode,
             alternate_corr,
             lookup_pyramid_levels,
             lookup_radius,
@@ -274,3 +274,6 @@ class ccmr(CCMR):
 @register_model
 class ccmr_p(CCMRPlus):
     pass
+
+
+register_model_variants({"ccmr": CCMR, "ccmr_p": CCMRPlus}, RAFT_CORR_VARIANTS)

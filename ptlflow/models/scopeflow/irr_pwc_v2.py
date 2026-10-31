@@ -1,16 +1,16 @@
 import random
 from typing import Optional, Sequence
 
-try:
-    from spatial_correlation_sampler import SpatialCorrelationSampler
-except ModuleNotFoundError:
-    from ptlflow.utils.correlation import (
-        IterSpatialCorrelationSampler as SpatialCorrelationSampler,
-    )
 import torch
 import torch.nn as nn
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    get_spatial_corr_sampler,
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from .pwc_modules import conv, upsample2d_as, rescale_flow, initialize_msra
 from .pwc_modules import (
     WarpingLayer,
@@ -40,6 +40,7 @@ class ScopeFlow(BaseModel):
         output_level: int = 4,
         num_levels: int = 7,
         num_chs: Sequence[int] = (3, 16, 32, 64, 96, 128, 196),
+        corr_mode: SpatialCorrMode = "iter",
         dropout_p: float = 0.0,
         bilateral_mask: bool = False,
         random_freeze: bool = False,
@@ -89,8 +90,10 @@ class ScopeFlow(BaseModel):
         self.leakyRELU = nn.LeakyReLU(0.1, inplace=True)
         self.feature_pyramid_extractor = FeatureExtractor(self.num_chs)
         self.warping_layer = WarpingLayer()
-        self.correlation = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.search_range + 1, padding=0
+        self.corr_mode = corr_mode
+        log_corr_mode_warnings(corr_mode)
+        self.correlation, self._corr_error = get_spatial_corr_sampler(
+            corr_mode, patch_size=2 * self.search_range + 1
         )
 
         # Calc dimensions
@@ -403,6 +406,8 @@ class ScopeFlow(BaseModel):
         return output_collated / float(first_inp.size(1))
 
     def _correlate(self, x1, x2_warp):
+        if self.correlation is None:
+            raise self._corr_error
         out_corr = self.correlation(x1, x2_warp)
         out_corr = out_corr.view(
             out_corr.shape[0], -1, out_corr.shape[3], out_corr.shape[4]
@@ -598,3 +603,6 @@ class ScopeFlow(BaseModel):
 @trainable
 class scopeflow(ScopeFlow):
     pass
+
+
+register_model_variants({"scopeflow": ScopeFlow}, SPATIAL_CORR_VARIANTS)

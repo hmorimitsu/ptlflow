@@ -142,20 +142,24 @@ class BasicEncoder_resconv(nn.Module):
 
         # uplayer2:
         cur_h, cur_w = list(enc_out3.size())[-2:]
-        enc_out4_resized = TF.resize(enc_out4, (cur_h, cur_w))
+        # antialias=False: these resizes upsample the deeper (smaller) encoder
+        # outputs, where antialiasing has no effect, and torchvision defaults
+        # antialias=True which exports as aten::_upsample_bilinear2d_aa and
+        # breaks the ONNX export.
+        enc_out4_resized = TF.resize(enc_out4, (cur_h, cur_w), antialias=False)
         up2layer_input = torch.cat((enc_out4_resized, enc_out3), dim=1)
         up2_out = self.after_up_layer2_conv(self.up_layer2(up2layer_input))
 
         # uplayer1:
         cur_h, cur_w = list(enc_out2.size())[-2:]
-        up2_out_resized = TF.resize(up2_out, (cur_h, cur_w))
+        up2_out_resized = TF.resize(up2_out, (cur_h, cur_w), antialias=False)
         up1layer_input = torch.cat((up2_out_resized, enc_out2), dim=1)
         up1_out = self.after_up_layer1_conv(self.up_layer1(up1layer_input))
 
         if self.model_type == "CCMR+":
             # uplayer0:
             cur_h, cur_w = list(enc_out1.size())[-2:]
-            up1_out_resized = TF.resize(up1_out, (cur_h, cur_w))
+            up1_out_resized = TF.resize(up1_out, (cur_h, cur_w), antialias=False)
             up0layer_input = torch.cat((up1_out_resized, enc_out1), dim=1)
             up0_out = self.after_up_layer0_conv(self.up_layer0(up0layer_input))
             enc_out4 = torch.split(enc_out4, [batch_dim, batch_dim], dim=0)
@@ -253,18 +257,20 @@ class Basic_Context_Encoder_resconv(nn.Module):
 
         # uplayer2:
         cur_h, cur_w = list(enc_out3.size())[-2:]
-        enc_out4_resized = TF.resize(enc_out4, (cur_h, cur_w))
+        # antialias=False: see the fnet comment above (upsampling only, and
+        # torchvision's antialias=True default breaks the ONNX export).
+        enc_out4_resized = TF.resize(enc_out4, (cur_h, cur_w), antialias=False)
         up2layer_input = torch.cat((enc_out4_resized, enc_out3), dim=1)
         up2_out = self.after_up_layer2_conv(self.up_layer2(up2layer_input))
         # uplayer1:
         cur_h, cur_w = list(enc_out2.size())[-2:]
-        up2_out_resized = TF.resize(up2_out, (cur_h, cur_w))
+        up2_out_resized = TF.resize(up2_out, (cur_h, cur_w), antialias=False)
         up1layer_input = torch.cat((up2_out_resized, enc_out2), dim=1)
         up1_out = self.after_up_layer1_conv(self.up_layer1(up1layer_input))
         if self.model_type == "CCMR+":
             # uplayer0:
             cur_h, cur_w = list(enc_out1.size())[-2:]
-            up1_out_resized = TF.resize(up1_out, (cur_h, cur_w))
+            up1_out_resized = TF.resize(up1_out, (cur_h, cur_w), antialias=False)
             up0layer_input = torch.cat((up1_out_resized, enc_out1), dim=1)
             up0_out = self.after_up_layer0_conv(self.up_layer0(up0layer_input))
             return [enc_out4, up2_out, up1_out, up0_out]

@@ -1,22 +1,22 @@
-from typing import Sequence
+from typing import Optional, Sequence
 
-from loguru import logger
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model
+from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
+    log_corr_mode_warnings,
+    RaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock
 from .extractor import BasicEncoder, Basic_Context_Encoder
 from .corr import get_corr_block
 from .utils import coords_grid, upflow2, get_correlation_depth
 from ..base_model.base_model import BaseModel
-
-try:
-    import alt_cuda_corr
-except ImportError:
-    alt_cuda_corr = None
 
 
 def downflow(flow, mode="bilinear", factor=0.125):
@@ -75,12 +75,16 @@ class MSRAFTPlus(BaseModel):
         iters: Sequence[int] = (4, 6, 5, 10),
         lookup_pyramid_levels: int = 2,
         lookup_radius: int = 4,
-        alternate_corr: bool = True,
+        corr_mode: RaftCorrMode = "localcorr_triton",
+        alternate_corr: Optional[bool] = None,
         simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=16, loss_fn=SequenceLoss(gamma, max_flow), simple_io=simple_io, **kwargs
+            output_stride=16,
+            loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
+            **kwargs,
         )
 
         self.gamma = gamma
@@ -88,7 +92,7 @@ class MSRAFTPlus(BaseModel):
         self.iters = iters
         self.lookup_pyramid_levels = lookup_pyramid_levels
         self.lookup_radius = lookup_radius
-        self.alternate_corr = alternate_corr
+        self.corr_mode = interpret_corr_mode(corr_mode, alternate_corr=alternate_corr)
 
         self.correlation_depth = get_correlation_depth(
             self.lookup_pyramid_levels, self.lookup_radius
@@ -104,10 +108,7 @@ class MSRAFTPlus(BaseModel):
             self.correlation_depth, hidden_dim=128, scale=2
         )
 
-        if self.alternate_corr and alt_cuda_corr is None:
-            logger.warning(
-                "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
-            )
+        log_corr_mode_warnings(self.corr_mode)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -188,7 +189,7 @@ class MSRAFTPlus(BaseModel):
                 fmap2=fmap2,
                 radius=self.lookup_radius,
                 num_levels=self.lookup_pyramid_levels,
-                alternate_corr=self.alternate_corr,
+                corr_mode=self.corr_mode,
             )
 
             net, inp = torch.split(cnet_pyramid[index], [128, 128], dim=1)
@@ -231,3 +232,6 @@ class MSRAFTPlus(BaseModel):
 @register_model
 class ms_raft_p(MSRAFTPlus):
     pass
+
+
+register_model_variants({"ms_raft_p": MSRAFTPlus}, RAFT_CORR_VARIANTS)

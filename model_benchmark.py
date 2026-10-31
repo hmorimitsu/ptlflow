@@ -36,7 +36,7 @@ from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
 from ptlflow.utils.registry import RegisteredModel
 from ptlflow.utils.timer import Timer
-from ptlflow.utils.utils import count_parameters
+from ptlflow.utils.utils import count_parameters, get_device
 
 NUM_COMMON_COLUMNS = 6
 TABLE_KEYS_LEGENDS = {
@@ -185,8 +185,39 @@ def _init_parser() -> ArgumentParser:
         type=int,
         default=1,
     )
+    parser.add_argument(
+        "--xpu",
+        action="store_true",
+        help="If set, run on the Intel XPU device (torch.xpu) instead of the GPU.",
+    )
 
     return parser
+
+
+def _xpu_module() -> Optional[Any]:
+    """Return torch.xpu if the module exists and an XPU device is available."""
+    xpu_module = getattr(torch, "xpu", None)
+    if xpu_module is not None and xpu_module.is_available():
+        return xpu_module
+    return None
+
+
+def _used_memory(
+    device: Optional[torch.device], device_handle: Optional[Any]
+) -> Optional[int]:
+    """Return the number of bytes currently used on the device.
+
+    NVIDIA GPUs are measured with pynvml (system-wide usage). Intel XPU devices are measured with
+    torch.xpu.memory_reserved() (this process only). Returns None if the memory cannot be measured.
+    """
+    if device is not None and device.type == "xpu":
+        xpu_module = _xpu_module()
+        if xpu_module is not None:
+            return xpu_module.memory_reserved()
+        return None
+    if pynvml is not None and device_handle is not None:
+        return pynvml.nvmlDeviceGetMemoryInfo(device_handle).used
+    return None
 
 
 def benchmark(args: Namespace, device_handle: Optional[Any]) -> pd.DataFrame:
@@ -227,9 +258,11 @@ def benchmark(args: Namespace, device_handle: Optional[Any]) -> pd.DataFrame:
         output_suffix = None
 
     model_args = args
-    available_model_names = ptlflow.get_model_names()
+    available_model_names = ptlflow.get_model_names(include_variants=True)
     if args.all:
-        model_names = available_model_names
+        # --all only iterates over the primary models; use
+        # --select <variant names> to benchmark generated variants.
+        model_names = ptlflow.get_model_names()
         model_args = None
     elif args.select is not None and len(args.select) > 0:
         for name in args.select:
@@ -248,9 +281,8 @@ def benchmark(args: Namespace, device_handle: Optional[Any]) -> pd.DataFrame:
 
     assert (len(args.input_size) % 2) == 0
 
-    if pynvml is not None and device_handle is not None:
-        device_info = pynvml.nvmlDeviceGetMemoryInfo(device_handle)
-        device_initial_used = device_info.used
+    device = get_device(args.xpu)
+    device_initial_used = _used_memory(device, device_handle)
 
     for isize in range(0, len(args.input_size), 2):
         input_size = args.input_size[isize : isize + 2]
@@ -266,35 +298,37 @@ def benchmark(args: Namespace, device_handle: Optional[Any]) -> pd.DataFrame:
                     all_memories = []
                     first_memory_used = 0
                     for irep in range(args.num_trials + 1):
-                        torch.cuda.empty_cache()
+                        if device is not None:
+                            if device.type == "cuda":
+                                torch.cuda.empty_cache()
+                            elif device.type == "xpu":
+                                xpu_module = _xpu_module()
+                                if xpu_module is not None:
+                                    xpu_module.empty_cache()
                         time.sleep(args.sleep_interval)
-                        if pynvml is not None and device_handle is not None:
-                            device_info = pynvml.nvmlDeviceGetMemoryInfo(device_handle)
-                            device_start_rep_used = device_info.used
+                        device_start_rep_used = _used_memory(device, device_handle)
                         model = ptlflow.get_model(mname, args=model_args)
                         model = model.eval()
-                        if torch.cuda.is_available():
-                            model = model.cuda()
+                        if device is not None:
+                            model = model.to(device)
                             if dtype_str == "fp16":
                                 model = model.half()
                         model_params = count_parameters(model)
                         repetition_times = estimate_inference_time(
-                            args, model, input_size, dtype_str
+                            args, model, input_size, dtype_str, device
                         )
                         if irep > 0:
                             all_times.extend(repetition_times)
 
-                        if device_handle is not None:
-                            device_info = pynvml.nvmlDeviceGetMemoryInfo(device_handle)
-                            model_memory_used = device_info.used - device_start_rep_used
+                        if device_start_rep_used is not None:
+                            device_used = _used_memory(device, device_handle)
+                            model_memory_used = device_used - device_start_rep_used
                             if irep > 0:
                                 all_memories.extend(
                                     [model_memory_used] * args.num_samples
                                 )
-                            else:
-                                first_memory_used = (
-                                    device_info.used - device_initial_used
-                                )
+                            elif device_initial_used is not None:
+                                first_memory_used = device_used - device_initial_used
                         model = model.cpu()
                         model = None
 
@@ -311,9 +345,9 @@ def benchmark(args: Namespace, device_handle: Optional[Any]) -> pd.DataFrame:
                         )
                     }
 
-                    if torch.cuda.is_available():
-                        model = model.cuda()
-                        inputs["images"] = inputs["images"].cuda()
+                    if device is not None:
+                        model = model.to(device)
+                        inputs["images"] = inputs["images"].to(device)
                         if dtype_str == "fp16":
                             model = model.half()
                             inputs["images"] = inputs["images"].half()
@@ -404,8 +438,14 @@ def benchmark(args: Namespace, device_handle: Optional[Any]) -> pd.DataFrame:
 
 @torch.no_grad()
 def count_flops(model, inputs):
+    activities = [ProfilerActivity.CPU]
+    input_device = inputs["images"].device
+    if input_device.type == "cuda":
+        activities.append(ProfilerActivity.CUDA)
+    elif input_device.type == "xpu" and hasattr(ProfilerActivity, "XPU"):
+        activities.append(ProfilerActivity.XPU)
     with profile(
-        activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+        activities=activities,
         record_shapes=True,
         with_flops=True,
     ) as prof:
@@ -424,6 +464,7 @@ def estimate_inference_time(
     model: BaseModel,
     input_size: Tuple[int, int],
     dtype_str: str,
+    device: Optional[torch.device] = None,
 ) -> list:
     """Compute the time of each inference run for one model.
 
@@ -433,13 +474,15 @@ def estimate_inference_time(
         Arguments for configuring the benchmark.
     model : BaseModel
         The model to perform the estimation.
+    device : Optional[torch.device], optional
+        The device where the inputs are transferred to. If None, the inputs remain on CPU.
 
     Returns
     -------
     list
         The time of each measured run.
     """
-    timer = Timer("inference")
+    timer = Timer("inference", device=device)
     time_vals = []
     for i in range(args.num_samples + 1):
         inputs = {
@@ -451,8 +494,8 @@ def estimate_inference_time(
                 input_size[1],
             )
         }
-        if torch.cuda.is_available():
-            inputs["images"] = inputs["images"].cuda()
+        if device is not None:
+            inputs["images"] = inputs["images"].to(device)
             if dtype_str == "fp16":
                 inputs["images"] = inputs["images"].half()
         if i > 0:
@@ -584,7 +627,7 @@ if __name__ == "__main__":
     )
 
     device_handle = None
-    if pynvml is not None:
+    if pynvml is not None and not cli.config.xpu and torch.cuda.is_available():
         try:
             device_id = int(os.environ["CUDA_VISIBLE_DEVICES"])
         except (KeyError, ValueError):

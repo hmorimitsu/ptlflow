@@ -3,17 +3,16 @@ Portions of this code copyright 2017, Clement Pinard
 """
 
 import numpy as np
-
-try:
-    from spatial_correlation_sampler import SpatialCorrelationSampler
-except ModuleNotFoundError:
-    from ptlflow.utils.correlation import (
-        IterSpatialCorrelationSampler as SpatialCorrelationSampler,
-    )
 import torch
 import torch.nn as nn
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    get_spatial_corr_sampler,
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from ..base_model.base_model import BaseModel
 from ..flownet.losses import MultiScale
 
@@ -53,6 +52,7 @@ class PWCNet(BaseModel):
         self,
         div_flow: float = 20.0,
         md: int = 4,
+        corr_mode: SpatialCorrMode = "iter",
         loss_start_scale: int = 4,
         loss_num_scales: int = 5,
         loss_base_weight: float = 0.32,
@@ -74,6 +74,7 @@ class PWCNet(BaseModel):
 
         self.div_flow = div_flow
         self.md = md
+        self.corr_mode = corr_mode
 
         self.conv1a = conv(3, 16, kernel_size=3, stride=2)
         self.conv1aa = conv(16, 16, kernel_size=3, stride=1)
@@ -96,8 +97,9 @@ class PWCNet(BaseModel):
 
         self.leakyRELU = nn.LeakyReLU(0.1)
 
-        self.corr = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.md + 1, padding=0
+        log_corr_mode_warnings(self.corr_mode)
+        self.corr, self._corr_error = get_spatial_corr_sampler(
+            self.corr_mode, patch_size=2 * self.md + 1
         )
 
         nd = (2 * self.md + 1) ** 2
@@ -168,32 +170,36 @@ class PWCNet(BaseModel):
         """
         B, C, H, W = x.size()
         # mesh grid
-        xx = torch.arange(0, W).view(1, -1).repeat(H, 1)
-        yy = torch.arange(0, H).view(-1, 1).repeat(1, W)
+        xx = torch.arange(0, W, device=x.device, dtype=x.dtype).view(1, -1).repeat(H, 1)
+        yy = torch.arange(0, H, device=x.device, dtype=x.dtype).view(-1, 1).repeat(1, W)
         xx = xx.view(1, 1, H, W).repeat(B, 1, 1, 1)
         yy = yy.view(1, 1, H, W).repeat(B, 1, 1, 1)
-        grid = torch.cat((xx, yy), 1).float()
+        grid = torch.cat((xx, yy), 1)
 
-        if x.is_cuda:
-            grid = grid.to(dtype=x.dtype, device=x.device)
         vgrid = grid + flo
 
-        # scale grid to [-1,1]
-        vgrid[:, 0, :, :] = 2.0 * vgrid[:, 0, :, :].clone() / max(W - 1, 1) - 1.0
-        vgrid[:, 1, :, :] = 2.0 * vgrid[:, 1, :, :].clone() / max(H - 1, 1) - 1.0
-
-        vgrid = vgrid.permute(0, 2, 3, 1)
+        # scale grid to [-1,1] without in-place slice assignments, which are
+        # not ONNX-exportable
+        vgrid_x = 2.0 * vgrid[:, 0:1] / max(W - 1, 1) - 1.0
+        vgrid_y = 2.0 * vgrid[:, 1:2] / max(H - 1, 1) - 1.0
+        vgrid = torch.cat((vgrid_x, vgrid_y), dim=1).permute(0, 2, 3, 1)
         output = nn.functional.grid_sample(x, vgrid, align_corners=True)
-        mask = torch.ones(x.size()).to(dtype=x.dtype, device=x.device)
-        mask = nn.functional.grid_sample(mask, vgrid, align_corners=True)
 
-        mask[mask < 0.9999] = 0
-        mask[mask > 0] = 1
+        # Validity mask as a closed form: bilinear weights sum to 1 exactly
+        # inside the image, so warping an all-ones image and thresholding at
+        # 0.9999 equals checking the sampling position against [-1, 1]. The
+        # second grid_sample is avoided: two GridSample nodes fused together
+        # crash the OpenCL compiler of the OpenVINO GPU plugin.
+        mask = (
+            (vgrid_x >= -1.0) & (vgrid_x <= 1.0) & (vgrid_y >= -1.0) & (vgrid_y <= 1.0)
+        ).to(dtype=output.dtype)
 
         return output * mask
 
     def forward(self, inputs):
         inputs = self._normalize_inputs(inputs)
+        if self.corr is None:
+            raise self._corr_error
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=0.0,
@@ -353,6 +359,8 @@ class PWCDCNet(PWCNet):
 
     def forward(self, inputs):
         inputs = self._normalize_inputs(inputs)
+        if self.corr is None:
+            raise self._corr_error
         images, image_resizer = self.preprocess_images(
             inputs["images"],
             bgr_add=0.0,
@@ -477,3 +485,8 @@ class pwcnet(PWCDCNet):
 @trainable
 class pwcnet_nodc(PWCNet):
     pass
+
+
+register_model_variants(
+    {"pwcnet": PWCDCNet, "pwcnet_nodc": PWCNet}, SPATIAL_CORR_VARIANTS
+)

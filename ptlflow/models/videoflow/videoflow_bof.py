@@ -1,7 +1,16 @@
+from typing import Optional
+
 import torch
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model
+from ptlflow.utils.corr_modes import (
+    get_raft_corr_block,
+    interpret_corr_mode,
+    log_corr_mode_warnings,
+    RaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants
 from .Networks.BOFNet.update import GMAUpdateBlock
 from .Networks.encoders import twins_svt_large
 from .Networks.BOFNet.cnn import BasicEncoder
@@ -28,7 +37,8 @@ class VideoFlowBOF(BaseModel):
         fnet: str = "twins",
         gma: str = "GMA-SK2",
         pretrain: bool = False,
-        corr_fn: str = "default",
+        corr_mode: RaftCorrMode = "allpairs",
+        corr_fn: Optional[str] = None,
         decoder_depth: int = 32,
         cost_heads_num: int = 1,
         simple_io: bool = False,
@@ -42,7 +52,7 @@ class VideoFlowBOF(BaseModel):
         self.fnet = fnet
         self.gma = gma
         self.pretrain = pretrain
-        self.corr_fn = corr_fn
+        self.corr_mode = interpret_corr_mode(corr_mode, corr_fn=corr_fn)
         self.decoder_depth = decoder_depth
 
         self.hidden_dim = 128
@@ -84,11 +94,13 @@ class VideoFlowBOF(BaseModel):
                 hidden_dim=128,
             )
 
-        print("[Using corr_fn {}]".format(self.corr_fn))
+        print("[Using corr_mode {}]".format(self.corr_mode))
 
         self.att = Attention(dim=128, heads=1, max_pos_size=160, dim_head=128)
 
         self.has_showed_warning = False
+
+        log_corr_mode_warnings(self.corr_mode)
 
     def initialize_flow(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
@@ -139,22 +151,24 @@ class VideoFlowBOF(BaseModel):
         fmap2 = fmaps[:, 1, ...]
         fmap3 = fmaps[:, 2, ...]
 
-        if self.corr_fn == "efficient":
-            corr_fn_21 = AlternateCorrBlock(fmap2, fmap1, radius=self.corr_radius)
-            corr_fn_23 = AlternateCorrBlock(fmap2, fmap3, radius=self.corr_radius)
-        else:
-            corr_fn_21 = CorrBlock(
-                fmap2,
-                fmap1,
-                num_levels=self.corr_levels,
-                radius=self.corr_radius,
-            )
-            corr_fn_23 = CorrBlock(
-                fmap2,
-                fmap3,
-                num_levels=self.corr_levels,
-                radius=self.corr_radius,
-            )
+        corr_fn_21 = get_raft_corr_block(
+            self.corr_mode,
+            fmap1=fmap2,
+            fmap2=fmap1,
+            radius=self.corr_radius,
+            num_levels=self.corr_levels,
+            allpairs_cls=CorrBlock,
+            alt_cls=AlternateCorrBlock,
+        )
+        corr_fn_23 = get_raft_corr_block(
+            self.corr_mode,
+            fmap1=fmap2,
+            fmap2=fmap3,
+            radius=self.corr_radius,
+            num_levels=self.corr_levels,
+            allpairs_cls=CorrBlock,
+            alt_cls=AlternateCorrBlock,
+        )
 
         cnet = self.cnet(images[:, 1, ...])
         net, inp = torch.split(cnet, [hdim, cdim], dim=1)
@@ -233,3 +247,6 @@ class VideoFlowBOF(BaseModel):
 @register_model
 class videoflow_bof(VideoFlowBOF):
     pass
+
+
+register_model_variants({"videoflow_bof": VideoFlowBOF}, RAFT_CORR_VARIANTS)

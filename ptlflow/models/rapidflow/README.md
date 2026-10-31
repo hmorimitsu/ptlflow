@@ -141,7 +141,7 @@ python tensorrt_test.py rapidflow --checkpoint things
 
 Directly converting the model to ONNX and TensorRT as shown in this example will work, but it is not optimal.
 To obtain the best convertion, it would be necessary to rewrite some parts of the code to remove conditions and operations that may change according to the input size.
-Also, these convertions only supports `--corr_mode allpairs`, which is not suitable for large images.
+Also, these convertions only supports `--model.corr_mode allpairs`, which is not suitable for large images.
 
 ## Code license
 

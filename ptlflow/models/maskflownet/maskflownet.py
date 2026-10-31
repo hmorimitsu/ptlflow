@@ -8,14 +8,13 @@ from torch.autograd import Variable
 import numpy as np
 from torchvision import ops
 
-try:
-    from spatial_correlation_sampler import SpatialCorrelationSampler
-except ModuleNotFoundError:
-    from ptlflow.utils.correlation import (
-        IterSpatialCorrelationSampler as SpatialCorrelationSampler,
-    )
-
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    get_spatial_corr_sampler,
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from ..base_model.base_model import BaseModel
 
 
@@ -75,6 +74,125 @@ def deformable_conv(
     return ops.DeformConv2d(
         in_planes, out_planes, kernel_size, strides, padding, bias=use_bias
     )
+
+
+class ExportableDeformConv2d(nn.Module):
+    """ONNX-exportable stand-in for torchvision deform_conv2d.
+
+    The legacy ONNX exporter cannot export torchvision::deform_conv2d (it
+    has no registered symbolic), so during export (simple_io=True or
+    deploy=True, as done by the edgeflowbench converters) the deformable
+    convolutions are replaced by this module, which computes the same
+    operation with standard ops (per-tap grid_sample + 1x1 convolution).
+    Matches ops.DeformConv2d outputs up to float rounding (~1e-6), also for
+    the out-of-range samples produced by large flow offsets.
+
+    Supports the configuration used by the MaskFlownet models: one offset
+    group, optional bias and no modulation mask.
+    """
+
+    def __init__(
+        self,
+        in_planes,
+        out_planes,
+        kernel_size=3,
+        strides=1,
+        padding=1,
+        use_bias=True,
+    ):
+        super().__init__()
+        if isinstance(kernel_size, int):
+            kernel_size = (kernel_size, kernel_size)
+        if isinstance(strides, int):
+            strides = (strides, strides)
+        if isinstance(padding, int):
+            padding = (padding, padding)
+
+        self.in_planes = in_planes
+        self.out_planes = out_planes
+        self.kernel_size = kernel_size
+        self.strides = strides
+        self.padding = padding
+        self.weight = nn.Parameter(
+            torch.empty(out_planes, in_planes, kernel_size[0], kernel_size[1])
+        )
+        if use_bias:
+            self.bias = nn.Parameter(torch.empty(out_planes))
+        else:
+            self.register_parameter("bias", None)
+
+        nn.init.kaiming_uniform_(self.weight, a=np.sqrt(5))
+        if self.bias is not None:
+            fan_in = in_planes * kernel_size[0] * kernel_size[1]
+            bound = 1 / np.sqrt(fan_in)
+            nn.init.uniform_(self.bias, -bound, bound)
+
+    def forward(self, x, offset):
+        batch_size, _, height, width = x.shape
+        kernel_h, kernel_w = self.kernel_size
+        stride_h, stride_w = self.strides
+        pad_h, pad_w = self.padding
+
+        # Zero-pad with torch.cat instead of F.pad: an F.pad output feeding
+        # grid_sample loses its static shape during ONNX export, while the
+        # cat output keeps it. Numerically identical to F.pad mode="constant".
+        if pad_h > 0 or pad_w > 0:
+            if pad_w > 0:
+                pad_w_tensor = torch.zeros(
+                    batch_size,
+                    x.shape[1],
+                    height,
+                    pad_w,
+                    dtype=x.dtype,
+                    device=x.device,
+                )
+                x = torch.cat([pad_w_tensor, x, pad_w_tensor], dim=3)
+            if pad_h > 0:
+                pad_h_tensor = torch.zeros(
+                    batch_size,
+                    x.shape[1],
+                    pad_h,
+                    width + 2 * pad_w,
+                    dtype=x.dtype,
+                    device=x.device,
+                )
+                x = torch.cat([pad_h_tensor, x, pad_h_tensor], dim=2)
+        padded_h = height + 2 * pad_h
+        padded_w = width + 2 * pad_w
+        out_h = (padded_h - kernel_h) // stride_h + 1
+        out_w = (padded_w - kernel_w) // stride_w + 1
+
+        base_y = torch.arange(out_h, dtype=x.dtype, device=x.device) * stride_h
+        base_x = torch.arange(out_w, dtype=x.dtype, device=x.device) * stride_w
+        grid_y, grid_x = torch.meshgrid(base_y, base_x, indexing="ij")
+
+        sampled_features = []
+        offset_index = 0
+        for kernel_y in range(kernel_h):
+            for kernel_x in range(kernel_w):
+                offset_y = offset[:, offset_index]
+                offset_x = offset[:, offset_index + 1]
+                offset_index += 2
+
+                sample_x = grid_x + kernel_x + offset_x
+                sample_y = grid_y + kernel_y + offset_y
+                sample_x = 2.0 * sample_x / max(padded_w - 1, 1) - 1.0
+                sample_y = 2.0 * sample_y / max(padded_h - 1, 1) - 1.0
+                sample_grid = torch.stack((sample_x, sample_y), dim=-1)
+                sampled = F.grid_sample(
+                    x,
+                    sample_grid,
+                    mode="bilinear",
+                    padding_mode="zeros",
+                    align_corners=True,
+                )
+                sampled_features.append(sampled)
+
+        sampled_features = torch.stack(sampled_features, dim=2).reshape(
+            batch_size, self.in_planes * kernel_h * kernel_w, out_h, out_w
+        )
+        weight = self.weight.view(self.out_planes, -1, 1, 1)
+        return F.conv2d(sampled_features, weight, bias=self.bias)
 
 
 def upsample_kernel2d(w, dtype, device):
@@ -141,11 +259,13 @@ class MaskFlownet_S(BaseModel):
         deform_bias: bool = True,
         strides: Sequence[int] = (64, 32, 16, 8, 4),
         upfeat_ch: Sequence[int] = (16, 16, 16, 16),
+        corr_mode: SpatialCorrMode = "iter",
         loss_weights: Sequence[float] = (0.005, 0.01, 0.02, 0.08, 0.32),
         loss_match: str = "upsampling",
         loss_eps: float = 1e-8,
         loss_q: Optional[float] = None,
         simple_io: bool = False,
+        deploy: bool = False,
         **kwargs,
     ):
         super(MaskFlownet_S, self).__init__(
@@ -160,6 +280,11 @@ class MaskFlownet_S(BaseModel):
             simple_io=simple_io,
             **kwargs,
         )
+        # deploy selects the ONNX-export-friendly ops (the grid_sample-based
+        # exportable deformable conv) without changing the input/output
+        # format like simple_io does. MaskFlownet sets it on its inner
+        # MaskFlownet_S when it is itself created with simple_io=True.
+        self.deploy = deploy
 
         self.div_flow = div_flow
         self.md = md
@@ -167,6 +292,7 @@ class MaskFlownet_S(BaseModel):
         self.deform_bias = deform_bias
         self.strides = strides
         self.upfeat_ch = upfeat_ch
+        self.corr_mode = corr_mode
 
         self.scale = self.div_flow * self.flow_multiplier
         self.deform_bias = self.deform_bias
@@ -190,8 +316,9 @@ class MaskFlownet_S(BaseModel):
         self.conv6b = conv(196, 196, kernel_size=3, stride=1)
         self.conv6c = conv(196, 196, kernel_size=3, stride=1)
 
-        self.corr_fn = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.md + 1, padding=0
+        log_corr_mode_warnings(self.corr_mode)
+        self.corr_fn, self._corr_error = get_spatial_corr_sampler(
+            self.corr_mode, patch_size=2 * self.md + 1
         )
         # self.corr    = Correlation(pad_size=md, kernel_size=1, max_displacement=md, stride1=1, stride2=1, corr_multiply=1)
         self.leakyRELU = nn.LeakyReLU(0.1)
@@ -279,10 +406,15 @@ class MaskFlownet_S(BaseModel):
 
         # self.upfeat5 = deconv()
 
-        self.deform5 = deformable_conv(128, 128)
-        self.deform4 = deformable_conv(96, 96)
-        self.deform3 = deformable_conv(64, 64)
-        self.deform2 = deformable_conv(32, 32)
+        deform_conv_factory = (
+            ExportableDeformConv2d
+            if (self.simple_io or self.deploy)
+            else deformable_conv
+        )
+        self.deform5 = deform_conv_factory(128, 128)
+        self.deform4 = deform_conv_factory(96, 96)
+        self.deform3 = deform_conv_factory(64, 64)
+        self.deform2 = deform_conv_factory(32, 32)
 
         self.conv5f = conv(
             16, 128, kernel_size=3, stride=1, padding=1, activation=False
@@ -322,29 +454,29 @@ class MaskFlownet_S(BaseModel):
         # vgrid = Variable(grid) + flo
         vgrid = Variable(grid) + torch.flip(flo, [1])
 
-        # scale grid to [-1,1]
-        vgrid[:, 0, :, :] = 2.0 * vgrid[:, 0, :, :].clone() / max(W - 1, 1) - 1.0
-        vgrid[:, 1, :, :] = 2.0 * vgrid[:, 1, :, :].clone() / max(H - 1, 1) - 1.0
-
-        vgrid = vgrid.permute(0, 2, 3, 1)
+        # scale grid to [-1,1] without in-place slice assignments, which are
+        # not ONNX-exportable
+        vgrid_x = 2.0 * vgrid[:, 0:1] / max(W - 1, 1) - 1.0
+        vgrid_y = 2.0 * vgrid[:, 1:2] / max(H - 1, 1) - 1.0
+        vgrid = torch.cat((vgrid_x, vgrid_y), dim=1).permute(0, 2, 3, 1)
         # vgrid = vgrid.permute(0,2,3,1).clamp(-1.1, 1.1)
         output = nn.functional.grid_sample(x, vgrid, align_corners=True)
-        mask = torch.autograd.Variable(
-            torch.ones(x.size(), dtype=x.dtype, device=device)
-        )
-        mask = nn.functional.grid_sample(mask, vgrid, align_corners=True)
 
-        # if W==128:
-        # np.save('mask.npy', mask.cpu().data.numpy())
-        # np.save('warp.npy', output.cpu().data.numpy())
-
-        mask[mask < 0.9999] = 0
-        mask[mask > 0] = 1
+        # Validity mask as a closed form: bilinear weights sum to 1 exactly
+        # inside the image, so warping an all-ones image and thresholding at
+        # 0.9999 equals checking the sampling position against [-1, 1]. The
+        # second grid_sample is avoided: two GridSample nodes fused together
+        # crash the OpenCL compiler of the OpenVINO GPU plugin.
+        mask = (
+            (vgrid_x >= -1.0) & (vgrid_x <= 1.0) & (vgrid_y >= -1.0) & (vgrid_y <= 1.0)
+        ).to(dtype=output.dtype)
 
         return output * mask
 
     def forward(self, inputs, skip_preprocess=False):
         inputs = self._normalize_inputs(inputs)
+        if self.corr_fn is None:
+            raise self._corr_error
         if not skip_preprocess:
             bgr_mean = rearrange(inputs["images"], "b n c h w -> b c (n h w)").mean(2)[
                 :, None, :, None, None
@@ -535,6 +667,7 @@ class MaskFlownet(BaseModel):
         deform_bias: bool = True,
         strides: Sequence[int] = (64, 32, 16, 8, 4),
         upfeat_ch: Sequence[int] = (16, 16, 16, 16),
+        corr_mode: SpatialCorrMode = "iter",
         loss_weights: Sequence[float] = (0.005, 0.01, 0.02, 0.08, 0.32),
         loss_match: str = "upsampling",
         loss_eps: float = 1e-8,
@@ -562,9 +695,12 @@ class MaskFlownet(BaseModel):
         self.deform_bias = deform_bias
         self.strides = strides
         self.upfeat_ch = upfeat_ch
+        self.corr_mode = corr_mode
 
         self.scale = self.div_flow * self.flow_multiplier
         self.deform_bias = self.deform_bias
+
+        log_corr_mode_warnings(self.corr_mode)
 
         self.MaskFlownet_S = MaskFlownet_S(
             div_flow=div_flow,
@@ -573,10 +709,12 @@ class MaskFlownet(BaseModel):
             deform_bias=deform_bias,
             strides=strides,
             upfeat_ch=upfeat_ch,
+            corr_mode=corr_mode,
             loss_weights=loss_weights,
             loss_match=loss_match,
             loss_eps=loss_eps,
             loss_q=loss_q,
+            deploy=simple_io,
             **kwargs,
         )
         self.activate = nn.LeakyReLU(0.1)
@@ -601,8 +739,8 @@ class MaskFlownet(BaseModel):
         self.conv6z = conv(196, 196, stride=1)
 
         self.leakyRELU = nn.LeakyReLU(0.1)
-        self.corr_fn = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.md2 + 1, padding=0
+        self.corr_fn, self._corr_error = get_spatial_corr_sampler(
+            self.corr_mode, patch_size=2 * self.md2 + 1
         )
         # self.corr    = Correlation(pad_size=self.md, kernel_size=1, max_displacement=self.md, stride1=1, stride2=1, corr_multiply=1)
 
@@ -686,11 +824,14 @@ class MaskFlownet(BaseModel):
 
         # self.upfeat5 = deconv()
 
-        self.deform6 = deformable_conv(196, 196)
-        self.deform5 = deformable_conv(128, 128)
-        self.deform4 = deformable_conv(96, 96)
-        self.deform3 = deformable_conv(64, 64)
-        self.deform2 = deformable_conv(32, 32)
+        deform_conv_factory = (
+            ExportableDeformConv2d if self.simple_io else deformable_conv
+        )
+        self.deform6 = deform_conv_factory(196, 196)
+        self.deform5 = deform_conv_factory(128, 128)
+        self.deform4 = deform_conv_factory(96, 96)
+        self.deform3 = deform_conv_factory(64, 64)
+        self.deform2 = deform_conv_factory(32, 32)
 
     def corr(self, f1, f2):
         corr = self.corr_fn(f1, f2)
@@ -717,27 +858,28 @@ class MaskFlownet(BaseModel):
         # vgrid = Variable(grid) + flo
         vgrid = Variable(grid) + torch.flip(flo, [1])
 
-        # scale grid to [-1,1]
-        vgrid[:, 0, :, :] = 2.0 * vgrid[:, 0, :, :].clone() / max(W - 1, 1) - 1.0
-        vgrid[:, 1, :, :] = 2.0 * vgrid[:, 1, :, :].clone() / max(H - 1, 1) - 1.0
-
-        # vgrid = vgrid.permute(0,2,3,1)
-        vgrid = vgrid.permute(0, 2, 3, 1).clamp(-1.1, 1.1)
+        # scale grid to [-1,1] without in-place slice assignments, which are
+        # not ONNX-exportable
+        vgrid_x = (2.0 * vgrid[:, 0:1] / max(W - 1, 1) - 1.0).clamp(-1.1, 1.1)
+        vgrid_y = (2.0 * vgrid[:, 1:2] / max(H - 1, 1) - 1.0).clamp(-1.1, 1.1)
+        vgrid = torch.cat((vgrid_x, vgrid_y), dim=1).permute(0, 2, 3, 1)
         output = nn.functional.grid_sample(x, vgrid, align_corners=True)
-        mask = torch.autograd.Variable(torch.ones(x.size())).cuda()
-        mask = nn.functional.grid_sample(mask, vgrid, align_corners=True)
 
-        # if W==128:
-        # np.save('mask.npy', mask.cpu().data.numpy())
-        # np.save('warp.npy', output.cpu().data.numpy())
-
-        mask[mask < 0.9999] = 0
-        mask[mask > 0] = 1
+        # Validity mask as a closed form: bilinear weights sum to 1 exactly
+        # inside the image, so warping an all-ones image and thresholding at
+        # 0.9999 equals checking the sampling position against [-1, 1]. The
+        # second grid_sample is avoided: two GridSample nodes fused together
+        # crash the OpenCL compiler of the OpenVINO GPU plugin.
+        mask = (
+            (vgrid_x >= -1.0) & (vgrid_x <= 1.0) & (vgrid_y >= -1.0) & (vgrid_y <= 1.0)
+        ).to(dtype=output.dtype)
 
         return output * mask
 
     def forward(self, inputs):
         inputs = self._normalize_inputs(inputs)
+        if self.corr_fn is None:
+            raise self._corr_error
         bgr_mean = rearrange(inputs["images"], "b n c h w -> b c (n h w)").mean(2)[
             :, None, :, None, None
         ]
@@ -966,3 +1108,8 @@ class maskflownet_s(MaskFlownet_S):
 @trainable
 class maskflownet(MaskFlownet):
     pass
+
+
+register_model_variants(
+    {"maskflownet": MaskFlownet, "maskflownet_s": MaskFlownet_S}, SPATIAL_CORR_VARIANTS
+)

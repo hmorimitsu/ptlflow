@@ -5,7 +5,8 @@ import torch.nn.functional as F
 from .update import GMAUpdateBlock
 from ..encoders import twins_svt_large
 from .cnn import BasicEncoder
-from .corr import CorrBlock
+from .corr import AlternateCorrBlock, CorrBlock
+from ptlflow.utils.corr_modes import get_raft_corr_block
 from ..utils import coords_grid
 from .gma import Attention
 from .sk import SKUpdateBlock6_Deep_nopoolres_AllDecoder
@@ -22,6 +23,7 @@ class MemFlowNet(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
+        self.corr_mode = getattr(cfg, "corr_mode", "allpairs")
 
         self.hidden_dim = 128
         self.context_dim = 128
@@ -127,11 +129,14 @@ class MemFlowNet(nn.Module):
         return query, key, inp
 
     def get_motion_feature(self, flow, coords1, fmaps):
-        corr_fn = CorrBlock(
-            fmaps[:, 0, ...],
-            fmaps[:, 1, ...],
+        corr_fn = get_raft_corr_block(
+            self.corr_mode,
+            fmap1=fmaps[:, 0, ...],
+            fmap2=fmaps[:, 1, ...],
             num_levels=self.cfg.corr_levels,
             radius=self.cfg.corr_radius,
+            allpairs_cls=CorrBlock,
+            alt_cls=AlternateCorrBlock,
         )
         corr = corr_fn(coords1 + flow)  # index correlation volume
         _, current_value = self.update_block.get_motion_and_value(flow, corr)

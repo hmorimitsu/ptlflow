@@ -5,6 +5,28 @@ import torch.nn.functional as F
 from .utils import split_feature, merge_splits, split_feature_1d, merge_splits_1d
 
 
+def _roll_along_dim(x, shift, dim):
+    # Equivalent to torch.roll(x, shift, dim), but implemented with cat/narrow
+    # so that the legacy torch.onnx exporter can trace it (torch.roll with
+    # dynamic negative shifts fails to export).
+    if shift == 0:
+        return x
+
+    size = x.shape[dim]
+    shift = shift % size
+    if shift == 0:
+        return x
+
+    return torch.cat(
+        (x.narrow(dim, size - shift, shift), x.narrow(dim, 0, size - shift)), dim=dim
+    )
+
+
+def _roll_2d(x, shift_h, shift_w):
+    x = _roll_along_dim(x, shift_h, dim=1)
+    return _roll_along_dim(x, shift_w, dim=2)
+
+
 def single_head_full_attention(q, k, v):
     # q, k, v: [B, L, C]
     assert q.dim() == k.dim() == v.dim() == 3
@@ -80,9 +102,9 @@ def single_head_split_window_attention(
         shift_size_h = window_size_h // 2
         shift_size_w = window_size_w // 2
 
-        q = torch.roll(q, shifts=(-shift_size_h, -shift_size_w), dims=(1, 2))
-        k = torch.roll(k, shifts=(-shift_size_h, -shift_size_w), dims=(1, 2))
-        v = torch.roll(v, shifts=(-shift_size_h, -shift_size_w), dims=(1, 2))
+        q = _roll_2d(q, -shift_size_h, -shift_size_w)
+        k = _roll_2d(k, -shift_size_h, -shift_size_w)
+        v = _roll_2d(v, -shift_size_h, -shift_size_w)
 
     q = split_feature(
         q, num_splits=num_splits, channel_last=True
@@ -110,7 +132,7 @@ def single_head_split_window_attention(
 
     # shift back
     if with_shift:
-        out = torch.roll(out, shifts=(shift_size_h, shift_size_w), dims=(1, 2))
+        out = _roll_2d(out, shift_size_h, shift_size_w)
 
     out = out.view(b, -1, c)
 
@@ -149,9 +171,9 @@ def single_head_split_window_attention_1d(
         assert attn_mask is not None  # compute once
         shift_size_w = window_size_w // 2
 
-        q = torch.roll(q, shifts=-shift_size_w, dims=1)
-        k = torch.roll(k, shifts=-shift_size_w, dims=1)
-        v = torch.roll(v, shifts=-shift_size_w, dims=1)
+        q = _roll_along_dim(q, -shift_size_w, dim=1)
+        k = _roll_along_dim(k, -shift_size_w, dim=1)
+        v = _roll_along_dim(v, -shift_size_w, dim=1)
 
     q = split_feature_1d(q, num_splits=num_splits)  # [B*H*K, W/K, C]
     k = split_feature_1d(k, num_splits=num_splits)
@@ -174,7 +196,7 @@ def single_head_split_window_attention_1d(
 
     # shift back
     if with_shift:
-        out = torch.roll(out, shifts=shift_size_w, dims=2)
+        out = _roll_along_dim(out, shift_size_w, dim=2)
 
     out = out.view(b, -1, c)
 

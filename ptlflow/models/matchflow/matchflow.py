@@ -5,7 +5,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
+    log_corr_mode_warnings,
+    RaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import (
+    register_model,
+    register_model_variants,
+    trainable,
+)
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock, GMAUpdateBlock
 from .extractor import BasicEncoder
@@ -14,11 +24,6 @@ from .corr import get_corr_block
 from .utils import coords_grid, upflow8, compute_grid_indices, compute_weight
 from .gma import Attention
 from ..base_model.base_model import BaseModel
-
-try:
-    import alt_cuda_corr
-except ImportError:
-    alt_cuda_corr = None
 
 
 class SequenceLoss(nn.Module):
@@ -73,7 +78,8 @@ class MatchFlow(BaseModel):
         tile_sigma: float = 0.05,
         position_only: bool = False,
         position_and_content: bool = False,
-        alternate_corr: bool = False,
+        corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         train_size: Optional[tuple[int, int]] = None,
         simple_io: bool = False,
         **kwargs,
@@ -98,7 +104,7 @@ class MatchFlow(BaseModel):
         self.tile_sigma = tile_sigma
         self.position_only = position_only
         self.position_and_content = position_and_content
-        self.alternate_corr = alternate_corr
+        self.corr_mode = interpret_corr_mode(corr_mode, alternate_corr=alternate_corr)
         self.train_size = train_size
 
         self.hidden_dim = hdim = 128
@@ -130,10 +136,7 @@ class MatchFlow(BaseModel):
                 corr_levels=corr_levels, corr_radius=corr_radius, hidden_dim=hdim
             )
 
-        if self.alternate_corr and alt_cuda_corr is None:
-            logger.warning(
-                "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
-            )
+        log_corr_mode_warnings(self.corr_mode)
 
         self.showed_warning = False
 
@@ -301,7 +304,7 @@ class MatchFlow(BaseModel):
             fmap2=fmap2,
             radius=self.corr_radius,
             num_levels=self.corr_levels,
-            alternate_corr=self.alternate_corr,
+            corr_mode=self.corr_mode,
         )
 
         # run the context network
@@ -367,7 +370,8 @@ class MatchFlowRAFT(MatchFlow):
         tile_sigma: float = 0.05,
         position_only: bool = False,
         position_and_content: bool = False,
-        alternate_corr: bool = False,
+        corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         train_size: Optional[Tuple[int, int]] = None,
         **kwargs,
     ) -> None:
@@ -386,6 +390,7 @@ class MatchFlowRAFT(MatchFlow):
             tile_sigma,
             position_only,
             position_and_content,
+            corr_mode,
             alternate_corr,
             train_size,
             **kwargs,
@@ -402,3 +407,8 @@ class matchflow(MatchFlow):
 @trainable
 class matchflow_raft(MatchFlowRAFT):
     pass
+
+
+register_model_variants(
+    {"matchflow": MatchFlow, "matchflow_raft": MatchFlowRAFT}, RAFT_CORR_VARIANTS
+)

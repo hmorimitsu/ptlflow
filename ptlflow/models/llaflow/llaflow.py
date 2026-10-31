@@ -1,9 +1,21 @@
-from loguru import logger
+from typing import Optional
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    get_raft_corr_block,
+    interpret_corr_mode,
+    log_corr_mode_warnings,
+    RaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import (
+    register_model,
+    register_model_variants,
+    trainable,
+)
 from ptlflow.utils.utils import forward_interpolate_batch
 from .update import BasicUpdateBlock, GMAUpdateBlock
 from .extractor import BasicEncoder
@@ -13,10 +25,12 @@ from .aggregate import LocalSimilar, LSA, ShiftLSA
 from .gma import Attention
 from ..base_model.base_model import BaseModel
 
-try:
-    import alt_cuda_corr
-except ImportError:
-    alt_cuda_corr = None
+
+def unsupported_alt_cuda_corr(fmap1, fmap2, radius=4, num_levels=4):
+    raise RuntimeError(
+        "corr_mode=alt_cuda_corr is not supported by llaflow, because its all-pairs "
+        "correlation is fused with the local similarity term. Use another corr_mode."
+    )
 
 
 class SequenceLoss(nn.Module):
@@ -63,13 +77,17 @@ class LLAFlow(BaseModel):
         gamma: float = 0.8,
         max_flow: float = 400,
         iters: int = 32,
-        alternate_corr: bool = False,
+        corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         gma: bool = True,
         simple_io: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
-            output_stride=8, loss_fn=SequenceLoss(gamma, max_flow), simple_io=simple_io, **kwargs
+            output_stride=8,
+            loss_fn=SequenceLoss(gamma, max_flow),
+            simple_io=simple_io,
+            **kwargs,
         )
 
         self.corr_levels = corr_levels
@@ -78,7 +96,7 @@ class LLAFlow(BaseModel):
         self.gamma = gamma
         self.max_flow = max_flow
         self.iters = iters
-        self.alternate_corr = alternate_corr
+        self.corr_mode = interpret_corr_mode(corr_mode, alternate_corr=alternate_corr)
         self.gma = gma
 
         self.hidden_dim = hdim = 128
@@ -106,10 +124,7 @@ class LLAFlow(BaseModel):
             )
             self.att = Attention(dim=cdim, heads=1, max_pos_size=160, dim_head=cdim)
 
-        if self.alternate_corr and alt_cuda_corr is None:
-            logger.warning(
-                "!!! alt_cuda_corr is not compiled! The slower IterativeCorrBlock will be used instead !!!"
-            )
+        log_corr_mode_warnings(self.corr_mode)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -174,9 +189,21 @@ class LLAFlow(BaseModel):
         # run the feature network
         fmap1, fmap2 = self.fnet([image1, image2])
         fmap2 = self.lsa(ls2, fmap2)
-        corr2 = self.s_lsa(ls1, fmap1, fmap2)
 
-        corr_fn = CorrBlock(fmap1, fmap2, self.gamma, corr2, radius=self.corr_radius)
+        if self.corr_mode == "allpairs":
+            corr2 = self.s_lsa(ls1, fmap1, fmap2)
+            corr_fn = CorrBlock(
+                fmap1, fmap2, self.gamma, corr2, radius=self.corr_radius
+            )
+        else:
+            corr_fn = get_raft_corr_block(
+                self.corr_mode,
+                fmap1=fmap1,
+                fmap2=fmap2,
+                radius=self.corr_radius,
+                num_levels=self.corr_levels,
+                alt_cls=unsupported_alt_cuda_corr,
+            )
 
         coords0, coords1 = self.initialize_flow(image1)
         if (
@@ -235,7 +262,8 @@ class LLAFlowRAFT(LLAFlow):
         gamma: float = 0.8,
         max_flow: float = 400,
         iters: int = 32,
-        alternate_corr: bool = False,
+        corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         gma: bool = False,
         **kwargs,
     ) -> None:
@@ -246,6 +274,7 @@ class LLAFlowRAFT(LLAFlow):
             gamma,
             max_flow,
             iters,
+            corr_mode,
             alternate_corr,
             gma,
             **kwargs,
@@ -262,3 +291,8 @@ class llaflow(LLAFlow):
 @trainable
 class llaflow_raft(LLAFlowRAFT):
     pass
+
+
+register_model_variants(
+    {"llaflow": LLAFlow, "llaflow_raft": LLAFlowRAFT}, RAFT_CORR_VARIANTS
+)

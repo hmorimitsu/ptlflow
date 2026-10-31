@@ -597,20 +597,26 @@ class CrossAttFeatTrans(SETransInitWeights):
         # if self.call_count == 0:
         #    print0(f"{self.name} query: {list(query_feat.shape)}, attn: {list(attention_scores.shape)}")
 
-        with torch.no_grad():
-            curr_max_attn = attention_scores.max().item()
-            curr_avg_attn = attention_scores.abs().mean().item()
+        # The .item() reads below are data-dependent: tracing (legacy ONNX
+        # exporter) silently bakes the taken branch, while torch.export
+        # (dynamo ONNX exporter) refuses them outright
+        # (GuardOnDataDependentSymNode). This block is an eager-mode
+        # diagnostic/safety net, so skip it entirely while exporting.
+        if not (torch.jit.is_tracing() or torch.compiler.is_exporting()):
+            with torch.no_grad():
+                curr_max_attn = attention_scores.max().item()
+                curr_avg_attn = attention_scores.abs().mean().item()
 
-        if curr_max_attn > self.max_attn:
-            self.max_attn = curr_max_attn
+            if curr_max_attn > self.max_attn:
+                self.max_attn = curr_max_attn
 
-        if curr_max_attn > self.attn_clip:
-            attention_scores = torch.clamp(
-                attention_scores, -self.attn_clip, self.attn_clip
-            )
-            self.clamp_count += 1
+            if curr_max_attn > self.attn_clip:
+                attention_scores = torch.clamp(
+                    attention_scores, -self.attn_clip, self.attn_clip
+                )
+                self.clamp_count += 1
 
-        self.call_count += 1
+            self.call_count += 1
         if self.training:
             if self.call_count % self.attn_diag_cycles == 0:
                 print0(
@@ -802,7 +808,14 @@ class SlidingPosBiases2D(nn.Module):
             all_w1s = self.all_w1s[:H, :W]
             all_h2s = self.all_h2s[:H, :W]
             all_w2s = self.all_w2s[:H, :W]
-            padded_pos_biases[(all_h1s, all_w1s, all_h2s, all_w2s)] = self.biases
+            # Expand the [2R+1, 2R+1] biases to the broadcast shape of the
+            # index tensors explicitly: assigning the raw parameter lets
+            # the ONNX exporter trace the implicit broadcast as a Reshape
+            # of [15,15] into [H,W,15,15], which changes the element count
+            # and is rejected later. expand() is a view, so eager results
+            # and gradients are unchanged.
+            biases_b = self.biases.expand(H, W, 2 * self.R + 1, 2 * self.R + 1)
+            padded_pos_biases[(all_h1s, all_w1s, all_h2s, all_w2s)] = biases_b
 
         # Remove padding. [H+2R, W+2R, H+2R, W+2R] => [H, W, H, W].
         pos_biases = padded_pos_biases[:, :, R:-R, R:-R]

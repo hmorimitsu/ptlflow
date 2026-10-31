@@ -1,16 +1,17 @@
 from typing import Dict, List, Optional, Tuple, Union
 
-try:
-    from spatial_correlation_sampler import SpatialCorrelationSampler
-except ModuleNotFoundError:
-    from ptlflow.utils.correlation import (
-        IterSpatialCorrelationSampler as SpatialCorrelationSampler,
-    )
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model
+from ptlflow.utils.correlation import IterSpatialCorrelationSampler
+from ptlflow.utils.corr_modes import (
+    get_spatial_corr_sampler,
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants
 from .warp import WarpingLayer
 from ..base_model.base_model import BaseModel
 
@@ -61,8 +62,40 @@ class FeatureExtractor(nn.Module):
         return features[::-1]
 
 
+def _get_corr_sampler(
+    corr_mode: SpatialCorrMode,
+    patch_size: int,
+    dilation_patch: int = 1,
+) -> Tuple[nn.Module, Optional[Exception]]:
+    """Create the correlation sampler of the submodules.
+
+    This extends ptlflow.utils.corr_modes.get_spatial_corr_sampler with the
+    patch dilation used by the deformation modules, which the shared factory
+    drops for the iter engine.
+
+    Returns
+    -------
+    Tuple[nn.Module, Optional[Exception]]
+        The sampler, and an error to be raised by the module forward if the
+        sampler could not be created (None on success).
+    """
+    if corr_mode == "iter" and dilation_patch != 1:
+        return (
+            IterSpatialCorrelationSampler(
+                kernel_size=1,
+                patch_size=patch_size,
+                padding=0,
+                dilation_patch=dilation_patch,
+            ),
+            None,
+        )
+    return get_spatial_corr_sampler(
+        corr_mode, patch_size=patch_size, dilation_patch=dilation_patch
+    )
+
+
 class FlowFieldDeformation(nn.Module):
-    def __init__(self, level: int) -> None:
+    def __init__(self, level: int, corr_mode: SpatialCorrMode = "iter") -> None:
         super(FlowFieldDeformation, self).__init__()
 
         patch_size = [None, 5, 7, 9][level]
@@ -73,8 +106,8 @@ class FlowFieldDeformation(nn.Module):
         self.up_conf = nn.ConvTranspose2d(1, 1, 4, 2, 1, bias=False)
         self.up_flow = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False, groups=2)
 
-        self.corr = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=patch_size, padding=0, stride=1, dilation_patch=2
+        self.corr, self._corr_error = _get_corr_sampler(
+            corr_mode, patch_size=patch_size, dilation_patch=2
         )
 
         self.feat_net = nn.Sequential(
@@ -119,7 +152,13 @@ class FlowFieldDeformation(nn.Module):
 
 
 class CostVolumeModulation(nn.Module):
-    def __init__(self, level: int, num_levels: int = 4, div_flow: float = 20.0) -> None:
+    def __init__(
+        self,
+        level: int,
+        num_levels: int = 4,
+        div_flow: float = 20.0,
+        corr_mode: SpatialCorrMode = "iter",
+    ) -> None:
         super().__init__()
 
         input_dims = [None, 210, 178, 146][level]
@@ -127,9 +166,7 @@ class CostVolumeModulation(nn.Module):
             level
         ]
 
-        self.corr = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=9, padding=0, stride=1, dilation_patch=1
-        )
+        self.corr, self._corr_error = _get_corr_sampler(corr_mode, patch_size=9)
 
         self.leaky_relu = nn.LeakyReLU(0.1, inplace=True)
 
@@ -179,6 +216,7 @@ class Matching(nn.Module):
         num_levels: int = 4,
         div_flow: float = 20.0,
         use_s_version: bool = False,
+        corr_mode: SpatialCorrMode = "iter",
     ) -> None:
         super(Matching, self).__init__()
 
@@ -195,11 +233,10 @@ class Matching(nn.Module):
             self.up_flow = None
 
         if level < 2:
-            self.corr = SpatialCorrelationSampler(
-                kernel_size=1, patch_size=9, padding=0, stride=1, dilation_patch=1
-            )
+            self.corr, self._corr_error = _get_corr_sampler(corr_mode, patch_size=9)
         else:
             self.corr = None
+            self._corr_error = None
 
         self.flow_net = nn.Sequential(
             nn.Conv2d(81, 128, 3, 1, 1),
@@ -457,6 +494,7 @@ class LiteFlowNet3(BaseModel):
         div_flow: float = 20.0,
         use_pseudo_regularization: bool = False,
         use_s_version: bool = False,
+        corr_mode: SpatialCorrMode = "iter",
         simple_io: bool = False,
         **kwargs,
     ):
@@ -470,6 +508,7 @@ class LiteFlowNet3(BaseModel):
         self.div_flow = div_flow
         self.use_pseudo_regularization = use_pseudo_regularization
         self.use_s_version = use_s_version
+        self.corr_mode = corr_mode
 
         self.num_levels = 4
 
@@ -478,22 +517,32 @@ class LiteFlowNet3(BaseModel):
         else:
             self.min_mod_level = 2
 
+        log_corr_mode_warnings(self.corr_mode)
+
         self.feature_net = FeatureExtractor()
         self.deformation_nets = nn.ModuleList(
             [
-                FlowFieldDeformation(i)
+                FlowFieldDeformation(i, corr_mode=self.corr_mode)
                 for i in range(self.min_mod_level, self.num_levels)
             ]
         )
         self.modulation_nets = nn.ModuleList(
             [
-                CostVolumeModulation(i, self.num_levels, self.div_flow)
+                CostVolumeModulation(
+                    i, self.num_levels, self.div_flow, corr_mode=self.corr_mode
+                )
                 for i in range(self.min_mod_level, self.num_levels)
             ]
         )
         self.matching_nets = nn.ModuleList(
             [
-                Matching(i, self.num_levels, self.div_flow, self.use_s_version)
+                Matching(
+                    i,
+                    self.num_levels,
+                    self.div_flow,
+                    self.use_s_version,
+                    corr_mode=self.corr_mode,
+                )
                 for i in range(self.num_levels)
             ]
         )
@@ -521,6 +570,8 @@ class LiteFlowNet3(BaseModel):
         self, inputs: Dict[str, torch.Tensor]
     ) -> Dict[str, Union[torch.Tensor, List[torch.Tensor]]]:
         inputs = self._normalize_inputs(inputs)
+        if self.matching_nets[0].corr is None:
+            raise self.matching_nets[0]._corr_error
         # The original implementation uses different BGR means for im1 and im2
         # Here, we use the same for both to make it simpler
         images, image_resizer = self.preprocess_images(
@@ -682,3 +733,14 @@ class liteflownet3s(LiteFlowNet3S):
 @register_model
 class liteflownet3s_pseudoreg(LiteFlowNet3SPseudoReg):
     pass
+
+
+register_model_variants(
+    {
+        "liteflownet3": LiteFlowNet3,
+        "liteflownet3_pseudoreg": LiteFlowNet3PseudoReg,
+        "liteflownet3s": LiteFlowNet3S,
+        "liteflownet3s_pseudoreg": LiteFlowNet3SPseudoReg,
+    },
+    SPATIAL_CORR_VARIANTS,
+)

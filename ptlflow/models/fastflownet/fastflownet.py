@@ -2,18 +2,18 @@
 Portions of this code copyright 2017, Clement Pinard
 """
 
-try:
-    from spatial_correlation_sampler import SpatialCorrelationSampler
-except ModuleNotFoundError:
-    from ptlflow.utils.correlation import (
-        IterSpatialCorrelationSampler as SpatialCorrelationSampler,
-    )
 from einops import rearrange
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model, trainable
+from ptlflow.utils.corr_modes import (
+    get_spatial_corr_sampler,
+    log_corr_mode_warnings,
+    SpatialCorrMode,
+    SPATIAL_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants, trainable
 from ..base_model.base_model import BaseModel
 from ..flownet.losses import MultiScale
 
@@ -106,6 +106,7 @@ class FastFlowNet(BaseModel):
         div_flow: float = 20.0,
         md: int = 4,
         groups: int = 3,
+        corr_mode: SpatialCorrMode = "iter",
         loss_start_scale: int = 4,
         loss_num_scales: int = 5,
         loss_base_weight: float = 0.32,
@@ -128,6 +129,7 @@ class FastFlowNet(BaseModel):
         self.div_flow = div_flow
         self.md = md
         self.groups = groups
+        self.corr_mode = corr_mode
 
         self.pconv1_1 = convrelu(3, 16, 3, 2)
         self.pconv1_2 = convrelu(16, 16, 3, 1)
@@ -138,8 +140,9 @@ class FastFlowNet(BaseModel):
         self.pconv3_2 = convrelu(64, 64, 3, 1)
         self.pconv3_3 = convrelu(64, 64, 3, 1)
 
-        self.corr_layer = SpatialCorrelationSampler(
-            kernel_size=1, patch_size=2 * self.md + 1, padding=0
+        log_corr_mode_warnings(self.corr_mode)
+        self.corr_layer, self._corr_error = get_spatial_corr_sampler(
+            self.corr_mode, patch_size=2 * self.md + 1
         )
         self.index = torch.tensor(
             [
@@ -198,6 +201,13 @@ class FastFlowNet(BaseModel):
                 80,
             ]
         )
+        # One-hot channel-selection kernel equivalent to
+        # torch.index_select(corr, dim=1, index=self.index). The conv2d form
+        # exports (and fuses in TensorRT) better than Gather/index_select.
+        index_weight = torch.zeros(len(self.index), (2 * self.md + 1) ** 2, 1, 1)
+        for i, idx in enumerate(self.index):
+            index_weight[i, idx, 0, 0] = 1.0
+        self.register_buffer("index_weight", index_weight, persistent=False)
 
         self.rconv2 = convrelu(32, 32, 3, 1)
         self.rconv3 = convrelu(64, 32, 3, 1)
@@ -230,20 +240,30 @@ class FastFlowNet(BaseModel):
 
     def warp(self, x, flo):
         B, C, H, W = x.size()
-        xx = torch.arange(0, W).view(1, -1).repeat(H, 1)
-        yy = torch.arange(0, H).view(-1, 1).repeat(1, W)
+        # Create the meshgrid directly on the input device/dtype to avoid the
+        # ONNX export freezing it as a CPU constant, and compute the sampling
+        # grid without in-place slice assignments, which are not
+        # ONNX/TensorRT-exportable.
+        xx = torch.arange(0, W, device=x.device, dtype=x.dtype).view(1, -1).repeat(H, 1)
+        yy = torch.arange(0, H, device=x.device, dtype=x.dtype).view(-1, 1).repeat(1, W)
         xx = xx.view(1, 1, H, W).repeat(B, 1, 1, 1)
         yy = yy.view(1, 1, H, W).repeat(B, 1, 1, 1)
-        grid = torch.cat([xx, yy], 1).to(x)
-        vgrid = grid + flo
-        vgrid[:, 0, :, :] = 2.0 * vgrid[:, 0, :, :] / max(W - 1, 1) - 1.0
-        vgrid[:, 1, :, :] = 2.0 * vgrid[:, 1, :, :] / max(H - 1, 1) - 1.0
-        vgrid = vgrid.permute(0, 2, 3, 1)
+        grid = torch.cat([xx, yy], 1)
+
+        grid_x = 2.0 * grid[:, 0:1, :, :] / max(W - 1, 1) - 1.0
+        grid_y = 2.0 * grid[:, 1:2, :, :] / max(H - 1, 1) - 1.0
+
+        flo_x = 2.0 * flo[:, 0:1, :, :] / max(W - 1, 1)
+        flo_y = 2.0 * flo[:, 1:2, :, :] / max(H - 1, 1)
+
+        vgrid = torch.cat([grid_x + flo_x, grid_y + flo_y], dim=1).permute(0, 2, 3, 1)
         output = F.grid_sample(x, vgrid, mode="bilinear", align_corners=True)
         return output
 
     def forward(self, inputs):
         inputs = self._normalize_inputs(inputs)
+        if self.corr_layer is None:
+            raise self._corr_error
         mean_bgr = rearrange(inputs["images"], "b n c h w -> b c (n h w)").mean(2)[
             :, None, :, None, None
         ]
@@ -273,45 +293,35 @@ class FastFlowNet(BaseModel):
         f26 = F.avg_pool2d(f25, kernel_size=(2, 2), stride=(2, 2))
 
         flow7_up = torch.zeros(f16.size(0), 2, f16.size(2), f16.size(3)).to(f15)
-        cv6 = torch.index_select(
-            self.corr(f16, f26), dim=1, index=self.index.to(f16).long()
-        )
+        cv6 = F.conv2d(self.corr(f16, f26), self.index_weight)
         r16 = self.rconv6(f16)
         cat6 = torch.cat([cv6, r16, flow7_up], 1)
         flow6 = self.decoder6(cat6)
 
         flow6_up = self.up6(flow6)
         f25_w = self.warp(f25, flow6_up * 0.625)
-        cv5 = torch.index_select(
-            self.corr(f15, f25_w), dim=1, index=self.index.to(f15).long()
-        )
+        cv5 = F.conv2d(self.corr(f15, f25_w), self.index_weight)
         r15 = self.rconv5(f15)
         cat5 = torch.cat([cv5, r15, flow6_up], 1)
         flow5 = self.decoder5(cat5) + flow6_up
 
         flow5_up = self.up5(flow5)
         f24_w = self.warp(f24, flow5_up * 1.25)
-        cv4 = torch.index_select(
-            self.corr(f14, f24_w), dim=1, index=self.index.to(f14).long()
-        )
+        cv4 = F.conv2d(self.corr(f14, f24_w), self.index_weight)
         r14 = self.rconv4(f14)
         cat4 = torch.cat([cv4, r14, flow5_up], 1)
         flow4 = self.decoder4(cat4) + flow5_up
 
         flow4_up = self.up4(flow4)
         f23_w = self.warp(f23, flow4_up * 2.5)
-        cv3 = torch.index_select(
-            self.corr(f13, f23_w), dim=1, index=self.index.to(f13).long()
-        )
+        cv3 = F.conv2d(self.corr(f13, f23_w), self.index_weight)
         r13 = self.rconv3(f13)
         cat3 = torch.cat([cv3, r13, flow4_up], 1)
         flow3 = self.decoder3(cat3) + flow4_up
 
         flow3_up = self.up3(flow3)
         f22_w = self.warp(f22, flow3_up * 5.0)
-        cv2 = torch.index_select(
-            self.corr(f12, f22_w), dim=1, index=self.index.to(f12).long()
-        )
+        cv2 = F.conv2d(self.corr(f12, f22_w), self.index_weight)
         r12 = self.rconv2(f12)
         cat2 = torch.cat([cv2, r12, flow3_up], 1)
         flow2 = self.decoder2(cat2) + flow3_up
@@ -334,3 +344,6 @@ class FastFlowNet(BaseModel):
 @trainable
 class fastflownet(FastFlowNet):
     pass
+
+
+register_model_variants({"fastflownet": FastFlowNet}, SPATIAL_CORR_VARIANTS)

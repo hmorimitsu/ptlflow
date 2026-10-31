@@ -1,7 +1,16 @@
+from typing import Optional
+
 import torch
 import torch.nn.functional as F
 
-from ptlflow.utils.registry import register_model
+from ptlflow.utils.corr_modes import (
+    get_raft_corr_block,
+    interpret_corr_mode,
+    log_corr_mode_warnings,
+    RaftCorrMode,
+    RAFT_CORR_VARIANTS,
+)
+from ptlflow.utils.registry import register_model, register_model_variants
 from .attention import Attention
 from .extractor import BasicEncoder
 from .corr import CorrBlock
@@ -27,7 +36,8 @@ class SplatFlow(BaseModel):
         gamma: float = 0.8,
         max_flow: float = 400,
         iters: int = 32,
-        alternate_corr: bool = False,
+        corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         fast_inference: bool = True,
         simple_io: bool = False,
         **kwargs,
@@ -40,7 +50,7 @@ class SplatFlow(BaseModel):
         self.gamma = gamma
         self.max_flow = max_flow
         self.iters = iters
-        self.alternate_corr = alternate_corr
+        self.corr_mode = interpret_corr_mode(corr_mode, alternate_corr=alternate_corr)
         self.fast_inference = fast_inference
 
         self.hdim = self.cdim = 128
@@ -53,6 +63,8 @@ class SplatFlow(BaseModel):
 
         if forward_warping is None:
             raise ModuleNotFoundError("No module named 'cupy'")
+
+        log_corr_mode_warnings(self.corr_mode)
 
     def init_coord(self, fmap):
         f_shape = fmap.shape
@@ -122,7 +134,9 @@ class SplatFlow(BaseModel):
     def forward_one_pair(self, image1, image2, mf_t=None):
         fmap1, fmap2 = self.fnet([image1, image2])
 
-        corr_fn = CorrBlock(fmap1, fmap2, radius=4)
+        corr_fn = get_raft_corr_block(
+            self.corr_mode, fmap1, fmap2, radius=4, allpairs_cls=CorrBlock
+        )
 
         coords0, coords1 = self.initialize_flow(fmap1)
 
@@ -159,3 +173,6 @@ class SplatFlow(BaseModel):
 @register_model
 class splatflow(SplatFlow):
     pass
+
+
+register_model_variants({"splatflow": SplatFlow}, RAFT_CORR_VARIANTS)
