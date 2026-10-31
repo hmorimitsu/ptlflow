@@ -24,6 +24,23 @@ This is still under development, so some things may not work as intended. I plan
 
 ## What's new
 
+###  - v0.5.0
+
+Major update focusing on the correlation computation of the models and on deployment.
+
+- Added features:
+  - Integration with the [localcorr](https://github.com/hmorimitsu/localcorr) package, which provides fast correlation kernels (Triton, CUDA, and SYCL) 
+  - New corr_mode argument to select the implementation used to compute the correlation of the models (e.g., allpairs, torch, or the localcorr engines). If the selected mode is not available, a pure PyTorch implementation is used as fallback. See the [installation instructions](https://ptlflow.readthedocs.io/en/latest/starting/installation.html) for more details.
+  - Each correlation mode can also be chosen by using its model variant directly, e.g., --model raft_localcorr_tritonfor NVIDIA and Intel GPUs. It is installed automatically on Linux.
+  - Support for Intel GPUs (XPU) in the infer, validate, and model_benchmark scripts
+  - All models now accept the simple_io argument, and many model operations were revised to be exportable to ONNX and TensorRT
+- Added new models:
+  - MegaFlow [https://arxiv.org/abs/2603.25739](https://arxiv.org/abs/2603.25739)
+  - UFM [https://arxiv.org/abs/2506.09278](https://arxiv.org/abs/2506.09278)
+- Additions / fixes:
+  - The old alternate_corr and corr_fn arguments are still accepted, but they are deprecated and converted into corr_mode
+  - Speed up metrics calculation and validation
+
 ###  - v0.4.2
 
 - Added new models:
