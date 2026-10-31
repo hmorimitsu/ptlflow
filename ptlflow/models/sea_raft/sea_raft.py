@@ -1,11 +1,12 @@
 import math
-from typing import Sequence
+from typing import Optional, Sequence
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
     log_corr_mode_warnings,
     RaftCorrMode,
     RAFT_CORR_VARIANTS,
@@ -68,6 +69,7 @@ class SEARAFT(BaseModel):
         max_flow: float = 400,
         iters: int = 4,
         corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         use_var: bool = True,
         var_min: float = 0,
         var_max: float = 10,
@@ -91,7 +93,7 @@ class SEARAFT(BaseModel):
         self.gamma = gamma
         self.max_flow = max_flow
         self.iters = iters
-        self.corr_mode = corr_mode
+        self.corr_mode = interpret_corr_mode(corr_mode, alternate_corr=alternate_corr)
         self.use_var = use_var
         self.var_min = var_min
         self.var_max = var_max
@@ -305,6 +307,7 @@ class SEARAFT_S(SEARAFT):
         max_flow: float = 400,
         iters: int = 4,
         corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         use_var: bool = True,
         var_min: float = 0,
         var_max: float = 10,
@@ -322,6 +325,7 @@ class SEARAFT_S(SEARAFT):
             max_flow,
             iters,
             corr_mode,
+            alternate_corr,
             use_var,
             var_min,
             var_max,
@@ -352,6 +356,7 @@ class SEARAFT_M(SEARAFT):
         max_flow: float = 400,
         iters: int = 4,
         corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         use_var: bool = True,
         var_min: float = 0,
         var_max: float = 10,
@@ -369,6 +374,7 @@ class SEARAFT_M(SEARAFT):
             max_flow,
             iters,
             corr_mode,
+            alternate_corr,
             use_var,
             var_min,
             var_max,
@@ -399,6 +405,7 @@ class SEARAFT_L(SEARAFT):
         max_flow: float = 400,
         iters: int = 12,
         corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         use_var: bool = True,
         var_min: float = 0,
         var_max: float = 10,
@@ -416,6 +423,7 @@ class SEARAFT_L(SEARAFT):
             max_flow,
             iters,
             corr_mode,
+            alternate_corr,
             use_var,
             var_min,
             var_max,

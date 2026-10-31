@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Optional, Sequence
 
 import torch
 import torch.nn as nn
@@ -11,6 +11,7 @@ from .utils import coords_grid, upflow2
 from .xcit import XCiT
 
 from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
     log_corr_mode_warnings,
     RaftCorrMode,
     RAFT_CORR_VARIANTS,
@@ -48,6 +49,7 @@ class CCMR(BaseModel):
         corr_radius: int = 4,
         iters: Sequence[int] = [8, 10, 15],
         corr_mode: RaftCorrMode = "localcorr_triton",
+        alternate_corr: Optional[bool] = None,
         lookup_pyramid_levels: int = 2,
         lookup_radius: int = 4,
         model_type: str = "CCMR",
@@ -62,7 +64,7 @@ class CCMR(BaseModel):
         self.corr_levels = corr_levels
         self.corr_radius = corr_radius
         self.iters = iters
-        self.corr_mode = corr_mode
+        self.corr_mode = interpret_corr_mode(corr_mode, alternate_corr=alternate_corr)
         self.lookup_pyramid_levels = lookup_pyramid_levels
         self.lookup_radius = lookup_radius
         self.model_type = model_type
@@ -239,6 +241,7 @@ class CCMRPlus(CCMR):
         corr_radius: int = 4,
         iters: Sequence[int] = [8, 10, 10, 10],
         corr_mode: RaftCorrMode = "alt_cuda_corr",
+        alternate_corr: Optional[bool] = None,
         lookup_pyramid_levels: int = 2,
         lookup_radius: int = 4,
         model_type: str = "CCMR+",
@@ -252,6 +255,7 @@ class CCMRPlus(CCMR):
             corr_radius,
             iters,
             corr_mode,
+            alternate_corr,
             lookup_pyramid_levels,
             lookup_radius,
             model_type,

@@ -22,8 +22,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
     log_corr_mode_warnings,
-    RaftCorrMode,
+    LegacyRaftCorrMode,
     RAFT_CORR_VARIANTS,
 )
 from ptlflow.utils.registry import (
@@ -131,7 +132,7 @@ class RPKNet(BaseModel):
         input_pad_one_side: bool = False,
         input_bgr_to_rgb: bool = False,
         detach_flow: bool = True,
-        corr_mode: RaftCorrMode = "allpairs",
+        corr_mode: LegacyRaftCorrMode = "allpairs",
         upgate_norm_type: str = "group",
         use_norm_affine: bool = False,
         group_norm_num_groups: int = 8,
@@ -179,7 +180,7 @@ class RPKNet(BaseModel):
         self.input_pad_one_side = input_pad_one_side
         self.input_bgr_to_rgb = input_bgr_to_rgb
         self.detach_flow = detach_flow
-        self.corr_mode = corr_mode
+        self.corr_mode = interpret_corr_mode(corr_mode)
         self.upgate_norm_type = upgate_norm_type
         self.use_norm_affine = use_norm_affine
         self.group_norm_num_groups = group_norm_num_groups

@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
     log_corr_mode_warnings,
     RaftCorrMode,
     RAFT_CORR_VARIANTS,
@@ -78,6 +79,7 @@ class MatchFlow(BaseModel):
         position_only: bool = False,
         position_and_content: bool = False,
         corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         train_size: Optional[tuple[int, int]] = None,
         simple_io: bool = False,
         **kwargs,
@@ -102,7 +104,7 @@ class MatchFlow(BaseModel):
         self.tile_sigma = tile_sigma
         self.position_only = position_only
         self.position_and_content = position_and_content
-        self.corr_mode = corr_mode
+        self.corr_mode = interpret_corr_mode(corr_mode, alternate_corr=alternate_corr)
         self.train_size = train_size
 
         self.hidden_dim = hdim = 128
@@ -369,6 +371,7 @@ class MatchFlowRAFT(MatchFlow):
         position_only: bool = False,
         position_and_content: bool = False,
         corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         train_size: Optional[Tuple[int, int]] = None,
         **kwargs,
     ) -> None:
@@ -388,6 +391,7 @@ class MatchFlowRAFT(MatchFlow):
             position_only,
             position_and_content,
             corr_mode,
+            alternate_corr,
             train_size,
             **kwargs,
         )

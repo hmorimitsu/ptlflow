@@ -1,10 +1,11 @@
-from typing import Sequence
+from typing import Optional, Sequence
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
     log_corr_mode_warnings,
     RaftCorrMode,
     RAFT_CORR_VARIANTS,
@@ -75,6 +76,7 @@ class MSRAFTPlus(BaseModel):
         lookup_pyramid_levels: int = 2,
         lookup_radius: int = 4,
         corr_mode: RaftCorrMode = "localcorr_triton",
+        alternate_corr: Optional[bool] = None,
         simple_io: bool = False,
         **kwargs,
     ) -> None:
@@ -90,7 +92,7 @@ class MSRAFTPlus(BaseModel):
         self.iters = iters
         self.lookup_pyramid_levels = lookup_pyramid_levels
         self.lookup_radius = lookup_radius
-        self.corr_mode = corr_mode
+        self.corr_mode = interpret_corr_mode(corr_mode, alternate_corr=alternate_corr)
 
         self.correlation_depth = get_correlation_depth(
             self.lookup_pyramid_levels, self.lookup_radius

@@ -1,10 +1,11 @@
-from typing import Sequence
+from typing import Optional, Sequence
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
     log_corr_mode_warnings,
     RaftCorrMode,
     RAFT_CORR_VARIANTS,
@@ -72,6 +73,7 @@ class SKFlow(BaseModel):
         position_only: bool = False,
         position_and_content: bool = False,
         corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         simple_io: bool = False,
         **kwargs,
     ) -> None:
@@ -93,7 +95,7 @@ class SKFlow(BaseModel):
         self.num_heads = num_heads
         self.position_only = position_only
         self.position_and_content = position_and_content
-        self.corr_mode = corr_mode
+        self.corr_mode = interpret_corr_mode(corr_mode, alternate_corr=alternate_corr)
 
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128

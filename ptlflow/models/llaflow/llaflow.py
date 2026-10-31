@@ -1,9 +1,12 @@
+from typing import Optional
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from ptlflow.utils.corr_modes import (
     get_raft_corr_block,
+    interpret_corr_mode,
     log_corr_mode_warnings,
     RaftCorrMode,
     RAFT_CORR_VARIANTS,
@@ -75,6 +78,7 @@ class LLAFlow(BaseModel):
         max_flow: float = 400,
         iters: int = 32,
         corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         gma: bool = True,
         simple_io: bool = False,
         **kwargs,
@@ -92,7 +96,7 @@ class LLAFlow(BaseModel):
         self.gamma = gamma
         self.max_flow = max_flow
         self.iters = iters
-        self.corr_mode = corr_mode
+        self.corr_mode = interpret_corr_mode(corr_mode, alternate_corr=alternate_corr)
         self.gma = gma
 
         self.hidden_dim = hdim = 128
@@ -259,6 +263,7 @@ class LLAFlowRAFT(LLAFlow):
         max_flow: float = 400,
         iters: int = 32,
         corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         gma: bool = False,
         **kwargs,
     ) -> None:
@@ -270,6 +275,7 @@ class LLAFlowRAFT(LLAFlow):
             max_flow,
             iters,
             corr_mode,
+            alternate_corr,
             gma,
             **kwargs,
         )

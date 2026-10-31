@@ -23,12 +23,18 @@ device), the factories below log a warning and fall back to the pure-PyTorch
 engines, which are always available: IterativeCorrBlock ("torch") for the
 RAFT-style models and IterSpatialCorrelationSampler ("iter") for the
 PWCNet-style models.
+
+For backward compatibility, interpret_corr_mode() translates the pre-v0.5
+arguments alternate_corr and corr_fn (and the corr_mode="local" value used by
+rapidflow, dpflow and rpknet) into corr_mode values, logging a deprecation
+warning.
 """
 
-from typing import Any, Dict, Literal, Optional, Tuple
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 
 from loguru import logger
 import torch
+import torch.nn as nn
 
 from ptlflow.utils.correlation import IterSpatialCorrelationSampler, IterativeCorrBlock
 
@@ -105,6 +111,11 @@ SPATIAL_CORR_VARIANTS = {
 }
 
 
+# Accepted for backward compatibility: before v0.5, rapidflow, dpflow and
+# rpknet used corr_mode="local" for their alt_cuda_corr engine.
+LegacyRaftCorrMode = Union[RaftCorrMode, Literal["local"]]
+
+
 _TRITON_AVAILABLE: Optional[bool] = None
 _FALLBACKS_LOGGED = set()
 
@@ -124,6 +135,18 @@ def _triton_available() -> bool:
         except (ImportError, OSError):
             _TRITON_AVAILABLE = False
     return _TRITON_AVAILABLE
+
+
+def _triton_gpu_available() -> bool:
+    """Check whether there is any GPU device the triton kernels can run on.
+
+    The triton kernels cannot run on CPU tensors, so the localcorr triton
+    modes are only usable if a CUDA or XPU device exists.
+    """
+    if torch.cuda.is_available():
+        return True
+    xpu = getattr(torch, "xpu", None)
+    return xpu is not None and xpu.is_available()
 
 
 def _log_corr_mode_fallback(corr_mode: str, fallback_mode: str, reason: str) -> None:
@@ -149,9 +172,10 @@ def _localcorr_unavailable_reason(
     called, so this centralizes the checks needed to decide the fallback:
 
     - the localcorr package must be importable;
-    - for eager execution, the triton modes need the triton package,
-      localcorr_cuda needs the built CUDA kernel library and CUDA tensors,
-      and localcorr_sycl needs the built SYCL XPU extension and XPU tensors;
+    - for eager execution, the triton modes need the triton package and GPU
+      (CUDA or XPU) tensors, localcorr_cuda needs the built CUDA kernel
+      library and CUDA tensors, and localcorr_sycl needs the built SYCL XPU
+      extension and XPU tensors;
     - during ONNX export the engines emit ONNX nodes without loading their
       eager kernels, so the eager-only requirements do not apply (the
       exception is the PWCNet-style localcorr_triton sampler, whose class
@@ -185,6 +209,19 @@ def _localcorr_unavailable_reason(
             "the triton package is not installed, which the localcorr eager kernels "
             "require"
         )
+    if corr_mode in ("localcorr_triton", "localcorr_onnx"):
+        # The triton kernels only run on GPU tensors, never on CPU ones.
+        if fmap1 is not None:
+            if not (fmap1.is_cuda or getattr(fmap1, "is_xpu", False)):
+                return (
+                    "the triton kernels require CUDA or XPU tensors, but the feature "
+                    f"maps are on device {fmap1.device}"
+                )
+        elif not _triton_gpu_available():
+            return (
+                "the triton kernels require CUDA or XPU tensors, but no CUDA or XPU "
+                "device is available"
+            )
     if corr_mode == "localcorr_cuda":
         if localcorr.get_cuda_pyramid_library() is None:
             return (
@@ -208,6 +245,110 @@ def _localcorr_unavailable_reason(
                 f"{fmap1.device}"
             )
     return None
+
+
+class _LocalcorrSamplerFallbackWrapper(nn.Module):
+    """Run a localcorr sampler on GPU tensors, IterSpatialCorrelationSampler on CPU ones.
+
+    The localcorr samplers are created in the model __init__, before any tensor
+    exists, so the input device can only be checked when they are called. The
+    localcorr kernels cannot run on CPU tensors, so on CPU inputs (eager
+    execution) this wrapper logs a warning and falls back to the pure-PyTorch
+    IterSpatialCorrelationSampler. During ONNX export the inputs are CPU
+    tensors by design, so the fallback must not (and does not) trigger then.
+    """
+
+    def __init__(self, sampler, corr_mode, patch_size, dilation_patch):
+        super().__init__()
+        self.sampler = sampler
+        self.corr_mode = corr_mode
+        self.iter_sampler = IterSpatialCorrelationSampler(
+            kernel_size=1,
+            patch_size=patch_size,
+            padding=0,
+            dilation_patch=dilation_patch,
+        )
+
+    def forward(self, input1: torch.Tensor, input2: torch.Tensor) -> torch.Tensor:
+        if input1.device.type not in ("cuda", "xpu") and not (
+            torch.onnx.is_in_onnx_export()
+        ):
+            _log_corr_mode_fallback(
+                self.corr_mode,
+                "iter",
+                "the localcorr kernels require CUDA or XPU tensors, but the feature "
+                f"maps are on device {input1.device}",
+            )
+            return self.iter_sampler(input1, input2)
+        return self.sampler(input1, input2)
+
+
+def interpret_corr_mode(
+    corr_mode: str,
+    alternate_corr: Optional[bool] = None,
+    corr_fn: Optional[str] = None,
+) -> str:
+    """Resolve the corr_mode value from the new argument and the deprecated ones.
+
+    Before v0.5, the correlation engine of the models was configured with the
+    alternate_corr (bool) or corr_fn (str) arguments, and rapidflow, dpflow and
+    rpknet used corr_mode="local" for the engine that is now called
+    alt_cuda_corr. These old arguments and value are still accepted for
+    backward compatibility: they are translated to the equivalent corr_mode
+    value with a deprecation warning, but they may be removed in the future.
+
+    Parameters
+    ----------
+    corr_mode : str
+        The value given to the corr_mode argument.
+    alternate_corr : Optional[bool], default None
+        Deprecated. If given, it overrides corr_mode: True maps to
+        "alt_cuda_corr" and False maps to "allpairs".
+    corr_fn : Optional[str], default None
+        Deprecated. If given, it overrides corr_mode: "efficient" maps to
+        "alt_cuda_corr" and "default" maps to "allpairs".
+
+    Returns
+    -------
+    str
+        The resolved corr_mode value.
+
+    Raises
+    ------
+    ValueError
+        If corr_fn is not one of "default" or "efficient".
+    """
+    if alternate_corr is not None:
+        resolved = "alt_cuda_corr" if alternate_corr else "allpairs"
+        logger.warning(
+            f"!!! The argument alternate_corr is deprecated and will be removed in "
+            f"the future! Its value {alternate_corr} was converted to "
+            f"corr_mode={resolved!r}. Please use the corr_mode argument instead !!!"
+        )
+        corr_mode = resolved
+    if corr_fn is not None:
+        if corr_fn == "efficient":
+            resolved = "alt_cuda_corr"
+        elif corr_fn == "default":
+            resolved = "allpairs"
+        else:
+            raise ValueError(
+                f"Invalid corr_fn {corr_fn}. Choose from ['default', 'efficient']."
+            )
+        logger.warning(
+            f"!!! The argument corr_fn is deprecated and will be removed in the "
+            f"future! Its value {corr_fn!r} was converted to corr_mode={resolved!r}. "
+            f"Please use the corr_mode argument instead !!!"
+        )
+        corr_mode = resolved
+    if corr_mode == "local":
+        logger.warning(
+            "!!! corr_mode='local' is deprecated and will be removed in the future! "
+            "It was converted to corr_mode='alt_cuda_corr'. Please use "
+            "corr_mode='alt_cuda_corr' instead !!!"
+        )
+        corr_mode = "alt_cuda_corr"
+    return corr_mode
 
 
 def log_corr_mode_warnings(corr_mode: str) -> None:
@@ -428,10 +569,15 @@ def get_spatial_corr_sampler(
         )
     if corr_mode.startswith("localcorr"):
         return (
-            localcorr.get_localcorr_sampler(
-                patch_size=patch_size,
-                dilation_patch=dilation_patch,
-                corr_mode=corr_mode,
+            _LocalcorrSamplerFallbackWrapper(
+                localcorr.get_localcorr_sampler(
+                    patch_size=patch_size,
+                    dilation_patch=dilation_patch,
+                    corr_mode=corr_mode,
+                ),
+                corr_mode,
+                patch_size,
+                dilation_patch,
             ),
             None,
         )

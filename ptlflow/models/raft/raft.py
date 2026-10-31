@@ -1,8 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Optional
 
 from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
     log_corr_mode_warnings,
     RaftCorrMode,
     RAFT_CORR_VARIANTS,
@@ -62,6 +64,7 @@ class RAFT(BaseModel):
         corr_levels: int = 4,
         corr_radius: int = 4,
         corr_mode: RaftCorrMode = "allpairs",
+        alternate_corr: Optional[bool] = None,
         dropout: float = 0.0,
         gamma: float = 0.8,
         max_flow: float = 400,
@@ -78,7 +81,7 @@ class RAFT(BaseModel):
 
         self.corr_levels = corr_levels
         self.corr_radius = corr_radius
-        self.corr_mode = corr_mode
+        self.corr_mode = interpret_corr_mode(corr_mode, alternate_corr=alternate_corr)
         self.dropout = dropout
         self.gamma = gamma
         self.max_flow = max_flow

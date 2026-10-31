@@ -9,7 +9,7 @@ from .submodules import *
 from .flownet_base import FlowNetBase
 
 
-from ptlflow.utils.corr_modes import SPATIAL_CORR_VARIANTS
+from ptlflow.utils.corr_modes import SPATIAL_CORR_VARIANTS, SpatialCorrMode
 from ptlflow.utils.registry import register_model, register_model_variants, trainable
 
 
@@ -23,6 +23,7 @@ class FlowNetCS(FlowNetBase):
         div_flow: float = 20.0,
         input_channels: int = 12,
         batch_norm: bool = False,
+        corr_mode: SpatialCorrMode = "localcorr_triton",
         loss_start_scale: int = 4,
         loss_num_scales: int = 5,
         loss_base_weight: float = 0.32,
@@ -49,6 +50,7 @@ class FlowNetCS(FlowNetBase):
             div_flow=div_flow,
             input_channels=input_channels,
             batch_norm=batch_norm,
+            corr_mode=corr_mode,
             loss_start_scale=loss_start_scale,
             loss_num_scales=loss_num_scales,
             loss_base_weight=loss_base_weight,

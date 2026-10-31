@@ -1,9 +1,12 @@
+from typing import Optional
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from ptlflow.utils.corr_modes import (
     get_raft_corr_block,
+    interpret_corr_mode,
     log_corr_mode_warnings,
     RaftCorrMode,
     RAFT_CORR_VARIANTS,
@@ -33,6 +36,7 @@ class VideoFlowMOF(BaseModel):
         gma: str = "GMA-SK2",
         pretrain: bool = False,
         corr_mode: RaftCorrMode = "allpairs",
+        corr_fn: Optional[str] = None,
         decoder_depth: int = 32,
         feat_dim: int = 256,
         Tfusion: str = "stack",
@@ -50,7 +54,7 @@ class VideoFlowMOF(BaseModel):
         self.fnet = fnet
         self.gma = gma
         self.pretrain = pretrain
-        self.corr_mode = corr_mode
+        self.corr_mode = interpret_corr_mode(corr_mode, corr_fn=corr_fn)
         self.decoder_depth = decoder_depth
         self.feat_dim = feat_dim
         self.Tfusion = Tfusion

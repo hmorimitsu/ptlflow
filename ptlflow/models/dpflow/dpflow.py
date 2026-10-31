@@ -34,9 +34,10 @@ from .utils import (
 )
 from ptlflow.utils.utils import forward_interpolate_batch
 from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
     get_raft_corr_block,
     log_corr_mode_warnings,
-    RaftCorrMode,
+    LegacyRaftCorrMode,
     RAFT_CORR_VARIANTS,
 )
 from ptlflow.utils.registry import (
@@ -112,7 +113,7 @@ class DPFlow(BaseModel):
         detach_flow: bool = True,
         use_norm_affine: bool = False,
         group_norm_num_groups: int = 8,
-        corr_mode: RaftCorrMode = "allpairs",
+        corr_mode: LegacyRaftCorrMode = "allpairs",
         corr_levels: int = 1,
         corr_range: int = 4,
         activation_function: str = "orig",  # "orig", "relu", "gelu", "silu", or "mish"
@@ -177,7 +178,7 @@ class DPFlow(BaseModel):
 
         self.pyramid_levels = pyramid_levels
         self.iters_per_level = iters_per_level
-        self.corr_mode = corr_mode
+        self.corr_mode = interpret_corr_mode(corr_mode)
         self.corr_range = corr_range
         self.corr_levels = corr_levels
         self.detach_flow = detach_flow

@@ -23,8 +23,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ptlflow.utils.corr_modes import (
+    interpret_corr_mode,
     log_corr_mode_warnings,
-    RaftCorrMode,
+    LegacyRaftCorrMode,
     RAFT_CORR_VARIANTS,
 )
 from ptlflow.utils.registry import (
@@ -84,7 +85,7 @@ class RAPIDFlow(BaseModel):
         self,
         pyramid_ranges: tuple[int, int] = (32, 8),
         iters: int = 12,
-        corr_mode: RaftCorrMode = "allpairs",
+        corr_mode: LegacyRaftCorrMode = "allpairs",
         corr_levels: int = 1,
         corr_range: int = 4,
         enc_hidden_chs: int = 64,
@@ -114,7 +115,7 @@ class RAPIDFlow(BaseModel):
 
         self.pyramid_ranges = pyramid_ranges
         self.iters = iters
-        self.corr_mode = corr_mode
+        self.corr_mode = interpret_corr_mode(corr_mode)
         self.corr_levels = corr_levels
         self.corr_range = corr_range
         self.enc_hidden_chs = enc_hidden_chs

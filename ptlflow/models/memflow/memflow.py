@@ -5,6 +5,7 @@ import torch.nn as nn
 
 from ptlflow.utils.corr_modes import (
     get_raft_corr_block,
+    interpret_corr_mode,
     log_corr_mode_warnings,
     RaftCorrMode,
     RAFT_CORR_VARIANTS,
@@ -85,6 +86,7 @@ class MemFlow(BaseModel):
         # The all-pairs CorrBlock is the original (and default) correlation
         # engine of this model, so "allpairs" remains the default corr_mode.
         corr_mode: RaftCorrMode = "allpairs",
+        corr_fn: Optional[str] = None,
         down_ratio: int = 8,
         decoder_depth: int = 15,
         cost_heads_num: int = 1,
@@ -134,7 +136,7 @@ class MemFlow(BaseModel):
         self.fnet = fnet
         self.feat_dim = feat_dim
         self.gma = gma
-        self.corr_mode = corr_mode
+        self.corr_mode = interpret_corr_mode(corr_mode, corr_fn=corr_fn)
         self.down_ratio = down_ratio
         self.decoder_depth = decoder_depth
         self.cost_heads_num = cost_heads_num
@@ -171,7 +173,7 @@ class MemFlow(BaseModel):
             decoder_depth=decoder_depth,
             pretrain=pretrain,
             gma=gma,
-            corr_mode=corr_mode,
+            corr_mode=self.corr_mode,
             train_avg_length=train_avg_length,
         )
 
@@ -331,6 +333,7 @@ class MemFlowT(MemFlow):
         feat_dim: int = 256,
         gma: str = "GMA-SK2",
         corr_mode: RaftCorrMode = "allpairs",
+        corr_fn: Optional[str] = None,
         down_ratio: int = 8,
         decoder_depth: int = 15,
         cost_heads_num: int = 1,
@@ -365,6 +368,7 @@ class MemFlowT(MemFlow):
             feat_dim,
             gma,
             corr_mode,
+            corr_fn,
             down_ratio,
             decoder_depth,
             cost_heads_num,
